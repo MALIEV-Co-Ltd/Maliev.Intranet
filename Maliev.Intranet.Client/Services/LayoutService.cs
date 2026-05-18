@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
@@ -37,6 +39,10 @@ public class LayoutService : IDisposable
     private ThemeMode _currentMode = ThemeMode.System;
     private bool _isInitialized;
     private bool _systemPreferencesIsDark;
+    private string _language = "en-TH";
+    private string _dateFormat = "dd MMM yyyy";
+    private string _timeZone = "Asia/Bangkok";
+    private bool _compactWorkspace;
     private const string ThemeCookieName = "maliev_theme";
 
     /// <summary>
@@ -96,6 +102,26 @@ public class LayoutService : IDisposable
     /// Gets the current user preference mode.
     /// </summary>
     public ThemeMode CurrentMode => _currentMode;
+
+    /// <summary>
+    /// Gets the currently selected employee language preference.
+    /// </summary>
+    public string Language => _language;
+
+    /// <summary>
+    /// Gets the currently selected employee date display format.
+    /// </summary>
+    public string DateFormat => _dateFormat;
+
+    /// <summary>
+    /// Gets the currently selected employee time zone preference.
+    /// </summary>
+    public string TimeZone => _timeZone;
+
+    /// <summary>
+    /// Gets a value indicating whether compact workspace density is enabled.
+    /// </summary>
+    public bool CompactWorkspace => _compactWorkspace;
 
     /// <summary>
     /// Initializes the theme service by reading from DOM.
@@ -239,6 +265,49 @@ public class LayoutService : IDisposable
     }
 
     /// <summary>
+    /// Applies saved employee workspace preferences to the current client session.
+    /// </summary>
+    /// <param name="themeMode">The saved theme mode.</param>
+    /// <param name="language">The saved UI language.</param>
+    /// <param name="dateFormat">The saved date display format.</param>
+    /// <param name="timeZone">The saved time zone identifier.</param>
+    /// <param name="compactWorkspace">Whether compact workspace density is enabled.</param>
+    public async Task ApplyWorkspacePreferencesAsync(
+        string? themeMode,
+        string? language,
+        string? dateFormat,
+        string? timeZone,
+        bool? compactWorkspace)
+    {
+        await SetModeAsync(ParseThemeMode(themeMode));
+
+        _language = NormalizeAllowedValue(language, ["en-TH", "th-TH", "en-US"], "en-TH");
+        _dateFormat = NormalizeAllowedValue(dateFormat, ["dd MMM yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "MMM d, yyyy"], "dd MMM yyyy");
+        _timeZone = NormalizeAllowedValue(timeZone, ["Asia/Bangkok", "UTC", "Asia/Singapore", "Asia/Tokyo", "Europe/Berlin", "America/Los_Angeles"], "Asia/Bangkok");
+        _compactWorkspace = compactWorkspace ?? false;
+
+        ApplyCulture(_language);
+        await ApplyPreferenceAttributesAsync();
+        MajorUpdateOccurred?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Formats a date using the current employee date format preference.
+    /// </summary>
+    /// <param name="value">The date to format.</param>
+    /// <returns>The formatted date or a dash when no value is supplied.</returns>
+    public string FormatDate(DateTime? value) =>
+        value.HasValue ? value.Value.ToString(_dateFormat, CultureInfo.CurrentCulture) : "-";
+
+    /// <summary>
+    /// Formats a date and time using the current employee date format preference.
+    /// </summary>
+    /// <param name="value">The date and time to format.</param>
+    /// <returns>The formatted date and time or a dash when no value is supplied.</returns>
+    public string FormatDateTime(DateTime? value) =>
+        value.HasValue ? $"{FormatDate(value)} {value.Value.ToString("HH:mm", CultureInfo.CurrentCulture)}" : "-";
+
+    /// <summary>
     /// Updates the system preference state (called by MudThemeProvider watcher).
     /// </summary>
     /// <param name="isSystemDark">Whether the system is currently in dark mode.</param>
@@ -264,6 +333,69 @@ public class LayoutService : IDisposable
             ThemeMode.System => _systemPreferencesIsDark,
             _ => false
         };
+    }
+
+    private static ThemeMode ParseThemeMode(string? value) =>
+        value?.Trim().ToLowerInvariant() switch
+        {
+            "dark" => ThemeMode.Dark,
+            "light" => ThemeMode.Light,
+            _ => ThemeMode.System
+        };
+
+    private static string NormalizeAllowedValue(string? value, IReadOnlyList<string> allowedValues, string fallback)
+    {
+        return allowedValues.FirstOrDefault(candidate =>
+            string.Equals(candidate, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
+    }
+
+    private static void ApplyCulture(string language)
+    {
+        try
+        {
+            var culture = (CultureInfo)CultureInfo.GetCultureInfo(language).Clone();
+            culture.DateTimeFormat.Calendar = new GregorianCalendar();
+            CultureInfo.DefaultThreadCurrentCulture = culture;
+            CultureInfo.DefaultThreadCurrentUICulture = culture;
+        }
+        catch (CultureNotFoundException)
+        {
+            var fallback = (CultureInfo)CultureInfo.GetCultureInfo("en-TH").Clone();
+            fallback.DateTimeFormat.Calendar = new GregorianCalendar();
+            CultureInfo.DefaultThreadCurrentCulture = fallback;
+            CultureInfo.DefaultThreadCurrentUICulture = fallback;
+        }
+    }
+
+    private async Task ApplyPreferenceAttributesAsync()
+    {
+        try
+        {
+            var language = JsonSerializer.Serialize(_language);
+            var dateFormat = JsonSerializer.Serialize(_dateFormat);
+            var timeZone = JsonSerializer.Serialize(_timeZone);
+            var compactWorkspace = JsonSerializer.Serialize(_compactWorkspace ? "true" : "false");
+
+            await _jsRuntime.InvokeVoidAsync(
+                "eval",
+                $"""
+                document.documentElement.lang = {language};
+                document.documentElement.setAttribute('data-maliev-date-format', {dateFormat});
+                document.documentElement.setAttribute('data-maliev-time-zone', {timeZone});
+                document.documentElement.setAttribute('data-maliev-compact-workspace', {compactWorkspace});
+                """);
+        }
+        catch (Exception ex)
+        {
+            if (ex.GetType().Name == "JSDisconnectedException" ||
+                ex.Message.Contains("JavaScript interop calls cannot be issued at this time"))
+            {
+                _logger.LogDebug("JS not available yet (prerendering)");
+                return;
+            }
+
+            _logger.LogError(ex, "Failed to apply workspace preference attributes");
+        }
     }
 
     /// <summary>

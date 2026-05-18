@@ -137,6 +137,31 @@ public sealed class CurrencyService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Switches the display currency by ISO code when the currency is available in the catalog.
+    /// </summary>
+    /// <param name="currencyCode">The ISO currency code to select.</param>
+    public async Task SetCurrencyCodeAsync(string? currencyCode)
+    {
+        if (string.IsNullOrWhiteSpace(currencyCode))
+        {
+            return;
+        }
+
+        if (!_initialized)
+        {
+            await InitializeAsync();
+        }
+
+        var target = Currencies.FirstOrDefault(currency =>
+            string.Equals(currency.Code, currencyCode, StringComparison.OrdinalIgnoreCase));
+
+        if (target is not null)
+        {
+            await SetCurrencyAsync(target);
+        }
+    }
+
     /// <summary>Converts a THB amount to the selected display currency.</summary>
     public decimal ConvertFromThb(decimal thbAmount) => thbAmount * ExchangeRate;
 

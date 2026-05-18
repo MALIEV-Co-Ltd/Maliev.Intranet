@@ -2,11 +2,13 @@ using System.Net;
 using System.Net.Http.Json;
 using Bunit;
 using Maliev.Intranet.Client.Pages.Hr;
+using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -24,7 +26,10 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         JSInterop.Mode = JSRuntimeMode.Loose;
 
         var handler = new MockHttpMessageHandler(HandleRequestAsync);
-        Services.AddSingleton(new HttpClient(handler) { BaseAddress = new Uri("http://test/") });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
+        Services.AddSingleton(client);
+        Services.AddSingleton(new LayoutService(JSInterop.JSRuntime, NullLogger<LayoutService>.Instance));
+        Services.AddSingleton(new CurrencyService(client, NullLogger<CurrencyService>.Instance));
 
         Render<MudPopoverProvider>();
     }
@@ -151,6 +156,8 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("\"themeMode\":\"light\"", _savedPreferenceJson, StringComparison.Ordinal);
             Assert.Contains("\"emailSignature\":\"MALIEV sales\"", _savedPreferenceJson, StringComparison.Ordinal);
             Assert.Contains("\"shortEmailSignature\":\"MALIEV\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Equal(ThemeMode.Light, Services.GetRequiredService<LayoutService>().CurrentMode);
+            Assert.Equal("EUR", Services.GetRequiredService<CurrencyService>().Code);
             Assert.Contains("Preferences saved.", cut.Markup, StringComparison.Ordinal);
         });
     }
@@ -218,6 +225,27 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                     },
                     UpdatedAt = new DateTime(2026, 5, 17, 6, 30, 0, DateTimeKind.Utc)
                 })
+            };
+        }
+
+        if (request.Method == HttpMethod.Get && request.RequestUri.PathAndQuery == "/api/v1/referenceData/currencies")
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new List<CurrencyDto>
+                {
+                    new() { Code = "THB", Name = "Thai Baht", Symbol = "฿", DecimalPlaces = 2, IsActive = true, IsPrimary = true },
+                    new() { Code = "USD", Name = "US Dollar", Symbol = "$", DecimalPlaces = 2, IsActive = true },
+                    new() { Code = "EUR", Name = "Euro", Symbol = "€", DecimalPlaces = 2, IsActive = true }
+                })
+            };
+        }
+
+        if (request.Method == HttpMethod.Get && request.RequestUri.PathAndQuery == "/api/v1/referenceData/currencies/rate?from=THB&to=EUR")
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ExchangeRateResponse("THB", "EUR", 0.025m))
             };
         }
 

@@ -1,7 +1,10 @@
 @page "/hr/profile"
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
+@using Maliev.Intranet.Client.Services
 @inject HttpClient Http
+@inject LayoutService LayoutService
+@inject CurrencyService CurrencyService
 @inject ISnackbar Snackbar
 
 <PageTitle>@(IsPreferencesTab ? "Preferences" : "My Profile") | MALIEV Intranet</PageTitle>
@@ -414,9 +417,9 @@
     private string DisplayWorkLocation => Display(FirstNonBlank(_profile?.WorkLocation, _selfProfile?.WorkLocation));
     private string DisplayStatus => Display(FirstNonBlank(_profile?.Status, _selfProfile?.EmploymentStatus, "Active"));
     private string DisplayEmployeeType => FormatEmployeeType(FirstNonBlank(_profile?.EmployeeType, _selfProfile?.EmploymentType, "FullTime"));
-    private string DisplayHireDate => (_profile?.HireDate ?? _selfProfile?.StartDate ?? _selfProfile?.CreatedAt)?.ToString("dd MMM yyyy") ?? "-";
+    private string DisplayHireDate => LayoutService.FormatDate(_profile?.HireDate ?? _selfProfile?.StartDate ?? _selfProfile?.CreatedAt);
     private string PreferenceUpdatedLabel => _preferences?.UpdatedAt is { } updatedAt && updatedAt != default
-        ? updatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+        ? LayoutService.FormatDateTime(updatedAt.ToLocalTime())
         : "Not saved yet";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -536,6 +539,7 @@
         {
             _preferences = await Http.GetFromJsonAsync<UserPreferenceDto>($"api/v1/preferences/{PreferenceScope}");
             ResetPreferenceModel();
+            await ApplyPreferenceModelAsync();
             _preferenceStatus = "Preferences reloaded.";
         }
         catch (Exception ex)
@@ -572,6 +576,7 @@
                 UpdatedAt = DateTime.UtcNow
             };
             ResetPreferenceModel();
+            await ApplyPreferenceModelAsync();
             _preferenceStatus = "Preferences saved.";
         }
         catch (Exception ex)
@@ -616,6 +621,17 @@
         ["emailSignature"] = _preferenceModel.EmailSignature ?? string.Empty,
         ["shortEmailSignature"] = _preferenceModel.ShortEmailSignature ?? string.Empty
     };
+
+    private async Task ApplyPreferenceModelAsync()
+    {
+        await LayoutService.ApplyWorkspacePreferencesAsync(
+            _preferenceModel.ThemeMode,
+            _preferenceModel.Language,
+            _preferenceModel.DateFormat,
+            _preferenceModel.TimeZone,
+            _preferenceModel.CompactWorkspace);
+        await CurrencyService.SetCurrencyCodeAsync(_preferenceModel.DefaultCurrency);
+    }
 
     private string BuildDefaultFullEmailSignature()
     {

@@ -1,11 +1,13 @@
 @inherits LayoutComponentBase
 @using System
+@using System.Text.Json
 @using Microsoft.AspNetCore.SignalR.Client
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Client.Helpers
 @using Maliev.Intranet.Client.Components
 
 @inject NavigationManager Navigation
+@inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject LayoutService LayoutService
 @inject CurrencyService CurrencyService
@@ -70,6 +72,7 @@
         {
             await LayoutService.InitializeAsync();
             await CurrencyService.InitializeAsync();
+            await ApplySavedPreferenceDefaultsAsync();
             await _mudThemeProvider.WatchSystemDarkModeAsync(OnSystemPreferenceChanged);
             await SyncThemeAsync();
             StateHasChanged();
@@ -150,6 +153,65 @@
         var theme = LayoutService.IsDarkMode ? "dark" : "light";
         await JSRuntime.InvokeVoidAsync("eval",
             $"document.documentElement.setAttribute('data-maliev-theme','{theme}');");
+    }
+
+    private async Task ApplySavedPreferenceDefaultsAsync()
+    {
+        try
+        {
+            using var response = await Http.GetAsync("api/v1/preferences/intranet-profile");
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var preferences = await response.Content.ReadFromJsonAsync<UserPreferenceDto>();
+            var data = preferences?.PreferenceData ?? [];
+            await LayoutService.ApplyWorkspacePreferencesAsync(
+                GetPreferenceString(data, "themeMode"),
+                GetPreferenceString(data, "language"),
+                GetPreferenceString(data, "dateFormat"),
+                GetPreferenceString(data, "timeZone"),
+                GetPreferenceBool(data, "compactWorkspace"));
+            await CurrencyService.SetCurrencyCodeAsync(GetPreferenceString(data, "defaultCurrency"));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Saved workspace preferences could not be applied");
+        }
+    }
+
+    private static string? GetPreferenceString(IReadOnlyDictionary<string, object> data, string key)
+    {
+        if (!data.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            string text => text,
+            JsonElement { ValueKind: JsonValueKind.String } element => element.GetString(),
+            JsonElement element when element.ValueKind is JsonValueKind.True or JsonValueKind.False or JsonValueKind.Number => element.ToString(),
+            _ => value.ToString()
+        };
+    }
+
+    private static bool? GetPreferenceBool(IReadOnlyDictionary<string, object> data, string key)
+    {
+        if (!data.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            bool state => state,
+            JsonElement { ValueKind: JsonValueKind.True } => true,
+            JsonElement { ValueKind: JsonValueKind.False } => false,
+            string text when bool.TryParse(text, out var state) => state,
+            _ => null
+        };
     }
 
     private void OnLayoutUpdate(object? sender, EventArgs e)
