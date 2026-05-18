@@ -1041,6 +1041,29 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void HrProfile_PreferencesSignatureFieldsUseScopedTextareaBordersAndSpacing()
+    {
+        var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor.css");
+        var toggleGridBlock = ExtractCssBlock(styles, ".preference-toggle-grid");
+        var signatureGridBlock = ExtractCssBlock(styles, ".signature-field-grid");
+        var textareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.profile-input");
+        var signatureTextareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.preferences-signature");
+
+        Assert.Contains("name=\"emailSignature\"", profile, StringComparison.Ordinal);
+        Assert.Contains("name=\"shortEmailSignature\"", profile, StringComparison.Ordinal);
+        Assert.Contains("BuildDefaultFullEmailSignature", profile, StringComparison.Ordinal);
+        Assert.Contains("BuildDefaultShortEmailSignature", profile, StringComparison.Ordinal);
+        Assert.Contains("gap: 1rem;", toggleGridBlock, StringComparison.Ordinal);
+        Assert.Contains("margin: 0.25rem 0;", toggleGridBlock, StringComparison.Ordinal);
+        Assert.Contains("gap: 1rem;", signatureGridBlock, StringComparison.Ordinal);
+        Assert.Contains("border: 1px solid var(--maliev-border);", textareaBlock, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-panel);", textareaBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: 8.5rem;", signatureTextareaBlock, StringComparison.Ordinal);
+        Assert.Contains(".profile-field ::deep textarea.preferences-signature.short", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerNew_UsesTabbedWorkflowAndIntegratedCompanyLayout()
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");

@@ -102,7 +102,30 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("Save preferences", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Default currency", cut.Markup, StringComparison.Ordinal);
             Assert.Contains("Employee-specific defaults", cut.Markup, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Full email signature", cut.Markup, StringComparison.Ordinal);
+            Assert.Contains("Short email signature", cut.Markup, StringComparison.Ordinal);
             Assert.DoesNotContain("Teams and documents", cut.Markup, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public void Profile_PreferencesQueryTab_DefaultsSignaturesFromEmployeeProfile()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo("http://test/hr/profile?tab=preferences");
+        var cut = Render<Profile>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var fullSignature = cut.Find("textarea[name='emailSignature']").GetAttribute("value") ?? string.Empty;
+            var shortSignature = cut.Find("textarea[name='shortEmailSignature']").GetAttribute("value") ?? string.Empty;
+
+            Assert.Contains("Best regards", fullSignature, StringComparison.Ordinal);
+            Assert.Contains("Mia Wong", fullSignature, StringComparison.Ordinal);
+            Assert.Contains("Maliev Co., Ltd.", fullSignature, StringComparison.Ordinal);
+            Assert.Contains("CNC Manufacturing and 3D Printing Services", fullSignature, StringComparison.Ordinal);
+            Assert.Contains("+66 (0)81-000-0000", fullSignature, StringComparison.Ordinal);
+            Assert.Contains("test@test.com", fullSignature, StringComparison.Ordinal);
+            Assert.Equal("Best regards\nMia Wong", shortSignature.Replace("\r\n", "\n", StringComparison.Ordinal));
         });
     }
 
@@ -115,7 +138,8 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
         cut.WaitForAssertion(() => Assert.Contains("Save preferences", cut.Markup, StringComparison.Ordinal));
         cut.Find("select[name='defaultCurrency']").Change("EUR");
         cut.Find("select[name='themeMode']").Change("light");
-        cut.Find("textarea").Input("MALIEV sales");
+        cut.Find("textarea[name='emailSignature']").Input("MALIEV sales");
+        cut.Find("textarea[name='shortEmailSignature']").Input("MALIEV");
 
         cut.FindAll("button").Single(button => button.TextContent.Contains("Save preferences", StringComparison.Ordinal)).Click();
 
@@ -126,6 +150,7 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("\"defaultCurrency\":\"EUR\"", _savedPreferenceJson, StringComparison.Ordinal);
             Assert.Contains("\"themeMode\":\"light\"", _savedPreferenceJson, StringComparison.Ordinal);
             Assert.Contains("\"emailSignature\":\"MALIEV sales\"", _savedPreferenceJson, StringComparison.Ordinal);
+            Assert.Contains("\"shortEmailSignature\":\"MALIEV\"", _savedPreferenceJson, StringComparison.Ordinal);
             Assert.Contains("Preferences saved.", cut.Markup, StringComparison.Ordinal);
         });
     }
@@ -237,7 +262,8 @@ public sealed class HrProfilePageTests : BunitContext, IAsyncLifetime
                         ["dateFormat"] = "dd MMM yyyy",
                         ["compactWorkspace"] = false,
                         ["operationalDigest"] = true,
-                        ["emailSignature"] = "MALIEV sales"
+                        ["emailSignature"] = "MALIEV sales",
+                        ["shortEmailSignature"] = "MALIEV"
                     },
                     UpdatedAt = new DateTime(2026, 5, 17, 6, 45, 0, DateTimeKind.Utc)
                 })

@@ -83,6 +83,13 @@
     margin-top: 1rem;
 }
 
+.signature-field-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
 .profile-input {
     width: 100%;
     min-height: 2.5rem;
@@ -113,6 +120,28 @@
     outline: 2px solid color-mix(in srgb, var(--mud-palette-primary) 35%, transparent);
     outline-offset: 1px;
     border-color: var(--mud-palette-primary);
+}
+
+.profile-field ::deep textarea.profile-input {
+    width: 100%;
+    min-height: 2.5rem;
+    box-sizing: border-box;
+    border: 1px solid var(--maliev-border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    color: var(--maliev-ink);
+    background: var(--maliev-panel);
+    font: inherit;
+}
+
+.profile-field ::deep textarea.profile-input:focus {
+    outline: 2px solid color-mix(in srgb, var(--mud-palette-primary) 35%, transparent);
+    outline-offset: 1px;
+    border-color: var(--mud-palette-primary);
+}
+
+.profile-field ::deep textarea.profile-input.invalid {
+    border-color: var(--mud-palette-error);
 }
 
 .profile-input.invalid {
@@ -239,7 +268,8 @@
 .preference-toggle-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 1rem;
+    margin: 0.25rem 0;
 }
 
 .preference-toggle {
@@ -280,6 +310,16 @@
     min-height: 7rem;
     resize: vertical;
     line-height: 1.45;
+}
+
+.profile-field ::deep textarea.preferences-signature {
+    min-height: 8.5rem;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+.profile-field ::deep textarea.preferences-signature.short {
+    min-height: 4.75rem;
 }
 
 .profile-counter {
