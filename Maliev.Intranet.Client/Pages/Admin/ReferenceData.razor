@@ -255,7 +255,7 @@
                                     </label>
                                     <label class="mlv-form-field">
                                         <span>Decimal places</span>
-                                        <input class="mlv-form-input" type="number" min="0" max="8" @bind="_currencyForm.DecimalPlaces" />
+                                        <input class="mlv-form-input" type="number" min="0" max="8" @bind="_currencyForm.DecimalPlaces" @bind:event="oninput" />
                                     </label>
                                 </div>
                                 <div class="reference-editor-actions">
