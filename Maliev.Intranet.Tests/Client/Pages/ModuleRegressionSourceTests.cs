@@ -365,6 +365,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Expense Entry", source, StringComparison.Ordinal);
         Assert.Contains("Payroll Journals", source, StringComparison.Ordinal);
         Assert.Contains("InputFile", source, StringComparison.Ordinal);
+        Assert.Contains("accounting-ai-panel", source, StringComparison.Ordinal);
+        Assert.Contains("Drag and drop receipts, transfer slips, invoices, or screenshots", source, StringComparison.Ordinal);
+        Assert.Contains("api/v1/aiprocessing/extract-accounting-entry", source, StringComparison.Ordinal);
+        Assert.Contains("ExtractAccountingEntryAsync", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyAccountingExtraction", source, StringComparison.Ordinal);
         Assert.Contains("LoadCurrenciesAsync", source, StringComparison.Ordinal);
         Assert.Contains("OnCurrencyChangedAsync", source, StringComparison.Ordinal);
         Assert.Contains("ExchangeRateToBase", source, StringComparison.Ordinal);

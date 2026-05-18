@@ -4,6 +4,7 @@ using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -151,6 +152,57 @@ public class AiProcessingControllerTests
         Assert.Equal("sales@thai-metals.example", extracted.Email);
         Assert.Equal("CNC", extracted.Capabilities[0]);
         Assert.True(extracted.Confidence > 0);
+    }
+
+    [Fact]
+    public async Task ExtractAccountingEntryFromDocument_WhenAiReturnsJson_ReturnsDraftJournalFields()
+    {
+        _chatbotClientMock
+            .Setup(client => client.InitiateSessionAsync("intranet", "en", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatbotSessionResponse
+            {
+                SessionId = Guid.Parse("31f9957d-326f-4a4d-b747-70709806dd86"),
+                Language = "en"
+            });
+
+        _chatbotClientMock
+            .Setup(client => client.SendMessageAsync(
+                It.IsAny<Guid>(),
+                It.Is<string>(prompt => prompt.Contains("accounting journal entry", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<List<ChatbotAttachment>?>(),
+                "application/json",
+                It.IsAny<object>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatbotMessageResponse
+            {
+                Content = """
+                    {
+                      "entry_type": "Income",
+                      "date": "2026-05-18",
+                      "description": "Stripe card payment",
+                      "reference": "PAY-1008",
+                      "amount": 129.95,
+                      "currency_code": "USD",
+                      "merchant_or_counterparty": "Stripe",
+                      "confidence": 0.86,
+                      "missing_fields": ["exchange rate"]
+                    }
+                    """
+            });
+
+        var result = await _controller.ExtractAccountingEntryFromDocument(new FormFileCollection(), "Stripe PAY-1008 USD 129.95", "Income");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var extracted = Assert.IsType<ExtractedAccountingEntryResponse>(ok.Value);
+        Assert.Equal("Income", extracted.EntryType);
+        Assert.Equal(new DateTime(2026, 5, 18), extracted.Date);
+        Assert.Equal("Stripe card payment", extracted.Description);
+        Assert.Equal("PAY-1008", extracted.Reference);
+        Assert.Equal(129.95m, extracted.Amount);
+        Assert.Equal("USD", extracted.CurrencyCode);
+        Assert.Equal("Stripe", extracted.MerchantOrCounterparty);
+        Assert.Equal("exchange rate", extracted.MissingFields[0]);
+        Assert.True(extracted.Confidence > 0.8);
     }
 
     private static AiProcessingController CreateController(

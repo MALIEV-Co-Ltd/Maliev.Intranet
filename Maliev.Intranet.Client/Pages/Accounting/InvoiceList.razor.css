@@ -1,0 +1,177 @@
+.accounting-ai-panel {
+    border: 1px solid color-mix(in srgb, var(--mud-palette-info) 28%, var(--mud-palette-lines-default));
+    border-radius: 8px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--mud-palette-info) 12%, transparent), transparent 44%),
+        linear-gradient(315deg, color-mix(in srgb, var(--mud-palette-success) 10%, transparent), transparent 48%),
+        var(--mud-palette-surface);
+    padding: 16px;
+    margin-bottom: 18px;
+}
+
+.accounting-ai-panel-head,
+.accounting-ai-actions,
+.accounting-ai-processing,
+.accounting-ai-summary,
+.accounting-ai-file {
+    display: flex;
+    align-items: center;
+}
+
+.accounting-ai-panel-head {
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.accounting-ai-panel-head strong,
+.accounting-ai-file strong,
+.accounting-ai-summary strong {
+    display: block;
+    font-size: var(--mud-typography-body2-size);
+}
+
+.accounting-ai-panel-head small,
+.accounting-ai-file small,
+.accounting-ai-summary small,
+.accounting-ai-text-field small {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+}
+
+.accounting-ai-icon {
+    inline-size: 34px;
+    block-size: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--mud-palette-info-darken);
+    background: color-mix(in srgb, var(--mud-palette-info) 16%, var(--mud-palette-surface));
+}
+
+.accounting-ai-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 0.9fr);
+    gap: 14px;
+}
+
+.accounting-ai-text-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.accounting-ai-text-field > span {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.accounting-ai-textarea {
+    min-height: 132px;
+    resize: vertical;
+}
+
+.accounting-ai-file-panel {
+    min-width: 0;
+}
+
+.accounting-ai-dropzone {
+    inline-size: 100%;
+    min-height: 132px;
+    border: 1px dashed color-mix(in srgb, var(--mud-palette-info) 46%, var(--mud-palette-lines-default));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--mud-palette-info) 8%, var(--mud-palette-surface));
+    color: var(--mud-palette-text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.accounting-ai-dropzone:hover,
+.accounting-ai-dropzone:focus-visible {
+    border-color: var(--mud-palette-info);
+    background: color-mix(in srgb, var(--mud-palette-info) 12%, var(--mud-palette-surface));
+}
+
+.accounting-ai-dropzone strong {
+    display: block;
+    font-size: var(--mud-typography-body2-size);
+}
+
+.accounting-ai-dropzone small {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-caption-size);
+}
+
+.accounting-ai-files {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.accounting-ai-file {
+    gap: 8px;
+    justify-content: space-between;
+    min-height: 42px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 8px;
+    background: var(--mud-palette-surface);
+    padding: 8px 10px;
+}
+
+.accounting-ai-file > span {
+    flex: 1;
+    min-width: 0;
+}
+
+.accounting-ai-file button {
+    border: 0;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.accounting-ai-actions {
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.accounting-ai-processing {
+    gap: 8px;
+    color: var(--mud-palette-info-darken);
+    margin-top: 12px;
+}
+
+.accounting-ai-summary {
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid color-mix(in srgb, var(--mud-palette-success) 38%, var(--mud-palette-lines-default));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--mud-palette-success) 10%, var(--mud-palette-surface));
+    padding: 10px 12px;
+    margin-top: 12px;
+}
+
+.accounting-ai-summary span {
+    color: var(--mud-palette-text-secondary);
+    font-size: var(--mud-typography-body2-size);
+}
+
+@media (max-width: 900px) {
+    .accounting-ai-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .accounting-ai-summary {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

@@ -125,6 +125,7 @@
         else if (_tab == "Income Entry")
         {
             <PanelCard Title="Income entry">
+                @AccountingAiPanel(_incomeForm, "Income")
                 <FormGrid>
                     <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_incomeForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
                     <FormField Label="Description"><input class="mlv-form-input" @bind="_incomeForm.Description" @bind:event="oninput" /></FormField>
@@ -173,6 +174,7 @@
         else if (_tab == "Expense Entry")
         {
             <PanelCard Title="Expense entry">
+                @AccountingAiPanel(_expenseForm, "Expense")
                 <FormGrid>
                     <FormField Label="Date"><input type="date" class="mlv-form-input" @bind="_expenseForm.Date" @bind:format="yyyy-MM-dd" /></FormField>
                     <FormField Label="Description"><input class="mlv-form-input" @bind="_expenseForm.Description" @bind:event="oninput" /></FormField>
@@ -423,6 +425,96 @@
             ? _incomeForm.IsSubmitting
             : _tab == "Expense Entry" && _expenseForm.IsSubmitting;
 
+    private RenderFragment AccountingAiPanel(QuickJournalForm form, string entryType) => @<section class="accounting-ai-panel" aria-label="@($"{entryType} AI accounting extraction")">
+        <div class="accounting-ai-panel-head">
+            <span class="accounting-ai-icon">
+                <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+            </span>
+            <span>
+                <strong>AI-assisted data entry</strong>
+                <small>Drag and drop receipts, transfer slips, invoices, or screenshots</small>
+            </span>
+        </div>
+
+        <div class="accounting-ai-grid">
+            <label class="accounting-ai-text-field">
+                <span>Paste evidence text</span>
+                <textarea class="mlv-form-textarea accounting-ai-textarea"
+                          maxlength="4000"
+                          @bind="form.ExtractionText"
+                          @bind:event="oninput"
+                          placeholder="Paste bank slip text, invoice lines, email payment details, or OCR text..."></textarea>
+                <small>@form.ExtractionText.Length / 4,000 characters</small>
+            </label>
+
+            <div class="accounting-ai-file-panel">
+                <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                               FilesChanged="@(files => OnAccountingExtractionFilesSelected(files, form))"
+                               Accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.csv"
+                               Hidden="true"
+                               MaximumFileCount="5">
+                    <CustomContent Context="uploadContext">
+                        <button type="button" class="accounting-ai-dropzone" @onclick="@uploadContext.OpenFilePickerAsync">
+                            <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" />
+                            <span>
+                                <strong>Drop accounting evidence</strong>
+                                <small>PDF, image, text, or CSV - max 25 MB each</small>
+                            </span>
+                        </button>
+                    </CustomContent>
+                </MudFileUpload>
+
+                @if (form.ExtractionFiles.Count > 0)
+                {
+                    <div class="accounting-ai-files" aria-label="Selected accounting extraction files">
+                        @foreach (var file in form.ExtractionFiles)
+                        {
+                            <div class="accounting-ai-file">
+                                <MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" />
+                                <span>
+                                    <strong>@file.Name</strong>
+                                    <small>@FormatFileSize(file.Size)</small>
+                                </span>
+                                <button type="button" aria-label="@($"Remove {file.Name}")" @onclick="@(() => RemoveAccountingExtractionFile(form, file))">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Close" Size="Size.Small" />
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="accounting-ai-actions">
+            <SecondaryButton Icon="@Icons.Material.Outlined.AutoFixHigh"
+                             Disabled="@(form.IsExtracting || !CanExtractAccountingEntry(form))"
+                             OnClick="@(_ => ExtractAccountingEntryAsync(form, entryType))">
+                @(form.IsExtracting ? "Extracting..." : "Extract and autofill")
+            </SecondaryButton>
+        </div>
+
+        @if (form.IsExtracting)
+        {
+            <div class="accounting-ai-processing" role="status" aria-live="polite">
+                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                <span>Reading evidence with AI...</span>
+            </div>
+        }
+        else if (form.LastExtraction is not null)
+        {
+            <div class="accounting-ai-summary" role="status" aria-live="polite">
+                <div>
+                    <strong>AI draft @($"{form.LastExtraction.Confidence:P0}")</strong>
+                    <span>@GetAccountingExtractionSummary(form)</span>
+                </div>
+                @if (form.LastExtraction.MissingFields.Count > 0)
+                {
+                    <small>Needs review: @string.Join(", ", form.LastExtraction.MissingFields)</small>
+                }
+            </div>
+        }
+    </section>;
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private void SetTab(string tab) => _tab = tab;
@@ -558,6 +650,151 @@
         }
     }
 
+    private static bool CanExtractAccountingEntry(QuickJournalForm form) =>
+        !string.IsNullOrWhiteSpace(form.ExtractionText) || form.ExtractionFiles.Count > 0;
+
+    private void OnAccountingExtractionFilesSelected(IReadOnlyList<IBrowserFile> files, QuickJournalForm form)
+    {
+        form.ExtractionFiles.Clear();
+        form.ExtractionFiles.AddRange(files.Take(5));
+        form.LastExtraction = null;
+        ResetQuickJournalMessages(form);
+    }
+
+    private static void RemoveAccountingExtractionFile(QuickJournalForm form, IBrowserFile file)
+    {
+        form.ExtractionFiles.Remove(file);
+        form.LastExtraction = null;
+        ResetQuickJournalMessages(form);
+    }
+
+    private async Task ExtractAccountingEntryAsync(QuickJournalForm form, string entryType)
+    {
+        if (form.IsExtracting || !CanExtractAccountingEntry(form))
+        {
+            return;
+        }
+
+        ResetQuickJournalMessages(form);
+        form.LastExtraction = null;
+
+        var oversizedFile = form.ExtractionFiles.FirstOrDefault(file => file.Size > MaxAccountingDocumentBytes);
+        if (oversizedFile is not null)
+        {
+            SetQuickJournalError(form, $"{oversizedFile.Name} exceeds the {MaxAccountingDocumentBytes / 1024 / 1024} MB extraction limit.");
+            return;
+        }
+
+        form.IsExtracting = true;
+        form.StatusMessage = "Extracting accounting data with AI...";
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(entryType), "entryType");
+            if (!string.IsNullOrWhiteSpace(form.ExtractionText))
+            {
+                content.Add(new StringContent(form.ExtractionText), "rawText");
+            }
+
+            foreach (var file in form.ExtractionFiles)
+            {
+                var stream = file.OpenReadStream(MaxAccountingDocumentBytes);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+                    string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            using var response = await Http.PostAsync("api/v1/aiprocessing/extract-accounting-entry", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                SetQuickJournalError(form, await ReadFailureMessageAsync(response, "Accounting data could not be extracted."));
+                return;
+            }
+
+            var extracted = await response.Content.ReadFromJsonAsync<ExtractedAccountingEntryResponse>();
+            if (extracted is null)
+            {
+                SetQuickJournalError(form, "Accounting extraction returned no usable data.");
+                return;
+            }
+
+            await ApplyAccountingExtractionAsync(form, extracted, entryType);
+            form.LastExtraction = extracted;
+            form.StatusMessage = "AI filled the draft. Review the entry before creating the journal.";
+        }
+        catch (Exception ex)
+        {
+            SetQuickJournalError(form, $"Accounting data could not be extracted: {ex.Message}");
+        }
+        finally
+        {
+            form.IsExtracting = false;
+        }
+    }
+
+    private async Task ApplyAccountingExtractionAsync(QuickJournalForm form, ExtractedAccountingEntryResponse extracted, string entryType)
+    {
+        if (extracted.Date is { } date)
+        {
+            form.Date = date;
+        }
+
+        SetIfPresent(value => form.Description = value, extracted.Description);
+        SetIfPresent(value => form.Reference = value, extracted.Reference);
+
+        if (extracted.Amount is > 0)
+        {
+            form.Amount = extracted.Amount.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(extracted.CurrencyCode))
+        {
+            form.CurrencyCode = NormalizeCurrencyCode(extracted.CurrencyCode);
+            if (extracted.ExchangeRateToBase is > 0)
+            {
+                form.ExchangeRateToBase = extracted.ExchangeRateToBase.Value;
+                form.CurrencyMessage = null;
+            }
+            else
+            {
+                await OnCurrencyChangedAsync(form, form.CurrencyCode);
+            }
+        }
+
+        ApplyAccountHint(entryType, isDebit: true, extracted.DebitAccountHint);
+        ApplyAccountHint(entryType, isDebit: false, extracted.CreditAccountHint);
+    }
+
+    private void ApplyAccountHint(string entryType, bool isDebit, string? accountHint)
+    {
+        var accountId = FindAccountIdByHint(accountHint);
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            return;
+        }
+
+        if (string.Equals(entryType, "Income", StringComparison.OrdinalIgnoreCase))
+        {
+            if (isDebit)
+            {
+                _incomeDebitAccountId = accountId;
+            }
+            else
+            {
+                _incomeCreditAccountId = accountId;
+            }
+        }
+        else if (isDebit)
+        {
+            _expenseDebitAccountId = accountId;
+        }
+        else
+        {
+            _expenseCreditAccountId = accountId;
+        }
+    }
+
     private async Task CreateJournalAsync(QuickJournalForm form, string successMessage)
     {
         if (form.IsSubmitting)
@@ -615,6 +852,9 @@
 
             form.Reference = string.Empty;
             form.Document = null;
+            form.ExtractionText = string.Empty;
+            form.ExtractionFiles.Clear();
+            form.LastExtraction = null;
             form.StatusMessage = successMessage;
             _journalPage = 1;
             await LoadJournalEntriesAsync();
@@ -867,6 +1107,61 @@
                 account.Name.Contains(hint, StringComparison.OrdinalIgnoreCase)))?.Id.ToString();
     }
 
+    private string? FindAccountIdByHint(string? accountHint)
+    {
+        if (string.IsNullOrWhiteSpace(accountHint))
+        {
+            return null;
+        }
+
+        var hint = accountHint.Trim();
+        return _accounts.FirstOrDefault(account =>
+            string.Equals(account.AccountNumber, hint, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(account.Code, hint, StringComparison.OrdinalIgnoreCase) ||
+            account.Name.Contains(hint, StringComparison.OrdinalIgnoreCase) ||
+            hint.Contains(account.Name, StringComparison.OrdinalIgnoreCase) ||
+            account.Type.Contains(hint, StringComparison.OrdinalIgnoreCase) ||
+            (account.Category?.Contains(hint, StringComparison.OrdinalIgnoreCase) ?? false))?.Id.ToString();
+    }
+
+    private static void SetIfPresent(Action<string> setter, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            setter(value.Trim());
+        }
+    }
+
+    private static string GetAccountingExtractionSummary(QuickJournalForm form)
+    {
+        var extraction = form.LastExtraction;
+        if (extraction is null)
+        {
+            return string.Empty;
+        }
+
+        var extractedCount = extraction.ExtractedFields.Count;
+        var missingCount = extraction.MissingFields.Count;
+        return missingCount == 0
+            ? $"{extractedCount} fields filled. Nothing obvious is missing."
+            : $"{extractedCount} fields filled. {missingCount} field(s) need manual input.";
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024 * 1024)
+        {
+            return $"{bytes / 1024d:0.#} KB";
+        }
+
+        return $"{bytes / 1024d / 1024d:0.#} MB";
+    }
+
     private static IEnumerable<ChartOfAccountDto> FlattenAccounts(IEnumerable<ChartOfAccountDto> accounts)
     {
         foreach (var account in accounts)
@@ -936,6 +1231,14 @@
         public string? CurrencyMessage { get; set; }
 
         public IBrowserFile? Document { get; set; }
+
+        public string ExtractionText { get; set; } = string.Empty;
+
+        public List<IBrowserFile> ExtractionFiles { get; } = [];
+
+        public ExtractedAccountingEntryResponse? LastExtraction { get; set; }
+
+        public bool IsExtracting { get; set; }
 
         public bool IsSubmitting { get; set; }
 

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,6 +27,7 @@ public class AiProcessingController(
     CustomerServiceClient customerClient,
     ILogger<AiProcessingController> logger) : ControllerBase
 {
+    private const long AccountingExtractionFileLimitBytes = 25 * 1024 * 1024;
     private readonly ILogger<AiProcessingController> _logger = logger;
 
     /// <summary>
@@ -446,6 +448,146 @@ public class AiProcessingController(
     }
 
     /// <summary>
+    /// Processes accounting evidence and text to extract a draft quick journal entry using AI.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Prediction.Extract)]
+    [HttpPost("extract-accounting-entry")]
+    public async Task<ActionResult<ExtractedAccountingEntryResponse>> ExtractAccountingEntryFromDocument(
+        [FromForm] IFormFileCollection files,
+        [FromForm] string? rawText,
+        [FromForm] string? entryType,
+        CancellationToken cancellationToken = default)
+    {
+        if ((files == null || files.Count == 0) && string.IsNullOrWhiteSpace(rawText))
+        {
+            return BadRequest("No files or text provided for processing.");
+        }
+
+        var normalizedEntryType = NormalizeAccountingEntryType(entryType);
+        var session = await chatbotClient.InitiateSessionAsync("intranet", "en", cancellationToken);
+        if (session == null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "AI extraction service is currently unavailable.");
+        }
+
+        var attachments = new List<ChatbotAttachment>();
+        if (files != null)
+        {
+            foreach (var file in files)
+            {
+                if (file.Length > AccountingExtractionFileLimitBytes)
+                {
+                    return BadRequest($"File '{file.FileName}' exceeds the {AccountingExtractionFileLimitBytes / 1024 / 1024} MB limit.");
+                }
+
+                using var memoryStream = new MemoryStream();
+                await file.OpenReadStream().CopyToAsync(memoryStream, cancellationToken);
+                var base64 = Convert.ToBase64String(memoryStream.ToArray());
+                var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "application/octet-stream"
+                    : file.ContentType;
+
+                attachments.Add(new ChatbotAttachment
+                {
+                    Type = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ? "Image" : "PDF",
+                    Url = $"data:{contentType};base64,{base64}",
+                    MimeType = contentType,
+                    SizeBytes = file.Length
+                });
+            }
+        }
+
+        var responseSchema = new
+        {
+            type = "object",
+            properties = new
+            {
+                entry_type = new { type = "string", description = "Income or Expense." },
+                date = new { type = "string", description = "Transaction date in ISO 8601 format YYYY-MM-DD, or null if not visible." },
+                description = new { type = "string", description = "Concise accounting journal description." },
+                reference = new { type = "string", description = "Slip, receipt, invoice, order, bank, payment, or transaction reference." },
+                amount = new { type = "number", description = "Transaction amount in the source currency before conversion." },
+                currency_code = new { type = "string", description = "ISO 4217 currency code such as THB, USD, EUR, JPY." },
+                exchange_rate_to_base = new { type = "number", description = "Exchange rate into THB if it is explicitly visible; otherwise null." },
+                merchant_or_counterparty = new { type = "string", description = "Customer, supplier, merchant, bank, or payment processor." },
+                debit_account_hint = new { type = "string", description = "Suggested debit account name, type, or number when evident." },
+                credit_account_hint = new { type = "string", description = "Suggested credit account name, type, or number when evident." },
+                extracted_fields = new { type = "array", items = new { type = "string" }, description = "Names of fields found with usable values." },
+                missing_fields = new { type = "array", items = new { type = "string" }, description = "Fields that still need employee input or review." },
+                notes = new { type = "string", description = "Short note explaining any ambiguity or assumptions." },
+                confidence = new { type = "number", description = "Confidence score between 0 and 1." }
+            }
+        };
+
+        var prompt = $"""
+            Extract an accounting journal entry draft for MALIEV from the provided receipt, transfer slip, invoice,
+            screenshot, or pasted text. This is only a draft for an employee to review; do not claim the entry is posted.
+
+            Requested entry type: {normalizedEntryType}
+            Accounting base currency: THB
+
+            Rules:
+            - Return valid JSON only.
+            - Use entry_type "Income" for customer receipts, sales income, bank deposits, payment processor payouts, or receivables collected.
+            - Use entry_type "Expense" for supplier invoices, purchases, bank fees, subscriptions, refunds paid, or operating costs.
+            - Use the transaction amount and currency as shown on the evidence.
+            - Use exchange_rate_to_base only when the evidence explicitly shows the rate. Do not invent rates.
+            - Put every important missing value in missing_fields. Include "exchange rate" when currency is not THB and no rate is visible.
+            - Keep description short enough for a journal entry line.
+            - Prefer reference numbers that an employee could later search for.
+
+            Text content:
+            {rawText}
+            """;
+
+        var response = await chatbotClient.SendMessageAsync(
+            session.SessionId,
+            prompt,
+            attachments.Count > 0 ? attachments : null,
+            responseMimeType: "application/json",
+            responseSchema: responseSchema,
+            ct: cancellationToken);
+
+        if (response == null || string.IsNullOrWhiteSpace(response.Content))
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned no accounting entry data.");
+        }
+
+        ExtractedAccountingEntryResponse? extracted;
+        try
+        {
+            extracted = JsonSerializer.Deserialize<ExtractedAccountingEntryResponse>(
+                StripJsonCodeFence(response.Content),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Accounting AI extraction returned invalid JSON: {Content}", response.Content);
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned data that could not be parsed.");
+        }
+
+        if (extracted == null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, "AI extraction returned no accounting entry data.");
+        }
+
+        extracted.EntryType = NormalizeAccountingEntryType(extracted.EntryType ?? normalizedEntryType);
+        extracted.CurrencyCode = string.IsNullOrWhiteSpace(extracted.CurrencyCode)
+            ? null
+            : extracted.CurrencyCode.Trim().ToUpperInvariant();
+        extracted.Description = extracted.Description?.Trim();
+        extracted.Reference = extracted.Reference?.Trim();
+        extracted.MerchantOrCounterparty = extracted.MerchantOrCounterparty?.Trim();
+        extracted.MissingFields = NormalizeAccountingMissingFields(extracted).ToList();
+        extracted.ExtractedFields = NormalizeAccountingExtractedFields(extracted).ToList();
+        extracted.Confidence = extracted.Confidence > 0
+            ? Math.Round(Math.Clamp(extracted.Confidence, 0, 1), 2)
+            : ComputeAccountingConfidence(extracted);
+
+        return Ok(extracted);
+    }
+
+    /// <summary>
     /// Extracts NDA-related dates (expiration, effective, signed) from an uploaded PDF using AI.
     /// </summary>
     /// <param name="file">The NDA PDF file to scan.</param>
@@ -799,6 +941,109 @@ public class AiProcessingController(
 
     private static bool LooksLikeStoragePath(string fileReference) =>
         fileReference.Contains('/', StringComparison.Ordinal) || fileReference.Contains('\\', StringComparison.Ordinal);
+
+    private static string NormalizeAccountingEntryType(string? entryType)
+    {
+        if (string.Equals(entryType?.Trim(), "Expense", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Expense";
+        }
+
+        return "Income";
+    }
+
+    private static IEnumerable<string> NormalizeAccountingMissingFields(ExtractedAccountingEntryResponse data)
+    {
+        var missing = new List<string>();
+        missing.AddRange(data.MissingFields.Where(field => !string.IsNullOrWhiteSpace(field)).Select(field => field.Trim()));
+
+        if (data.Date is null)
+        {
+            missing.Add("date");
+        }
+
+        if (string.IsNullOrWhiteSpace(data.Description))
+        {
+            missing.Add("description");
+        }
+
+        if (data.Amount is null or <= 0)
+        {
+            missing.Add("amount");
+        }
+
+        if (string.IsNullOrWhiteSpace(data.CurrencyCode))
+        {
+            missing.Add("currency");
+        }
+
+        if (!string.IsNullOrWhiteSpace(data.CurrencyCode) &&
+            !string.Equals(data.CurrencyCode, "THB", StringComparison.OrdinalIgnoreCase) &&
+            data.ExchangeRateToBase is null or <= 0)
+        {
+            missing.Add("exchange rate");
+        }
+
+        return missing
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(field => field, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> NormalizeAccountingExtractedFields(ExtractedAccountingEntryResponse data)
+    {
+        var extracted = new List<string>();
+        extracted.AddRange(data.ExtractedFields.Where(field => !string.IsNullOrWhiteSpace(field)).Select(field => field.Trim()));
+
+        AddIfPresent(extracted, "entry type", data.EntryType);
+        AddIfPresent(extracted, "date", data.Date);
+        AddIfPresent(extracted, "description", data.Description);
+        AddIfPresent(extracted, "reference", data.Reference);
+        AddIfPresent(extracted, "amount", data.Amount);
+        AddIfPresent(extracted, "currency", data.CurrencyCode);
+        AddIfPresent(extracted, "exchange rate", data.ExchangeRateToBase);
+        AddIfPresent(extracted, "counterparty", data.MerchantOrCounterparty);
+
+        return extracted
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(field => field, StringComparer.OrdinalIgnoreCase);
+
+        static void AddIfPresent(List<string> fields, string label, object? value)
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            if (value is string text && string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            if (value is decimal amount && amount <= 0)
+            {
+                return;
+            }
+
+            fields.Add(label);
+        }
+    }
+
+    private static double ComputeAccountingConfidence(ExtractedAccountingEntryResponse data)
+    {
+        var fields = new object?[]
+        {
+            data.EntryType,
+            data.Date,
+            data.Description,
+            data.Reference,
+            data.Amount is > 0 ? data.Amount : null,
+            data.CurrencyCode,
+            data.MerchantOrCounterparty
+        };
+
+        var filled = fields.Count(field => field is not null and not "");
+        return Math.Round((double)filled / fields.Length, 2);
+    }
 
     private static string StripJsonCodeFence(string content)
     {

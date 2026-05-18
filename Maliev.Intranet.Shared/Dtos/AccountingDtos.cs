@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Shared.Dtos;
 
@@ -299,6 +300,68 @@ public sealed record CreateJournalEntryRequest
     /// </summary>
     [Required]
     public List<JournalEntryLineDto> Lines { get; set; } = [];
+}
+
+/// <summary>
+/// Response model containing draft accounting entry data extracted by AI analysis.
+/// </summary>
+public class ExtractedAccountingEntryResponse
+{
+    /// <summary>The extracted quick entry type, typically Income or Expense.</summary>
+    [JsonPropertyName("entry_type")]
+    public string? EntryType { get; set; }
+
+    /// <summary>The transaction date found in the document or text.</summary>
+    [JsonPropertyName("date")]
+    public DateTime? Date { get; set; }
+
+    /// <summary>The extracted journal entry description.</summary>
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    /// <summary>The extracted external reference, slip number, invoice number, or payment identifier.</summary>
+    [JsonPropertyName("reference")]
+    public string? Reference { get; set; }
+
+    /// <summary>The extracted transaction amount in the source currency.</summary>
+    [JsonPropertyName("amount")]
+    public decimal? Amount { get; set; }
+
+    /// <summary>The ISO 4217 source currency code found in the document.</summary>
+    [JsonPropertyName("currency_code")]
+    public string? CurrencyCode { get; set; }
+
+    /// <summary>The extracted exchange rate into the accounting base currency, if visible.</summary>
+    [JsonPropertyName("exchange_rate_to_base")]
+    public decimal? ExchangeRateToBase { get; set; }
+
+    /// <summary>The extracted merchant, customer, supplier, bank, or payment processor name.</summary>
+    [JsonPropertyName("merchant_or_counterparty")]
+    public string? MerchantOrCounterparty { get; set; }
+
+    /// <summary>The suggested debit account name, number, or type hint.</summary>
+    [JsonPropertyName("debit_account_hint")]
+    public string? DebitAccountHint { get; set; }
+
+    /// <summary>The suggested credit account name, number, or type hint.</summary>
+    [JsonPropertyName("credit_account_hint")]
+    public string? CreditAccountHint { get; set; }
+
+    /// <summary>The fields that were found with usable values.</summary>
+    [JsonPropertyName("extracted_fields")]
+    public List<string> ExtractedFields { get; set; } = [];
+
+    /// <summary>The fields that still need employee review or manual input.</summary>
+    [JsonPropertyName("missing_fields")]
+    public List<string> MissingFields { get; set; } = [];
+
+    /// <summary>Short extraction note for the employee reviewer.</summary>
+    [JsonPropertyName("notes")]
+    public string? Notes { get; set; }
+
+    /// <summary>Overall AI confidence score for the extraction.</summary>
+    [JsonPropertyName("confidence")]
+    public double Confidence { get; set; }
 }
 
 /// <summary>
