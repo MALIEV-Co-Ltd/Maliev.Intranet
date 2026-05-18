@@ -702,19 +702,19 @@
     .topbar-mobile-nav-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding: 4px 2px 18px;
+        gap: 6px;
+        padding: 4px 0 18px;
     }
 
     .topbar-mobile-nav-link {
         display: grid;
-        grid-template-columns: 28px minmax(0, 1fr);
+        grid-template-columns: 24px minmax(0, 1fr);
         align-items: center;
-        column-gap: 12px;
+        column-gap: 10px;
         box-sizing: border-box;
         width: 100%;
         min-height: 48px;
-        padding: 10px 14px;
+        padding: 10px 12px;
         border-radius: var(--maliev-radius-xs);
         color: var(--maliev-muted);
         font-size: var(--maliev-font-base);
@@ -723,10 +723,10 @@
         text-decoration: none;
     }
 
-    .topbar-mobile-nav-link .mud-icon-root {
+    .topbar-mobile-nav-link ::deep .mud-icon-root {
         display: inline-flex;
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
@@ -757,18 +757,17 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
-        margin-top: 2px;
-        padding: 12px 0 8px;
+        margin-top: 0;
+        padding: 12px 0 10px;
         border-top: 1px solid var(--maliev-border);
     }
 
     .topbar-mobile-nav-group-title {
-        display: grid;
-        grid-template-columns: 28px minmax(0, 1fr);
+        display: flex;
         align-items: center;
-        column-gap: 12px;
-        min-height: 40px;
-        padding: 8px 14px 6px;
+        gap: 8px;
+        min-height: 34px;
+        padding: 8px 12px 4px;
         color: var(--maliev-muted-2);
         font-size: var(--maliev-font-micro);
         font-weight: 800;
@@ -776,10 +775,10 @@
         text-transform: uppercase;
     }
 
-    .topbar-mobile-nav-group-title .mud-icon-root {
+    .topbar-mobile-nav-group-title ::deep .mud-icon-root {
         display: inline-flex;
-        width: 28px;
-        height: 28px;
+        width: 22px;
+        height: 22px;
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
