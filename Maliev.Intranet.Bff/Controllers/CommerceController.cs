@@ -192,12 +192,21 @@ public sealed class CommerceController(
         {
             Index = index + 1,
             ItemName = item.ItemName,
+            PartNumber = item.PartNumber,
+            AssemblyName = item.AssemblyName,
+            SubassemblyName = item.SubassemblyName,
+            ImageUrl = item.ImageUrl,
+            DrawingUrl = item.DrawingUrl,
+            SupplierName = item.SupplierName,
+            SupplierUrl = item.SupplierUrl,
             Specification = item.Specification,
             Quantity = item.Quantity,
             Unit = item.Unit,
             UnitCost = item.UnitCost,
             Currency = item.Currency,
             LineTotal = item.LineTotal == 0m ? decimal.Round(item.Quantity * item.UnitCost, 2, MidpointRounding.AwayFromZero) : item.LineTotal,
+            LeadTimeDays = item.LeadTimeDays,
+            SourcingTimeDays = CalculateBomItemSourcingDays(item),
             Notes = item.Notes
         }).ToList();
 
@@ -211,8 +220,14 @@ public sealed class CommerceController(
             GeneratedAt = DateTime.UtcNow,
             Currency = currency,
             Items = items,
-            TotalCost = items.Where(item => string.Equals(item.Currency, currency, StringComparison.OrdinalIgnoreCase)).Sum(item => item.LineTotal)
+            TotalCost = items.Where(item => string.Equals(item.Currency, currency, StringComparison.OrdinalIgnoreCase)).Sum(item => item.LineTotal),
+            SourcingTimeDays = items.Select(item => item.SourcingTimeDays.GetValueOrDefault()).DefaultIfEmpty(0).Max()
         };
+    }
+
+    private static int CalculateBomItemSourcingDays(CommerceProductBomItemDto item)
+    {
+        return Math.Max(0, item.LeadTimeDays.GetValueOrDefault()) + Math.Max(0, item.SourcingTimeDays.GetValueOrDefault());
     }
 
     private static string BuildBomDownloadFileName(string handle)

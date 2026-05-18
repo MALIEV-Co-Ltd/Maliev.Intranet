@@ -135,6 +135,9 @@ public class CommerceBomPdfData
 
     /// <summary>Gets or sets the total expected cost.</summary>
     public decimal TotalCost { get; set; }
+
+    /// <summary>Gets or sets the longest expected sourcing time in days across BOM items.</summary>
+    public int SourcingTimeDays { get; set; }
 }
 
 /// <summary>
@@ -147,6 +150,27 @@ public class CommerceBomPdfItem
 
     /// <summary>Gets or sets the material, component, or consumable name.</summary>
     public string ItemName { get; set; } = "";
+
+    /// <summary>Gets or sets the supplier or internal part number.</summary>
+    public string? PartNumber { get; set; }
+
+    /// <summary>Gets or sets the parent assembly name.</summary>
+    public string? AssemblyName { get; set; }
+
+    /// <summary>Gets or sets the nested subassembly name.</summary>
+    public string? SubassemblyName { get; set; }
+
+    /// <summary>Gets or sets the component image URL.</summary>
+    public string? ImageUrl { get; set; }
+
+    /// <summary>Gets or sets the drawing or technical file URL.</summary>
+    public string? DrawingUrl { get; set; }
+
+    /// <summary>Gets or sets the preferred supplier name.</summary>
+    public string? SupplierName { get; set; }
+
+    /// <summary>Gets or sets the supplier product or sourcing URL.</summary>
+    public string? SupplierUrl { get; set; }
 
     /// <summary>Gets or sets the item specification, grade, color, size, or supplier reference.</summary>
     public string? Specification { get; set; }
@@ -165,6 +189,12 @@ public class CommerceBomPdfItem
 
     /// <summary>Gets or sets the expected line total.</summary>
     public decimal LineTotal { get; set; }
+
+    /// <summary>Gets or sets the supplier or manufacturing lead time in days.</summary>
+    public int? LeadTimeDays { get; set; }
+
+    /// <summary>Gets or sets the internal sourcing preparation time in days.</summary>
+    public int? SourcingTimeDays { get; set; }
 
     /// <summary>Gets or sets internal notes about the item.</summary>
     public string? Notes { get; set; }

@@ -655,12 +655,36 @@ public class ModuleRegressionSourceTests
         Assert.Contains("AddBomItem", listing, StringComparison.Ordinal);
         Assert.Contains("Export BOM PDF", listing, StringComparison.Ordinal);
         Assert.Contains("BomPdfHref", listing, StringComparison.Ordinal);
+        Assert.Contains("commerce-bom-card", listing, StringComparison.Ordinal);
+        Assert.Contains("commerce-bom-image", listing, StringComparison.Ordinal);
+        Assert.Contains("Part no", listing, StringComparison.Ordinal);
+        Assert.Contains("Assembly", listing, StringComparison.Ordinal);
+        Assert.Contains("Subassembly", listing, StringComparison.Ordinal);
+        Assert.Contains("Supplier URL", listing, StringComparison.Ordinal);
+        Assert.Contains("Drawing URL", listing, StringComparison.Ordinal);
+        Assert.Contains("Lead time", listing, StringComparison.Ordinal);
+        Assert.Contains("Sourcing time", listing, StringComparison.Ordinal);
+        Assert.Contains("BomSourcingDays", listing, StringComparison.Ordinal);
 
         Assert.Contains("List<CommerceProductBomItemDto> BomItems", commerceDtos, StringComparison.Ordinal);
         Assert.Contains("List<CommerceProductBomItemMutationRequest> BomItems", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? PartNumber", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? AssemblyName", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? SubassemblyName", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? ImageUrl", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? DrawingUrl", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? SupplierName", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? SupplierUrl", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public int? LeadTimeDays", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public int? SourcingTimeDays", commerceDtos, StringComparison.Ordinal);
+
         Assert.Contains("PdfDocumentType.CommerceBom", controller, StringComparison.Ordinal);
         Assert.Contains("products/{handle}/bom/pdf", controller, StringComparison.Ordinal);
+        Assert.Contains("PartNumber = item.PartNumber", controller, StringComparison.Ordinal);
+        Assert.Contains("SourcingTimeDays = CalculateBomItemSourcingDays(item)", controller, StringComparison.Ordinal);
         Assert.Contains("CommerceBomPdfData", pdfDtos, StringComparison.Ordinal);
+        Assert.Contains("public int SourcingTimeDays", pdfDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? DrawingUrl", pdfDtos, StringComparison.Ordinal);
     }
 
     [Fact]
