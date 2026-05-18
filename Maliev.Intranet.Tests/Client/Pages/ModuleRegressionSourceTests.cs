@@ -898,9 +898,12 @@ public class ModuleRegressionSourceTests
     {
         var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var mainLayoutStyles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "MainLayout.razor.css");
         var searchStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "GlobalSearchBox.razor.css");
         var wideDesktopStyles = styles[styles.IndexOf("@media (max-width: 1680px)", StringComparison.Ordinal)..];
         var compactNavStyles = styles[styles.IndexOf("@media (max-width: 1600px)", StringComparison.Ordinal)..];
+        var compactBottomBarStyles = styles[styles.LastIndexOf("@media (max-width: 1280px)", StringComparison.Ordinal)..];
+        var compactLayoutStyles = mainLayoutStyles[mainLayoutStyles.IndexOf("@media (max-width: 1280px)", StringComparison.Ordinal)..];
 
         Assert.Contains("class=\"topbar-spacer\"", razor, StringComparison.Ordinal);
         Assert.Contains("class=\"topbar-mobile-menu-button\"", razor, StringComparison.Ordinal);
@@ -934,6 +937,18 @@ public class ModuleRegressionSourceTests
         Assert.Contains("width: min(390px, calc(100vw - 52px));", drawerBlock, StringComparison.Ordinal);
         Assert.Contains("padding: 10px 12px calc(16px + env(safe-area-inset-bottom));", drawerBlock, StringComparison.Ordinal);
         Assert.Contains("border-radius: 0;", drawerBlock, StringComparison.Ordinal);
+        var bottomDockedRootBlock = ExtractCssBlock(compactBottomBarStyles, ".topbar-root");
+        Assert.Contains("position: fixed;", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("top: auto;", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("bottom: 0;", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("height: calc(52px + env(safe-area-inset-bottom));", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("padding: 0 8px env(safe-area-inset-bottom);", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("border-top: 1px solid var(--maliev-border);", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("padding-bottom: calc(52px + env(safe-area-inset-bottom));", ExtractCssBlock(compactLayoutStyles, ".body-area"), StringComparison.Ordinal);
+        Assert.Contains("inset: 0 0 calc(52px + env(safe-area-inset-bottom)) 0;", ExtractCssBlock(compactBottomBarStyles, ".topbar-mobile-drawer-backdrop"), StringComparison.Ordinal);
+        Assert.Contains("bottom: calc(52px + env(safe-area-inset-bottom));", ExtractCssBlock(compactBottomBarStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
+        Assert.Contains("bottom: calc(100% + 8px);", ExtractCssBlock(compactBottomBarStyles, ".topbar-profile-popover"), StringComparison.Ordinal);
+        Assert.Contains(".topbar-root ::deep .topbar-global-search .global-search-panel", compactBottomBarStyles, StringComparison.Ordinal);
         Assert.Contains("min-height: 48px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-drawer-head"), StringComparison.Ordinal);
         Assert.Contains("width: 44px;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-drawer-close"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: 28px minmax(0, 1fr);", ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-link"), StringComparison.Ordinal);

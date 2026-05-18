@@ -808,10 +808,47 @@
     }
 }
 
+@media (max-width: 1280px) {
+    .topbar-root {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 2800;
+        height: calc(52px + env(safe-area-inset-bottom));
+        min-height: calc(52px + env(safe-area-inset-bottom));
+        padding: 0 8px env(safe-area-inset-bottom);
+        border-top: 1px solid var(--maliev-border);
+        background: var(--maliev-panel);
+        box-shadow: 0 -1px 0 var(--maliev-border), 0 -10px 30px color-mix(in oklab, var(--maliev-ink), transparent 88%);
+    }
+
+    .topbar-mobile-drawer-backdrop {
+        inset: 0 0 calc(52px + env(safe-area-inset-bottom)) 0;
+    }
+
+    .topbar-mobile-nav-drawer {
+        top: 0;
+        bottom: calc(52px + env(safe-area-inset-bottom));
+    }
+
+    .topbar-profile-popover {
+        top: auto;
+        bottom: calc(100% + 8px);
+    }
+
+    .topbar-root ::deep .topbar-global-search .global-search-panel {
+        top: auto;
+        bottom: calc(100% + 8px);
+        max-height: min(520px, calc(100vh - 96px - env(safe-area-inset-bottom)));
+    }
+}
+
 @media (max-width: 720px) {
     .topbar-root {
         gap: 4px;
-        padding: 0 6px;
+        padding: 0 6px env(safe-area-inset-bottom);
     }
 
     .topbar-left {
