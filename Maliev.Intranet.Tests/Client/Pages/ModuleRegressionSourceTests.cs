@@ -644,6 +644,7 @@ public class ModuleRegressionSourceTests
     public void AdminReferenceDataPage_UsesExistingReferenceDataServices()
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ReferenceData.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ReferenceData.razor.css");
         var admin = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor");
 
         Assert.Contains("@page \"/admin/reference-data\"", page, StringComparison.Ordinal);
@@ -654,10 +655,23 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ReferenceDataService.AutocompleteLocationsAsync(query, 12)", page, StringComparison.Ordinal);
         Assert.Contains("MudSkeleton", page, StringComparison.Ordinal);
         Assert.Contains("OnDebounceIntervalElapsed=\"SearchLocationsAfterInput\"", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"reference-registry-item\"", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"reference-registry-card\"", page, StringComparison.Ordinal);
+        Assert.Contains("reference-registry-toolbar", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"reference-location-search\"", page, StringComparison.Ordinal);
+        Assert.Contains("Class=\"reference-location-search-button\"", page, StringComparison.Ordinal);
         Assert.Contains("Href=\"/admin/reference-data\"", admin, StringComparison.Ordinal);
         Assert.Contains("Href=\"/commerce/catalog\"", admin, StringComparison.Ordinal);
         Assert.Contains("Href=\"/mfg/materials\"", admin, StringComparison.Ordinal);
-        Assert.DoesNotContain("api/v1/ReferenceData", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("api/v1/ReferenceData/locations", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("flex: 1 1 320px", page, StringComparison.Ordinal);
+
+        Assert.Contains("max-width: 70rem;", ExtractCssBlock(styles, ".reference-registry-item,"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(16rem, 26rem) max-content;", ExtractCssBlock(styles, ".reference-registry-toolbar {"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-input.mud-input-outlined"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
+        Assert.Contains("white-space: nowrap;", ExtractCssBlock(styles, ".reference-registry-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr);", ExtractCssBlock(styles, "@media (max-width: 760px)"), StringComparison.Ordinal);
     }
 
     [Fact]

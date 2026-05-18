@@ -1,0 +1,47 @@
+.reference-registry-item,
+.reference-registry-card {
+    max-width: 70rem;
+    width: 100%;
+}
+
+.reference-registry-toolbar {
+    display: grid;
+    align-items: end;
+    grid-template-columns: minmax(16rem, 26rem) max-content;
+    gap: 0.75rem;
+    margin-bottom: 0.875rem;
+}
+
+.reference-location-search {
+    min-width: 0;
+    width: 100%;
+}
+
+.reference-registry-toolbar ::deep .mud-input-control,
+.reference-registry-toolbar ::deep .mud-input-control-input-container {
+    min-height: unset;
+}
+
+.reference-registry-toolbar ::deep .mud-input.mud-input-outlined {
+    align-items: center;
+    min-height: 40px;
+}
+
+.reference-registry-toolbar ::deep .mud-input-slot {
+    min-height: unset;
+}
+
+.reference-registry-toolbar ::deep .mud-button-root {
+    min-height: 40px;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .reference-registry-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .reference-registry-toolbar ::deep .mud-button-root {
+        width: 100%;
+    }
+}

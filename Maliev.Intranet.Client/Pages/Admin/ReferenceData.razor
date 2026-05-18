@@ -164,19 +164,20 @@
 
                 @if (ShouldShow("registry"))
                 {
-                <MudItem xs="12">
-                    <PanelCard Title="RegistryService Thai Locations">
-                        <div class="mlv-toolbar">
+                <MudItem xs="12" lg="8" xl="7" Class="reference-registry-item">
+                    <PanelCard Title="RegistryService Thai Locations" Class="reference-registry-card">
+                        <div class="reference-registry-toolbar">
                             <MudTextField @bind-Value="_locationQuery"
+                                          Class="reference-location-search"
                                           Label="Search by postcode, district, city, or province"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
                                           Immediate="true"
                                           DebounceInterval="300"
-                                          OnDebounceIntervalElapsed="SearchLocationsAfterInput"
-                                          Style="min-width: 280px; flex: 1 1 320px;" />
+                                          OnDebounceIntervalElapsed="SearchLocationsAfterInput" />
                             <MudButton Variant="Variant.Filled"
                                        Color="Color.Primary"
+                                       Class="reference-location-search-button"
                                        StartIcon="@Icons.Material.Outlined.Search"
                                        Disabled="@_searchingLocations"
                                        OnClick="SearchLocationsAsync">
