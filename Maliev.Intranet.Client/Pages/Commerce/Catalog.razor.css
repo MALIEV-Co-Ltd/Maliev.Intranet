@@ -2,8 +2,8 @@
     align-items: end;
     display: grid;
     gap: 0.75rem;
-    grid-template-columns: minmax(16rem, 20rem) minmax(14rem, 17rem) auto auto;
-    justify-content: start;
+    grid-template-columns: minmax(15rem, 1fr) minmax(13rem, 17rem) max-content max-content;
+    width: 100%;
 }
 
 .catalog-product-search,
@@ -19,6 +19,13 @@
 
 .catalog-product-toolbar ::deep .mud-input.mud-input-outlined {
     align-items: center;
+    min-height: 40px;
+}
+
+.catalog-product-toolbar ::deep .mud-button-root {
+    align-self: end;
+    min-height: 40px;
+    white-space: nowrap;
 }
 
 .mlv-thumb-placeholder {
@@ -47,6 +54,10 @@
 @media (max-width: 920px) {
     .catalog-product-toolbar {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .catalog-product-toolbar ::deep .mud-button-root {
+        width: 100%;
     }
 }
 

@@ -662,8 +662,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Class=\"catalog-product-search\"", source, StringComparison.Ordinal);
         Assert.Contains("Class=\"catalog-product-filter\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("flex: 1 1 260px", source, StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: minmax(16rem, 20rem) minmax(14rem, 17rem) auto auto;", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(15rem, 1fr) minmax(13rem, 17rem) max-content max-content;", styles, StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", ExtractCssBlock(styles, ".catalog-product-toolbar"), StringComparison.Ordinal);
         Assert.Contains(".catalog-product-toolbar ::deep .mud-input-control", styles, StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".catalog-product-toolbar ::deep .mud-input.mud-input-outlined"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, ".catalog-product-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
+        Assert.Contains("white-space: nowrap;", ExtractCssBlock(styles, ".catalog-product-toolbar ::deep .mud-button-root"), StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 620px)", styles, StringComparison.Ordinal);
     }
 
