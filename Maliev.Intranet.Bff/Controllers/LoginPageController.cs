@@ -126,7 +126,7 @@ public sealed class LoginPageController : Controller
             min-height: 100vh;
             min-height: 100dvh;
             display: grid;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto minmax(0, 1fr) auto;
         }
         .login-header,
         .login-footer {
@@ -431,7 +431,6 @@ public sealed class LoginPageController : Controller
                 padding: 12px;
             }
             .login-main {
-                align-items: start;
                 padding: 18px 12px;
             }
             .login-gateway-card {
