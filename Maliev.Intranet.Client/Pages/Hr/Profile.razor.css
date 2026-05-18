@@ -262,7 +262,8 @@
 .preference-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    column-gap: 1rem;
+    row-gap: 1.45rem;
 }
 
 .preference-toggle-grid {

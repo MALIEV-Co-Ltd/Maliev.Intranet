@@ -1045,6 +1045,7 @@ public class ModuleRegressionSourceTests
     {
         var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor.css");
+        var preferenceGridBlock = ExtractCssBlock(styles, ".preference-form-grid");
         var toggleGridBlock = ExtractCssBlock(styles, ".preference-toggle-grid");
         var signatureGridBlock = ExtractCssBlock(styles, ".signature-field-grid");
         var textareaBlock = ExtractCssBlock(styles, ".profile-field ::deep textarea.profile-input");
@@ -1054,6 +1055,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("name=\"shortEmailSignature\"", profile, StringComparison.Ordinal);
         Assert.Contains("BuildDefaultFullEmailSignature", profile, StringComparison.Ordinal);
         Assert.Contains("BuildDefaultShortEmailSignature", profile, StringComparison.Ordinal);
+        Assert.Contains("row-gap: 1.45rem;", preferenceGridBlock, StringComparison.Ordinal);
+        Assert.Contains("column-gap: 1rem;", preferenceGridBlock, StringComparison.Ordinal);
         Assert.Contains("gap: 1rem;", toggleGridBlock, StringComparison.Ordinal);
         Assert.Contains("margin: 0.25rem 0;", toggleGridBlock, StringComparison.Ordinal);
         Assert.Contains("gap: 1rem;", signatureGridBlock, StringComparison.Ordinal);
