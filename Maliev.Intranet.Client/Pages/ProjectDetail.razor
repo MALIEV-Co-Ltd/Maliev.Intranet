@@ -761,10 +761,12 @@
         {
             if (_planningLoading)
             {
-                content.OpenElement(4, "div");
-                content.AddAttribute(5, "class", "project-muted-box compact");
-                content.AddContent(6, "Loading production plan...");
-                content.CloseElement();
+                content.OpenComponent<ProgressiveSkeleton>(4);
+                content.AddAttribute(5, "Layout", "compact");
+                content.AddAttribute(6, "Rows", 3);
+                content.AddAttribute(7, "ShowFilters", false);
+                content.AddAttribute(8, "Label", "Loading production plan");
+                content.CloseComponent();
                 return;
             }
 

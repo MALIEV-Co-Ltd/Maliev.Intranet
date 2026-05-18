@@ -29,7 +29,7 @@
     <PageBody Class="customer-record-body">
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading customer" />
         }
         else if (!string.IsNullOrWhiteSpace(_error))
         {
@@ -519,7 +519,7 @@
                 </div>
                 @if (_activityLoading)
                 {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="customer-activity-loading" />
+                    <ProgressiveSkeleton Layout="list" Rows="4" ShowFilters="false" Class="customer-activity-loading" Label="Loading customer activity" />
                 }
                 @if (ActivityFeed.Count > 0)
                 {
@@ -578,7 +578,7 @@
 
                 @if (_emailTemplatesLoading)
                 {
-                    <div class="customer-email-template-empty">Loading templates...</div>
+                    <ProgressiveSkeleton Layout="list" Rows="3" ShowFilters="false" Label="Loading email templates" />
                 }
                 else if (_emailTemplates.Count == 0)
                 {

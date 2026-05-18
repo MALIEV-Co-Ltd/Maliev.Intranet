@@ -11,7 +11,7 @@
     <DialogContent>
         @if (_loading)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+            <ProgressiveSkeleton Layout="list" Rows="4" ShowFilters="false" Class="my-4" Label="Loading NDA audit history" />
         }
         else if (_history.Any())
         {

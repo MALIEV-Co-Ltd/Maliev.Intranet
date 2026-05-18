@@ -535,7 +535,7 @@
                     <div class="pcs-routing-body @(_routingExpanded ? "" : "pcs-collapsed")">
                         @if (Part!.ProductionRoutingLoading)
                         {
-                            <MudProgressLinear Indeterminate="true" Class="mb-2" />
+                            <ProgressiveSkeleton Layout="compact" Rows="2" ShowFilters="false" Class="mb-2" Label="Loading production routing" />
                         }
                         else if (Part!.ProductionRouting != null)
                         {

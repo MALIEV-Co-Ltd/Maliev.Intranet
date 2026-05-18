@@ -626,6 +626,33 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void PageLoadingStates_UseProgressiveSkeletonsInsteadOfIndeterminateLinearBars()
+    {
+        var skeleton = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "ProgressiveSkeleton.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "ProgressiveSkeleton.razor.css");
+        var clientRoot = FindRepoDirectory("Maliev.Intranet.Client");
+        var componentFiles = Directory.EnumerateFiles(clientRoot, "*.razor", SearchOption.AllDirectories);
+        var offenders = new List<string>();
+        var indeterminateLinearPattern = new Regex("<MudProgressLinear\\b[^>]*Indeterminate\\s*=\\s*\"true\"");
+
+        Assert.Contains("mlv-progressive-skeleton", skeleton, StringComparison.Ordinal);
+        Assert.Contains("MudSkeleton", skeleton, StringComparison.Ordinal);
+        Assert.Contains("Animation=\"Animation.Wave\"", skeleton, StringComparison.Ordinal);
+        Assert.Contains(".mlv-progressive-skeleton", styles, StringComparison.Ordinal);
+
+        foreach (var componentFile in componentFiles)
+        {
+            var source = File.ReadAllText(componentFile);
+            if (indeterminateLinearPattern.IsMatch(source))
+            {
+                offenders.Add(Path.GetRelativePath(clientRoot, componentFile));
+            }
+        }
+
+        Assert.True(offenders.Count == 0, $"Indeterminate linear progress bars should use ProgressiveSkeleton or an inline operation indicator:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
+
+    [Fact]
     public void CommerceCatalog_SearchToolbarUsesCompactBoundedLayout()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");

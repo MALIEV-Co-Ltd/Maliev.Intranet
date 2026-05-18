@@ -16,8 +16,7 @@
         @if (_loading)
         {
             <PanelCard>
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
-                <div class="mlv-empty">Loading listing...</div>
+                <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading listing" />
             </PanelCard>
         }
         else

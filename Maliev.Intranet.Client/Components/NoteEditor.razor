@@ -86,7 +86,7 @@
 
         @if (_noteActivityLoading)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+            <ProgressiveSkeleton Layout="list" Rows="4" ShowFilters="false" Class="mb-4" Label="Loading note activity" />
         }
         else
         {

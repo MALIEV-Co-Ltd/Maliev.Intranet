@@ -36,7 +36,7 @@
     <PageBody>
         @if (_loading)
         {
-            <div class="mlv-empty">Loading material...</div>
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading material" />
         }
         else if (_material is null)
         {

@@ -513,7 +513,7 @@
                                         }
                                         else if (_loadingDocumentPreview)
                                         {
-                                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                                            <ProgressiveSkeleton Layout="compact" Rows="3" ShowFilters="false" Label="Loading document preview" />
                                         }
                                         else if (!string.IsNullOrWhiteSpace(_documentPreviewError))
                                         {

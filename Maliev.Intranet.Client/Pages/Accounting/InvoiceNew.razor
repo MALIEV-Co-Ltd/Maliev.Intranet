@@ -55,7 +55,7 @@
 
                 @if (_customerLoading)
                 {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
+                    <ProgressiveSkeleton Layout="compact" Rows="2" ShowFilters="false" Class="mt-3" Label="Loading customer details" />
                 }
                 else if (_customerDetail is not null)
                 {

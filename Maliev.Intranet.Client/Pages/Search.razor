@@ -14,7 +14,7 @@
 
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+            <ProgressiveSkeleton Layout="list" Rows="4" ShowFilters="false" Class="mb-3" Label="Loading search results" />
         }
 
         @if (NormalizedQuery.Length < 2)

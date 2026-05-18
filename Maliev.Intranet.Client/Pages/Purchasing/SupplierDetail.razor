@@ -28,7 +28,7 @@
     <PageBody>
         @if (_loading)
         {
-            <div class="mlv-empty">Loading supplier...</div>
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading supplier" />
         }
         else if (_supplier is null)
         {

@@ -134,7 +134,7 @@
         <PanelCard>
             @if (_loading)
             {
-                <div class="mlv-empty">Loading suppliers...</div>
+                <ProgressiveSkeleton Layout="table" Rows="6" Columns="4" ShowFilters="false" Label="Loading suppliers" />
             }
             else if (_suppliers.Count == 0)
             {

@@ -18,7 +18,7 @@
                           Immediate="true" />
             @if (_isSearching)
             {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-1" Style="height: 2px;" />
+                <ProgressiveSkeleton Layout="compact" Rows="1" ShowFilters="false" Class="mt-1" Label="Searching documents" />
             }
         </div>
         

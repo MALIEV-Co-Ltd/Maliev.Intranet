@@ -23,7 +23,7 @@
 
         @if (_manualRefreshInProgress)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+            <ProgressiveSkeleton Layout="compact" Rows="2" ShowFilters="false" Class="mb-3" Label="Refreshing health checks" />
         }
         else if (_health is null && _history is null)
         {

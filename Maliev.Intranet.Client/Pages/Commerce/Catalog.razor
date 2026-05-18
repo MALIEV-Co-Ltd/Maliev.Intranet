@@ -55,8 +55,7 @@
 
                     @if (_loadingProducts)
                     {
-                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
-                        <div class="mlv-empty">Loading commerce products...</div>
+                        <ProgressiveSkeleton Layout="table" Rows="4" Columns="4" ShowFilters="false" Class="mb-2" Label="Loading commerce products" />
                     }
                     else if (_products.Count == 0)
                     {

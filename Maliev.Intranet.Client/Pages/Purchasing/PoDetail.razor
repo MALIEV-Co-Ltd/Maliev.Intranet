@@ -18,7 +18,7 @@
     <PageBody>
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading purchase order" />
         }
         else if (_order is null)
         {

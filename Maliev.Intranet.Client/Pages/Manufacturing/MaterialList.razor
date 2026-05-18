@@ -107,7 +107,7 @@
         <PanelCard>
             @if (_loading)
             {
-                <div class="mlv-empty">Loading materials...</div>
+                <ProgressiveSkeleton Layout="table" Rows="7" Columns="6" ShowFilters="false" Label="Loading materials" />
             }
             else if (_materials.Count == 0)
             {
