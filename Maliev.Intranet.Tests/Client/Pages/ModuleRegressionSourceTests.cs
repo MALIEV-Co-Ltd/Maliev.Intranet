@@ -222,6 +222,31 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void LeavePage_UsesSegmentedDurationControlAndEqualDateGrid()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Leave.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Leave.razor.css");
+
+        Assert.Contains("Class=\"leave-request-card\"", source, StringComparison.Ordinal);
+        Assert.Contains("role=\"radiogroup\"", source, StringComparison.Ordinal);
+        Assert.Contains("leave-period-option", source, StringComparison.Ordinal);
+        Assert.Contains("LeavePeriodOptions", source, StringComparison.Ordinal);
+        Assert.Contains("SetLeavePeriod", source, StringComparison.Ordinal);
+        Assert.Contains("leave-date-grid", source, StringComparison.Ordinal);
+        Assert.Contains("ReadApiErrorMessageAsync", source, StringComparison.Ordinal);
+        Assert.Contains("ApiErrorResponse", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Half day\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("@bind=\"_request.HalfDayPeriod\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("style=\"justify-content:flex-end\"", source, StringComparison.Ordinal);
+
+        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr));", ExtractCssBlock(styles, ".leave-period-options {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: auto minmax(0, 1fr);", ExtractCssBlock(styles, ".leave-period-option {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(2, minmax(0, 1fr));", ExtractCssBlock(styles, ".leave-date-grid {"), StringComparison.Ordinal);
+        Assert.Contains("justify-content: flex-end;", ExtractCssBlock(styles, ".leave-actions {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(styles, "@media (max-width: 760px)"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectsPage_UsesSharedShellAndQueryBackedPagination()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Projects.razor");

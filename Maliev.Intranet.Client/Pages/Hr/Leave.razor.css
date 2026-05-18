@@ -1,0 +1,126 @@
+.leave-request-card {
+    overflow: visible;
+}
+
+.leave-request-form {
+    display: grid;
+    gap: 1rem;
+}
+
+::deep .leave-request-grid {
+    row-gap: 1rem;
+}
+
+.leave-period-field {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.leave-field-label {
+    color: var(--maliev-ink-3);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 700;
+}
+
+.leave-period-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.leave-period-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    min-height: 4.25rem;
+    padding: 0.75rem;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-ring);
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.leave-period-option:hover {
+    border-color: color-mix(in srgb, var(--mud-palette-primary) 48%, var(--maliev-border));
+    background: color-mix(in srgb, var(--mud-palette-primary) 4%, var(--maliev-panel));
+}
+
+.leave-period-option.selected {
+    border-color: var(--mud-palette-primary);
+    background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--maliev-panel));
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.leave-period-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.leave-period-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in srgb, var(--mud-palette-primary) 10%, var(--maliev-panel-3));
+    color: var(--mud-palette-primary);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.leave-period-copy {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.leave-period-copy strong,
+.leave-period-copy span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.leave-period-copy strong {
+    color: var(--maliev-ink);
+    font-size: var(--mud-typography-body2-size);
+}
+
+.leave-period-copy span {
+    color: var(--maliev-ink-3);
+    font-size: var(--mud-typography-caption-size);
+}
+
+.leave-date-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+::deep .leave-date-field {
+    min-width: 0;
+}
+
+::deep .leave-date-field .mlv-form-input {
+    width: 100%;
+}
+
+.leave-actions {
+    justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+    .leave-period-options,
+    .leave-date-grid {
+        grid-template-columns: 1fr;
+    }
+}
