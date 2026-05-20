@@ -137,6 +137,26 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("chatbot-import-button", styles, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ExpandedPromptEditor_ProvidesLargeDialogForLongPrompts()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+
+        Assert.Contains("Open large editor", page, StringComparison.Ordinal);
+        Assert.Contains("OpenPromptEditor", page, StringComparison.Ordinal);
+        Assert.Contains("ClosePromptEditor", page, StringComparison.Ordinal);
+        Assert.Contains("_promptEditorOpen", page, StringComparison.Ordinal);
+        Assert.Contains("role=\"dialog\"", page, StringComparison.Ordinal);
+        Assert.Contains("aria-modal=\"true\"", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-prompt-dialog", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-prompt-dialog-grid", page, StringComparison.Ordinal);
+        Assert.Contains("Lines=\"22\"", page, StringComparison.Ordinal);
+        Assert.Contains(".chatbot-prompt-dialog-backdrop", styles, StringComparison.Ordinal);
+        Assert.Contains(".chatbot-expanded-field", styles, StringComparison.Ordinal);
+        Assert.Contains("position: fixed", styles, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();

@@ -179,6 +179,15 @@
                             </MudAlert>
                         }
 
+                        <div class="chatbot-prompt-toolbar">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.OpenInFull"
+                                       OnClick="OpenPromptEditor">
+                                Open large editor
+                            </MudButton>
+                        </div>
+
                         <div class="chatbot-instruction-text-field">
                             <MudTextField @bind-Value="_form.PersonaDefinition"
                                           Label="System prompt / skill instructions"
@@ -229,6 +238,73 @@
             </MudItem>
         </MudGrid>
     </PageBody>
+
+    @if (_promptEditorOpen)
+    {
+        <div class="chatbot-prompt-dialog-backdrop" @onclick="ClosePromptEditor"></div>
+        <section class="chatbot-prompt-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="chatbot-prompt-editor-title">
+            <header class="chatbot-prompt-dialog-header">
+                <div>
+                    <MudText id="chatbot-prompt-editor-title" Typo="Typo.h5">Prompt editor</MudText>
+                    <div class="chatbot-prompt-dialog-meta">@_form.Name</div>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               aria-label="Close prompt editor"
+                               OnClick="ClosePromptEditor" />
+            </header>
+
+            <div class="chatbot-prompt-dialog-grid">
+                <div class="chatbot-instruction-text-field chatbot-expanded-field">
+                    <MudTextField @bind-Value="_form.PersonaDefinition"
+                                  Label="System prompt / skill instructions"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="22"
+                                  Immediate="true"
+                                  Error="@IsInstructionTextOverLimit(_form.PersonaDefinition)"
+                                  ErrorText="@InstructionTextTooLongMessage" />
+                    <div class="@InstructionTextCounterClass(_form.PersonaDefinition)" role="status" aria-live="polite">
+                        <span>@FormatInstructionTextCount(_form.PersonaDefinition)</span>
+                        @if (!string.IsNullOrWhiteSpace(InstructionTextLengthMessage(_form.PersonaDefinition)))
+                        {
+                            <span>@InstructionTextLengthMessage(_form.PersonaDefinition)</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="chatbot-instruction-text-field chatbot-expanded-field">
+                    <MudTextField @bind-Value="_form.BusinessConstraints"
+                                  Label="Business constraints / guardrails"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="22"
+                                  Immediate="true"
+                                  Error="@IsInstructionTextOverLimit(_form.BusinessConstraints)"
+                                  ErrorText="@InstructionTextTooLongMessage" />
+                    <div class="@InstructionTextCounterClass(_form.BusinessConstraints)" role="status" aria-live="polite">
+                        <span>@FormatInstructionTextCount(_form.BusinessConstraints)</span>
+                        @if (!string.IsNullOrWhiteSpace(InstructionTextLengthMessage(_form.BusinessConstraints)))
+                        {
+                            <span>@InstructionTextLengthMessage(_form.BusinessConstraints)</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <footer class="chatbot-prompt-dialog-footer">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="ClosePromptEditor">
+                    Done
+                </MudButton>
+            </footer>
+        </section>
+    }
 </div>
 
 @code {
@@ -241,6 +317,7 @@
     private bool _loading;
     private bool _saving;
     private bool _refining;
+    private bool _promptEditorOpen;
     private string? _refinementSummary;
     private string? _importedPromptFileName;
     private static readonly int[] PriorityOptions = Enumerable
@@ -647,6 +724,16 @@
         return string.IsNullOrWhiteSpace(statusClass)
             ? "chatbot-instruction-character-count"
             : $"chatbot-instruction-character-count {statusClass}";
+    }
+
+    private void OpenPromptEditor()
+    {
+        _promptEditorOpen = true;
+    }
+
+    private void ClosePromptEditor()
+    {
+        _promptEditorOpen = false;
     }
 
     private void SetPriority(int priority)
