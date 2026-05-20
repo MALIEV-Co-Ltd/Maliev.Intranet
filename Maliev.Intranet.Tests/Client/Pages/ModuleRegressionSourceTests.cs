@@ -1249,6 +1249,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("font-size: var(--mud-typography-caption-size);", ExtractCssBlock(styles, ".ai-text-label"), StringComparison.Ordinal);
         Assert.Contains("padding-top: calc(var(--mud-typography-caption-size) + 0.35rem);", styles, StringComparison.Ordinal);
         Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, "::deep .ai-text-input .mud-input {"), StringComparison.Ordinal);
+        Assert.Contains("margin-top: 0 !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
         Assert.Contains("padding: 0.95rem 1rem !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
         Assert.Contains("--ai-dropzone-cyan: #0891b2;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
         Assert.Contains("--ai-dropzone-fuchsia: #c026d3;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);

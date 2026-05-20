@@ -122,6 +122,7 @@
 ::deep .ai-text-input textarea.mud-input-slot {
     box-sizing: border-box;
     min-height: calc(var(--ai-extraction-surface-min-height) - 2px) !important;
+    margin-top: 0 !important;
     padding: 0.95rem 1rem !important;
     line-height: 1.45;
     resize: vertical;
