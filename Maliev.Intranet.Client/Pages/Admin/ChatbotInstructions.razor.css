@@ -70,6 +70,15 @@
     gap: var(--maliev-space-2);
 }
 
+.chatbot-instruction-ai-button {
+    min-width: 136px;
+}
+
+.chatbot-instruction-ai-summary {
+    border: 1px solid color-mix(in oklab, var(--maliev-primary), transparent 72%);
+    border-radius: 8px;
+}
+
 .chatbot-instruction-character-count {
     display: flex;
     align-items: center;

@@ -225,6 +225,35 @@ public class ChatControllerTests
     }
 
     [Fact]
+    public async Task RefineInstruction_ShouldProxyWritablePromptDraft()
+    {
+        var request = new BffSystemInstructionRefinementRequest
+        {
+            Name = "Customer Website Assistant",
+            Category = BffSystemInstructionCategory.Core,
+            TopicKey = "website",
+            PersonaDefinition = "Mali website prompt",
+            BusinessConstraints = "Customer-safe only"
+        };
+
+        _chatbotClientMock
+            .Setup(x => x.RefineSystemInstructionAsync(request, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BffSystemInstructionRefinementResponse
+            {
+                PersonaDefinition = "Refined Mali website prompt",
+                BusinessConstraints = "Refined customer-safe constraints",
+                Summary = "Clarified persona and tightened safety scope."
+            });
+
+        var result = await _controller.RefineInstruction(request, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var bffResponse = Assert.IsType<BffSystemInstructionRefinementResponse>(okResult.Value);
+        Assert.Contains("Refined", bffResponse.PersonaDefinition, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("safety", bffResponse.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SendMessage_ShouldReturnOk()
     {
         var request = new BffChatMessageRequest { SessionId = Guid.NewGuid(), Content = "hi" };

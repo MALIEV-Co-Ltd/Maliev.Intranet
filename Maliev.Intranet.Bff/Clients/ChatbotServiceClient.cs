@@ -380,6 +380,42 @@ public class ChatbotServiceClient(HttpClient httpClient, ILogger<ChatbotServiceC
     }
 
     /// <summary>
+    /// Refines a configurable system instruction or skill prompt draft without saving it.
+    /// </summary>
+    public virtual async Task<BffSystemInstructionRefinementResponse?> RefineSystemInstructionAsync(
+        BffSystemInstructionRefinementRequest request,
+        CancellationToken ct = default)
+    {
+        LastError = null;
+        try
+        {
+            var content = JsonContent.Create(request, options: SnakeCaseOptions);
+            var response = await httpClient.PostAsync("/chatbot/v1/admin/instructions/refine", content, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                LastError = $"{(int)response.StatusCode} {response.StatusCode}: {errorBody}";
+                logger.LogError("ChatbotService instruction refinement failed ({StatusCode}): {ErrorBody}", response.StatusCode, errorBody);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<BffSystemInstructionRefinementResponse>(SnakeCaseOptions, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            LastError = "ChatbotService instruction refinement timed out.";
+            logger.LogWarning("ChatbotService instruction refinement timed out.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            logger.LogError(ex, "ChatbotService instruction refinement failed unexpectedly.");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Extracts customer intent (needs customer data, search term, needs history) from a user message.
     /// </summary>
     public virtual async Task<ChatbotCustomerIntentResponse?> ExtractCustomerIntentAsync(string userMessage, CancellationToken ct = default)

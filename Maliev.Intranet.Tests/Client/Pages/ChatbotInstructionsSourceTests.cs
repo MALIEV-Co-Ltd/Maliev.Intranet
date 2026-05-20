@@ -71,10 +71,30 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("InstructionTextLengthMessage(_form.PersonaDefinition)", page, StringComparison.Ordinal);
         Assert.Contains("InstructionTextLengthMessage(_form.BusinessConstraints)", page, StringComparison.Ordinal);
         Assert.Contains("HasInstructionTextLengthError", page, StringComparison.Ordinal);
-        Assert.Contains("Disabled=\"@(_saving || HasInstructionTextLengthError)\"", page, StringComparison.Ordinal);
+        Assert.Contains("Disabled=\"@(_saving || _refining || HasInstructionTextLengthError)\"", page, StringComparison.Ordinal);
         Assert.Contains("chatbot-instruction-character-count", styles, StringComparison.Ordinal);
         Assert.Contains(".chatbot-instruction-character-count.near-limit", styles, StringComparison.Ordinal);
         Assert.Contains(".chatbot-instruction-character-count.over-limit", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InstructionEditor_OffersAiRefinement()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+        var dto = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "ChatDtos.cs");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "ChatController.cs");
+        var serviceClient = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "ChatbotServiceClient.cs");
+
+        Assert.Contains("Improve with AI", page, StringComparison.Ordinal);
+        Assert.Contains("OnClick=\"RefineInstructionAsync\"", page, StringComparison.Ordinal);
+        Assert.Contains("api/v1/chat/instructions/refine", page, StringComparison.Ordinal);
+        Assert.Contains("_refining", page, StringComparison.Ordinal);
+        Assert.Contains("BffSystemInstructionRefinementRequest", dto, StringComparison.Ordinal);
+        Assert.Contains("BffSystemInstructionRefinementResponse", dto, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"instructions/refine\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("RefineSystemInstructionAsync", serviceClient, StringComparison.Ordinal);
+        Assert.Contains("chatbot-instruction-ai-summary", styles, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] relativeParts)

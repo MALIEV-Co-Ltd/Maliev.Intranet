@@ -200,6 +200,72 @@ public class BffSystemInstructionMutationRequest
 }
 
 /// <summary>
+/// Request for improving a chatbot system instruction draft with ChatbotService AI.
+/// </summary>
+public class BffSystemInstructionRefinementRequest
+{
+    /// <summary>
+    /// Gets or sets the display name.
+    /// </summary>
+    [StringLength(BffSystemInstructionLimits.NameMaxLength, MinimumLength = 1)]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the instruction category.
+    /// </summary>
+    public BffSystemInstructionCategory Category { get; set; } = BffSystemInstructionCategory.Topic;
+
+    /// <summary>
+    /// Gets or sets the profile or topic key.
+    /// </summary>
+    [StringLength(BffSystemInstructionLimits.TopicKeyMaxLength)]
+    public string? TopicKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets the persona or prompt body to improve.
+    /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
+    public string PersonaDefinition { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the business constraints and safety rules to improve.
+    /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
+    public string BusinessConstraints { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets optional operator guidance for the refinement.
+    /// </summary>
+    [StringLength(500)]
+    public string? ImprovementGoal { get; set; }
+}
+
+/// <summary>
+/// Response containing an AI-improved chatbot instruction draft.
+/// </summary>
+public class BffSystemInstructionRefinementResponse
+{
+    /// <summary>
+    /// Gets or sets the improved persona or prompt body.
+    /// </summary>
+    public string PersonaDefinition { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the improved business constraints and safety rules.
+    /// </summary>
+    public string BusinessConstraints { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a concise summary of the improvements made.
+    /// </summary>
+    public string Summary { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Request payload for sending a user message to an active chat session.
 /// </summary>
 public class BffChatMessageRequest

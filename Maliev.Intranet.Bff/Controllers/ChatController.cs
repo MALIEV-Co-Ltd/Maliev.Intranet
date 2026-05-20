@@ -153,6 +153,23 @@ public class ChatController(
     }
 
     /// <summary>
+    /// Uses ChatbotService AI to improve a chatbot system instruction draft without saving it.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Chat.InstructionsWrite, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("instructions/refine")]
+    public async Task<ActionResult<BffSystemInstructionRefinementResponse>> RefineInstruction(
+        [FromBody] BffSystemInstructionRefinementRequest request,
+        CancellationToken ct = default)
+    {
+        var result = await chatbotClient.RefineSystemInstructionAsync(request, ct);
+
+        if (result == null)
+            return ChatbotFailure("Failed to refine chatbot instruction.");
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Sends a message in an existing chat session.
     /// </summary>
     [RequirePermission(MalievPermissions.Chat.SessionsCreate, AuthenticationSchemes = "Bearer,Cookies")]

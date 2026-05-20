@@ -113,6 +113,14 @@
                             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Extension" OnClick="StartTopicSkill">
                                 Skill prompt
                             </MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Class="chatbot-instruction-ai-button"
+                                       StartIcon="@Icons.Material.Outlined.AutoFixHigh"
+                                       Disabled="@(!CanRefineInstruction)"
+                                       OnClick="RefineInstructionAsync">
+                                @(_refining ? "Improving..." : "Improve with AI")
+                            </MudButton>
                         </div>
                     </div>
 
@@ -129,6 +137,12 @@
                             Upload Markdown with frontmatter such as <span class="mlv-mono">topic_key: "website"</span> or paste prompt text directly.
                             Employees need <span class="mlv-mono">chatbot.instructions.write</span> to save changes.
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(_refinementSummary))
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="chatbot-instruction-ai-summary">
+                                @_refinementSummary
+                            </MudAlert>
+                        }
                         <InputFile OnChange="ImportPromptFileAsync" accept=".md,.txt" />
 
                         <div class="chatbot-instruction-text-field">
@@ -171,7 +185,7 @@
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    StartIcon="@Icons.Material.Outlined.Save"
-                                   Disabled="@(_saving || HasInstructionTextLengthError)"
+                                   Disabled="@(_saving || _refining || HasInstructionTextLengthError)"
                                    OnClick="SaveInstructionAsync">
                             Save instruction
                         </MudButton>
@@ -192,12 +206,26 @@
     private string _topicFilter = string.Empty;
     private bool _loading;
     private bool _saving;
+    private bool _refining;
+    private string? _refinementSummary;
 
     private const string InstructionTextTooLongMessage = "Instruction text must be 5,000 characters or fewer.";
 
     private bool HasInstructionTextLengthError
         => IsInstructionTextOverLimit(_form.PersonaDefinition)
             || IsInstructionTextOverLimit(_form.BusinessConstraints);
+
+    private bool HasInstructionTextMinimum
+        => TrimmedInstructionTextLength(_form.PersonaDefinition) >= BffSystemInstructionLimits.InstructionTextMinLength
+            && TrimmedInstructionTextLength(_form.BusinessConstraints) >= BffSystemInstructionLimits.InstructionTextMinLength;
+
+    private bool CanRefineInstruction
+        => !_loading
+            && !_saving
+            && !_refining
+            && !string.IsNullOrWhiteSpace(_form.Name)
+            && HasInstructionTextMinimum
+            && !HasInstructionTextLengthError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -261,6 +289,7 @@
     private void SelectInstruction(BffSystemInstructionDto instruction)
     {
         _editingId = instruction.Id;
+        _refinementSummary = null;
         _form = new BffSystemInstructionMutationRequest
         {
             Name = instruction.Name,
@@ -276,12 +305,14 @@
     private void StartWebsiteCore()
     {
         _editingId = null;
+        _refinementSummary = null;
         _form = CreateWebsiteCoreForm();
     }
 
     private void StartTopicSkill()
     {
         _editingId = null;
+        _refinementSummary = null;
         _form = new BffSystemInstructionMutationRequest
         {
             Name = "New customer skill prompt",
@@ -316,6 +347,7 @@
         using var reader = new StreamReader(stream);
         var content = await reader.ReadToEndAsync();
         ApplyImportedPrompt(content, Path.GetFileNameWithoutExtension(file.Name));
+        _refinementSummary = null;
         Snackbar.Add("Prompt file loaded into the editor.", Severity.Success);
     }
 
@@ -392,6 +424,60 @@
         }
     }
 
+    private async Task RefineInstructionAsync()
+    {
+        if (!CanRefineInstruction)
+        {
+            Snackbar.Add("Add a name, prompt, and constraints before asking AI to improve the draft.", Severity.Warning);
+            return;
+        }
+
+        _refining = true;
+        try
+        {
+            var request = new BffSystemInstructionRefinementRequest
+            {
+                Name = _form.Name,
+                Category = _form.Category,
+                TopicKey = _form.TopicKey,
+                PersonaDefinition = _form.PersonaDefinition,
+                BusinessConstraints = _form.BusinessConstraints,
+                ImprovementGoal = "Improve clarity, remove duplication, tighten customer-safe guardrails, and keep the prompt actionable for the MALIEV manufacturing assistant."
+            };
+
+            var response = await Http.PostAsJsonAsync("api/v1/chat/instructions/refine", request, _jsonOptions);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("AI could not refine this instruction draft.", Severity.Error);
+                return;
+            }
+
+            var refined = await response.Content.ReadFromJsonAsync<BffSystemInstructionRefinementResponse>(_jsonOptions);
+            if (refined is null)
+            {
+                Snackbar.Add("AI returned an empty refinement.", Severity.Warning);
+                return;
+            }
+
+            _form.PersonaDefinition = refined.PersonaDefinition;
+            _form.BusinessConstraints = refined.BusinessConstraints;
+            _refinementSummary = string.IsNullOrWhiteSpace(refined.Summary)
+                ? "AI refinement applied. Review the draft before saving."
+                : refined.Summary;
+
+            Snackbar.Add("AI refinement applied to the draft. Review before saving.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("AI could not refine this instruction draft.", Severity.Error);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _refining = false;
+        }
+    }
+
     private async Task SaveInstructionAsync()
     {
         if (!ValidateForm())
@@ -435,8 +521,8 @@
     {
         if (string.IsNullOrWhiteSpace(_form.Name)
             || string.IsNullOrWhiteSpace(_form.TopicKey)
-            || _form.PersonaDefinition.Trim().Length < BffSystemInstructionLimits.InstructionTextMinLength
-            || _form.BusinessConstraints.Trim().Length < BffSystemInstructionLimits.InstructionTextMinLength)
+            || TrimmedInstructionTextLength(_form.PersonaDefinition) < BffSystemInstructionLimits.InstructionTextMinLength
+            || TrimmedInstructionTextLength(_form.BusinessConstraints) < BffSystemInstructionLimits.InstructionTextMinLength)
         {
             Snackbar.Add("Name, key, prompt, and constraints are required.", Severity.Warning);
             return false;
@@ -469,6 +555,11 @@
     private static int InstructionTextLength(string? text)
     {
         return text?.Length ?? 0;
+    }
+
+    private static int TrimmedInstructionTextLength(string? text)
+    {
+        return text?.Trim().Length ?? 0;
     }
 
     private static bool IsInstructionTextOverLimit(string? text)
