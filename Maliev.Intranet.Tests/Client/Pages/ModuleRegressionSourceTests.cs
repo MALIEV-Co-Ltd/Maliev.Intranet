@@ -1247,10 +1247,15 @@ public class ModuleRegressionSourceTests
         Assert.Contains("gap: 0.75rem;", ExtractCssBlock(styles, ".ai-intake {"), StringComparison.Ordinal);
         Assert.Contains("gap: 0.35rem;", ExtractCssBlock(styles, ".ai-text-column {"), StringComparison.Ordinal);
         Assert.Contains("font-size: var(--mud-typography-caption-size);", ExtractCssBlock(styles, ".ai-text-label"), StringComparison.Ordinal);
-        Assert.Contains("padding-top: calc(var(--mud-typography-caption-size) + 0.35rem);", styles, StringComparison.Ordinal);
+        Assert.Contains("padding-top: 1.25rem;", styles, StringComparison.Ordinal);
         Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, "::deep .ai-text-input .mud-input {"), StringComparison.Ordinal);
         Assert.Contains("margin-top: 0 !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
         Assert.Contains("padding: 0.95rem 1rem !important;", ExtractCssBlock(styles, "::deep .ai-text-input textarea.mud-input-slot {"), StringComparison.Ordinal);
+        Assert.Contains("display: grid;", ExtractCssBlock(styles, ".ai-action-row {"), StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", ExtractCssBlock(styles, ".ai-action-row {"), StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", ExtractCssBlock(styles, "::deep .ai-extract-action.mlv-button.secondary {"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 40px;", ExtractCssBlock(styles, "::deep .ai-extract-action.mlv-button.secondary {"), StringComparison.Ordinal);
+        Assert.Contains("justify-content: center;", ExtractCssBlock(styles, "::deep .ai-extract-action.mlv-button.secondary {"), StringComparison.Ordinal);
         Assert.Contains("--ai-dropzone-cyan: #0891b2;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
         Assert.Contains("--ai-dropzone-fuchsia: #c026d3;", ExtractCssBlock(styles, ".customer-create-page"), StringComparison.Ordinal);
         Assert.Contains("min-height: var(--ai-extraction-surface-min-height);", ExtractCssBlock(styles, ".document-dropzone.ai-dropzone {"), StringComparison.Ordinal);

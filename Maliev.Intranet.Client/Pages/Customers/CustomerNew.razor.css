@@ -99,7 +99,7 @@
     display: grid;
     gap: 0.65rem;
     align-content: start;
-    padding-top: calc(var(--mud-typography-caption-size) + 0.35rem);
+    padding-top: 1.25rem;
 }
 
 ::deep .ai-text-input,
@@ -211,12 +211,37 @@
 }
 
 .ai-action-row {
-    display: flex;
-    justify-content: flex-end;
+    display: grid;
+    width: 100%;
 }
 
-.ai-extract-action {
-    min-height: 34px;
+::deep .ai-extract-action.mlv-button.secondary {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+    border-color: color-mix(in oklch, var(--ai-dropzone-violet) 28%, var(--maliev-border));
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--ai-dropzone-cyan) 10%, var(--mud-palette-surface)),
+            color-mix(in oklch, var(--ai-dropzone-violet) 8%, var(--mud-palette-surface)));
+    color: color-mix(in oklch, var(--ai-dropzone-violet) 74%, var(--maliev-text));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ai-dropzone-cyan) 12%, transparent);
+}
+
+::deep .ai-extract-action.mlv-button.secondary:not(:disabled):hover,
+::deep .ai-extract-action.mlv-button.secondary:not(:disabled):focus-visible {
+    border-color: color-mix(in oklch, var(--ai-dropzone-fuchsia) 42%, var(--ai-dropzone-cyan));
+    background:
+        linear-gradient(135deg,
+            color-mix(in oklch, var(--ai-dropzone-cyan) 16%, var(--mud-palette-surface)),
+            color-mix(in oklch, var(--ai-dropzone-fuchsia) 12%, var(--mud-palette-surface)));
+    color: var(--maliev-text);
+}
+
+::deep .ai-extract-action.mlv-button.secondary:disabled {
+    opacity: 0.68;
+    background: color-mix(in oklch, var(--mud-palette-primary) 5%, var(--mud-palette-surface));
+    color: color-mix(in oklch, var(--maliev-text-muted) 78%, var(--mud-palette-primary));
 }
 
 .ai-intake-toggle {
