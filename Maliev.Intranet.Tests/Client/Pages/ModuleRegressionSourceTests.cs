@@ -288,6 +288,19 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerList_RendersLoadingTableInsideResultsPanel()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
+        var panelBlock = ExtractRazorBlock(source, "<PanelCard>");
+
+        Assert.Contains("@if (_loading)", panelBlock, StringComparison.Ordinal);
+        Assert.Contains("<ProgressiveSkeleton Layout=\"table\"", panelBlock, StringComparison.Ordinal);
+        Assert.Contains("else if (_customers.Count > 0)", panelBlock, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"mlv-empty\">No customers match this view.</div>", panelBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("Class=\"mb-3\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_PaymentTermOptionsStretchToMenuWidth()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
@@ -1588,5 +1601,16 @@ public class ModuleRegressionSourceTests
         Assert.True(blockEnd >= 0, $"Expected selector '{selector}' declaration block to close.");
 
         return source.Substring(blockStart + 1, blockEnd - blockStart - 1);
+    }
+
+    private static string ExtractRazorBlock(string source, string startTag)
+    {
+        var startIndex = source.IndexOf(startTag, StringComparison.Ordinal);
+        Assert.True(startIndex >= 0, $"Expected tag '{startTag}' to exist.");
+
+        var endIndex = source.IndexOf("</PanelCard>", startIndex, StringComparison.Ordinal);
+        Assert.True(endIndex >= 0, $"Expected tag '{startTag}' to close.");
+
+        return source[startIndex..(endIndex + "</PanelCard>".Length)];
     }
 }
