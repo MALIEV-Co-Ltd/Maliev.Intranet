@@ -26,18 +26,24 @@
         <MudGrid Spacing="3">
             <MudItem xs="12" lg="7">
                 <PanelCard>
-                    <div class="mlv-toolbar">
+                    <div class="mlv-toolbar chatbot-instruction-filter-toolbar">
                         <MudTextField @bind-Value="_topicFilter"
-                                      Label="Topic/profile key"
-                                      Placeholder="website, materials, quote-prep"
+                                      Class="chatbot-filter-search"
+                                      Placeholder="Topic/profile key"
+                                      aria-label="Topic/profile key"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
                                       Immediate="true"
                                       DebounceInterval="300"
-                                      OnDebounceIntervalElapsed="LoadInstructionsAfterInput"
-                                      Style="min-width: 240px; flex: 1 1 260px;" />
-                        <MudSelect T="string" @bind-Value="_categoryFilter" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 180px;">
-                            <MudSelectItem Value="@string.Empty">All</MudSelectItem>
+                                      OnDebounceIntervalElapsed="LoadInstructionsAfterInput" />
+                        <MudSelect T="string"
+                                   @bind-Value="_categoryFilter"
+                                   Class="chatbot-filter-category"
+                                   Placeholder="Category"
+                                   aria-label="Instruction category"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense">
+                            <MudSelectItem Value="@string.Empty">All categories</MudSelectItem>
                             <MudSelectItem Value="@BffSystemInstructionCategory.Core.ToString()">Core</MudSelectItem>
                             <MudSelectItem Value="@BffSystemInstructionCategory.Topic.ToString()">Topic skill</MudSelectItem>
                         </MudSelect>
