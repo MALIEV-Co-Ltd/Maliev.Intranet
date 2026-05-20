@@ -88,6 +88,22 @@ public class Phase3DashboardTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void Dashboard_ShouldShowQuickActionsBeforeDashboardStatusPanels()
+    {
+        var cut = Render<Home>();
+        var markup = cut.Markup;
+        var quickActionsIndex = markup.IndexOf("Quick actions", StringComparison.OrdinalIgnoreCase);
+        var revenueIndex = markup.IndexOf("Total Revenue (Today)", StringComparison.OrdinalIgnoreCase);
+        var actionItemsIndex = markup.IndexOf("Action items", StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(quickActionsIndex >= 0, "Expected dashboard quick actions to render.");
+        Assert.True(revenueIndex >= 0, "Expected dashboard stat tiles to render.");
+        Assert.True(actionItemsIndex >= 0, "Expected dashboard action item panel to render.");
+        Assert.True(quickActionsIndex < revenueIndex, "Quick actions should appear before dashboard stat tiles.");
+        Assert.True(quickActionsIndex < actionItemsIndex, "Quick actions should appear before dashboard status panels.");
+    }
+
+    [Fact]
     public void Dashboard_ShouldNotRenderFallbackStats_WhileDashboardRequestIsLoading()
     {
         var dashboardResponse = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);

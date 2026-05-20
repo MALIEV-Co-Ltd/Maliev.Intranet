@@ -20,6 +20,19 @@
             <div class="mlv-error">@_error</div>
         }
 
+        <PanelCard Title="Quick actions" Class="mb-4">
+            <div class="mlv-toolbar" style="margin-bottom:0">
+                <div class="mlv-toolbar-left">
+                    <SecondaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/customers/new">New Customer</SecondaryButton>
+                    <SecondaryButton Icon="@Icons.Material.Outlined.ReceiptLong" Href="/accounting/new">New Invoice</SecondaryButton>
+                    <SecondaryButton Icon="@Icons.Material.Outlined.Inventory2" Href="/purchasing/new">New PO</SecondaryButton>
+                </div>
+                <div class="mlv-toolbar-right">
+                    <SecondaryButton Icon="@Icons.Material.Outlined.AdminPanelSettings" Href="/iam">IAM Review</SecondaryButton>
+                </div>
+            </div>
+        </PanelCard>
+
         <StatBar Class="mb-4">
             @foreach (var tile in DashboardStats)
             {
@@ -128,19 +141,6 @@
                 {
                     <div class="mlv-empty">No recent orders found.</div>
                 }
-            </PanelCard>
-
-            <PanelCard Title="Quick actions" Class="mlv-span-12">
-                <div class="mlv-toolbar" style="margin-bottom:0">
-                    <div class="mlv-toolbar-left">
-                        <SecondaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/customers/new">New Customer</SecondaryButton>
-                        <SecondaryButton Icon="@Icons.Material.Outlined.ReceiptLong" Href="/accounting/new">New Invoice</SecondaryButton>
-                        <SecondaryButton Icon="@Icons.Material.Outlined.Inventory2" Href="/purchasing/new">New PO</SecondaryButton>
-                    </div>
-                    <div class="mlv-toolbar-right">
-                        <SecondaryButton Icon="@Icons.Material.Outlined.AdminPanelSettings" Href="/iam">IAM Review</SecondaryButton>
-                    </div>
-                </div>
             </PanelCard>
         </div>
     </PageBody>
