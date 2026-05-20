@@ -337,7 +337,6 @@
 
     private static readonly IReadOnlyList<PreferenceOption> ThemeOptions =
     [
-        new("system", "System"),
         new("light", "Light"),
         new("dark", "Dark")
     ];
@@ -593,9 +592,10 @@
     private void ResetPreferenceModel()
     {
         var data = _preferences?.PreferenceData ?? [];
+        var defaultThemeMode = LayoutService.IsDarkMode ? "dark" : "light";
         _preferenceModel = new ProfilePreferenceForm
         {
-            ThemeMode = GetOptionValue(data, "themeMode", ThemeOptions, "system"),
+            ThemeMode = GetOptionValue(data, "themeMode", ThemeOptions, defaultThemeMode),
             LandingPage = GetOptionValue(data, "landingPage", LandingPageOptions, "/dashboard"),
             DefaultCurrency = GetOptionValue(data, "defaultCurrency", CurrencyOptions, "THB"),
             Language = GetOptionValue(data, "language", LanguageOptions, "en-TH"),

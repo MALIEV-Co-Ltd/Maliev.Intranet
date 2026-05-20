@@ -410,9 +410,8 @@ public sealed class LoginPageController : Controller
             height: 18px;
             stroke: currentColor;
         }
-        :root[data-maliev-mode="light"] [data-theme-icon="light"],
-        :root[data-maliev-mode="dark"] [data-theme-icon="dark"],
-        :root[data-maliev-mode="system"] [data-theme-icon="system"] {
+        :root[data-maliev-theme="light"] [data-theme-icon="light"],
+        :root[data-maliev-theme="dark"] [data-theme-icon="dark"] {
             display: block;
         }
         .error-alert {
@@ -459,7 +458,7 @@ public sealed class LoginPageController : Controller
             }
             function themePreference() {
                 const pref = cookie('maliev_theme') || localPreference() || 'system';
-                return pref === 'light' || pref === 'dark' || pref === 'system' ? pref : 'system';
+                return pref === 'light' || pref === 'dark' ? pref : 'system';
             }
             function effectiveTheme(pref) {
                 const systemDark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
@@ -471,7 +470,7 @@ public sealed class LoginPageController : Controller
                     return;
                 }
 
-                const label = pref === 'dark' ? 'Dark theme' : pref === 'light' ? 'Light theme' : 'Auto theme';
+                const label = effectiveTheme(pref) === 'dark' ? 'Dark theme' : 'Light theme';
                 button.setAttribute('aria-label', label);
                 button.setAttribute('title', label);
             }
@@ -483,7 +482,7 @@ public sealed class LoginPageController : Controller
             }
             window.toggleTheme = function() {
                 const pref = themePreference();
-                const next = pref === 'system' ? 'light' : pref === 'light' ? 'dark' : 'system';
+                const next = effectiveTheme(pref) === 'dark' ? 'light' : 'dark';
                 try {
                     localStorage.setItem('maliev_theme', next);
                 } catch {
@@ -507,17 +506,13 @@ public sealed class LoginPageController : Controller
                     <img src="/images/logo.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--light" />
                     <img src="/images/logo-white.svg" alt="MALIEV Logo" class="header-logo-img header-logo-img--dark" />
                 </div>
-                <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" data-theme-toggle aria-label="Auto theme" title="Auto theme">
+                <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" data-theme-toggle aria-label="Light theme" title="Light theme">
                     <svg class="theme-icon" data-theme-icon="light" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2M5.64 5.64 4.22 4.22M19.78 19.78l-1.42-1.42M18.36 5.64l1.42-1.42M4.22 19.78l1.42-1.42" stroke-width="2" stroke-linecap="round"/>
                         <circle cx="12" cy="12" r="4" stroke-width="2"/>
                     </svg>
                     <svg class="theme-icon" data-theme-icon="dark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a7 7 0 1 0 11.5 11.5Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    <svg class="theme-icon" data-theme-icon="system" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <rect x="3" y="4" width="18" height="12" rx="2" stroke-width="2"/>
-                        <path d="M8 20h8M12 16v4M16.5 9.5h2v2M18.5 9.5 15 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
             </div>

@@ -29,24 +29,24 @@ public class ThemeServiceTests
     }
 
     [Fact]
-    public async Task LayoutService_ToggleCyclesCorrectly()
+    public async Task LayoutService_TogglePersistsOnlyExplicitLightOrDarkModes()
     {
         // Arrange
         var jsMock = new Mock<IJSRuntime>();
         var loggerMock = new Mock<ILogger<LayoutService>>();
         var service = new LayoutService(jsMock.Object, loggerMock.Object);
 
-        // Act & Assert cycle: System (Initial) -> Light -> Dark -> System
+        // Act & Assert cycle: System (Initial) -> Dark -> Light -> Dark
         Assert.Equal(ThemeMode.System, service.CurrentMode);
+
+        await service.ToggleModeAsync();
+        Assert.Equal(ThemeMode.Dark, service.CurrentMode);
 
         await service.ToggleModeAsync();
         Assert.Equal(ThemeMode.Light, service.CurrentMode);
 
         await service.ToggleModeAsync();
         Assert.Equal(ThemeMode.Dark, service.CurrentMode);
-
-        await service.ToggleModeAsync();
-        Assert.Equal(ThemeMode.System, service.CurrentMode);
     }
 
     [Fact]

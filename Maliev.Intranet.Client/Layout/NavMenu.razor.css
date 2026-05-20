@@ -11,9 +11,6 @@
     border-radius: var(--maliev-radius-xs);
 }
 
-.auto-mode-icon ::deep svg path {
-    fill: url(#auto-mode-gradient) !important;
-}
 .nav-logo-button {
     display: inline-flex;
     align-items: center;

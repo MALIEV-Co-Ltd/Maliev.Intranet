@@ -200,19 +200,11 @@ public class LayoutService : IDisposable
     }
 
     /// <summary>
-    /// Toggles the theme mode in a cycle: System -> Light -> Dark -> System.
+    /// Toggles the theme mode between explicit Light and Dark preferences.
     /// </summary>
     public async Task ToggleModeAsync()
     {
-        var newMode = _currentMode switch
-        {
-            ThemeMode.System => ThemeMode.Light,
-            ThemeMode.Light => ThemeMode.Dark,
-            ThemeMode.Dark => ThemeMode.System,
-            _ => ThemeMode.System
-        };
-
-        await SetModeAsync(newMode);
+        await SetModeAsync(_isDarkMode ? ThemeMode.Light : ThemeMode.Dark);
     }
 
     /// <summary>
@@ -229,13 +221,6 @@ public class LayoutService : IDisposable
         _currentMode = mode;
         CalculateEffectiveTheme(); // Update local state immediately
 
-        var themeString = mode switch
-        {
-            ThemeMode.Dark => "dark",
-            ThemeMode.Light => "light",
-            _ => "system"
-        };
-
         try
         {
             // Calculate what the DOM attribute should be
@@ -247,14 +232,26 @@ public class LayoutService : IDisposable
                 $"document.documentElement.setAttribute('data-maliev-theme', '{effectiveTheme}')"
             );
 
-            // Persist preference to cookie
-            await _jsRuntime.InvokeVoidAsync(
-                "eval",
-                $"document.cookie = '{ThemeCookieName}={themeString}; path=/; max-age=31536000; SameSite=Lax'"
-            );
+            if (mode == ThemeMode.System)
+            {
+                await _jsRuntime.InvokeVoidAsync(
+                    "eval",
+                    $"document.cookie = '{ThemeCookieName}=; path=/; max-age=0; SameSite=Lax'; localStorage.removeItem('{ThemeCookieName}')"
+                );
+            }
+            else
+            {
+                var themeString = mode == ThemeMode.Dark ? "dark" : "light";
 
-            // Persist to localStorage (fallback)
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", ThemeCookieName, themeString);
+                // Persist preference to cookie
+                await _jsRuntime.InvokeVoidAsync(
+                    "eval",
+                    $"document.cookie = '{ThemeCookieName}={themeString}; path=/; max-age=31536000; SameSite=Lax'"
+                );
+
+                // Persist to localStorage (fallback)
+                await _jsRuntime.InvokeVoidAsync("localStorage.setItem", ThemeCookieName, themeString);
+            }
 
             MajorUpdateOccurred?.Invoke(this, EventArgs.Empty);
         }

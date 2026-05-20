@@ -98,19 +98,13 @@ public partial class Login : ComponentBase
         StateHasChanged();
     }
 
-    private string GetThemeIcon() => LayoutService.CurrentMode switch
-    {
-        ThemeMode.Dark => Icons.Material.Outlined.DarkMode,
-        ThemeMode.Light => Icons.Material.Outlined.LightMode,
-        _ => Icons.Material.Filled.AutoMode
-    };
+    private string GetThemeIcon() => LayoutService.IsDarkMode
+        ? Icons.Material.Outlined.DarkMode
+        : Icons.Material.Outlined.LightMode;
 
-    private string GetThemeTooltip() => LayoutService.CurrentMode switch
-    {
-        ThemeMode.Dark => "Switch to Light Mode",
-        ThemeMode.Light => "Switch to Dark Mode",
-        _ => "Toggle Theme"
-    };
+    private string GetThemeTooltip() => LayoutService.IsDarkMode
+        ? "Switch to Light Mode"
+        : "Switch to Dark Mode";
 
     private async Task HandleLogin()
     {

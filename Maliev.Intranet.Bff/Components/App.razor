@@ -154,16 +154,16 @@
             }
 
             function getThemePreference() {
-                // Priority: Cookie > localStorage > 'system'
+                // Priority: explicit stored preference > system preference
                 const cookie = getCookie('maliev_theme');
-                if (cookie === 'dark' || cookie === 'light' || cookie === 'system') return cookie;
+                if (cookie === 'dark' || cookie === 'light') return cookie;
 
                 try {
                     const local = localStorage.getItem('maliev_theme');
-                    if (local === 'dark' || local === 'light' || local === 'system') return local;
+                    if (local === 'dark' || local === 'light') return local;
                 } catch (e) { /* localStorage blocked in Safari private mode */ }
 
-                return 'system'; // Default
+                return 'system';
             }
 
             function applyTheme() {
