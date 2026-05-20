@@ -7,7 +7,7 @@
 
 .customer-create-page {
     --customer-field-height: 36px;
-    --ai-extraction-surface-min-height: 132px;
+    --ai-extraction-surface-min-height: 88px;
     --ai-dropzone-cyan: #0891b2;
     --ai-dropzone-blue: #2563eb;
     --ai-dropzone-violet: #7c3aed;
@@ -73,10 +73,10 @@
 }
 
 .ai-intake {
-    grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.72fr);
+    grid-template-columns: minmax(320px, 1fr) minmax(280px, 0.64fr);
     align-items: start;
-    gap: 0.75rem;
-    padding-top: 0.75rem;
+    gap: 0.55rem;
+    padding-top: 0.5rem;
 }
 
 .ai-text-column,
@@ -86,7 +86,7 @@
 
 .ai-text-column {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.25rem;
     align-content: start;
 }
 
@@ -99,9 +99,9 @@
 
 .ai-file-column {
     display: grid;
-    gap: 0.65rem;
+    gap: 0.45rem;
     align-content: start;
-    padding-top: 1.25rem;
+    padding-top: 1rem;
 }
 
 ::deep .ai-text-input,
@@ -125,8 +125,8 @@
     box-sizing: border-box;
     min-height: calc(var(--ai-extraction-surface-min-height) - 2px) !important;
     margin-top: 0 !important;
-    padding: 0.95rem 1rem !important;
-    line-height: 1.45;
+    padding: 0.65rem 0.75rem !important;
+    line-height: 1.38;
     resize: vertical;
 }
 
@@ -150,11 +150,11 @@
 
 .ai-selected-file {
     display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr) 1.75rem;
+    grid-template-columns: 1rem minmax(0, 1fr) 1.5rem;
     align-items: center;
-    gap: 0.55rem;
-    min-height: 38px;
-    padding: 0.45rem 0.55rem;
+    gap: 0.45rem;
+    min-height: 32px;
+    padding: 0.32rem 0.45rem;
     border: 1px solid var(--maliev-border);
     border-radius: 6px;
     background: color-mix(in oklch, var(--mud-palette-primary) 4%, var(--mud-palette-surface));
@@ -191,8 +191,8 @@
 }
 
 .ai-selected-file button {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.5rem;
+    height: 1.5rem;
     border: 0;
     border-radius: 50%;
     background: transparent;
@@ -219,7 +219,7 @@
 
 ::deep .ai-extract-action.mlv-button.secondary {
     width: 100%;
-    min-height: 40px;
+    min-height: 34px;
     justify-content: center;
     border-color: color-mix(in oklch, var(--ai-dropzone-violet) 28%, var(--maliev-border));
     background:
@@ -252,7 +252,7 @@
     border-radius: var(--maliev-radius-sm);
     background: var(--mud-palette-surface);
     color: var(--maliev-text);
-    padding: 0.85rem 1rem;
+    padding: 0.62rem 0.75rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -294,8 +294,8 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-height: 52px;
-    padding: 0.75rem 0.9rem;
+    min-height: 42px;
+    padding: 0.55rem 0.7rem;
     border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 42%, var(--maliev-border));
     border-radius: var(--maliev-radius-sm);
     background:
@@ -663,8 +663,8 @@
     height: var(--ai-extraction-surface-min-height);
     justify-content: center;
     align-items: center;
-    gap: 0.8rem;
-    padding: 1rem 1.2rem;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
     border: 1px dashed color-mix(in oklch, var(--ai-dropzone-cyan) 42%, var(--ai-dropzone-violet));
     background:
         linear-gradient(135deg,
@@ -699,14 +699,14 @@
 }
 
 .document-dropzone.ai-dropzone .mud-icon-root {
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0.45rem;
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0.36rem;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--ai-dropzone-cyan), var(--ai-dropzone-violet) 58%, var(--ai-dropzone-fuchsia));
     color: white;
-    font-size: 1.35rem;
-    box-shadow: 0 8px 20px color-mix(in oklch, var(--ai-dropzone-violet) 24%, transparent);
+    font-size: 1.1rem;
+    box-shadow: 0 6px 16px color-mix(in oklch, var(--ai-dropzone-violet) 22%, transparent);
 }
 
 .document-dropzone.ai-dropzone span {
