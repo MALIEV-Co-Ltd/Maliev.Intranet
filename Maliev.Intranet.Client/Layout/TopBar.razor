@@ -12,12 +12,12 @@
 <header class="topbar-root">
     @* ── Left: Logo ── *@
     <div class="topbar-left">
-        <button type="button"
-                class="topbar-logo-button"
-                aria-label="Go to dashboard"
-                @onclick="NavigateHome">
+        <a href="/"
+           class="topbar-logo-button"
+           aria-label="Go to application home"
+           @onclick="CloseTopbarMenus">
             <MudImage Src="@LogoUrl" Alt="MALIEV" Height="22" />
-        </button>
+        </a>
 
         <button type="button"
                 class="topbar-mobile-menu-button"
@@ -391,11 +391,10 @@
         }
     }
 
-    private void NavigateHome()
+    private void CloseTopbarMenus()
     {
         _mobileNavOpen = false;
         _profileMenuOpen = false;
-        Navigation.NavigateTo("/");
     }
 
     private void ToggleMobileNav()

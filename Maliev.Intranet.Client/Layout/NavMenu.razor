@@ -8,13 +8,11 @@
 <div class="nav-sidebar d-flex flex-column" style="height: 100%; overflow: hidden;">
     <!-- Logo -->
     <div class="d-flex align-center px-4 py-3" style="min-height: 56px; flex-shrink: 0;">
-        <button type="button"
-                class="nav-logo-button"
-                title="Dashboard"
-                aria-label="Go to dashboard"
-                @onclick="@(() => Navigation.NavigateTo("/"))">
+        <a href="/"
+           class="nav-logo-button"
+           aria-label="Go to application home">
             <MudImage Src="@LogoUrl" Alt="Maliev Logo" Height="22" />
-        </button>
+        </a>
     </div>
 
     <!-- Search -->

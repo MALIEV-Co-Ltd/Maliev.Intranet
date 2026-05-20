@@ -95,15 +95,13 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void TopBar_LogoClick_NavigatesToDashboard()
+    public void TopBar_LogoLink_PointsToApplicationHome()
     {
-        var navigation = Services.GetRequiredService<NavigationManager>();
-        navigation.NavigateTo("/customers");
-
         var cut = Render<TopBar>();
-        cut.Find("button.topbar-logo-button").Click();
+        var logo = cut.Find("a.topbar-logo-button");
 
-        Assert.EndsWith("/", navigation.Uri);
+        Assert.Equal("/", logo.GetAttribute("href"));
+        Assert.Equal("Go to application home", logo.GetAttribute("aria-label"));
     }
 
     [Fact]

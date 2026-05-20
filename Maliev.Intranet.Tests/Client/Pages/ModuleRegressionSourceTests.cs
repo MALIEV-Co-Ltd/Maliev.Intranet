@@ -145,8 +145,11 @@ public class ModuleRegressionSourceTests
 
         Assert.DoesNotContain("new(\"Dashboard\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("title=\"Dashboard\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Go to dashboard\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain(".topbar-logo-button:hover", styles, StringComparison.Ordinal);
-        Assert.Contains("Navigation.NavigateTo(\"/\")", source, StringComparison.Ordinal);
+        Assert.Contains("<a href=\"/\"", source, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Go to application home\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Navigation.NavigateTo(\"/\")", source, StringComparison.Ordinal);
         Assert.Contains("My Profile", source, StringComparison.Ordinal);
         Assert.Contains("Preferences", source, StringComparison.Ordinal);
         Assert.Contains("Sign out", source, StringComparison.Ordinal);
