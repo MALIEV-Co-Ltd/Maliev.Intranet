@@ -1239,6 +1239,14 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("Label=\"Paste customer text\"", page, StringComparison.Ordinal);
         Assert.Contains("role=\"status\" aria-live=\"polite\"", page, StringComparison.Ordinal);
         Assert.Contains("AI extraction in progress", page, StringComparison.Ordinal);
+        Assert.Contains("GetExtractionProgressLabel()", page, StringComparison.Ordinal);
+        Assert.Contains("GetExtractionProgressDescription()", page, StringComparison.Ordinal);
+        Assert.Contains("Improving extraction", page, StringComparison.Ordinal);
+        Assert.Contains("Refining autofill", page, StringComparison.Ordinal);
+        Assert.Contains("Refinement passes", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extracting attempt", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Attempt @", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("return $\"Attempt", page, StringComparison.Ordinal);
         Assert.Contains("Class=\"ai-processing-spinner\"", page, StringComparison.Ordinal);
         Assert.Contains("_showExtractionSummary = false;", page, StringComparison.Ordinal);
         Assert.Contains("_showExtractionSummary = true;", page, StringComparison.Ordinal);

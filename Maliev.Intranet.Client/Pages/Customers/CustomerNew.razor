@@ -99,7 +99,7 @@
 
                                 <div class="ai-action-row">
                                     <SecondaryButton Class="ai-extract-action" Icon="@Icons.Material.Outlined.Psychology" Disabled="@(!_hasExtractionInput || _extracting)" OnClick="ExtractAsync">
-                                        @(_extracting ? $"Extracting attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}..." : "Extract and autofill")
+                                        @(_extracting ? $"{GetExtractionProgressLabel()}..." : "Extract and autofill")
                                     </SecondaryButton>
                                 </div>
                             </div>
@@ -113,7 +113,7 @@
                                                          Class="ai-processing-spinner" />
                                     <span>
                                         <strong>AI extraction in progress</strong>
-                                        <small>Analyzing customer text and documents. Attempt @_currentExtractionAttempt of @MaxExtractionAttempts.</small>
+                                        <small>@GetExtractionProgressDescription()</small>
                                     </span>
                                 </div>
                             }
@@ -1727,7 +1727,7 @@
 
         if (_lastExtractionAttempts > 0)
         {
-            items.Add(new("Attempts", $"{_lastExtractionAttempts} of {MaxExtractionAttempts}"));
+            items.Add(new("Refinement passes", $"{_lastExtractionAttempts} of {MaxExtractionAttempts}"));
         }
 
         return items.Count == 0
@@ -1782,7 +1782,7 @@
     {
         if (_extracting)
         {
-            return $"Attempt {_currentExtractionAttempt}/{MaxExtractionAttempts}";
+            return GetExtractionProgressLabel();
         }
 
         if (_lastExtraction != null)
@@ -1792,6 +1792,20 @@
 
         return _aiIntakeExpanded ? "Expanded" : "Collapsed";
     }
+
+    private string GetExtractionProgressLabel() => _currentExtractionAttempt switch
+    {
+        <= 1 => "Reading details",
+        2 => "Improving extraction",
+        _ => "Refining autofill"
+    };
+
+    private string GetExtractionProgressDescription() => _currentExtractionAttempt switch
+    {
+        <= 1 => "Reading customer text and documents.",
+        2 => "Improving the extracted fields with another pass.",
+        _ => "Refining the autofill details before applying the best result."
+    };
 
     private string GetCompanySourceLabel()
     {
