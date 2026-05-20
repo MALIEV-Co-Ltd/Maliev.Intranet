@@ -933,6 +933,7 @@
             await ApplyExtractionAsync(bestResult);
             _lastExtraction = bestResult;
             _showExtractionSummary = true;
+            _extractionFiles.Clear();
         }
         finally
         {
@@ -992,20 +993,10 @@
 
         if (extracted.Addresses?.Count > 0)
         {
-            _addresses = extracted.Addresses
+            _addresses = DeduplicateExtractedAddresses(extracted.Addresses)
                 .Take(3)
                 .Select(ToAddressDraft)
                 .ToList();
-
-            if (_addresses.All(a => !string.Equals(a.Request.Type, "Shipping", StringComparison.OrdinalIgnoreCase)))
-            {
-                _addresses.Add(CloneAddress(_addresses[0], "Shipping"));
-            }
-
-            if (_addresses.All(a => !string.Equals(a.Request.Type, "Company Billing", StringComparison.OrdinalIgnoreCase)))
-            {
-                _addresses.Add(CloneAddress(_addresses[0], "Company Billing"));
-            }
         }
 
         EnsureDefaultAddressSet();
@@ -1535,6 +1526,47 @@
         || !string.IsNullOrWhiteSpace(address.StateProvince)
         || !string.IsNullOrWhiteSpace(address.PostalCode);
 
+    private static IEnumerable<ExtractedAddress> DeduplicateExtractedAddresses(IEnumerable<ExtractedAddress> addresses)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var address in addresses)
+        {
+            if (!HasExtractedAddressContent(address))
+            {
+                continue;
+            }
+
+            var key = BuildExtractedAddressKey(address);
+            if (seen.Add(key))
+            {
+                yield return address;
+            }
+        }
+    }
+
+    private static bool HasExtractedAddressContent(ExtractedAddress address) =>
+        !string.IsNullOrWhiteSpace(address.AddressLine1)
+        || !string.IsNullOrWhiteSpace(address.District)
+        || !string.IsNullOrWhiteSpace(address.City)
+        || !string.IsNullOrWhiteSpace(address.StateProvince)
+        || !string.IsNullOrWhiteSpace(address.PostalCode);
+
+    private static string BuildExtractedAddressKey(ExtractedAddress address) =>
+        string.Join("|",
+            NormalizeAddressPart(address.AddressLine1),
+            NormalizeAddressPart(address.AddressLine2),
+            NormalizeAddressPart(address.AddressLine3),
+            NormalizeAddressPart(address.District),
+            NormalizeAddressPart(address.City),
+            NormalizeAddressPart(address.StateProvince),
+            NormalizeAddressPart(address.PostalCode));
+
+    private static string NormalizeAddressPart(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : string.Join(" ", value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
     private string GetCustomerName()
     {
         var name = $"{_onboarding.Customer.FirstName} {_onboarding.Customer.LastName}".Trim();
@@ -1574,19 +1606,29 @@
     {
         if (CustomerBillingIndex < 0)
         {
-            _addresses.Insert(0, new AddressDraft { Request = new CreateAddressRequest { Type = "Billing", IsDefault = true, CountryId = _thailand?.Id ?? Guid.Empty } });
+            _addresses.Insert(0, CreateEmptyAddress("Billing"));
         }
 
         if (CustomerShippingIndex < 0)
         {
-            _addresses.Add(CloneAddress(_addresses[CustomerBillingIndex], "Shipping"));
+            _addresses.Add(CreateEmptyAddress("Shipping"));
         }
 
         if (CompanyBillingIndex < 0)
         {
-            _addresses.Add(CloneAddress(_addresses[CustomerBillingIndex], "Company Billing"));
+            _addresses.Add(CreateEmptyAddress("Company Billing"));
         }
     }
+
+    private AddressDraft CreateEmptyAddress(string type) => new()
+    {
+        Request = new CreateAddressRequest
+        {
+            Type = type,
+            IsDefault = true,
+            CountryId = _thailand?.Id ?? Guid.Empty
+        }
+    };
 
     private static string NormalizeBranch(string? branch)
     {

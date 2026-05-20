@@ -117,6 +117,8 @@ public class AiProcessingController(
         // Log data received from ChatbotService
         _logger.LogInformation("Received from ChatbotService: {@Result}", result);
 
+        var uniqueAddresses = DeduplicateExtractedAddresses(result.Addresses ?? []);
+
         // 3. Map to BFF response
         var extracted = new ExtractedCustomerDataResponse
         {
@@ -131,7 +133,7 @@ public class AiProcessingController(
             CompanyPhone = result.CompanyPhone,
             VatNumber = result.VatNumber,
             BranchNumber = result.BranchNumber,
-            Addresses = result.Addresses?.Select(a =>
+            Addresses = uniqueAddresses.Select(a =>
             {
                 _logger.LogInformation("Mapping address from AI: Type={Type}, Line1={Line1}, District={District}, City={City}, PC={PC}",
                     a.Type, a.AddressLine1, a.District, a.City, a.PostalCode);
@@ -266,6 +268,50 @@ public class AiProcessingController(
 
         return Ok(extracted);
     }
+
+    private static List<ChatbotExtractedAddress> DeduplicateExtractedAddresses(IEnumerable<ChatbotExtractedAddress> addresses)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unique = new List<ChatbotExtractedAddress>();
+
+        foreach (var address in addresses)
+        {
+            if (!HasAddressContent(address))
+            {
+                continue;
+            }
+
+            var key = BuildAddressKey(address);
+            if (seen.Add(key))
+            {
+                unique.Add(address);
+            }
+        }
+
+        return unique;
+    }
+
+    private static bool HasAddressContent(ChatbotExtractedAddress address) =>
+        !string.IsNullOrWhiteSpace(address.AddressLine1)
+        || !string.IsNullOrWhiteSpace(address.District)
+        || !string.IsNullOrWhiteSpace(address.City)
+        || !string.IsNullOrWhiteSpace(address.StateProvince)
+        || !string.IsNullOrWhiteSpace(address.PostalCode);
+
+    private static string BuildAddressKey(ChatbotExtractedAddress address) =>
+        string.Join("|",
+            NormalizeAddressPart(address.AddressLine1),
+            NormalizeAddressPart(address.AddressLine2),
+            NormalizeAddressPart(address.AddressLine3),
+            NormalizeAddressPart(address.District),
+            NormalizeAddressPart(address.City),
+            NormalizeAddressPart(address.StateProvince),
+            NormalizeAddressPart(address.PostalCode));
+
+    private static string NormalizeAddressPart(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : string.Join(" ", value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
     /// <summary>
     /// Processes uploaded documents and text to extract supplier onboarding data using AI.

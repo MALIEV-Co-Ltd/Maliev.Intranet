@@ -1235,6 +1235,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Class=\"ai-processing-spinner\"", page, StringComparison.Ordinal);
         Assert.Contains("_showExtractionSummary = false;", page, StringComparison.Ordinal);
         Assert.Contains("_showExtractionSummary = true;", page, StringComparison.Ordinal);
+        Assert.Contains("_extractionFiles.Clear();", page, StringComparison.Ordinal);
+        Assert.Contains("DeduplicateExtractedAddresses(extracted.Addresses)", page, StringComparison.Ordinal);
+        Assert.Contains("_addresses.Add(CreateEmptyAddress(\"Shipping\"));", page, StringComparison.Ordinal);
+        Assert.Contains("_addresses.Add(CreateEmptyAddress(\"Company Billing\"));", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("_addresses.Add(CloneAddress(_addresses[0], \"Shipping\"));", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("_addresses.Add(CloneAddress(_addresses[0], \"Company Billing\"));", page, StringComparison.Ordinal);
         Assert.Contains("class=\"extraction-summary-dismiss\"", page, StringComparison.Ordinal);
         Assert.Contains("AI extraction review", page, StringComparison.Ordinal);
         Assert.Contains("Needs input", page, StringComparison.Ordinal);

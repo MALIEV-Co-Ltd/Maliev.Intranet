@@ -155,6 +155,61 @@ public class AiProcessingControllerTests
     }
 
     [Fact]
+    public async Task ExtractCustomerFromDocument_WhenAiReturnsDuplicateAddresses_ReturnsOnePhysicalAddress()
+    {
+        _chatbotClientMock
+            .Setup(client => client.ExtractCustomerAsync(
+                It.IsAny<List<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<List<ChatbotExtractionFileData>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatbotExtractCustomerResponse
+            {
+                FirstName = "Sutthichai",
+                LastName = "Songnisai",
+                Email = "sutthichai.songnisai@maliev.com",
+                Addresses =
+                [
+                    new ChatbotExtractedAddress
+                    {
+                        Type = "Billing",
+                        AddressLine1 = "36/1 Moo 3",
+                        District = "Khlong Khoi",
+                        City = "Pak Kret",
+                        StateProvince = "Nonthaburi",
+                        PostalCode = "11120"
+                    },
+                    new ChatbotExtractedAddress
+                    {
+                        Type = "Shipping",
+                        AddressLine1 = "36/1   Moo 3",
+                        District = "Khlong Khoi",
+                        City = "Pak Kret",
+                        StateProvince = "Nonthaburi",
+                        PostalCode = "11120"
+                    },
+                    new ChatbotExtractedAddress
+                    {
+                        Type = "Company Billing",
+                        AddressLine1 = "36/1 Moo 3",
+                        District = "Khlong Khoi",
+                        City = "Pak Kret",
+                        StateProvince = "Nonthaburi",
+                        PostalCode = "11120"
+                    }
+                ]
+            });
+
+        var result = await _controller.ExtractCustomerFromDocument(new FormFileCollection(), "business card text");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var extracted = Assert.IsType<ExtractedCustomerDataResponse>(ok.Value);
+        var address = Assert.Single(extracted.Addresses ?? []);
+        Assert.Equal("Billing", address.Type);
+        Assert.Equal("36/1 Moo 3", address.AddressLine1);
+    }
+
+    [Fact]
     public async Task ExtractAccountingEntryFromDocument_WhenAiReturnsJson_ReturnsDraftJournalFields()
     {
         _chatbotClientMock
