@@ -54,6 +54,15 @@
     font-size: var(--mud-typography-body2-size) !important;
 }
 
+.mud-input-control.mud-input-outlined-with-label .mud-input-label.mud-shrink,
+.mud-input-control.mud-input-outlined-with-label .mud-input-label-inputcontrol.mud-shrink {
+    background-color: var(--maliev-panel);
+    border-radius: var(--maliev-radius-xs);
+    line-height: 1.1;
+    padding-inline: var(--maliev-space-2);
+    z-index: 1;
+}
+
 .mud-input-slot::placeholder {
     font-size: var(--mud-typography-default-size);
     opacity: 0.6;

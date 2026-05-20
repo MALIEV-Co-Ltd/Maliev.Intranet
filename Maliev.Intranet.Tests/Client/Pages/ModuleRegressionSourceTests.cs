@@ -46,6 +46,18 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void OutlinedMudInputLabels_MaskCompactFieldBorder()
+    {
+        var overrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+
+        Assert.Contains(".mud-input-control.mud-input-outlined-with-label .mud-input-label.mud-shrink", overrides, StringComparison.Ordinal);
+        Assert.Contains(".mud-input-control.mud-input-outlined-with-label .mud-input-label-inputcontrol.mud-shrink", overrides, StringComparison.Ordinal);
+        Assert.Contains("background-color: var(--maliev-panel);", overrides, StringComparison.Ordinal);
+        Assert.Contains("padding-inline: var(--maliev-space-2);", overrides, StringComparison.Ordinal);
+        Assert.Contains("z-index: 1;", overrides, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerList_SubscribesToCustomerChangedRealtimeSignal()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
