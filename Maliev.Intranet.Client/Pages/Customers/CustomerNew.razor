@@ -553,7 +553,7 @@
                             }
                         </div>
 
-                        <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                        <div class="customer-create-actions">
                             <SecondaryButton Href="/customers">Cancel</SecondaryButton>
                             <PrimaryButton Type="submit" Disabled="@(_saving || _hasPendingDocumentUploads)" Icon="@Icons.Material.Outlined.PersonAdd">
                                 @(_saving ? "Creating..." : "Create Customer")

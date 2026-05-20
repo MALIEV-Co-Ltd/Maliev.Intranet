@@ -67,7 +67,9 @@
 }
 
 .customer-create-tab-panel {
-    min-height: 430px;
+    display: grid;
+    gap: 1rem;
+    min-height: 0;
 }
 
 .ai-intake {
@@ -433,6 +435,14 @@
 .customer-classification-default small {
     color: var(--maliev-text-muted);
     line-height: 1.35;
+}
+
+.customer-create-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
 .section-divider h3 {
