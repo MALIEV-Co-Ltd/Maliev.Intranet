@@ -174,6 +174,10 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ClearAfterNavigation = true", snackbarPolicy, StringComparison.Ordinal);
         Assert.Contains("config.VisibleStateDuration = 5000;", mainLayout, StringComparison.Ordinal);
         Assert.DoesNotContain("config.VisibleStateDuration = 10000;", mainLayout, StringComparison.Ordinal);
+        Assert.Contains("CustomerCreateRequestTimeout", customerNew, StringComparison.Ordinal);
+        Assert.Contains("new CancellationTokenSource(CustomerCreateRequestTimeout)", customerNew, StringComparison.Ordinal);
+        Assert.Contains("catch (OperationCanceledException)", customerNew, StringComparison.Ordinal);
+        Assert.Contains("Customer creation is taking longer than expected.", customerNew, StringComparison.Ordinal);
         Assert.Contains("AI extraction review", customerNew, StringComparison.Ordinal);
         Assert.Contains("DismissExtractionSummary", customerNew, StringComparison.Ordinal);
         Assert.Contains("GetMissingExtractionItems", customerNew, StringComparison.Ordinal);

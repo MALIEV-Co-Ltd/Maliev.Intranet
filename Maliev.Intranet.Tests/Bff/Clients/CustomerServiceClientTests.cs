@@ -144,6 +144,39 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task CreateCustomerBasicAsync_WhenInitialInternalNoteFails_ReturnsCreatedCustomer()
+    {
+        var customerId = Guid.NewGuid();
+        var request = new CustomerOnboardingRequest
+        {
+            Customer = new CreateCustomerRequest { FirstName = "John", LastName = "Doe" },
+            InternalNote = "Company branch: Head office / สำนักงานใหญ่"
+        };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m => m.RequestUri!.PathAndQuery.Contains("/customers")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new CustomerResponse { Id = customerId })
+            });
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m => m.RequestUri!.PathAndQuery.Contains("/internal-notes")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+
+        var result = await _client.CreateCustomerBasicAsync(request);
+
+        Assert.NotNull(result);
+        Assert.Equal(customerId, result.Id);
+    }
+
+    [Fact]
     public async Task CreateCustomerBasicAsync_WithOnboardingPayload_CreatesRelatedRecords()
     {
         var customerId = Guid.NewGuid();

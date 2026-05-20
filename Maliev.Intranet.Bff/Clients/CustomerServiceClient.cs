@@ -12,6 +12,8 @@ namespace Maliev.Intranet.Bff.Clients;
 /// <param name="logger">The logger instance.</param>
 public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServiceClient> logger)
 {
+    private static readonly TimeSpan NonCriticalOnboardingStepTimeout = TimeSpan.FromSeconds(10);
+
     /// <summary>
     /// Creates a customer with basic details (Company + Customer + Note).
     /// </summary>
@@ -85,15 +87,46 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
 
         if (!string.IsNullOrEmpty(request.InternalNote))
         {
-            await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", new CreateInternalNoteRequest
-            {
-                OwnerType = "Customer",
-                OwnerId = customer.Id,
-                NoteText = request.InternalNote
-            }, ct);
+            await TryCreateInitialInternalNoteAsync(customer.Id, request.InternalNote, ct);
         }
 
         return customer;
+    }
+
+    private async Task TryCreateInitialInternalNoteAsync(Guid customerId, string noteText, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(NonCriticalOnboardingStepTimeout);
+
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/customer/v1/internal-notes", new CreateInternalNoteRequest
+            {
+                OwnerType = "Customer",
+                OwnerId = customerId,
+                NoteText = noteText
+            }, timeout.Token);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Initial internal note creation failed for customer {CustomerId} with status {StatusCode}; customer creation will continue.",
+                    customerId,
+                    response.StatusCode);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            logger.LogWarning(ex, "Initial internal note creation timed out for customer {CustomerId}; customer creation will continue.", customerId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Initial internal note creation failed for customer {CustomerId}; customer creation will continue.", customerId);
+        }
     }
 
     /// <summary>

@@ -651,6 +651,7 @@
 
     private const int MaxExtractionAttempts = 3;
     private const int CompanySuggestionSearchLimit = 20;
+    private static readonly TimeSpan CustomerCreateRequestTimeout = TimeSpan.FromSeconds(45);
     private CreateTab _activeCreateTab = CreateTab.Contact;
     private DocumentPanel _activeDocumentPanel = DocumentPanel.Standard;
     private const double HighConfidenceThreshold = 0.9;
@@ -1063,7 +1064,8 @@
             _onboarding.Nda = BuildNdaRequest();
             _onboarding.InternalNote = BuildInternalNote();
 
-            var response = await Http.PostAsJsonAsync("api/v1/customers/create-basic", _onboarding);
+            using var createTimeout = new CancellationTokenSource(CustomerCreateRequestTimeout);
+            var response = await Http.PostAsJsonAsync("api/v1/customers/create-basic", _onboarding, createTimeout.Token);
             if (!response.IsSuccessStatusCode)
             {
                 _error = await ReadApiErrorMessageAsync(response, "Customer could not be created.");
@@ -1079,6 +1081,10 @@
 
             Snackbar.Add("Customer created.", Severity.Success);
             Navigation.NavigateTo($"/customers/{customer.Id}");
+        }
+        catch (OperationCanceledException)
+        {
+            _error = "Customer creation is taking longer than expected. Please check the customer list before trying again.";
         }
         catch (Exception ex)
         {
