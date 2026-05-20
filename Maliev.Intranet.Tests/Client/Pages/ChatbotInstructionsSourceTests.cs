@@ -51,6 +51,32 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains(".chatbot-instruction-active-control ::deep .chatbot-instruction-active-switch", styles, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void InstructionTextFields_ShowCountsAndLengthWarnings()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+        var dto = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "ChatDtos.cs");
+        var mutationRequest = dto[dto.IndexOf("public class BffSystemInstructionMutationRequest", StringComparison.Ordinal)..];
+
+        Assert.Contains("BffSystemInstructionLimits", dto, StringComparison.Ordinal);
+        Assert.Contains("public const int InstructionTextWarningLength = 4000;", dto, StringComparison.Ordinal);
+        Assert.Contains("public const int InstructionTextMaxLength = 5000;", dto, StringComparison.Ordinal);
+        Assert.Contains("[StringLength(BffSystemInstructionLimits.NameMaxLength, MinimumLength = 1)]", mutationRequest, StringComparison.Ordinal);
+        Assert.Contains("[StringLength(BffSystemInstructionLimits.TopicKeyMaxLength)]", mutationRequest, StringComparison.Ordinal);
+        Assert.Contains("BffSystemInstructionLimits.InstructionTextMaxLength", mutationRequest, StringComparison.Ordinal);
+        Assert.Contains("MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength", mutationRequest, StringComparison.Ordinal);
+        Assert.Contains("FormatInstructionTextCount(_form.PersonaDefinition)", page, StringComparison.Ordinal);
+        Assert.Contains("FormatInstructionTextCount(_form.BusinessConstraints)", page, StringComparison.Ordinal);
+        Assert.Contains("InstructionTextLengthMessage(_form.PersonaDefinition)", page, StringComparison.Ordinal);
+        Assert.Contains("InstructionTextLengthMessage(_form.BusinessConstraints)", page, StringComparison.Ordinal);
+        Assert.Contains("HasInstructionTextLengthError", page, StringComparison.Ordinal);
+        Assert.Contains("Disabled=\"@(_saving || HasInstructionTextLengthError)\"", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-instruction-character-count", styles, StringComparison.Ordinal);
+        Assert.Contains(".chatbot-instruction-character-count.near-limit", styles, StringComparison.Ordinal);
+        Assert.Contains(".chatbot-instruction-character-count.over-limit", styles, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();

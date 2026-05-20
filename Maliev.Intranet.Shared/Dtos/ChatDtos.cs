@@ -1,4 +1,37 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.Intranet.Shared;
+
+/// <summary>
+/// Shared validation limits for configurable chatbot system instructions.
+/// </summary>
+public static class BffSystemInstructionLimits
+{
+    /// <summary>
+    /// Maximum display name length accepted by ChatbotService.
+    /// </summary>
+    public const int NameMaxLength = 200;
+
+    /// <summary>
+    /// Maximum topic or profile key length accepted by ChatbotService.
+    /// </summary>
+    public const int TopicKeyMaxLength = 100;
+
+    /// <summary>
+    /// Minimum length for instruction text accepted by ChatbotService.
+    /// </summary>
+    public const int InstructionTextMinLength = 10;
+
+    /// <summary>
+    /// Character count where the editor starts warning that an instruction is getting long.
+    /// </summary>
+    public const int InstructionTextWarningLength = 4000;
+
+    /// <summary>
+    /// Maximum length for instruction text accepted by ChatbotService.
+    /// </summary>
+    public const int InstructionTextMaxLength = 5000;
+}
 
 /// <summary>
 /// Request payload to initiate a new AI-assisted chat session within the intranet.
@@ -71,6 +104,7 @@ public class BffSystemInstructionDto
     /// <summary>
     /// Gets or sets the display name.
     /// </summary>
+    [StringLength(BffSystemInstructionLimits.NameMaxLength, MinimumLength = 1)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
@@ -81,6 +115,7 @@ public class BffSystemInstructionDto
     /// <summary>
     /// Gets or sets the profile or topic key.
     /// </summary>
+    [StringLength(BffSystemInstructionLimits.TopicKeyMaxLength)]
     public string? TopicKey { get; set; }
 
     /// <summary>
@@ -91,11 +126,17 @@ public class BffSystemInstructionDto
     /// <summary>
     /// Gets or sets the persona or prompt body.
     /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
     public string PersonaDefinition { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the business constraints and safety rules.
     /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
     public string BusinessConstraints { get; set; } = string.Empty;
 
     /// <summary>
@@ -117,6 +158,7 @@ public class BffSystemInstructionMutationRequest
     /// <summary>
     /// Gets or sets the display name.
     /// </summary>
+    [StringLength(BffSystemInstructionLimits.NameMaxLength, MinimumLength = 1)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
@@ -127,6 +169,7 @@ public class BffSystemInstructionMutationRequest
     /// <summary>
     /// Gets or sets the profile or topic key.
     /// </summary>
+    [StringLength(BffSystemInstructionLimits.TopicKeyMaxLength)]
     public string? TopicKey { get; set; }
 
     /// <summary>
@@ -137,11 +180,17 @@ public class BffSystemInstructionMutationRequest
     /// <summary>
     /// Gets or sets the persona or prompt body.
     /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
     public string PersonaDefinition { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the business constraints and safety rules.
     /// </summary>
+    [StringLength(
+        BffSystemInstructionLimits.InstructionTextMaxLength,
+        MinimumLength = BffSystemInstructionLimits.InstructionTextMinLength)]
     public string BusinessConstraints { get; set; } = string.Empty;
 
     /// <summary>

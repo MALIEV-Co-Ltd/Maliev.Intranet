@@ -131,25 +131,47 @@
                         </div>
                         <InputFile OnChange="ImportPromptFileAsync" accept=".md,.txt" />
 
-                        <MudTextField @bind-Value="_form.PersonaDefinition"
-                                      Label="System prompt / skill instructions"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Lines="10"
-                                      Immediate="true" />
-                        <MudTextField @bind-Value="_form.BusinessConstraints"
-                                      Label="Business constraints / guardrails"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Lines="7"
-                                      Immediate="true" />
+                        <div class="chatbot-instruction-text-field">
+                            <MudTextField @bind-Value="_form.PersonaDefinition"
+                                          Label="System prompt / skill instructions"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Lines="10"
+                                          Immediate="true"
+                                          Error="@IsInstructionTextOverLimit(_form.PersonaDefinition)"
+                                          ErrorText="@InstructionTextTooLongMessage" />
+                            <div class="@InstructionTextCounterClass(_form.PersonaDefinition)" role="status" aria-live="polite">
+                                <span>@FormatInstructionTextCount(_form.PersonaDefinition)</span>
+                                @if (!string.IsNullOrWhiteSpace(InstructionTextLengthMessage(_form.PersonaDefinition)))
+                                {
+                                    <span>@InstructionTextLengthMessage(_form.PersonaDefinition)</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="chatbot-instruction-text-field">
+                            <MudTextField @bind-Value="_form.BusinessConstraints"
+                                          Label="Business constraints / guardrails"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Lines="7"
+                                          Immediate="true"
+                                          Error="@IsInstructionTextOverLimit(_form.BusinessConstraints)"
+                                          ErrorText="@InstructionTextTooLongMessage" />
+                            <div class="@InstructionTextCounterClass(_form.BusinessConstraints)" role="status" aria-live="polite">
+                                <span>@FormatInstructionTextCount(_form.BusinessConstraints)</span>
+                                @if (!string.IsNullOrWhiteSpace(InstructionTextLengthMessage(_form.BusinessConstraints)))
+                                {
+                                    <span>@InstructionTextLengthMessage(_form.BusinessConstraints)</span>
+                                }
+                            </div>
+                        </div>
                     </MudStack>
 
                     <div class="d-flex flex-wrap gap-2 mt-4">
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    StartIcon="@Icons.Material.Outlined.Save"
-                                   Disabled="@_saving"
+                                   Disabled="@(_saving || HasInstructionTextLengthError)"
                                    OnClick="SaveInstructionAsync">
                             Save instruction
                         </MudButton>
@@ -170,6 +192,12 @@
     private string _topicFilter = string.Empty;
     private bool _loading;
     private bool _saving;
+
+    private const string InstructionTextTooLongMessage = "Instruction text must be 5,000 characters or fewer.";
+
+    private bool HasInstructionTextLengthError
+        => IsInstructionTextOverLimit(_form.PersonaDefinition)
+            || IsInstructionTextOverLimit(_form.BusinessConstraints);
 
     protected override async Task OnInitializedAsync()
     {
@@ -407,10 +435,16 @@
     {
         if (string.IsNullOrWhiteSpace(_form.Name)
             || string.IsNullOrWhiteSpace(_form.TopicKey)
-            || _form.PersonaDefinition.Trim().Length < 10
-            || _form.BusinessConstraints.Trim().Length < 10)
+            || _form.PersonaDefinition.Trim().Length < BffSystemInstructionLimits.InstructionTextMinLength
+            || _form.BusinessConstraints.Trim().Length < BffSystemInstructionLimits.InstructionTextMinLength)
         {
             Snackbar.Add("Name, key, prompt, and constraints are required.", Severity.Warning);
+            return false;
+        }
+
+        if (HasInstructionTextLengthError)
+        {
+            Snackbar.Add("Prompt and constraint instructions must be 5,000 characters or fewer.", Severity.Warning);
             return false;
         }
 
@@ -430,6 +464,53 @@
     private static string FormatInstructionVersion(int version)
     {
         return $"v{version}";
+    }
+
+    private static int InstructionTextLength(string? text)
+    {
+        return text?.Length ?? 0;
+    }
+
+    private static bool IsInstructionTextOverLimit(string? text)
+    {
+        return InstructionTextLength(text) > BffSystemInstructionLimits.InstructionTextMaxLength;
+    }
+
+    private static bool IsInstructionTextNearLimit(string? text)
+    {
+        var length = InstructionTextLength(text);
+        return length >= BffSystemInstructionLimits.InstructionTextWarningLength
+            && length <= BffSystemInstructionLimits.InstructionTextMaxLength;
+    }
+
+    private static string FormatInstructionTextCount(string? text)
+    {
+        return $"{InstructionTextLength(text):N0} / {BffSystemInstructionLimits.InstructionTextMaxLength:N0} characters";
+    }
+
+    private static string InstructionTextLengthMessage(string? text)
+    {
+        var length = InstructionTextLength(text);
+        if (length > BffSystemInstructionLimits.InstructionTextMaxLength)
+        {
+            var excess = length - BffSystemInstructionLimits.InstructionTextMaxLength;
+            return $"Too long by {excess:N0} characters.";
+        }
+
+        return length >= BffSystemInstructionLimits.InstructionTextWarningLength
+            ? "Long instruction; trim if the extra detail is not required."
+            : string.Empty;
+    }
+
+    private static string InstructionTextCounterClass(string? text)
+    {
+        var statusClass = IsInstructionTextOverLimit(text)
+            ? "over-limit"
+            : IsInstructionTextNearLimit(text) ? "near-limit" : string.Empty;
+
+        return string.IsNullOrWhiteSpace(statusClass)
+            ? "chatbot-instruction-character-count"
+            : $"chatbot-instruction-character-count {statusClass}";
     }
 
     private static string Preview(string text)
