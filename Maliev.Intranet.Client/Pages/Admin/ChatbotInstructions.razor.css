@@ -79,6 +79,85 @@
     border-radius: 8px;
 }
 
+.chatbot-import-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--maliev-space-3);
+    padding: var(--maliev-space-3);
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    background: var(--maliev-panel-2);
+}
+
+.chatbot-import-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--maliev-space-1);
+    min-width: 0;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.35;
+}
+
+.chatbot-import-label {
+    color: var(--maliev-text);
+    font-weight: 800;
+}
+
+.chatbot-import-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--maliev-space-2);
+    min-width: 172px;
+}
+
+.chatbot-import-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--maliev-space-2);
+    min-height: 34px;
+    padding: 0 var(--maliev-space-3);
+    border: 1px solid var(--maliev-ink);
+    border-radius: 8px;
+    background: var(--maliev-ink);
+    color: var(--maliev-panel);
+    cursor: pointer;
+    font-size: var(--mud-typography-body2-size);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.chatbot-import-button:hover {
+    background: color-mix(in oklab, var(--maliev-ink), var(--maliev-panel) 8%);
+}
+
+.chatbot-import-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chatbot-import-file {
+    flex: 1 1 100%;
+    min-width: 0;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .chatbot-priority-field {
     display: flex;
     flex-direction: column;
@@ -193,6 +272,20 @@
     .chatbot-instruction-editor-header {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .chatbot-import-panel {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .chatbot-import-actions {
+        justify-content: flex-start;
+        min-width: 0;
+    }
+
+    .chatbot-import-file {
+        text-align: left;
     }
 
     .chatbot-instruction-character-count {

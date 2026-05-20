@@ -120,6 +120,23 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("[Range(BffSystemInstructionLimits.PriorityMin, BffSystemInstructionLimits.PriorityMax)]", mutationRequest, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MarkdownImporter_ExplainsPromptAndConstraintMapping()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+
+        Assert.DoesNotContain("Upload Markdown with frontmatter such as", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-import-panel", page, StringComparison.Ordinal);
+        Assert.Contains("Markdown import", page, StringComparison.Ordinal);
+        Assert.Contains("Body -> System prompt", page, StringComparison.Ordinal);
+        Assert.Contains("## Business Constraints -> Business constraints", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-prompt-import", page, StringComparison.Ordinal);
+        Assert.Contains("_importedPromptFileName", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-import-input", styles, StringComparison.Ordinal);
+        Assert.Contains("chatbot-import-button", styles, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();

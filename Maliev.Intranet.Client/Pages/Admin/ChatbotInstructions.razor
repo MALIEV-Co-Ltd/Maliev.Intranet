@@ -154,9 +154,23 @@
                             </div>
                         </div>
 
-                        <div class="mlv-empty text-left">
-                            Upload Markdown with frontmatter such as <span class="mlv-mono">topic_key: "website"</span> or paste prompt text directly.
-                            Employees need <span class="mlv-mono">chatbot.instructions.write</span> to save changes.
+                        <div class="chatbot-import-panel">
+                            <div class="chatbot-import-copy">
+                                <span class="chatbot-import-label">Markdown import</span>
+                                <span>Body -> System prompt. ## Business Constraints -> Business constraints.</span>
+                                <span>Frontmatter can set name, topic_key, category, priority, is_active.</span>
+                            </div>
+                            <div class="chatbot-import-actions">
+                                <label class="chatbot-import-button" for="chatbot-prompt-import">
+                                    <MudIcon Icon="@Icons.Material.Outlined.UploadFile" Size="Size.Small" />
+                                    Choose markdown
+                                </label>
+                                <InputFile id="chatbot-prompt-import"
+                                           Class="chatbot-import-input"
+                                           OnChange="ImportPromptFileAsync"
+                                           accept=".md,.txt" />
+                                <span class="chatbot-import-file">@(_importedPromptFileName ?? "No file selected")</span>
+                            </div>
                         </div>
                         @if (!string.IsNullOrWhiteSpace(_refinementSummary))
                         {
@@ -164,7 +178,6 @@
                                 @_refinementSummary
                             </MudAlert>
                         }
-                        <InputFile OnChange="ImportPromptFileAsync" accept=".md,.txt" />
 
                         <div class="chatbot-instruction-text-field">
                             <MudTextField @bind-Value="_form.PersonaDefinition"
@@ -229,6 +242,7 @@
     private bool _saving;
     private bool _refining;
     private string? _refinementSummary;
+    private string? _importedPromptFileName;
     private static readonly int[] PriorityOptions = Enumerable
         .Range(
             BffSystemInstructionLimits.PriorityMin,
@@ -316,6 +330,7 @@
     {
         _editingId = instruction.Id;
         _refinementSummary = null;
+        _importedPromptFileName = null;
         _form = new BffSystemInstructionMutationRequest
         {
             Name = instruction.Name,
@@ -332,6 +347,7 @@
     {
         _editingId = null;
         _refinementSummary = null;
+        _importedPromptFileName = null;
         _form = CreateWebsiteCoreForm();
     }
 
@@ -339,6 +355,7 @@
     {
         _editingId = null;
         _refinementSummary = null;
+        _importedPromptFileName = null;
         _form = new BffSystemInstructionMutationRequest
         {
             Name = "New customer skill prompt",
@@ -374,6 +391,7 @@
         var content = await reader.ReadToEndAsync();
         ApplyImportedPrompt(content, Path.GetFileNameWithoutExtension(file.Name));
         _refinementSummary = null;
+        _importedPromptFileName = file.Name;
         Snackbar.Add("Prompt file loaded into the editor.", Severity.Success);
     }
 
