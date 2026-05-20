@@ -131,7 +131,28 @@
                             <MudSelectItem Value="@BffSystemInstructionCategory.Topic">Topic skill</MudSelectItem>
                         </MudSelect>
                         <MudTextField @bind-Value="_form.TopicKey" Label="Profile or skill key" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudNumericField @bind-Value="_form.Priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        <div class="chatbot-priority-field">
+                            <div class="chatbot-priority-heading">
+                                <span>Priority</span>
+                                <span>Higher priority wins when several topic skills match.</span>
+                            </div>
+                            <div class="chatbot-priority-options" role="radiogroup" aria-label="Instruction priority">
+                                @foreach (var priority in PriorityOptions)
+                                {
+                                    <button type="button"
+                                            class="@PriorityButtonClass(priority)"
+                                            role="radio"
+                                            aria-checked="@(_form.Priority == priority ? "true" : "false")"
+                                            @onclick="() => SetPriority(priority)">
+                                        @priority
+                                    </button>
+                                }
+                            </div>
+                            <div class="chatbot-priority-scale" aria-hidden="true">
+                                <span>1 Low</span>
+                                <span>5 High</span>
+                            </div>
+                        </div>
 
                         <div class="mlv-empty text-left">
                             Upload Markdown with frontmatter such as <span class="mlv-mono">topic_key: "website"</span> or paste prompt text directly.
@@ -208,6 +229,11 @@
     private bool _saving;
     private bool _refining;
     private string? _refinementSummary;
+    private static readonly int[] PriorityOptions = Enumerable
+        .Range(
+            BffSystemInstructionLimits.PriorityMin,
+            BffSystemInstructionLimits.PriorityMax - BffSystemInstructionLimits.PriorityMin + 1)
+        .ToArray();
 
     private const string InstructionTextTooLongMessage = "Instruction text must be 5,000 characters or fewer.";
 
@@ -295,7 +321,7 @@
             Name = instruction.Name,
             Category = instruction.Category,
             TopicKey = instruction.TopicKey,
-            Priority = instruction.Priority,
+            Priority = ClampPriority(instruction.Priority),
             PersonaDefinition = instruction.PersonaDefinition,
             BusinessConstraints = instruction.BusinessConstraints,
             IsActive = instruction.IsActive
@@ -318,7 +344,7 @@
             Name = "New customer skill prompt",
             Category = BffSystemInstructionCategory.Topic,
             TopicKey = "customer-skill",
-            Priority = 10,
+            Priority = 3,
             PersonaDefinition = "Describe the specialized customer-facing task that Mali should handle.",
             BusinessConstraints = "Preserve the active core persona, customer-facing scope, and MALIEV safety rules.",
             IsActive = true
@@ -399,7 +425,7 @@
 
         if (frontmatter.TryGetValue("priority", out var priorityText) && int.TryParse(priorityText, out var priority))
         {
-            _form.Priority = priority;
+            _form.Priority = ClampPriority(priority);
         }
 
         if (frontmatter.TryGetValue("is_active", out var activeText) && bool.TryParse(activeText, out var isActive))
@@ -485,6 +511,7 @@
             return;
         }
 
+        _form.Priority = ClampPriority(_form.Priority);
         _saving = true;
         try
         {
@@ -604,6 +631,26 @@
             : $"chatbot-instruction-character-count {statusClass}";
     }
 
+    private void SetPriority(int priority)
+    {
+        _form.Priority = ClampPriority(priority);
+    }
+
+    private string PriorityButtonClass(int priority)
+    {
+        return priority == _form.Priority
+            ? "chatbot-priority-button selected"
+            : "chatbot-priority-button";
+    }
+
+    private static int ClampPriority(int priority)
+    {
+        return Math.Clamp(
+            priority,
+            BffSystemInstructionLimits.PriorityMin,
+            BffSystemInstructionLimits.PriorityMax);
+    }
+
     private static string Preview(string text)
     {
         var normalized = text.ReplaceLineEndings(" ").Trim();
@@ -617,7 +664,7 @@
             Name = "Customer Website Assistant",
             Category = BffSystemInstructionCategory.Core,
             TopicKey = "website",
-            Priority = 0,
+            Priority = 5,
             PersonaDefinition = "Mali / น้องมะลิ is the customer-facing manufacturing assistant for MALIEV public channels.",
             BusinessConstraints = "Only answer customer-safe MALIEV manufacturing, material, quote, order, delivery, and support topics.",
             IsActive = true

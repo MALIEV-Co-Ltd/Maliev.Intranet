@@ -31,6 +31,16 @@ public static class BffSystemInstructionLimits
     /// Maximum length for instruction text accepted by ChatbotService.
     /// </summary>
     public const int InstructionTextMaxLength = 5000;
+
+    /// <summary>
+    /// Lowest instruction priority level available in the admin editor.
+    /// </summary>
+    public const int PriorityMin = 1;
+
+    /// <summary>
+    /// Highest instruction priority level available in the admin editor.
+    /// </summary>
+    public const int PriorityMax = 5;
 }
 
 /// <summary>
@@ -175,7 +185,8 @@ public class BffSystemInstructionMutationRequest
     /// <summary>
     /// Gets or sets the injection priority for topic prompts.
     /// </summary>
-    public int Priority { get; set; } = 10;
+    [Range(BffSystemInstructionLimits.PriorityMin, BffSystemInstructionLimits.PriorityMax)]
+    public int Priority { get; set; } = 3;
 
     /// <summary>
     /// Gets or sets the persona or prompt body.

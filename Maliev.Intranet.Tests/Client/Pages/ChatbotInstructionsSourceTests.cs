@@ -97,6 +97,29 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("chatbot-instruction-ai-summary", styles, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PriorityEditor_UsesBoundedLevelButtons()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+        var dto = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "ChatDtos.cs");
+        var mutationRequest = dto[dto.IndexOf("public class BffSystemInstructionMutationRequest", StringComparison.Ordinal)..];
+
+        Assert.DoesNotContain("MudNumericField @bind-Value=\"_form.Priority\"", page, StringComparison.Ordinal);
+        Assert.Contains("role=\"radiogroup\"", page, StringComparison.Ordinal);
+        Assert.Contains("PriorityOptions", page, StringComparison.Ordinal);
+        Assert.Contains("SetPriority(priority)", page, StringComparison.Ordinal);
+        Assert.Contains("1 Low", page, StringComparison.Ordinal);
+        Assert.Contains("5 High", page, StringComparison.Ordinal);
+        Assert.Contains("ClampPriority(instruction.Priority)", page, StringComparison.Ordinal);
+        Assert.Contains("ClampPriority(priority)", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-priority-button", styles, StringComparison.Ordinal);
+        Assert.Contains("chatbot-priority-button.selected", styles, StringComparison.Ordinal);
+        Assert.Contains("public const int PriorityMin = 1;", dto, StringComparison.Ordinal);
+        Assert.Contains("public const int PriorityMax = 5;", dto, StringComparison.Ordinal);
+        Assert.Contains("[Range(BffSystemInstructionLimits.PriorityMin, BffSystemInstructionLimits.PriorityMax)]", mutationRequest, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();
