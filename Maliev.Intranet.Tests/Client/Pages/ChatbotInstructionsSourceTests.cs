@@ -17,6 +17,7 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("All categories", page, StringComparison.Ordinal);
         Assert.DoesNotContain("flex: 1 1 260px", page, StringComparison.Ordinal);
         Assert.DoesNotContain("Label=\"Topic/profile key\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("::deep(", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 0 1 320px;", styles, StringComparison.Ordinal);
         Assert.Contains("width: 160px;", styles, StringComparison.Ordinal);
     }
@@ -29,6 +30,25 @@ public class ChatbotInstructionsSourceTests
         Assert.DoesNotContain("v@instruction.Version", page, StringComparison.Ordinal);
         Assert.Contains("@FormatInstructionVersion(instruction.Version)", page, StringComparison.Ordinal);
         Assert.Contains("private static string FormatInstructionVersion(int version)", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ActiveToggle_RendersInEditorHeader()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor.css");
+
+        var headerIndex = page.IndexOf("chatbot-instruction-editor-header", StringComparison.Ordinal);
+        var stackIndex = page.IndexOf("<MudStack Spacing=\"2\">", StringComparison.Ordinal);
+
+        Assert.True(headerIndex >= 0, "The editor should have a dedicated header.");
+        Assert.True(stackIndex >= 0, "The editor should keep the field stack.");
+        Assert.True(headerIndex < stackIndex, "The active control belongs above the editor fields.");
+        Assert.Contains("chatbot-instruction-active-control", page, StringComparison.Ordinal);
+        Assert.Contains("chatbot-instruction-active-switch", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Active\"", page, StringComparison.Ordinal);
+        Assert.Contains("border-radius: 999px;", styles, StringComparison.Ordinal);
+        Assert.Contains(".chatbot-instruction-active-control ::deep .chatbot-instruction-active-switch", styles, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] relativeParts)

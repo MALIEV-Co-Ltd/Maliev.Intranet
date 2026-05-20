@@ -5,19 +5,63 @@
     gap: var(--maliev-space-4);
 }
 
-.chatbot-instruction-filter-toolbar ::deep(.chatbot-filter-search) {
+.chatbot-instruction-filter-toolbar ::deep .chatbot-filter-search {
     flex: 0 1 320px;
     width: min(320px, 100%);
     min-width: 220px;
 }
 
-.chatbot-instruction-filter-toolbar ::deep(.chatbot-filter-category) {
+.chatbot-instruction-filter-toolbar ::deep .chatbot-filter-category {
     flex: 0 0 160px;
     width: 160px;
 }
 
-.chatbot-instruction-filter-toolbar ::deep(.mud-button-root) {
+.chatbot-instruction-filter-toolbar ::deep .mud-button-root {
     flex: 0 0 auto;
+}
+
+.chatbot-instruction-editor-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--maliev-space-3);
+    margin-bottom: var(--maliev-space-4);
+    padding-bottom: var(--maliev-space-3);
+    border-bottom: 1px solid var(--maliev-border);
+}
+
+.chatbot-instruction-editor-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--maliev-space-3);
+    min-width: 0;
+}
+
+.chatbot-instruction-active-control {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--maliev-space-2);
+    min-height: 32px;
+    padding: 2px 10px 2px 2px;
+    border: 1px solid var(--maliev-border);
+    border-radius: 999px;
+    background: var(--maliev-panel-2);
+    color: var(--maliev-text);
+    font-size: var(--mud-typography-body2-size);
+    line-height: 1;
+}
+
+.chatbot-instruction-active-control ::deep .chatbot-instruction-active-switch {
+    margin: 0;
+}
+
+.chatbot-instruction-active-control ::deep .mud-switch-base {
+    padding: 5px;
+}
+
+.chatbot-instruction-active-control ::deep .mud-switch-span {
+    padding: 0;
 }
 
 @media (max-width: 720px) {
@@ -25,10 +69,15 @@
         align-items: stretch;
     }
 
-    .chatbot-instruction-filter-toolbar ::deep(.chatbot-filter-search),
-    .chatbot-instruction-filter-toolbar ::deep(.chatbot-filter-category) {
+    .chatbot-instruction-filter-toolbar ::deep .chatbot-filter-search,
+    .chatbot-instruction-filter-toolbar ::deep .chatbot-filter-category {
         flex: 1 1 100%;
         width: 100%;
         min-width: 0;
+    }
+
+    .chatbot-instruction-editor-header {
+        align-items: stretch;
+        flex-direction: column;
     }
 }

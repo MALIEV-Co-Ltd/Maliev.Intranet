@@ -94,8 +94,18 @@
 
             <MudItem xs="12" lg="5">
                 <PanelCard>
-                    <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
-                        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit instruction" : "New instruction")</MudText>
+                    <div class="chatbot-instruction-editor-header">
+                        <div class="chatbot-instruction-editor-title">
+                            <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit instruction" : "New instruction")</MudText>
+                            <div class="chatbot-instruction-active-control">
+                                <MudSwitch T="bool"
+                                           @bind-Value="_form.IsActive"
+                                           Color="Color.Primary"
+                                           Class="chatbot-instruction-active-switch"
+                                           aria-label="Active instruction" />
+                                <span>Active</span>
+                            </div>
+                        </div>
                         <div class="d-flex flex-wrap gap-2">
                             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Person" OnClick="StartWebsiteCore">
                                 Website core
@@ -114,7 +124,6 @@
                         </MudSelect>
                         <MudTextField @bind-Value="_form.TopicKey" Label="Profile or skill key" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                         <MudNumericField @bind-Value="_form.Priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                        <MudSwitch @bind-Value="_form.IsActive" Color="Color.Primary" Label="Active" />
 
                         <div class="mlv-empty text-left">
                             Upload Markdown with frontmatter such as <span class="mlv-mono">topic_key: "website"</span> or paste prompt text directly.
