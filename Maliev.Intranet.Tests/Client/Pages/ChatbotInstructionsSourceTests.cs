@@ -21,6 +21,16 @@ public class ChatbotInstructionsSourceTests
         Assert.Contains("width: 160px;", styles, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void VersionColumn_UsesExplicitRazorExpression()
+    {
+        var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor");
+
+        Assert.DoesNotContain("v@instruction.Version", page, StringComparison.Ordinal);
+        Assert.Contains("@FormatInstructionVersion(instruction.Version)", page, StringComparison.Ordinal);
+        Assert.Contains("private static string FormatInstructionVersion(int version)", page, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();

@@ -83,7 +83,7 @@
                                         <td class="mlv-mono">@(instruction.TopicKey ?? "-")</td>
                                         <td>@CategoryLabel(instruction.Category)</td>
                                         <td><StatusBadge Status="@(instruction.IsActive ? "Active" : "Inactive")" /></td>
-                                        <td class="mlv-mono">v@instruction.Version</td>
+                                        <td class="mlv-mono">@FormatInstructionVersion(instruction.Version)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -416,6 +416,11 @@
     private static string CategoryLabel(BffSystemInstructionCategory category)
     {
         return category == BffSystemInstructionCategory.Core ? "Core" : "Topic skill";
+    }
+
+    private static string FormatInstructionVersion(int version)
+    {
+        return $"v{version}";
     }
 
     private static string Preview(string text)
