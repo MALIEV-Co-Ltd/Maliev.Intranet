@@ -1289,6 +1289,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-column: 1 / -1;", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
         Assert.Contains("var(--ai-dropzone-violet)", ExtractCssBlock(styles, ".ai-processing-state {"), StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".ai-processing-spinner"), StringComparison.Ordinal);
+        Assert.Contains("margin-top: 0.85rem;", ExtractCssBlock(styles, ".extraction-summary {"), StringComparison.Ordinal);
         Assert.Contains("padding: 0.65rem 0.75rem;", ExtractCssBlock(styles, ".extraction-summary {"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);", ExtractCssBlock(styles, ".extraction-summary-grid"), StringComparison.Ordinal);
         Assert.Contains("width: 1.75rem;", ExtractCssBlock(styles, ".extraction-summary-dismiss"), StringComparison.Ordinal);

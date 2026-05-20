@@ -1026,6 +1026,7 @@
     grid-column: 1 / -1;
     display: grid;
     gap: 0.65rem;
+    margin-top: 0.85rem;
     border: 1px solid color-mix(in oklch, var(--mud-palette-success) 34%, var(--maliev-border));
     border-radius: var(--maliev-radius-sm);
     padding: 0.65rem 0.75rem;
