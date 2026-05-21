@@ -165,10 +165,7 @@
                                     <MudIcon Icon="@Icons.Material.Outlined.UploadFile" Size="Size.Small" />
                                     Choose markdown
                                 </label>
-                                <InputFile id="chatbot-prompt-import"
-                                           Class="chatbot-import-input"
-                                           OnChange="ImportPromptFileAsync"
-                                           accept=".md,.txt" />
+                                <InputFile OnChange="ImportPromptFileAsync" id="chatbot-prompt-import" Class="chatbot-import-input" accept=".md,.txt" />
                                 <span class="chatbot-import-file">@(_importedPromptFileName ?? "No file selected")</span>
                             </div>
                         </div>
@@ -228,6 +225,7 @@
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    StartIcon="@Icons.Material.Outlined.Save"
+                                   data-required-permission="@InstructionWritePermission"
                                    Disabled="@(_saving || _refining || HasInstructionTextLengthError)"
                                    OnClick="SaveInstructionAsync">
                             Save instruction
@@ -327,6 +325,7 @@
         .ToArray();
 
     private const string InstructionTextTooLongMessage = "Instruction text must be 5,000 characters or fewer.";
+    private const string InstructionWritePermission = "chatbot.instructions.write";
 
     private bool HasInstructionTextLengthError
         => IsInstructionTextOverLimit(_form.PersonaDefinition)
