@@ -151,6 +151,8 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 ownerId,
                 type = address.Type,
                 isDefault = address.IsDefault,
+                placeLabel = address.PlaceLabel,
+                placeLabelOther = address.PlaceLabelOther,
                 addressLine1 = address.AddressLine1,
                 addressLine2 = address.AddressLine2,
                 addressLine3 = address.AddressLine3,
@@ -160,7 +162,13 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
                 postalCode = address.PostalCode,
                 countryId = address.CountryId,
                 recipientName = address.RecipientName,
-                recipientPhone = address.RecipientPhone
+                recipientPhone = address.RecipientPhone,
+                driverNote = address.DriverNote,
+                addressSource = string.IsNullOrWhiteSpace(address.AddressSource) ? "Manual" : address.AddressSource,
+                googlePlaceId = address.GooglePlaceId,
+                formattedAddress = address.FormattedAddress,
+                latitude = address.Latitude,
+                longitude = address.Longitude
             }, ct);
 
             if (response.IsSuccessStatusCode)
@@ -212,6 +220,8 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         {
             Type = "Shipping",
             IsDefault = true,
+            PlaceLabel = billingAddress.PlaceLabel,
+            PlaceLabelOther = billingAddress.PlaceLabelOther,
             AddressLine1 = billingAddress.AddressLine1,
             AddressLine2 = billingAddress.AddressLine2,
             AddressLine3 = billingAddress.AddressLine3,
@@ -221,7 +231,13 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             PostalCode = billingAddress.PostalCode,
             CountryId = billingAddress.CountryId,
             RecipientName = billingAddress.RecipientName,
-            RecipientPhone = billingAddress.RecipientPhone
+            RecipientPhone = billingAddress.RecipientPhone,
+            DriverNote = billingAddress.DriverNote,
+            AddressSource = billingAddress.AddressSource,
+            GooglePlaceId = billingAddress.GooglePlaceId,
+            FormattedAddress = billingAddress.FormattedAddress,
+            Latitude = billingAddress.Latitude,
+            Longitude = billingAddress.Longitude
         };
     }
 
@@ -480,6 +496,8 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             OwnerId = TryGetGuid(element, "ownerId") ?? Guid.Empty,
             Type = GetString(element, "type") ?? "Billing",
             IsDefault = TryGetBool(element, "isDefault"),
+            PlaceLabel = GetString(element, "placeLabel"),
+            PlaceLabelOther = GetString(element, "placeLabelOther"),
             AddressLine1 = GetString(element, "addressLine1") ?? string.Empty,
             AddressLine2 = GetString(element, "addressLine2"),
             AddressLine3 = GetString(element, "addressLine3"),
@@ -490,6 +508,12 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             CountryId = TryGetGuid(element, "countryId") ?? Guid.Empty,
             RecipientName = GetString(element, "recipientName"),
             RecipientPhone = GetString(element, "recipientPhone"),
+            DriverNote = GetString(element, "driverNote"),
+            AddressSource = GetString(element, "addressSource") ?? "Manual",
+            GooglePlaceId = GetString(element, "googlePlaceId"),
+            FormattedAddress = GetString(element, "formattedAddress"),
+            Latitude = TryGetDecimal(element, "latitude"),
+            Longitude = TryGetDecimal(element, "longitude"),
             CreatedAt = TryGetDateTime(element, "createdAt"),
             UpdatedAt = TryGetDateTime(element, "updatedAt"),
             Xmin = TryGetUInt32(element, "xmin")
@@ -582,6 +606,13 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         && property.TryGetUInt32(out var value)
             ? value
             : 0;
+
+    private static decimal? TryGetDecimal(JsonElement element, string propertyName) =>
+        TryGetProperty(element, propertyName, out var property)
+        && property.ValueKind == JsonValueKind.Number
+        && property.TryGetDecimal(out var value)
+            ? value
+            : null;
 
     /// <summary>
     /// Creates a company in CustomerService.
@@ -875,6 +906,8 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
         {
             type = request.Type,
             isDefault = request.IsDefault,
+            placeLabel = request.PlaceLabel,
+            placeLabelOther = request.PlaceLabelOther,
             addressLine1 = request.AddressLine1,
             addressLine2 = request.AddressLine2,
             addressLine3 = request.AddressLine3,
@@ -885,6 +918,12 @@ public class CustomerServiceClient(HttpClient httpClient, ILogger<CustomerServic
             countryId = request.CountryId,
             recipientName = request.RecipientName,
             recipientPhone = request.RecipientPhone,
+            driverNote = request.DriverNote,
+            addressSource = request.AddressSource,
+            googlePlaceId = request.GooglePlaceId,
+            formattedAddress = request.FormattedAddress,
+            latitude = request.Latitude,
+            longitude = request.Longitude,
             xmin = request.Xmin
         }, ct);
         return response.IsSuccessStatusCode;

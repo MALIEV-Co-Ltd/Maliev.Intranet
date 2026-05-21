@@ -389,6 +389,31 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerAddressSurfaces_UseGoogleAddressPickerAndStructuredContactFields()
+    {
+        var customerNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
+        var customerDetail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
+        var addressDialog = ReadRepoFile("Maliev.Intranet.Client", "Components", "AddressDialog.razor");
+        var addressCard = ReadRepoFile("Maliev.Intranet.Client", "Components", "AddressCard.razor");
+        var googlePicker = ReadRepoFile("Maliev.Intranet.Client", "Components", "GoogleAddressPicker.razor");
+        var googleScript = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "google-address-picker.js");
+
+        foreach (var source in new[] { customerNew, customerDetail, addressDialog, addressCard })
+        {
+            Assert.Contains("GoogleAddressPicker", source, StringComparison.Ordinal);
+            Assert.Contains("Address No./Moo/Soi/Road", source, StringComparison.Ordinal);
+            Assert.Contains("Mobile Number", source, StringComparison.Ordinal);
+            Assert.Contains("Note to driver", source, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Search for your location", googlePicker, StringComparison.Ordinal);
+        Assert.Contains("Icons.Material.Filled.Map", googlePicker, StringComparison.Ordinal);
+        Assert.Contains("PlaceAutocompleteElement", googleScript, StringComparison.Ordinal);
+        Assert.Contains("gmp-select", googleScript, StringComparison.Ordinal);
+        Assert.Contains("GoogleMapPin", googleScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_EmailDialogStaysOpenAndUsesNotificationTemplates()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");

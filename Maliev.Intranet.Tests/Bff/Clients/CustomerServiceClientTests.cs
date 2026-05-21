@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
@@ -24,6 +25,53 @@ public class CustomerServiceClientTests
         };
         var logger = new Mock<ILogger<CustomerServiceClient>>().Object;
         _client = new CustomerServiceClient(httpClient, logger);
+    }
+
+    [Fact]
+    public async Task CreateAddressesAsync_ForwardsGoogleAddressMetadata()
+    {
+        var ownerId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
+        JsonElement payload = default;
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/customer/v1/addresses", request.RequestUri!.PathAndQuery);
+            payload = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new AddressResponse { Id = Guid.NewGuid() })
+            };
+        });
+        var client = new CustomerServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }, new Mock<ILogger<CustomerServiceClient>>().Object);
+
+        await client.CreateAddressesAsync(ownerId, [
+            new CreateAddressRequest
+            {
+                Type = "Shipping",
+                IsDefault = true,
+                PlaceLabel = "Work",
+                AddressLine1 = "88 Rama IX Road",
+                City = "Huai Khwang",
+                StateProvince = "Bangkok",
+                PostalCode = "10310",
+                CountryId = countryId,
+                DriverNote = "Call before delivery",
+                AddressSource = "GooglePlace",
+                GooglePlaceId = "ChIJ-test",
+                FormattedAddress = "MALIEV Co., Ltd., Bangkok",
+                Latitude = 13.7563m,
+                Longitude = 100.5018m
+            }
+        ]);
+
+        Assert.Equal("Work", payload.GetProperty("placeLabel").GetString());
+        Assert.Equal("Call before delivery", payload.GetProperty("driverNote").GetString());
+        Assert.Equal("GooglePlace", payload.GetProperty("addressSource").GetString());
+        Assert.Equal("ChIJ-test", payload.GetProperty("googlePlaceId").GetString());
+        Assert.Equal("MALIEV Co., Ltd., Bangkok", payload.GetProperty("formattedAddress").GetString());
+        Assert.Equal(13.7563m, payload.GetProperty("latitude").GetDecimal());
+        Assert.Equal(100.5018m, payload.GetProperty("longitude").GetDecimal());
     }
 
     [Fact]

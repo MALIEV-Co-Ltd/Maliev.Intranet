@@ -216,6 +216,12 @@ public class AddressResponse
     public string Type { get; set; } = string.Empty;
     /// <summary>Indicates if this is the default address for its type.</summary>
     public bool IsDefault { get; set; }
+    /// <summary>User-facing place label such as Home, Work, or Other.</summary>
+    [JsonPropertyName("placeLabel")]
+    public string? PlaceLabel { get; set; }
+    /// <summary>Custom label when <see cref="PlaceLabel"/> is Other.</summary>
+    [JsonPropertyName("placeLabelOther")]
+    public string? PlaceLabelOther { get; set; }
     /// <summary>The first line of the street address.</summary>
     public string AddressLine1 { get; set; } = string.Empty;
     /// <summary>The second line of the street address (e.g., apartment or suite).</summary>
@@ -236,6 +242,24 @@ public class AddressResponse
     public string? RecipientName { get; set; }
     /// <summary>The contact phone number for the recipient.</summary>
     public string? RecipientPhone { get; set; }
+    /// <summary>Optional delivery note for the driver.</summary>
+    [JsonPropertyName("driverNote")]
+    public string? DriverNote { get; set; }
+    /// <summary>Source used to populate the address: Manual, GooglePlace, or GoogleMapPin.</summary>
+    [JsonPropertyName("addressSource")]
+    public string AddressSource { get; set; } = "Manual";
+    /// <summary>Google Places identifier when the address came from Google suggestions.</summary>
+    [JsonPropertyName("googlePlaceId")]
+    public string? GooglePlaceId { get; set; }
+    /// <summary>Formatted address returned by Google.</summary>
+    [JsonPropertyName("formattedAddress")]
+    public string? FormattedAddress { get; set; }
+    /// <summary>Latitude returned by Google address selection.</summary>
+    [JsonPropertyName("latitude")]
+    public decimal? Latitude { get; set; }
+    /// <summary>Longitude returned by Google address selection.</summary>
+    [JsonPropertyName("longitude")]
+    public decimal? Longitude { get; set; }
     /// <summary>The date and time when the address record was created.</summary>
     public DateTime CreatedAt { get; set; }
     /// <summary>The date and time when the address record was last updated.</summary>
@@ -543,6 +567,14 @@ public class CreateAddressRequest
     /// <summary>Whether this address should be set as the default for its type.</summary>
     public bool IsDefault { get; set; } = true;
 
+    /// <summary>User-facing place label such as Home, Work, or Other.</summary>
+    [JsonPropertyName("placeLabel")]
+    public string? PlaceLabel { get; set; }
+
+    /// <summary>Custom label when <see cref="PlaceLabel"/> is Other.</summary>
+    [JsonPropertyName("placeLabelOther")]
+    public string? PlaceLabelOther { get; set; }
+
     /// <summary>The primary street address line.</summary>
     [Required]
     public string AddressLine1 { get; set; } = string.Empty;
@@ -575,6 +607,30 @@ public class CreateAddressRequest
     /// <summary>The phone number for the recipient.</summary>
     public string? RecipientPhone { get; set; }
 
+    /// <summary>Optional delivery note for the driver.</summary>
+    [JsonPropertyName("driverNote")]
+    public string? DriverNote { get; set; }
+
+    /// <summary>Source used to populate the address: Manual, GooglePlace, or GoogleMapPin.</summary>
+    [JsonPropertyName("addressSource")]
+    public string AddressSource { get; set; } = "Manual";
+
+    /// <summary>Google Places identifier when the address came from Google suggestions.</summary>
+    [JsonPropertyName("googlePlaceId")]
+    public string? GooglePlaceId { get; set; }
+
+    /// <summary>Formatted address returned by Google.</summary>
+    [JsonPropertyName("formattedAddress")]
+    public string? FormattedAddress { get; set; }
+
+    /// <summary>Latitude returned by Google address selection.</summary>
+    [JsonPropertyName("latitude")]
+    public decimal? Latitude { get; set; }
+
+    /// <summary>Longitude returned by Google address selection.</summary>
+    [JsonPropertyName("longitude")]
+    public decimal? Longitude { get; set; }
+
     /// <summary>The optional concurrency version token.</summary>
     public byte[]? Version { get; set; }
 }
@@ -588,6 +644,12 @@ public class UpdateAddressRequest
     public string? Type { get; set; }
     /// <summary>Indicates if this is the default address for its type.</summary>
     public bool? IsDefault { get; set; }
+    /// <summary>User-facing place label such as Home, Work, or Other.</summary>
+    [JsonPropertyName("placeLabel")]
+    public string? PlaceLabel { get; set; }
+    /// <summary>Custom label when <see cref="PlaceLabel"/> is Other.</summary>
+    [JsonPropertyName("placeLabelOther")]
+    public string? PlaceLabelOther { get; set; }
     /// <summary>The primary street address line.</summary>
     public string? AddressLine1 { get; set; }
     /// <summary>The secondary address line.</summary>
@@ -608,6 +670,24 @@ public class UpdateAddressRequest
     public string? RecipientName { get; set; }
     /// <summary>The phone number for the recipient.</summary>
     public string? RecipientPhone { get; set; }
+    /// <summary>Optional delivery note for the driver.</summary>
+    [JsonPropertyName("driverNote")]
+    public string? DriverNote { get; set; }
+    /// <summary>Source used to populate the address: Manual, GooglePlace, or GoogleMapPin.</summary>
+    [JsonPropertyName("addressSource")]
+    public string? AddressSource { get; set; }
+    /// <summary>Google Places identifier when the address came from Google suggestions.</summary>
+    [JsonPropertyName("googlePlaceId")]
+    public string? GooglePlaceId { get; set; }
+    /// <summary>Formatted address returned by Google.</summary>
+    [JsonPropertyName("formattedAddress")]
+    public string? FormattedAddress { get; set; }
+    /// <summary>Latitude returned by Google address selection.</summary>
+    [JsonPropertyName("latitude")]
+    public decimal? Latitude { get; set; }
+    /// <summary>Longitude returned by Google address selection.</summary>
+    [JsonPropertyName("longitude")]
+    public decimal? Longitude { get; set; }
 
     /// <summary>Concurrency version token required for updates.</summary>
     [Required]

@@ -307,16 +307,19 @@
                                                     <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(companyAddressIndex))">Copy customer billing</button>
                                                 </div>
 
+                                                @AddressGooglePicker(companyAddressIndex)
+                                                @AddressPlaceAndContactFields(companyAddressIndex)
+
                                                 <FormGrid>
-                                                    <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
+                                                    <FormField Label="Address No./Moo/Soi/Road"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine1" /></FormField>
                                                     <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[companyAddressIndex].Request.AddressLine2" /></FormField>
-                                                    <FormField Label="Subdistrict">
+                                                    <FormField Label="Sub District">
                                                         @AddressAutocomplete(companyAddressIndex, AddressField.Subdistrict)
                                                     </FormField>
                                                     <FormField Label="District">
                                                         @AddressAutocomplete(companyAddressIndex, AddressField.District)
                                                     </FormField>
-                                                    <FormField Label="State / Province">
+                                                    <FormField Label="Province">
                                                         @AddressAutocomplete(companyAddressIndex, AddressField.Province)
                                                     </FormField>
                                                     <FormField Label="Postal code">
@@ -339,23 +342,26 @@
                                     @if (CustomerBillingIndex >= 0)
                                     {
                                         var index = CustomerBillingIndex;
-                                        <div class="address-panel">
-                                            <div class="address-panel-header">
-                                                <strong>Customer billing address</strong>
-                                            </div>
+                                            <div class="address-panel">
+                                                <div class="address-panel-header">
+                                                    <strong>Customer billing address</strong>
+                                                </div>
 
-                                            <FormGrid>
-                                                <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                                <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
-                                                <FormField Label="Subdistrict">
-                                                    @AddressAutocomplete(index, AddressField.Subdistrict)
-                                                </FormField>
-                                                <FormField Label="District">
-                                                    @AddressAutocomplete(index, AddressField.District)
-                                                </FormField>
-                                                <FormField Label="State / Province">
-                                                    @AddressAutocomplete(index, AddressField.Province)
-                                                </FormField>
+                                                @AddressGooglePicker(index)
+                                                @AddressPlaceAndContactFields(index)
+
+                                                <FormGrid>
+                                                    <FormField Label="Address No./Moo/Soi/Road"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                    <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                    <FormField Label="Sub District">
+                                                        @AddressAutocomplete(index, AddressField.Subdistrict)
+                                                    </FormField>
+                                                    <FormField Label="District">
+                                                        @AddressAutocomplete(index, AddressField.District)
+                                                    </FormField>
+                                                    <FormField Label="Province">
+                                                        @AddressAutocomplete(index, AddressField.Province)
+                                                    </FormField>
                                                 <FormField Label="Postal code">
                                                     @AddressAutocomplete(index, AddressField.PostalCode)
                                                 </FormField>
@@ -366,26 +372,29 @@
                                     @if (CustomerShippingIndex >= 0)
                                     {
                                         var index = CustomerShippingIndex;
-                                        <div class="address-panel">
-                                            <div class="address-panel-header">
-                                                <strong>Customer shipping address</strong>
+                                            <div class="address-panel">
+                                                <div class="address-panel-header">
+                                                    <strong>Customer shipping address</strong>
                                                 <div>
                                                     <button type="button" class="address-copy" @onclick="@(() => CopyBillingTo(index))">Copy billing</button>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <FormGrid>
-                                                <FormField Label="Address line 1"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
-                                                <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
-                                                <FormField Label="Subdistrict">
-                                                    @AddressAutocomplete(index, AddressField.Subdistrict)
-                                                </FormField>
-                                                <FormField Label="District">
-                                                    @AddressAutocomplete(index, AddressField.District)
-                                                </FormField>
-                                                <FormField Label="State / Province">
-                                                    @AddressAutocomplete(index, AddressField.Province)
-                                                </FormField>
+                                                @AddressGooglePicker(index)
+                                                @AddressPlaceAndContactFields(index)
+
+                                                <FormGrid>
+                                                    <FormField Label="Address No./Moo/Soi/Road"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine1" /></FormField>
+                                                    <FormField Label="Address line 2"><ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.AddressLine2" /></FormField>
+                                                    <FormField Label="Sub District">
+                                                        @AddressAutocomplete(index, AddressField.Subdistrict)
+                                                    </FormField>
+                                                    <FormField Label="District">
+                                                        @AddressAutocomplete(index, AddressField.District)
+                                                    </FormField>
+                                                    <FormField Label="Province">
+                                                        @AddressAutocomplete(index, AddressField.Province)
+                                                    </FormField>
                                                 <FormField Label="Postal code">
                                                     @AddressAutocomplete(index, AddressField.PostalCode)
                                                 </FormField>
@@ -728,9 +737,9 @@
 
     private static List<AddressDraft> CreateDefaultAddresses() =>
     [
-        new() { Request = new CreateAddressRequest { Type = "Billing", IsDefault = true } },
-        new() { Request = new CreateAddressRequest { Type = "Shipping", IsDefault = true } },
-        new() { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true } }
+        new() { Request = new CreateAddressRequest { Type = "Billing", IsDefault = true, PlaceLabel = "Home" } },
+        new() { Request = new CreateAddressRequest { Type = "Shipping", IsDefault = true, PlaceLabel = "Home" } },
+        new() { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true, PlaceLabel = "Work" } }
     ];
 
     private RenderFragment AddressAutocomplete(int index, AddressField field) => builder =>
@@ -755,7 +764,8 @@
         builder.AddAttribute(17, "PopoverClass", "address-lookup-popover");
         builder.AddAttribute(18, "ListClass", "address-lookup-results");
         builder.AddAttribute(19, "ListItemClass", "address-lookup-result-item");
-        builder.AddAttribute(20, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
+        builder.AddAttribute(20, "Disabled", AddressFieldLockedByGoogle(index, field));
+        builder.AddAttribute(21, "ItemTemplate", (RenderFragment<RegistryThaiLocation>)(location => itemBuilder =>
         {
             var sequence = 0;
             itemBuilder.OpenElement(sequence++, "div");
@@ -793,6 +803,40 @@
         }));
         builder.CloseComponent();
     };
+
+    private RenderFragment AddressGooglePicker(int index) => @<div class="address-google-picker-shell">
+        <GoogleAddressPicker Latitude="@_addresses[index].Request.Latitude"
+                             Longitude="@_addresses[index].Request.Longitude"
+                             FormattedAddress="@_addresses[index].Request.FormattedAddress"
+                             SelectionChanged="@((GoogleAddressSelection selection) => ApplyGoogleSelection(index, selection))" />
+    </div>;
+
+    private RenderFragment AddressPlaceAndContactFields(int index) => @<div class="address-place-contact-grid">
+        <FormGrid>
+            <FormField Label="Place name">
+                <select class="mlv-form-input" @bind="_addresses[index].Request.PlaceLabel">
+                    <option value="Home">Home</option>
+                    <option value="Work">Work</option>
+                    <option value="Other">Other</option>
+                </select>
+            </FormField>
+            @if (string.Equals(_addresses[index].Request.PlaceLabel, "Other", StringComparison.OrdinalIgnoreCase))
+            {
+                <FormField Label="Other place name">
+                    <ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.PlaceLabelOther" />
+                </FormField>
+            }
+            <FormField Label="Recipient Name">
+                <ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.RecipientName" />
+            </FormField>
+            <FormField Label="Mobile Number">
+                <ImmediateInputText class="mlv-form-input" @bind-Value="_addresses[index].Request.RecipientPhone" />
+            </FormField>
+            <FormField Label="Note to driver" Class="customer-span-2">
+                <textarea class="mlv-form-input" @bind="_addresses[index].Request.DriverNote" @bind:event="oninput"></textarea>
+            </FormField>
+        </FormGrid>
+    </div>;
 
     private RenderFragment DocumentUploadList(List<UploadedDocumentDraft> documents, DocumentPanel panel) => builder =>
     {
@@ -1039,6 +1083,7 @@
                 PostalCode = address.PostalCode ?? string.Empty,
                 RecipientName = address.RecipientName,
                 RecipientPhone = address.RecipientPhone,
+                PlaceLabel = "Home",
                 CountryId = _thailand?.Id ?? Guid.Empty
             }
         };
@@ -1394,7 +1439,7 @@
         var index = CompanyBillingIndex;
         if (index < 0)
         {
-            _addresses.Add(new AddressDraft { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true, CountryId = _thailand?.Id ?? Guid.Empty } });
+            _addresses.Add(new AddressDraft { Request = new CreateAddressRequest { Type = "Company Billing", IsDefault = true, PlaceLabel = "Work", CountryId = _thailand?.Id ?? Guid.Empty } });
             index = _addresses.Count - 1;
         }
 
@@ -1413,9 +1458,62 @@
                 PostalCode = address.PostalCode,
                 CountryId = address.CountryId,
                 RecipientName = address.RecipientName,
-                RecipientPhone = address.RecipientPhone
+                RecipientPhone = address.RecipientPhone,
+                PlaceLabel = string.IsNullOrWhiteSpace(address.PlaceLabel) ? "Work" : address.PlaceLabel,
+                PlaceLabelOther = address.PlaceLabelOther,
+                DriverNote = address.DriverNote,
+                AddressSource = address.AddressSource,
+                GooglePlaceId = address.GooglePlaceId,
+                FormattedAddress = address.FormattedAddress,
+                Latitude = address.Latitude,
+                Longitude = address.Longitude
             }
         };
+    }
+
+    private bool AddressFieldLockedByGoogle(int index, AddressField field)
+    {
+        if (index < 0 || index >= _addresses.Count)
+        {
+            return false;
+        }
+
+        var address = _addresses[index].Request;
+        var googleSource = string.Equals(address.AddressSource, "GooglePlace", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(address.AddressSource, "GoogleMapPin", StringComparison.OrdinalIgnoreCase);
+
+        return googleSource && field switch
+        {
+            AddressField.Province => !string.IsNullOrWhiteSpace(address.StateProvince),
+            AddressField.PostalCode => !string.IsNullOrWhiteSpace(address.PostalCode),
+            _ => false
+        };
+    }
+
+    private void ApplyGoogleSelection(int index, GoogleAddressSelection selection)
+    {
+        if (index < 0 || index >= _addresses.Count)
+        {
+            return;
+        }
+
+        var address = _addresses[index].Request;
+        if (!string.IsNullOrWhiteSpace(selection.AddressLine1)) address.AddressLine1 = selection.AddressLine1;
+        if (!string.IsNullOrWhiteSpace(selection.District)) address.District = selection.District;
+        if (!string.IsNullOrWhiteSpace(selection.City)) address.City = selection.City;
+        if (!string.IsNullOrWhiteSpace(selection.StateProvince)) address.StateProvince = selection.StateProvince;
+        if (!string.IsNullOrWhiteSpace(selection.PostalCode)) address.PostalCode = selection.PostalCode;
+
+        address.AddressSource = string.IsNullOrWhiteSpace(selection.Source) ? "GooglePlace" : selection.Source;
+        address.GooglePlaceId = selection.PlaceId;
+        address.FormattedAddress = selection.FormattedAddress;
+        address.Latitude = selection.Latitude;
+        address.Longitude = selection.Longitude;
+
+        if (_thailand is not null)
+        {
+            address.CountryId = _thailand.Id;
+        }
     }
 
     private void ApplyLocation(int index, RegistryThaiLocation? location)
@@ -1466,7 +1564,15 @@
             PostalCode = source.Request.PostalCode,
             CountryId = source.Request.CountryId,
             RecipientName = source.Request.RecipientName,
-            RecipientPhone = source.Request.RecipientPhone
+            RecipientPhone = source.Request.RecipientPhone,
+            PlaceLabel = source.Request.PlaceLabel,
+            PlaceLabelOther = source.Request.PlaceLabelOther,
+            DriverNote = source.Request.DriverNote,
+            AddressSource = source.Request.AddressSource,
+            GooglePlaceId = source.Request.GooglePlaceId,
+            FormattedAddress = source.Request.FormattedAddress,
+            Latitude = source.Request.Latitude,
+            Longitude = source.Request.Longitude
         }
     };
 
@@ -1633,6 +1739,7 @@
         {
             Type = type,
             IsDefault = true,
+            PlaceLabel = type == "Company Billing" ? "Work" : "Home",
             CountryId = _thailand?.Id ?? Guid.Empty
         }
     };

@@ -36,7 +36,34 @@
                     </MudGrid>
                 </MudPaper>
 
+                <GoogleAddressPicker Latitude="@Address.Latitude"
+                                     Longitude="@Address.Longitude"
+                                     FormattedAddress="@Address.FormattedAddress"
+                                     SelectionChanged="ApplyGoogleSelection" />
+
                 <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2">Place label</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudToggleGroup T="string" @bind-Value="Address.PlaceLabel"
+                                        SelectionMode="SelectionMode.SingleSelection"
+                                        Color="Color.Primary"
+                                        CheckMark="false"
+                                        FixedContent="true"
+                                        Class="rounded-lg">
+                            <MudToggleItem Value="@("Home")" Text="Home" UnselectedIcon="@Icons.Material.Filled.Home" SelectedIcon="@Icons.Material.Filled.Home" />
+                            <MudToggleItem Value="@("Work")" Text="Work" UnselectedIcon="@Icons.Material.Filled.Business" SelectedIcon="@Icons.Material.Filled.Business" />
+                            <MudToggleItem Value="@("Other")" Text="Other" UnselectedIcon="@Icons.Material.Filled.Place" SelectedIcon="@Icons.Material.Filled.Place" />
+                        </MudToggleGroup>
+                    </MudItem>
+                    @if (string.Equals(Address.PlaceLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudTextField T="string" Label="Other place name" @bind-Value="Address.PlaceLabelOther" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                    }
+
                     @if (Address.Type == "Billing")
                     {
                         @if (HasCompany)
@@ -56,18 +83,21 @@
                         }
                     }
 
-                    @if (Address.Type == "Shipping")
-                    {
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string" Label="Recipient Name" @bind-Value="Address.RecipientName" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerName" Margin="Margin.Dense" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField T="string" Label="Recipient Phone" @bind-Value="Address.RecipientPhone" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerMobile" Margin="Margin.Dense" />
-                        </MudItem>
-                    }
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2">Contact Information</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Recipient Name" @bind-Value="Address.RecipientName" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerName" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField T="string" Label="Mobile Number" @bind-Value="Address.RecipientPhone" Immediate="true" Variant="Variant.Outlined" Placeholder="@CustomerMobile" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string" Label="Note to driver" @bind-Value="Address.DriverNote" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                    </MudItem>
 
                     <MudItem xs="12">
-                        <MudTextField T="string" Label="Address Line 1" @bind-Value="Address.AddressLine1" Immediate="true" Variant="Variant.Outlined" Required="true" Placeholder="House/building number, street" Margin="Margin.Dense" />
+                        <MudTextField T="string" Label="Address No./Moo/Soi/Road" @bind-Value="Address.AddressLine1" Immediate="true" Variant="Variant.Outlined" Required="true" Placeholder="House/building number, street" Margin="Margin.Dense" />
                     </MudItem>
 
                     <MudItem xs="12" sm="6">
@@ -79,7 +109,7 @@
 
                     <MudItem xs="12" sm="6">
                         <MudAutocomplete T="RegistryThaiLocation"
-                                         Label="District/Subdistrict"
+                                         Label="Sub District"
                                          Value="@SelectedLocation"
                                          Text="@Address.District"
                                          TextChanged="@((string text) => Address.District = text)"
@@ -108,7 +138,7 @@
 
                     <MudItem xs="12" sm="6">
                         <MudAutocomplete T="RegistryThaiLocation"
-                                         Label="City/District"
+                                         Label="District"
                                          Value="@SelectedLocation"
                                          Text="@Address.City"
                                          TextChanged="@((string text) => Address.City = text)"
@@ -137,7 +167,7 @@
 
                     <MudItem xs="12" sm="6">
                         <MudAutocomplete T="RegistryThaiLocation"
-                                         Label="State/Province"
+                                         Label="Province"
                                          Value="@SelectedLocation"
                                          Text="@Address.StateProvince"
                                          TextChanged="@((string text) => Address.StateProvince = text)"
@@ -153,6 +183,7 @@
                                          ResetValueOnEmptyText="false"
                                          DebounceInterval="500"
                                          MinCharacters="2"
+                                         Disabled="@ProvinceLocked"
                                          ValueChanged="@OnLocationSelected"
                                         >
                             <ItemTemplate Context="loc">
@@ -182,6 +213,7 @@
                                          ResetValueOnEmptyText="false"
                                          DebounceInterval="500"
                                          MinCharacters="2"
+                                         Disabled="@PostalCodeLocked"
                                          ValueChanged="@OnLocationSelected"
                                         >
                             <ItemTemplate Context="loc">
@@ -230,9 +262,16 @@
     private MudForm _form = default!;
     private CountryDto? SelectedCountry;
     private RegistryThaiLocation? SelectedLocation;
+    private bool ProvinceLocked => IsGoogleAddress && !string.IsNullOrWhiteSpace(Address.StateProvince);
+    private bool PostalCodeLocked => IsGoogleAddress && !string.IsNullOrWhiteSpace(Address.PostalCode);
+    private bool IsGoogleAddress => string.Equals(Address.AddressSource, "GooglePlace", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Address.AddressSource, "GoogleMapPin", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
+        Address.PlaceLabel = string.IsNullOrWhiteSpace(Address.PlaceLabel) ? "Home" : Address.PlaceLabel;
+        Address.RecipientName = string.IsNullOrWhiteSpace(Address.RecipientName) ? CustomerName : Address.RecipientName;
+        Address.RecipientPhone = string.IsNullOrWhiteSpace(Address.RecipientPhone) ? CustomerMobile : Address.RecipientPhone;
         SelectedCountry = AllCountries.FirstOrDefault(c => c.Id == Address.CountryId);
         
         if (!string.IsNullOrEmpty(Address.District) || !string.IsNullOrEmpty(Address.City))
@@ -248,6 +287,24 @@
                 PostalCode = Address.PostalCode ?? string.Empty
             };
         }
+    }
+
+    private void ApplyGoogleSelection(GoogleAddressSelection selection)
+    {
+        if (!string.IsNullOrWhiteSpace(selection.AddressLine1)) Address.AddressLine1 = selection.AddressLine1;
+        if (!string.IsNullOrWhiteSpace(selection.District)) Address.District = selection.District;
+        if (!string.IsNullOrWhiteSpace(selection.City)) Address.City = selection.City;
+        if (!string.IsNullOrWhiteSpace(selection.StateProvince)) Address.StateProvince = selection.StateProvince;
+        if (!string.IsNullOrWhiteSpace(selection.PostalCode)) Address.PostalCode = selection.PostalCode;
+
+        Address.AddressSource = string.IsNullOrWhiteSpace(selection.Source) ? "GooglePlace" : selection.Source;
+        Address.GooglePlaceId = selection.PlaceId;
+        Address.FormattedAddress = selection.FormattedAddress;
+        Address.Latitude = selection.Latitude;
+        Address.Longitude = selection.Longitude;
+
+        var thai = AllCountries.FirstOrDefault(c => c.Code == "TH");
+        if (thai != null) OnCountryChanged(thai);
     }
 
     private void OnTypeChanged(string type)

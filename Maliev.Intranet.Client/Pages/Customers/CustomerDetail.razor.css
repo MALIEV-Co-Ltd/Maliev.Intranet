@@ -109,6 +109,7 @@
 }
 
 .customer-input,
+.customer-contact-input,
 .customer-textarea {
     width: 100%;
     border: 1px solid var(--maliev-border);
@@ -118,7 +119,8 @@
     font: inherit;
 }
 
-.customer-input {
+.customer-input,
+.customer-contact-input {
     min-height: 34px;
     padding: 0 12px;
 }

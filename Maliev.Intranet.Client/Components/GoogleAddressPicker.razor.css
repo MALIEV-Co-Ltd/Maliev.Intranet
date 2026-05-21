@@ -1,0 +1,129 @@
+.google-address-picker {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.google-address-picker-head {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.google-address-label {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.google-address-search-row {
+    align-items: stretch;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.google-address-autocomplete {
+    min-height: 42px;
+}
+
+.google-address-autocomplete:empty::before {
+    align-items: center;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: 4px;
+    color: var(--mud-palette-text-secondary);
+    content: "Search for your location";
+    display: flex;
+    min-height: 42px;
+    padding: 0 0.875rem;
+}
+
+.google-address-map-button {
+    height: 42px;
+    width: 42px;
+}
+
+.google-address-selected,
+.google-address-status {
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.55rem 0.7rem;
+}
+
+.google-address-selected {
+    background: color-mix(in srgb, var(--mud-palette-success) 10%, transparent);
+    color: var(--mud-palette-text-primary);
+}
+
+.google-address-status {
+    background: color-mix(in srgb, var(--mud-palette-warning) 14%, transparent);
+    color: var(--mud-palette-text-primary);
+}
+
+.google-address-map-backdrop {
+    align-items: center;
+    background: rgba(17, 24, 39, 0.58);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 1rem;
+    position: fixed;
+    z-index: 1400;
+}
+
+.google-address-map-dialog {
+    background: var(--mud-palette-surface);
+    border-radius: 8px;
+    box-shadow: var(--mud-elevation-12);
+    display: grid;
+    gap: 0;
+    max-width: min(920px, 96vw);
+    overflow: hidden;
+    width: 100%;
+}
+
+.google-address-map-title,
+.google-address-map-footer {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.85rem 1rem;
+}
+
+.google-address-map-close,
+.google-address-map-done {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--mud-palette-text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+}
+
+.google-address-map-done {
+    background: var(--mud-palette-primary);
+    border-radius: 6px;
+    color: var(--mud-palette-primary-text);
+    font-weight: 700;
+    min-height: 36px;
+    padding: 0 1rem;
+}
+
+.google-address-map-canvas {
+    aspect-ratio: 16 / 9;
+    min-height: 360px;
+    width: 100%;
+}
+
+.google-address-map-footer {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+    .google-address-map-canvas {
+        aspect-ratio: 4 / 5;
+        min-height: 420px;
+    }
+}

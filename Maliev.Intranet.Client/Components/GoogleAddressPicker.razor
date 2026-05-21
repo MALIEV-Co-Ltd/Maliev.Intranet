@@ -1,0 +1,148 @@
+@using Maliev.Intranet.Shared
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<div class="google-address-picker">
+    <div class="google-address-picker-head">
+        <label class="google-address-label" for="@_autocompleteElementId">Search for your location</label>
+        <div class="google-address-search-row">
+            <div id="@_autocompleteElementId" class="google-address-autocomplete" aria-label="Search for your location"></div>
+            <MudIconButton Icon="@Icons.Material.Filled.Map"
+                           Color="Color.Primary"
+                           Variant="Variant.Outlined"
+                           Class="google-address-map-button"
+                           aria-label="Open map"
+                           OnClick="OpenMapAsync" />
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_selectedSummary))
+        {
+            <div class="google-address-selected">@_selectedSummary</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(_statusMessage))
+        {
+            <div class="google-address-status">@_statusMessage</div>
+        }
+    </div>
+
+    @if (_mapOpen)
+    {
+        <div class="google-address-map-backdrop" role="dialog" aria-modal="true" aria-label="Select address on Google map">
+            <div class="google-address-map-dialog">
+                <div class="google-address-map-title">
+                    <strong>Select location</strong>
+                    <button type="button" class="google-address-map-close" @onclick="CloseMapAsync" aria-label="Close map">
+                        <MudIcon Icon="@Icons.Material.Filled.Close" />
+                    </button>
+                </div>
+                <div id="@_mapElementId" class="google-address-map-canvas"></div>
+                <div class="google-address-map-footer">
+                    <span>Drag the marker or click the map to update the address.</span>
+                    <button type="button" class="google-address-map-done" @onclick="CloseMapAsync">Done</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly string _autocompleteElementId = $"google-address-autocomplete-{Guid.NewGuid():N}";
+    private readonly string _mapElementId = $"google-address-map-{Guid.NewGuid():N}";
+    private DotNetObjectReference<GoogleAddressPicker>? _dotNetReference;
+    private GoogleAddressConfigResponse? _config;
+    private bool _searchInitialized;
+    private bool _mapOpen;
+    private string? _selectedSummary;
+    private string? _statusMessage;
+
+    /// <summary>Latitude to center the map on when editing an existing address.</summary>
+    [Parameter] public decimal? Latitude { get; set; }
+
+    /// <summary>Longitude to center the map on when editing an existing address.</summary>
+    [Parameter] public decimal? Longitude { get; set; }
+
+    /// <summary>Current formatted address for display.</summary>
+    [Parameter] public string? FormattedAddress { get; set; }
+
+    /// <summary>Callback raised when Google returns a structured address.</summary>
+    [Parameter] public EventCallback<GoogleAddressSelection> SelectionChanged { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _searchInitialized)
+        {
+            return;
+        }
+
+        _dotNetReference = DotNetObjectReference.Create(this);
+        _config = await LoadConfigAsync();
+        _selectedSummary = FormattedAddress;
+
+        if (string.IsNullOrWhiteSpace(_config.ApiKey))
+        {
+            _statusMessage = "Google Maps key is not configured. Manual address fields remain available.";
+            StateHasChanged();
+            return;
+        }
+
+        await JS.InvokeVoidAsync("malievGoogleAddressPicker.initializeSearch", _autocompleteElementId, _dotNetReference, _config);
+        _searchInitialized = true;
+    }
+
+    private async Task<GoogleAddressConfigResponse> LoadConfigAsync()
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GoogleAddressConfigResponse>("api/v1/address/google-config") ?? new GoogleAddressConfigResponse();
+        }
+        catch
+        {
+            return new GoogleAddressConfigResponse();
+        }
+    }
+
+    private async Task OpenMapAsync()
+    {
+        _config ??= await LoadConfigAsync();
+        if (string.IsNullOrWhiteSpace(_config.ApiKey))
+        {
+            _statusMessage = "Google Maps key is not configured. Manual address fields remain available.";
+            return;
+        }
+
+        _mapOpen = true;
+        StateHasChanged();
+        await Task.Yield();
+        await JS.InvokeVoidAsync("malievGoogleAddressPicker.initializeMap", _mapElementId, _dotNetReference, _config, new
+        {
+            latitude = Latitude,
+            longitude = Longitude
+        });
+    }
+
+    private async Task CloseMapAsync()
+    {
+        _mapOpen = false;
+        await JS.InvokeVoidAsync("malievGoogleAddressPicker.disposeMap", _mapElementId);
+    }
+
+    /// <summary>Receives Google address selections from JavaScript interop.</summary>
+    [JSInvokable]
+    public async Task NotifyGoogleAddressSelected(GoogleAddressSelection selection)
+    {
+        _selectedSummary = selection.FormattedAddress;
+        _statusMessage = null;
+        await SelectionChanged.InvokeAsync(selection);
+        StateHasChanged();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await JS.InvokeVoidAsync("malievGoogleAddressPicker.disposeSearch", _autocompleteElementId);
+        await JS.InvokeVoidAsync("malievGoogleAddressPicker.disposeMap", _mapElementId);
+        _dotNetReference?.Dispose();
+    }
+}

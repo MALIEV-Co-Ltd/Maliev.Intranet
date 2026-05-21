@@ -659,23 +659,49 @@
     @if (_addressEdit is not null)
     {
         <div class="customer-address-form">
+            <GoogleAddressPicker Latitude="@_addressEdit.Latitude"
+                                 Longitude="@_addressEdit.Longitude"
+                                 FormattedAddress="@_addressEdit.FormattedAddress"
+                                 SelectionChanged="ApplyGoogleAddressSelection" />
             <div class="customer-address-editor-grid">
                 <div class="customer-address-editor-fields">
                     <div class="customer-form-grid">
                         <label class="customer-field">
+                            <span>Place name</span>
+                            <select class="customer-input" @bind="_addressEdit.PlaceLabel">
+                                <option>Home</option>
+                                <option>Work</option>
+                                <option>Other</option>
+                            </select>
+                        </label>
+                        @if (string.Equals(_addressEdit.PlaceLabel, "Other", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <label class="customer-field">
+                                <span>Other place name</span>
+                                <input class="customer-input" @bind="_addressEdit.PlaceLabelOther" @bind:event="oninput" />
+                            </label>
+                        }
+                        <label class="customer-field">
                             <span>Recipient name</span>
                             <input class="customer-input" @bind="_addressEdit.Label" @bind:event="oninput" />
+                        </label>
+                        <label class="customer-field">
+                            <span>Mobile Number</span>
+                            <input class="customer-contact-input" @bind="_addressEdit.RecipientPhone" @bind:event="oninput" />
+                        </label>
+                        <label class="customer-field customer-span-2">
+                            <span>Note to driver</span>
+                            <textarea class="customer-textarea" @bind="_addressEdit.DriverNote" @bind:event="oninput"></textarea>
                         </label>
                         <label class="customer-field">
                             <span>Type</span>
                             <select class="customer-input" @bind="_addressEdit.Type">
                                 <option>Billing</option>
                                 <option>Shipping</option>
-                                <option>Office</option>
                             </select>
                         </label>
                         <label class="customer-field customer-span-2">
-                            <span>Street</span>
+                            <span>Address No./Moo/Soi/Road</span>
                             <input class="customer-input" @bind="_addressEdit.AddressLine1" @bind:event="oninput" />
                         </label>
                         <label class="customer-field customer-span-2">
@@ -702,7 +728,7 @@
                             }
                         </label>
                         <label class="customer-field customer-suggestion-field">
-                            <span>District / sub-district</span>
+                            <span>Sub District</span>
                             <input class="customer-input"
                                    value="@_addressEdit.District"
                                    @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.District, args.Value?.ToString()))"
@@ -721,9 +747,10 @@
                             }
                         </label>
                         <label class="customer-field customer-suggestion-field">
-                            <span>State / province</span>
+                            <span>Province</span>
                             <input class="customer-input"
                                    value="@_addressEdit.StateProvince"
+                                   disabled="@AddressProvinceLocked"
                                    @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.StateProvince, args.Value?.ToString()))"
                                    @onfocus="@(() => ShowAddressSuggestions(AddressField.StateProvince))" />
                             @if (ShouldShowAddressSuggestions(AddressField.StateProvince))
@@ -743,6 +770,7 @@
                             <span>Postal</span>
                             <input class="customer-input"
                                    value="@_addressEdit.PostalCode"
+                                   disabled="@AddressPostalCodeLocked"
                                    @oninput="@((ChangeEventArgs args) => OnAddressFieldInputAsync(AddressField.PostalCode, args.Value?.ToString()))"
                                    @onfocus="@(() => ShowAddressSuggestions(AddressField.PostalCode))" />
                             @if (ShouldShowAddressSuggestions(AddressField.PostalCode))
@@ -954,6 +982,12 @@
     private string EmptyActivityMessage => HasActivitySearch ? "No activity matches this search." : "No activity recorded.";
     private string AddressModalTitle => _addressEdit?.Id is null ? "Add address" : "Edit address";
     private string AddressMapElementId => $"customer-address-map-{Id:N}";
+    private bool AddressProvinceLocked => _addressEdit is not null
+        && _addressEdit.IsGoogleAddress
+        && !string.IsNullOrWhiteSpace(_addressEdit.StateProvince);
+    private bool AddressPostalCodeLocked => _addressEdit is not null
+        && _addressEdit.IsGoogleAddress
+        && !string.IsNullOrWhiteSpace(_addressEdit.PostalCode);
     private PaymentTermDto? SelectedPaymentTerm => _edit is null
         ? null
         : _paymentTerms.FirstOrDefault(term => string.Equals(term.Name, _edit.PaymentTerms, StringComparison.Ordinal));
@@ -1647,6 +1681,7 @@
         _addressEdit = AddressEditModel.Create(
             _customer?.Addresses.FirstOrDefault()?.CountryId ?? DefaultCountryId(),
             DefaultAddressRecipientName());
+        _addressEdit.RecipientPhone = DefaultAddressRecipientPhone();
         ResetAddressLookupState();
         return Task.CompletedTask;
     }
@@ -1680,6 +1715,32 @@
         _fieldLocationMatches.Clear();
     }
 
+    private void ApplyGoogleAddressSelection(GoogleAddressSelection selection)
+    {
+        if (_addressEdit is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(selection.AddressLine1)) _addressEdit.AddressLine1 = selection.AddressLine1;
+        if (!string.IsNullOrWhiteSpace(selection.District)) _addressEdit.District = selection.District;
+        if (!string.IsNullOrWhiteSpace(selection.City)) _addressEdit.City = selection.City;
+        if (!string.IsNullOrWhiteSpace(selection.StateProvince)) _addressEdit.StateProvince = selection.StateProvince;
+        if (!string.IsNullOrWhiteSpace(selection.PostalCode)) _addressEdit.PostalCode = selection.PostalCode;
+
+        _addressEdit.AddressSource = string.IsNullOrWhiteSpace(selection.Source) ? "GooglePlace" : selection.Source;
+        _addressEdit.GooglePlaceId = selection.PlaceId;
+        _addressEdit.FormattedAddress = selection.FormattedAddress;
+        _addressEdit.Latitude = selection.Latitude;
+        _addressEdit.Longitude = selection.Longitude;
+
+        var thai = _countries.FirstOrDefault(c => string.Equals(c.Code, "TH", StringComparison.OrdinalIgnoreCase));
+        if (thai is not null)
+        {
+            _addressEdit.CountryId = thai.Id;
+        }
+    }
+
     private async Task SaveAddressAsync()
     {
         if (_customer is null || _addressEdit is null)
@@ -1704,6 +1765,8 @@
                 {
                     Type = _addressEdit.Type,
                     IsDefault = _addressEdit.IsDefault,
+                    PlaceLabel = _addressEdit.PlaceLabel,
+                    PlaceLabelOther = _addressEdit.PlaceLabelOther,
                     AddressLine1 = _addressEdit.AddressLine1,
                     AddressLine2 = _addressEdit.AddressLine2,
                     District = _addressEdit.District,
@@ -1712,6 +1775,13 @@
                     PostalCode = _addressEdit.PostalCode,
                     CountryId = _addressEdit.CountryId == Guid.Empty ? null : _addressEdit.CountryId,
                     RecipientName = _addressEdit.Label,
+                    RecipientPhone = _addressEdit.RecipientPhone,
+                    DriverNote = _addressEdit.DriverNote,
+                    AddressSource = _addressEdit.AddressSource,
+                    GooglePlaceId = _addressEdit.GooglePlaceId,
+                    FormattedAddress = _addressEdit.FormattedAddress,
+                    Latitude = _addressEdit.Latitude,
+                    Longitude = _addressEdit.Longitude,
                     Version = _addressEdit.Version,
                     Xmin = _addressEdit.Xmin
                 });
@@ -1730,6 +1800,8 @@
                     {
                         Type = _addressEdit.Type,
                         IsDefault = _addressEdit.IsDefault,
+                        PlaceLabel = _addressEdit.PlaceLabel,
+                        PlaceLabelOther = _addressEdit.PlaceLabelOther,
                         AddressLine1 = _addressEdit.AddressLine1,
                         AddressLine2 = _addressEdit.AddressLine2,
                         District = _addressEdit.District,
@@ -1737,7 +1809,14 @@
                         StateProvince = _addressEdit.StateProvince,
                         PostalCode = _addressEdit.PostalCode,
                         CountryId = _addressEdit.CountryId,
-                        RecipientName = _addressEdit.Label
+                        RecipientName = _addressEdit.Label,
+                        RecipientPhone = _addressEdit.RecipientPhone,
+                        DriverNote = _addressEdit.DriverNote,
+                        AddressSource = _addressEdit.AddressSource,
+                        GooglePlaceId = _addressEdit.GooglePlaceId,
+                        FormattedAddress = _addressEdit.FormattedAddress,
+                        Latitude = _addressEdit.Latitude,
+                        Longitude = _addressEdit.Longitude
                     }
                 });
             }
@@ -1769,6 +1848,8 @@
             {
                 Type = address.Type,
                 IsDefault = true,
+                PlaceLabel = address.PlaceLabel,
+                PlaceLabelOther = address.PlaceLabelOther,
                 AddressLine1 = address.AddressLine1,
                 AddressLine2 = address.AddressLine2,
                 AddressLine3 = address.AddressLine3,
@@ -1779,6 +1860,12 @@
                 CountryId = address.CountryId,
                 RecipientName = address.RecipientName,
                 RecipientPhone = address.RecipientPhone,
+                DriverNote = address.DriverNote,
+                AddressSource = address.AddressSource,
+                GooglePlaceId = address.GooglePlaceId,
+                FormattedAddress = address.FormattedAddress,
+                Latitude = address.Latitude,
+                Longitude = address.Longitude,
                 Version = address.Version,
                 Xmin = address.Xmin
             });
@@ -2479,6 +2566,26 @@
         return _customer?.Email?.Trim() ?? string.Empty;
     }
 
+    private string DefaultAddressRecipientPhone()
+    {
+        if (!string.IsNullOrWhiteSpace(_edit?.Phone))
+        {
+            return _edit.Phone.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_customer?.Mobile))
+        {
+            return _customer.Mobile.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_customer?.CompanyPhone))
+        {
+            return _customer.CompanyPhone.Trim();
+        }
+
+        return string.Empty;
+    }
+
     private static IReadOnlyList<string> FormatAddressLines(AddressResponse address)
     {
         var street = string.Join(", ", new[] { address.AddressLine1, address.AddressLine2, address.AddressLine3 }
@@ -2785,6 +2892,8 @@
         public string Label { get; set; } = string.Empty;
         public string Type { get; set; } = "Billing";
         public bool IsDefault { get; set; }
+        public string PlaceLabel { get; set; } = "Home";
+        public string? PlaceLabelOther { get; set; }
         public string AddressLine1 { get; set; } = string.Empty;
         public string? AddressLine2 { get; set; }
         public string? District { get; set; }
@@ -2792,8 +2901,17 @@
         public string StateProvince { get; set; } = string.Empty;
         public string PostalCode { get; set; } = string.Empty;
         public Guid CountryId { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? DriverNote { get; set; }
+        public string AddressSource { get; set; } = "Manual";
+        public string? GooglePlaceId { get; set; }
+        public string? FormattedAddress { get; set; }
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
         public byte[] Version { get; set; } = [];
         public uint Xmin { get; set; }
+        public bool IsGoogleAddress => string.Equals(AddressSource, "GooglePlace", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(AddressSource, "GoogleMapPin", StringComparison.OrdinalIgnoreCase);
 
         public static AddressEditModel Create(Guid countryId, string recipientName) => new()
         {
@@ -2808,6 +2926,8 @@
             Label = AddressName(address, address.Type),
             Type = string.IsNullOrWhiteSpace(address.Type) ? "Billing" : address.Type,
             IsDefault = address.IsDefault,
+            PlaceLabel = string.IsNullOrWhiteSpace(address.PlaceLabel) ? "Home" : address.PlaceLabel,
+            PlaceLabelOther = address.PlaceLabelOther,
             AddressLine1 = address.AddressLine1,
             AddressLine2 = address.AddressLine2,
             District = address.District,
@@ -2815,6 +2935,13 @@
             StateProvince = address.StateProvince,
             PostalCode = address.PostalCode,
             CountryId = address.CountryId,
+            RecipientPhone = address.RecipientPhone,
+            DriverNote = address.DriverNote,
+            AddressSource = string.IsNullOrWhiteSpace(address.AddressSource) ? "Manual" : address.AddressSource,
+            GooglePlaceId = address.GooglePlaceId,
+            FormattedAddress = address.FormattedAddress,
+            Latitude = address.Latitude,
+            Longitude = address.Longitude,
             Version = address.Version,
             Xmin = address.Xmin
         };

@@ -54,6 +54,8 @@ public class SharedDtoTests
         _ = new CustomerSummaryDto { Name = "Cust" };
         _ = new CustomerDetailDto { FirstName = "John" };
         _ = new AddressResponse { City = "BKK" };
+        _ = new GoogleAddressConfigResponse { ApiKey = "browser-key" };
+        _ = new GoogleAddressSelection { Source = "GooglePlace", PlaceId = "place-1" };
         _ = new NDAResponse { Status = "Active" };
         _ = new InternalNoteResponse { NoteText = "Note" };
         _ = new DocumentResponse { FileName = "doc.pdf" };
@@ -91,6 +93,37 @@ public class SharedDtoTests
         _ = new CreateEmployeeRequest { Email = "test@test.com" };
 
         Assert.True(true);
+    }
+
+    [Fact]
+    public void AddressDtos_GoogleMetadata_UseCamelCaseWireNames()
+    {
+        var request = new CreateAddressRequest
+        {
+            Type = "Shipping",
+            AddressLine1 = "88 Rama IX Road",
+            City = "Huai Khwang",
+            StateProvince = "Bangkok",
+            PostalCode = "10310",
+            CountryId = Guid.NewGuid(),
+            PlaceLabel = "Work",
+            DriverNote = "Call before delivery",
+            AddressSource = "GooglePlace",
+            GooglePlaceId = "ChIJ-test",
+            FormattedAddress = "MALIEV Co., Ltd., Bangkok",
+            Latitude = 13.7563m,
+            Longitude = 100.5018m
+        };
+
+        var json = JsonSerializer.Serialize(request);
+
+        Assert.Contains("\"placeLabel\":\"Work\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"driverNote\":\"Call before delivery\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"addressSource\":\"GooglePlace\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"googlePlaceId\":\"ChIJ-test\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"formattedAddress\":\"MALIEV Co., Ltd., Bangkok\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"latitude\":13.7563", json, StringComparison.Ordinal);
+        Assert.Contains("\"longitude\":100.5018", json, StringComparison.Ordinal);
     }
 
     [Fact]
