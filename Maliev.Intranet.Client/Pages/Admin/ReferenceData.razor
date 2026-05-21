@@ -640,10 +640,13 @@
         await LoadLocationPageAsync(1);
     }
 
-    private async Task LoadLocationPageAsync(int pageNumber)
+    private async Task LoadLocationPageAsync(int pageNumber, bool clearStatus = true)
     {
         _loadingLocations = true;
-        ClearStatus();
+        if (clearStatus)
+        {
+            ClearStatus();
+        }
 
         try
         {
@@ -938,7 +941,7 @@
             }
 
             CancelLocationEdit();
-            await LoadLocationPageAsync(_locationPage.PageNumber);
+            await LoadLocationPageAsync(_locationPage.PageNumber, clearStatus: false);
         }
         catch (Exception ex)
         {
@@ -959,7 +962,7 @@
         {
             await ReferenceDataService.DeleteRegistryLocationAsync(location.Id);
             SetStatus("Registry location deleted.");
-            await LoadLocationPageAsync(_locationPage.PageNumber);
+            await LoadLocationPageAsync(_locationPage.PageNumber, clearStatus: false);
         }
         catch (Exception ex)
         {
