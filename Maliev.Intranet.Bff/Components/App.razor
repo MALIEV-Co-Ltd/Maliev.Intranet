@@ -212,6 +212,7 @@
 </head>
 
 <body>
+    <ReconnectModal />
     <div id="wasm-loading" class="wasm-loading" aria-live="polite" aria-busy="true">
         <div class="wasm-loading-stage">
             <WasmLogoLoadingAnimation />
@@ -308,6 +309,7 @@
         })();
         window.malievMarkWasmReady = window.malievWasmLoader.markReady;
     </script>
+    <script src="js/maliev-reconnect.js"></script>
     <script src="_framework/blazor.web.js" autostart="false"></script>
     <script>
         Blazor.start({

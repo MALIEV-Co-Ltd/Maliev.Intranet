@@ -47,6 +47,10 @@
     --maliev-shadow-card:      rgba(0,0,0,0.08) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 2px, rgba(0,0,0,0.04) 0 8px 8px -8px, #fafafa 0 0 0 1px inset;
     --maliev-focus-color:      hsla(212, 100%, 48%, 1);
     --maliev-focus-ring:       0 0 0 2px #ffffff, 0 0 0 4px var(--maliev-focus-color);
+    --maliev-reconnect-button-bg: #0a72ef;
+    --maliev-reconnect-button-hover: #075fc9;
+    --maliev-reconnect-button-text: #ffffff;
+    --maliev-reconnect-button-focus: rgba(10, 114, 239, 0.24);
 
     /* Radius scale */
     --maliev-radius-xs:   3px;
@@ -133,6 +137,10 @@
     --maliev-shadow-lg:        rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.46) 0 16px 40px -24px;
     --maliev-shadow-card:      rgba(255,255,255,0.12) 0 0 0 1px, rgba(0,0,0,0.36) 0 2px 2px, rgba(0,0,0,0.36) 0 8px 8px -8px, rgba(255,255,255,0.06) 0 0 0 1px inset;
     --maliev-focus-ring:       0 0 0 2px #0a0a0a, 0 0 0 4px var(--maliev-focus-color);
+    --maliev-reconnect-button-bg: #0a72ef;
+    --maliev-reconnect-button-hover: #2686ff;
+    --maliev-reconnect-button-text: #ffffff;
+    --maliev-reconnect-button-focus: rgba(10, 114, 239, 0.32);
 
     --maliev-viewer-bg:    linear-gradient(180deg, #111111 0%, #171717 100%);
     --maliev-scroll:       #404040;
