@@ -1,0 +1,236 @@
+@page "/sales/contact-requests"
+@page "/contact-requests"
+@attribute [RequirePermission(MalievPermissions.ContactRequest.Read)]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Contact Requests | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Contact Requests" Subtitle="Website contact inbox, customer copies, attachments, lifecycle state, and employee replies.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        <StatBar Class="mb-4">
+            <StatTile Label="Matching requests" Value="@_meta.TotalItems.ToString("N0")" />
+            <StatTile Label="New" Value="@_requests.Count(request => request.Status == ContactRequestStatus.New).ToString("N0")" />
+            <StatTile Label="In progress" Value="@_requests.Count(request => request.Status == ContactRequestStatus.InProgress).ToString("N0")" />
+            <StatTile Label="Resolved" Value="@_requests.Count(request => request.Status == ContactRequestStatus.Resolved).ToString("N0")" Trend="true" />
+        </StatBar>
+
+        <PanelCard Title="Filters">
+            <FormGrid>
+                <FormField Label="Status">
+                    <select class="mlv-form-input" @bind="_statusFilter">
+                        <option value="">All statuses</option>
+                        <option value="0">New</option>
+                        <option value="1">In progress</option>
+                        <option value="2">Resolved</option>
+                        <option value="3">Closed</option>
+                    </select>
+                </FormField>
+                <FormField Label="Email">
+                    <input class="mlv-form-input" @bind="_emailFilter" @bind:event="oninput" placeholder="customer@example.com" />
+                </FormField>
+            </FormGrid>
+            <div class="mlv-toolbar mt-3">
+                <div class="mlv-toolbar-left"></div>
+                <div class="mlv-toolbar-right">
+                    <SecondaryButton Icon="@Icons.Material.Outlined.Clear" OnClick="@ClearFiltersAsync">Clear</SecondaryButton>
+                    <PrimaryButton Icon="@Icons.Material.Outlined.Search" OnClick="@ApplyFiltersAsync">Apply filters</PrimaryButton>
+                </div>
+            </div>
+        </PanelCard>
+
+        @if (_loading)
+        {
+            <ProgressiveSkeleton Layout="table" Rows="6" Columns="6" ShowFilters="false" Class="mb-3" Label="Loading contact requests" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard>
+            @if (_requests.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                            <th>Subject</th>
+                            <th>Files</th>
+                            <th>Received</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var request in _requests)
+                        {
+                            <tr @onclick="@(() => Navigation.NavigateTo($"/sales/contact-requests/{request.Id}"))">
+                                <td>
+                                    <div class="mlv-row-main mlv-mono">@DisplayReference(request)</div>
+                                    <div class="mlv-row-sub">@request.ContactType</div>
+                                </td>
+                                <td>
+                                    <div class="mlv-row-main">@Display(request.FullName)</div>
+                                    <div class="mlv-row-sub">@Display(request.Email)</div>
+                                </td>
+                                <td><StatusBadge Status="@DisplayStatus(request.Status)" /></td>
+                                <td>@request.Priority</td>
+                                <td>@Display(request.Subject)</td>
+                                <td>@request.Files.Count.ToString("N0")</td>
+                                <td>@request.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No website contact requests match this view.</div>
+            }
+        </PanelCard>
+
+        <PaginationFooter Meta="@_meta"
+                          CurrentPage="@_page"
+                          PageSize="@_pageSize"
+                          PageChanged="OnPageChanged"
+                          PageSizeChanged="OnPageSizeChanged"
+                          Disabled="@_loading" />
+    </PageBody>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public int? QueryPageSize { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] public string? QueryStatus { get; set; }
+    [SupplyParameterFromQuery(Name = "email")] public string? QueryEmail { get; set; }
+
+    private List<ContactRequestDto> _requests = [];
+    private PaginationMeta _meta = new();
+    private bool _loading = true;
+    private string? _error;
+    private int _page = 1;
+    private int _pageSize = 20;
+    private string _statusFilter = string.Empty;
+    private string _emailFilter = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _page = Math.Max(1, QueryPage ?? 1);
+        _pageSize = NormalizePageSize(QueryPageSize ?? 20);
+        _statusFilter = QueryStatus ?? string.Empty;
+        _emailFilter = QueryEmail ?? string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task ApplyFiltersAsync(MouseEventArgs _)
+    {
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task ClearFiltersAsync(MouseEventArgs _)
+    {
+        _statusFilter = string.Empty;
+        _emailFilter = string.Empty;
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task OnPageSizeChanged(int pageSize)
+    {
+        _pageSize = NormalizePageSize(pageSize);
+        _page = 1;
+        await NavigateAndLoadAsync();
+    }
+
+    private async Task NavigateAndLoadAsync()
+    {
+        Navigation.NavigateTo(BuildListUrl(), replace: true);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<ContactRequestDto>>(BuildApiUrl());
+            _requests = response?.Data.ToList() ?? [];
+            _meta = response?.Meta ?? new();
+            _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
+            _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+            _meta.TotalItems = _meta.TotalItems == 0 ? _meta.TotalCount : _meta.TotalItems;
+        }
+        catch (Exception ex)
+        {
+            _error = "Contact requests could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BuildApiUrl()
+    {
+        var query = BuildQuery();
+        return $"api/v1/contactrequests?{string.Join("&", query)}";
+    }
+
+    private string BuildListUrl()
+    {
+        var query = BuildQuery().Where(item => item is not "page=1" and not "pageSize=20").ToList();
+        return query.Count == 0 ? "/sales/contact-requests" : $"/sales/contact-requests?{string.Join("&", query)}";
+    }
+
+    private List<string> BuildQuery()
+    {
+        var query = new List<string> { $"page={_page}", $"pageSize={_pageSize}" };
+        if (!string.IsNullOrWhiteSpace(_statusFilter))
+        {
+            query.Add($"status={Uri.EscapeDataString(_statusFilter)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_emailFilter))
+        {
+            query.Add($"email={Uri.EscapeDataString(_emailFilter.Trim())}");
+        }
+
+        return query;
+    }
+
+    private static int NormalizePageSize(int pageSize) => pageSize switch
+    {
+        <= 10 => 10,
+        <= 20 => 20,
+        _ => 50
+    };
+
+    private static string DisplayReference(ContactRequestDto request) =>
+        string.IsNullOrWhiteSpace(request.PublicReference) ? $"MLV-C-{request.Id:000000}" : request.PublicReference;
+
+    private static string DisplayStatus(ContactRequestStatus status) =>
+        status == ContactRequestStatus.InProgress ? "In Progress" : status.ToString();
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

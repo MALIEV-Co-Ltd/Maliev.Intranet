@@ -1,0 +1,310 @@
+@page "/sales/contact-requests/{ContactRequestId:int}"
+@attribute [RequirePermission(MalievPermissions.ContactRequest.Read)]
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Contact Request | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="@(_request?.PublicReference ?? "Contact Request")" Subtitle="Review the stored message, attachments, status, priority, and customer reply path.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.ArrowBack" Href="/sales/contact-requests">Back to Contact Requests</SecondaryButton>
+        <PrimaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Class="mb-3" Label="Loading contact request" />
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        @if (_request is not null)
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Status" Value="@DisplayStatus(_request.Status)" />
+                <StatTile Label="Priority" Value="@_request.Priority.ToString()" />
+                <StatTile Label="Attachments" Value="@_request.Files.Count.ToString("N0")" />
+                <StatTile Label="Received" Value="@_request.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm")" />
+            </StatBar>
+
+            <PanelCard Title="Lifecycle">
+                <div class="mlv-toolbar mb-3">
+                    <div class="mlv-toolbar-left">
+                        <StatusBadge Status="@DisplayStatus(_request.Status)" />
+                        <span class="mlv-mono">@_request.PublicReference</span>
+                    </div>
+                    <div class="mlv-toolbar-right">
+                        <SecondaryButton Icon="@Icons.Material.Outlined.PlayArrow" Disabled="@_statusUpdating" OnClick="@StartWorkAsync">Start work</SecondaryButton>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.TaskAlt" Disabled="@_statusUpdating" OnClick="@ResolveAsync">Resolve</SecondaryButton>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.Inventory2" Disabled="@_statusUpdating" OnClick="@CloseAsync">Close</SecondaryButton>
+                    </div>
+                </div>
+
+                <FormGrid>
+                    <FormField Label="Status">
+                        <select class="mlv-form-input" @bind="_statusValue">
+                            <option value="0">New</option>
+                            <option value="1">In progress</option>
+                            <option value="2">Resolved</option>
+                            <option value="3">Closed</option>
+                        </select>
+                    </FormField>
+                    <FormField Label="Priority">
+                        <select class="mlv-form-input" @bind="_priorityValue">
+                            <option value="0">Low</option>
+                            <option value="1">Medium</option>
+                            <option value="2">High</option>
+                            <option value="3">Urgent</option>
+                        </select>
+                    </FormField>
+                </FormGrid>
+                <div class="mlv-toolbar mt-3">
+                    <div class="mlv-toolbar-left"></div>
+                    <div class="mlv-toolbar-right">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@_statusUpdating" OnClick="@SaveLifecycleAsync">Save lifecycle</PrimaryButton>
+                    </div>
+                </div>
+            </PanelCard>
+
+            <PanelCard Title="Customer request">
+                <dl class="mlv-detail-grid">
+                    <div><dt>Name</dt><dd>@Display(_request.FullName)</dd></div>
+                    <div><dt>Email</dt><dd><a href="mailto:@_request.Email">@Display(_request.Email)</a></dd></div>
+                    <div><dt>Phone</dt><dd>@Display(_request.PhoneNumber)</dd></div>
+                    <div><dt>Company</dt><dd>@Display(_request.Company)</dd></div>
+                    <div><dt>Type</dt><dd>@_request.ContactType</dd></div>
+                    <div><dt>Updated</dt><dd>@_request.UpdatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd></div>
+                </dl>
+                <div class="mt-4">
+                    <div class="mlv-row-main">@Display(_request.Subject)</div>
+                    <p class="mt-2">@_request.Message</p>
+                </div>
+            </PanelCard>
+
+            <PanelCard Title="Attachments">
+                @if (_request.Files.Count == 0)
+                {
+                    <div class="mlv-empty">No attachments were included with this contact request.</div>
+                }
+                else
+                {
+                    <table class="mlv-table">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Uploaded</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var file in _request.Files)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="mlv-row-main">@Display(file.FileName)</div>
+                                        <div class="mlv-row-sub mlv-mono">@Display(file.ObjectName)</div>
+                                    </td>
+                                    <td>@Display(file.ContentType)</td>
+                                    <td>@FormatBytes(file.FileSize)</td>
+                                    <td>@file.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td>
+                                        <a class="button secondary" href="@BuildDownloadUrl(file.Id)" target="_blank" rel="noopener noreferrer">Download</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </PanelCard>
+
+            <PanelCard Title="Reply from Intranet">
+                <FormGrid>
+                    <FormField Label="Reply message">
+                        <textarea class="mlv-form-input" rows="7" @bind="_replyMessage" @bind:event="oninput"></textarea>
+                    </FormField>
+                </FormGrid>
+                <label class="mlv-checkbox mt-3">
+                    <input type="checkbox" @bind="_markResolved" />
+                    <span>Mark resolved after sending</span>
+                </label>
+                <div class="mlv-toolbar mt-3">
+                    <div class="mlv-toolbar-left">
+                        <span class="mlv-form-help">This sends through NotificationService. The MALIEV inbox email remains notification-only.</span>
+                    </div>
+                    <div class="mlv-toolbar-right">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.Send" Disabled="@(_replySending || string.IsNullOrWhiteSpace(_replyMessage))" OnClick="@SendReplyAsync">Send reply</PrimaryButton>
+                    </div>
+                </div>
+            </PanelCard>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public int ContactRequestId { get; set; }
+
+    private ContactRequestDto? _request;
+    private bool _loading = true;
+    private bool _statusUpdating;
+    private bool _replySending;
+    private string? _error;
+    private string _statusValue = "0";
+    private string _priorityValue = "1";
+    private string _replyMessage = string.Empty;
+    private bool _markResolved = true;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task ReloadAsync(MouseEventArgs _) => await LoadAsync();
+
+    private async Task StartWorkAsync(MouseEventArgs _) => await UpdateLifecycleAsync(ContactRequestStatus.InProgress, null);
+
+    private async Task ResolveAsync(MouseEventArgs _) => await UpdateLifecycleAsync(ContactRequestStatus.Resolved, null);
+
+    private async Task CloseAsync(MouseEventArgs _) => await UpdateLifecycleAsync(ContactRequestStatus.Closed, null);
+
+    private async Task SaveLifecycleAsync(MouseEventArgs _)
+    {
+        var status = Enum.TryParse<ContactRequestStatus>(_statusValue, out var parsedStatus)
+            ? parsedStatus
+            : ContactRequestStatus.New;
+        var priority = Enum.TryParse<ContactRequestPriority>(_priorityValue, out var parsedPriority)
+            ? parsedPriority
+            : ContactRequestPriority.Medium;
+        await UpdateLifecycleAsync(status, priority);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _request = await Http.GetFromJsonAsync<ContactRequestDto>($"api/v1/contactrequests/{ContactRequestId}");
+            if (_request is null)
+            {
+                _error = "Contact request was not found.";
+                return;
+            }
+
+            _statusValue = ((int)_request.Status).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            _priorityValue = ((int)_request.Priority).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex)
+        {
+            _error = "Contact request could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task UpdateLifecycleAsync(ContactRequestStatus status, ContactRequestPriority? priority)
+    {
+        _statusUpdating = true;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"api/v1/contactrequests/{ContactRequestId}/status", new ContactRequestStatusUpdateRequest
+            {
+                Status = status,
+                Priority = priority
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Contact request lifecycle could not be updated.", Severity.Warning);
+                return;
+            }
+
+            _request = await response.Content.ReadFromJsonAsync<ContactRequestDto>();
+            if (_request is not null)
+            {
+                _statusValue = ((int)_request.Status).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _priorityValue = ((int)_request.Priority).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            Snackbar.Add("Contact request lifecycle updated.", Severity.Success);
+        }
+        finally
+        {
+            _statusUpdating = false;
+        }
+    }
+
+    private async Task SendReplyAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_replyMessage))
+        {
+            Snackbar.Add("Write a reply before sending.", Severity.Warning);
+            return;
+        }
+
+        _replySending = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/contactrequests/{ContactRequestId}/reply", new ContactRequestReplyRequest
+            {
+                ReplyMessage = _replyMessage,
+                MarkResolved = _markResolved
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Reply could not be sent.", Severity.Warning);
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ContactRequestReplyResponse>();
+            if (result is not null && _request is not null)
+            {
+                _request.Status = result.Status;
+                _statusValue = ((int)result.Status).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            _replyMessage = string.Empty;
+            Snackbar.Add("Reply sent to customer.", Severity.Success);
+        }
+        finally
+        {
+            _replySending = false;
+        }
+    }
+
+    private string BuildDownloadUrl(int fileId) => $"api/v1/contactrequests/{ContactRequestId}/files/{fileId}/download";
+
+    private static string DisplayStatus(ContactRequestStatus status) =>
+        status == ContactRequestStatus.InProgress ? "In Progress" : status.ToString();
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatBytes(long? bytes)
+    {
+        if (!bytes.HasValue)
+        {
+            return "-";
+        }
+
+        if (bytes.Value >= 1024 * 1024)
+        {
+            return $"{bytes.Value / 1024d / 1024d:0.#} MB";
+        }
+
+        if (bytes.Value >= 1024)
+        {
+            return $"{bytes.Value / 1024d:0.#} KB";
+        }
+
+        return $"{bytes.Value} B";
+    }
+}

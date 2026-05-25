@@ -173,6 +173,19 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for website contact request management.
+    /// </summary>
+    public static class ContactRequest
+    {
+        /// <summary>Permission to read website contact requests.</summary>
+        public const string Read = "contact.contacts.read";
+        /// <summary>Permission to update website contact request lifecycle status and replies.</summary>
+        public const string Update = "contact.contacts.update";
+        /// <summary>Permission to delete website contact requests.</summary>
+        public const string Delete = "contact.contacts.delete";
+    }
+
+    /// <summary>
     /// Permissions for order lifecycle management.
     /// </summary>
     public static class Order
