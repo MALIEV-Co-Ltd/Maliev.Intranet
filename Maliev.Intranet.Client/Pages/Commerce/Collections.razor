@@ -42,11 +42,37 @@
                            OnClick="PreviewStorefront">
                     Preview storefront
                 </MudButton>
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Default"
-                           EndIcon="@Icons.Material.Outlined.KeyboardArrowDown">
-                    More actions
-                </MudButton>
+                <MudMenu AnchorOrigin="Origin.BottomRight"
+                         TransformOrigin="Origin.TopRight"
+                         Dense="true"
+                         Class="commerce-collections-more-menu"
+                         PopoverClass="commerce-collections-more-popover">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   EndIcon="@Icons.Material.Outlined.KeyboardArrowDown"
+                                   OnClick="@(() => context.ToggleAsync())">
+                            More actions
+                        </MudButton>
+                    </ActivatorContent>
+                    <ChildContent>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Refresh"
+                                     Disabled="@_loadingCollections"
+                                     OnClick="LoadCollectionsAsync">
+                            Refresh collections
+                        </MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Add"
+                                     OnClick="StartNewCollection">
+                            New collection
+                        </MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Delete"
+                                     Disabled="@(!CanUnpublishSelectedCollection)"
+                                     OnClick="UnpublishSelectedCollectionAsync">
+                            Unpublish collection
+                        </MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
                 @if (IsCollectionEditorOpen)
                 {
                     <MudButton Variant="Variant.Outlined"
@@ -467,6 +493,10 @@
     private bool CanPreviewStorefront => IsCollectionEditorOpen
         && !string.IsNullOrWhiteSpace(_collectionForm.Handle);
 
+    private bool CanUnpublishSelectedCollection => !_saving
+        && _editingCollectionId.HasValue
+        && _collectionForm.IsPublished;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCollectionsAsync();
@@ -562,6 +592,16 @@
         {
             _saving = false;
         }
+    }
+
+    private async Task UnpublishSelectedCollectionAsync()
+    {
+        if (!CanUnpublishSelectedCollection || !_editingCollectionId.HasValue)
+        {
+            return;
+        }
+
+        await UnpublishCollectionAsync(_editingCollectionId.Value);
     }
 
     private async Task UploadCollectionImageFilesAsync(IReadOnlyList<IBrowserFile> files)

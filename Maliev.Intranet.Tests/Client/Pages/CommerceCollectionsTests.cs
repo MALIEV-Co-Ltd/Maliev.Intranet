@@ -76,6 +76,25 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_MoreActionsOpensActionMenu()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+
+        Assert.Contains("Class=\"commerce-collections-more-menu\"", collections, StringComparison.Ordinal);
+        Assert.Contains("PopoverClass=\"commerce-collections-more-popover\"", collections, StringComparison.Ordinal);
+        Assert.Contains("<ActivatorContent>", collections, StringComparison.Ordinal);
+        Assert.Contains("context.ToggleAsync", collections, StringComparison.Ordinal);
+        Assert.Contains("More actions", collections, StringComparison.Ordinal);
+        Assert.Contains("MudMenuItem Icon=\"@Icons.Material.Outlined.Refresh\"", collections, StringComparison.Ordinal);
+        Assert.Contains("OnClick=\"LoadCollectionsAsync\"", collections, StringComparison.Ordinal);
+        Assert.Contains("MudMenuItem Icon=\"@Icons.Material.Outlined.Add\"", collections, StringComparison.Ordinal);
+        Assert.Contains("OnClick=\"StartNewCollection\"", collections, StringComparison.Ordinal);
+        Assert.Contains("MudMenuItem Icon=\"@Icons.Material.Outlined.Delete\"", collections, StringComparison.Ordinal);
+        Assert.Contains("OnClick=\"UnpublishSelectedCollectionAsync\"", collections, StringComparison.Ordinal);
+        Assert.Contains("CanUnpublishSelectedCollection", collections, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionsMarkup_UsesTrashIconForDestructiveRowAction()
     {
         var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
