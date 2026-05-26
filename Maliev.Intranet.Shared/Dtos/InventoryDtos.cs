@@ -176,6 +176,197 @@ public sealed record InventoryBatchDto
 }
 
 /// <summary>
+/// Request model for receiving one QR-tracked physical material item.
+/// </summary>
+public sealed record CreateInventoryItemRequest
+{
+    /// <summary>The material identifier this physical item belongs to.</summary>
+    [Required]
+    public Guid MaterialId { get; set; }
+
+    /// <summary>The original quantity received for this item.</summary>
+    [Range(0.01, double.MaxValue)]
+    public decimal InitialQuantity { get; set; }
+
+    /// <summary>The quantity unit, such as g, kg, m, pcs, spool, or block.</summary>
+    [Required]
+    [StringLength(16)]
+    public string QuantityUnit { get; set; } = "g";
+
+    /// <summary>The physical storage location where this item is kept.</summary>
+    [Required]
+    [StringLength(200)]
+    public string Location { get; set; } = string.Empty;
+
+    /// <summary>The physical form factor, such as spool, block, sheet, bar, bottle, or bag.</summary>
+    [Required]
+    [StringLength(32)]
+    public string FormFactor { get; set; } = "Spool";
+
+    /// <summary>The optional low-stock alert threshold in the same unit as the item quantity.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? LowStockThresholdQuantity { get; set; }
+
+    /// <summary>The supplier that provided this item, when known.</summary>
+    public Guid? SupplierId { get; set; }
+
+    /// <summary>The purchase order linked to this item, when known.</summary>
+    public Guid? PurchaseOrderId { get; set; }
+
+    /// <summary>The supplier or manufacturer lot number.</summary>
+    [StringLength(100)]
+    public string? LotNumber { get; set; }
+
+    /// <summary>The manufacturer SKU or catalog code.</summary>
+    [StringLength(100)]
+    public string? ManufacturerSku { get; set; }
+
+    /// <summary>The visible material color, when useful for shop-floor picking.</summary>
+    [StringLength(80)]
+    public string? Color { get; set; }
+
+    /// <summary>The grade or specification for this exact piece of material.</summary>
+    [StringLength(120)]
+    public string? MaterialGrade { get; set; }
+
+    /// <summary>The material length in millimeters for stock pieces.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? LengthMm { get; set; }
+
+    /// <summary>The material width in millimeters for stock pieces.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? WidthMm { get; set; }
+
+    /// <summary>The material height in millimeters for stock pieces.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? HeightMm { get; set; }
+
+    /// <summary>The material diameter in millimeters for round stock or filament.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? DiameterMm { get; set; }
+
+    /// <summary>The material thickness in millimeters for sheets.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? ThicknessMm { get; set; }
+
+    /// <summary>The employee or integration that received this item.</summary>
+    [StringLength(120)]
+    public string? ReceivedBy { get; set; }
+}
+
+/// <summary>
+/// Request model for consuming material from one exact QR-tracked inventory item.
+/// </summary>
+public sealed record ConsumeInventoryItemRequest
+{
+    /// <summary>The production job that consumed this item, when available.</summary>
+    public Guid? JobId { get; set; }
+
+    /// <summary>The order item that consumed this item, when available.</summary>
+    public Guid? OrderItemId { get; set; }
+
+    /// <summary>The operator who scanned or consumed this item.</summary>
+    [StringLength(120)]
+    public string? OperatorId { get; set; }
+
+    /// <summary>The machine that consumed this item.</summary>
+    [StringLength(120)]
+    public string? MachineId { get; set; }
+
+    /// <summary>The quantity consumed from this item, in the item quantity unit.</summary>
+    [Range(0.01, double.MaxValue)]
+    public decimal QuantityConsumed { get; set; }
+
+    /// <summary>Optional notes about the consumption event.</summary>
+    [StringLength(500)]
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Response DTO for one QR-tracked physical material item.
+/// </summary>
+public sealed record InventoryItemDto
+{
+    /// <summary>The unique inventory item identifier.</summary>
+    public Guid Id { get; init; }
+
+    /// <summary>The material identifier this item belongs to.</summary>
+    public Guid MaterialId { get; init; }
+
+    /// <summary>The short shop-floor tracking code encoded into the QR label.</summary>
+    public string TrackingCode { get; init; } = string.Empty;
+
+    /// <summary>The QR payload used by scanners and printed labels.</summary>
+    public string QrPayload { get; init; } = string.Empty;
+
+    /// <summary>The original received quantity for this item.</summary>
+    public decimal InitialQuantity { get; init; }
+
+    /// <summary>The remaining quantity for this item.</summary>
+    public decimal RemainingQuantity { get; init; }
+
+    /// <summary>The item quantity unit.</summary>
+    public string QuantityUnit { get; init; } = "g";
+
+    /// <summary>The original weight in grams for weight-managed materials.</summary>
+    public decimal InitialWeightGrams { get; init; }
+
+    /// <summary>The remaining weight in grams for weight-managed materials.</summary>
+    public decimal RemainingWeightGrams { get; init; }
+
+    /// <summary>The current item lifecycle status.</summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>The physical storage location for this item.</summary>
+    public string Location { get; init; } = string.Empty;
+
+    /// <summary>The item form factor, such as spool, block, sheet, bar, bottle, or bag.</summary>
+    public string FormFactor { get; init; } = "Spool";
+
+    /// <summary>The optional low-stock threshold in the item quantity unit.</summary>
+    public decimal? LowStockThresholdQuantity { get; init; }
+
+    /// <summary>The supplier that provided this item, when known.</summary>
+    public Guid? SupplierId { get; init; }
+
+    /// <summary>The purchase order linked to this item, when known.</summary>
+    public Guid? PurchaseOrderId { get; init; }
+
+    /// <summary>The supplier or manufacturer lot number.</summary>
+    public string? LotNumber { get; init; }
+
+    /// <summary>The manufacturer SKU or catalog code.</summary>
+    public string? ManufacturerSku { get; init; }
+
+    /// <summary>The visible material color, when useful for shop-floor picking.</summary>
+    public string? Color { get; init; }
+
+    /// <summary>The grade or specification for this exact piece of material.</summary>
+    public string? MaterialGrade { get; init; }
+
+    /// <summary>The material length in millimeters for stock pieces.</summary>
+    public decimal? LengthMm { get; init; }
+
+    /// <summary>The material width in millimeters for stock pieces.</summary>
+    public decimal? WidthMm { get; init; }
+
+    /// <summary>The material height in millimeters for stock pieces.</summary>
+    public decimal? HeightMm { get; init; }
+
+    /// <summary>The material diameter in millimeters for round stock or filament.</summary>
+    public decimal? DiameterMm { get; init; }
+
+    /// <summary>The material thickness in millimeters for sheets.</summary>
+    public decimal? ThicknessMm { get; init; }
+
+    /// <summary>The employee or integration that received this item.</summary>
+    public string? ReceivedBy { get; init; }
+
+    /// <summary>The timestamp when this item was received.</summary>
+    public DateTimeOffset ReceivedAt { get; init; }
+}
+
+/// <summary>
 /// Summary of active inventory batches for one material.
 /// </summary>
 public sealed record MaterialInventoryStatusDto

@@ -41,6 +41,7 @@ public sealed class PlatformContractInventoryTests
             ["ComplianceServiceClient.cs"] = "Maliev.ComplianceService",
             ["CompensationServiceClient.cs"] = "Maliev.CompensationService",
             ["EmployeeServiceClient.cs"] = "Maliev.EmployeeService",
+            ["InventoryServiceClient.cs"] = "Maliev.InventoryService",
             ["JobServiceClient.cs"] = "Maliev.JobService",
             ["LeaveServiceClient.cs"] = "Maliev.LeaveService",
             ["LifecycleServiceClient.cs"] = "Maliev.LifecycleService",
