@@ -41,6 +41,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 
 ### Interactive
 - **Link Blue** (`#0072f5`): Primary link color with underline decoration.
+- **Primary Action Blue** (`#0a72ef`): Filled primary action buttons such as "Save changes", "New collection", "Quote", and other commit/create CTAs. Hover uses `#075fc9` in light mode and `#2686ff` in dark mode.
 - **Focus Blue** (`hsla(212, 100%, 48%, 1)`): `--ds-focus-color`, focus ring on interactive elements.
 - **Ring Blue** (`rgba(147, 197, 253, 0.5)`): `--tw-ring-color`, Tailwind ring utility.
 
@@ -114,12 +115,13 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Focus: `2px solid var(--ds-focus-color)` outline + `var(--ds-focus-ring)` shadow
 - Use: Standard secondary button
 
-**Primary Dark (Inferred from Geist system)**
-- Background: `#171717`
+**Primary Action Blue**
+- Background: `#0a72ef`
 - Text: `#ffffff`
+- Hover: `#075fc9` in light mode, `#2686ff` in dark mode
 - Padding: 8px 16px
 - Radius: 6px
-- Use: Primary CTA ("Start Deploying", "Get Started")
+- Use: Filled primary actions that create, save, quote, submit, or otherwise commit meaningful work. This includes MudBlazor `Variant.Filled` + `Color.Primary` buttons and the shared `PrimaryButton` component. Primary action buttons are blue even though neutral text and chrome continue to use near-black / near-white system tokens.
 
 **Pill Button / Badge**
 - Background: `#ebf5ff` (tinted blue)
@@ -237,6 +239,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Use shadow-as-border (`0px 0px 0px 1px rgba(52, 55, 65, 0.08)`) instead of traditional CSS borders
 - Enable `"liga"` on all Geist text — ligatures are structural, not optional
 - Use the three-weight system: 400 (body), 500 (UI), 600 (headings)
+- Use **Primary Action Blue** for filled primary action buttons; reserve neutral near-black / near-white tokens for text and quiet chrome.
 - Apply workflow accent colors (Red/Pink/Blue) only in their workflow context
 - Use multi-layer shadow stacks for cards (border + elevation + ambient + inner highlight)
 - Keep the color palette achromatic — grays from `#171717` to `#ffffff` are the system
@@ -247,7 +250,7 @@ What distinguishes Vercel from other monochrome design systems is its shadow-as-
 - Don't use weight 700 (bold) on body text — 600 is the maximum, used only for headings
 - Don't use traditional CSS `border` on cards — use the shadow-border technique
 - Don't introduce warm colors (oranges, yellows, greens) into the UI chrome
-- Don't apply the workflow accent colors (Ship Red, Preview Pink, Develop Blue) decoratively
+- Don't apply workflow accent colors (Ship Red, Preview Pink, Develop Blue) decoratively outside their workflow context; use the dedicated Primary Action Blue token for CTAs instead.
 - Don't use heavy shadows (> 0.1 opacity) — the shadow system is whisper-level
 - Don't increase body text letter-spacing — Geist is designed to run tight
 - Don't use pill radius (9999px) on primary action buttons — pills are for badges/tags only

@@ -42,6 +42,9 @@
     --maliev-info:        #0072f5;
     --maliev-info-bg:     #ebf5ff;
     --maliev-info-fg:     #0068d6;
+    --maliev-action-primary:       #0a72ef;
+    --maliev-action-primary-hover: #075fc9;
+    --maliev-action-primary-text:  #ffffff;
 
     /* Shadows */
     --maliev-shadow-ring:      rgba(0,0,0,0.08) 0 0 0 1px;
@@ -134,6 +137,9 @@
     --maliev-info:        #60a5fa;
     --maliev-info-bg:     #0b2f62;
     --maliev-info-fg:     #bfdbfe;
+    --maliev-action-primary:       #0a72ef;
+    --maliev-action-primary-hover: #2686ff;
+    --maliev-action-primary-text:  #ffffff;
 
     --maliev-shadow-ring:      rgba(255,255,255,0.12) 0 0 0 1px;
     --maliev-shadow-ring-soft: rgba(255,255,255,0.08) 0 0 0 1px;

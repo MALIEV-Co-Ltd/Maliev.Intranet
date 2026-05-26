@@ -200,11 +200,12 @@
 }
 
 .mud-button-root.mud-button-filled-primary {
-    background-color: var(--mud-palette-primary) !important;
-    color: var(--mud-palette-primary-text) !important;
+    background-color: var(--maliev-action-primary) !important;
+    color: var(--maliev-action-primary-text) !important;
 }
 
 .mud-button-root.mud-button-filled-primary:hover {
+    background-color: var(--maliev-action-primary-hover) !important;
     box-shadow: var(--maliev-shadow-md);
 }
 

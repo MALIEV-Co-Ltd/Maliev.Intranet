@@ -16,12 +16,13 @@
 }
 
 .mlv-button.primary {
-    background: var(--mud-palette-primary);
-    color: var(--mud-palette-primary-text);
+    background: var(--maliev-action-primary);
+    color: var(--maliev-action-primary-text);
     box-shadow: var(--maliev-shadow-ring);
 }
 
 .mlv-button.primary:hover {
+    background: var(--maliev-action-primary-hover);
     transform: translateY(-1px);
     box-shadow: var(--maliev-shadow-md);
 }

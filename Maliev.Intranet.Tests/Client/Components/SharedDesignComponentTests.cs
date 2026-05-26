@@ -76,14 +76,25 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void SharedButtons_UseMudPrimaryAndRingTokens()
+    public void SharedButtons_UseBluePrimaryActionAndRingTokens()
     {
+        var design = ReadRepoFile("DESIGN.md");
+        var tokens = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "design-tokens.css");
         var primary = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PrimaryButton.razor.css");
         var secondary = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "SecondaryButton.razor.css");
+        var mudOverrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
 
-        Assert.Contains("background: var(--mud-palette-primary);", primary, StringComparison.Ordinal);
-        Assert.Contains("color: var(--mud-palette-primary-text);", primary, StringComparison.Ordinal);
+        Assert.Contains("Primary Action Blue", design, StringComparison.Ordinal);
+        Assert.Contains("--maliev-action-primary:", tokens, StringComparison.Ordinal);
+        Assert.Contains("--maliev-action-primary-hover:", tokens, StringComparison.Ordinal);
+        Assert.Contains("--maliev-action-primary-text:", tokens, StringComparison.Ordinal);
+
+        Assert.Contains("background: var(--maliev-action-primary);", primary, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-action-primary-text);", primary, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", primary, StringComparison.Ordinal);
+
+        Assert.Contains("background-color: var(--maliev-action-primary) !important;", mudOverrides, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-action-primary-text) !important;", mudOverrides, StringComparison.Ordinal);
 
         Assert.Contains("background: var(--maliev-panel);", secondary, StringComparison.Ordinal);
         Assert.Contains("color: var(--maliev-ink-2);", secondary, StringComparison.Ordinal);
@@ -116,7 +127,7 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
         Assert.Contains(".mud-popover", styles, StringComparison.Ordinal);
         Assert.Contains(".mud-menu", styles, StringComparison.Ordinal);
         Assert.Contains(".mud-button-root.mud-button-filled-primary", styles, StringComparison.Ordinal);
-        Assert.Contains("background-color: var(--mud-palette-primary) !important;", styles, StringComparison.Ordinal);
+        Assert.Contains("background-color: var(--maliev-action-primary) !important;", styles, StringComparison.Ordinal);
         Assert.Contains(".mud-button-root.mud-button-outlined", styles, StringComparison.Ordinal);
         Assert.Contains(".mud-button-root.mud-button-text", styles, StringComparison.Ordinal);
         Assert.Contains(".mud-table-container", styles, StringComparison.Ordinal);
