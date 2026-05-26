@@ -201,6 +201,45 @@ public sealed class SupplierServiceClientTests
     }
 
     [Fact]
+    public async Task UpdateSupplierStatusAsync_MapsStatusAndRowVersionToSupplierServiceContract()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? payload = null;
+        var supplierId = Guid.Parse("4c2f4c8d-fbc8-4e84-8565-5c378c6da726");
+        var client = MakeClient(async request =>
+        {
+            capturedRequest = request;
+            payload = await request.Content!.ReadAsStringAsync();
+            return JsonContent.Create(new
+            {
+                id = supplierId,
+                companyName = "Thai Metals Supply",
+                status = "Active",
+                rowVersion = "43"
+            });
+        });
+
+        using var response = await client.UpdateSupplierStatusAsync(supplierId, new UpdateSupplierStatusRequest
+        {
+            Status = "Active",
+            Reason = "Approved supplier after document review",
+            RowVersion = "42"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Patch, capturedRequest.Method);
+        Assert.Equal($"/supplier/v1/suppliers/{supplierId}/status", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(payload);
+
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+        Assert.Equal("Active", root.GetProperty("status").GetString());
+        Assert.Equal("Approved supplier after document review", root.GetProperty("reason").GetString());
+        Assert.Equal("42", root.GetProperty("rowVersion").GetString());
+    }
+
+    [Fact]
     public async Task AddSupplierDocumentAsync_MapsIntranetDocumentToSupplierCertificationContract()
     {
         HttpRequestMessage? capturedRequest = null;

@@ -164,15 +164,36 @@ public class SupplierServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Updates a supplier lifecycle status.
+    /// </summary>
+    /// <param name="id">The supplier identifier.</param>
+    /// <param name="request">The status update request.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The downstream SupplierService response.</returns>
+    public async Task<HttpResponseMessage> UpdateSupplierStatusAsync(Guid id, UpdateSupplierStatusRequest request, CancellationToken ct = default)
+    {
+        var downstreamRequest = new DownstreamUpdateSupplierStatusRequest(
+            request.Status.Trim(),
+            string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim(),
+            request.RowVersion);
+
+        return await httpClient.PatchAsJsonAsync($"/supplier/v1/suppliers/{id}/status", downstreamRequest, ct);
+    }
+
+    /// <summary>
     /// Deactivates a supplier.
     /// </summary>
-    public async Task<HttpResponseMessage> DeactivateSupplierAsync(Guid id, CancellationToken ct = default)
+    /// <param name="id">The supplier identifier.</param>
+    /// <param name="rowVersion">The current supplier row version.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The downstream SupplierService response.</returns>
+    public async Task<HttpResponseMessage> DeactivateSupplierAsync(Guid id, string rowVersion, CancellationToken ct = default)
     {
-        return await httpClient.PatchAsJsonAsync($"/supplier/v1/suppliers/{id}/status", new
+        return await UpdateSupplierStatusAsync(id, new UpdateSupplierStatusRequest
         {
             Status = "Inactive",
             Reason = "Deactivated from Intranet.",
-            RowVersion = string.Empty
+            RowVersion = rowVersion
         }, ct);
     }
 
@@ -369,6 +390,11 @@ public class SupplierServiceClient(HttpClient httpClient)
         [property: JsonPropertyName("postalCode")] string? PostalCode,
         [property: JsonPropertyName("materialCategoryIds")] IEnumerable<Guid>? MaterialCategoryIds,
         [property: JsonPropertyName("capabilities")] IEnumerable<string>? Capabilities,
+        [property: JsonPropertyName("rowVersion")] string RowVersion);
+
+    private sealed record DownstreamUpdateSupplierStatusRequest(
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("reason")] string? Reason,
         [property: JsonPropertyName("rowVersion")] string RowVersion);
 
     private sealed record DownstreamCreateSupplierDocumentRequest(

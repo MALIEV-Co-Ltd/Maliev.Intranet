@@ -119,13 +119,47 @@ public class SuppliersController(
     }
 
     /// <summary>
+    /// Updates a supplier lifecycle status.
+    /// </summary>
+    /// <param name="id">The supplier ID.</param>
+    /// <param name="request">The supplier status request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The downstream status update response.</returns>
+    [RequirePermission(MalievPermissions.Supplier.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/status")]
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateSupplierStatusRequest request, CancellationToken ct)
+    {
+        using var response = await client.UpdateSupplierStatusAsync(id, request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return string.IsNullOrWhiteSpace(body)
+                ? StatusCode((int)response.StatusCode)
+                : StatusCode((int)response.StatusCode, body);
+        }
+
+        return string.IsNullOrWhiteSpace(body)
+            ? NoContent()
+            : new ContentResult
+            {
+                StatusCode = (int)response.StatusCode,
+                Content = body,
+                ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json"
+            };
+    }
+
+    /// <summary>
     /// Deactivates a supplier.
     /// </summary>
+    /// <param name="id">The supplier ID.</param>
+    /// <param name="rowVersion">The supplier row version.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>No content when the status change succeeds.</returns>
     [RequirePermission(MalievPermissions.Supplier.Delete, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPatch("{id:guid}/deactivate")]
-    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Deactivate(Guid id, [FromQuery] string rowVersion, CancellationToken ct)
     {
-        var response = await client.DeactivateSupplierAsync(id, ct);
+        var response = await client.DeactivateSupplierAsync(id, rowVersion, ct);
         return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
     }
 

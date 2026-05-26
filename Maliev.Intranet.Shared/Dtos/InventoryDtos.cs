@@ -646,6 +646,23 @@ public sealed record UpdateSupplierRequest
 }
 
 /// <summary>
+/// Request model for changing an existing supplier lifecycle status.
+/// </summary>
+public sealed record UpdateSupplierStatusRequest
+{
+    /// <summary>The new supplier lifecycle status.</summary>
+    [Required]
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>The reason recorded on the supplier status audit trail.</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>The row version required by SupplierService for optimistic concurrency control.</summary>
+    [Required]
+    public string RowVersion { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Response model containing supplier data extracted by AI analysis.
 /// </summary>
 public class ExtractedSupplierDataResponse

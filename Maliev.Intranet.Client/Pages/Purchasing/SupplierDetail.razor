@@ -107,6 +107,26 @@
                         <dt>Onboarding</dt><dd>@Display(_supplier.OnboardingStage)</dd>
                         <dt>Payment terms</dt><dd>Commercial supplier terms pending procurement master-data model.</dd>
                     </dl>
+                    <div class="supplier-status-control" aria-label="Supplier status transition">
+                        <label class="mlv-form-field">
+                            <span>Status transition</span>
+                            <select class="mlv-form-input" @bind="_statusTarget" disabled="@_statusUpdating">
+                                @foreach (var status in SupplierStatuses)
+                                {
+                                    <option value="@status">@DisplaySupplierStatus(status)</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="mlv-form-field">
+                            <span>Reason</span>
+                            <ImmediateInputText class="mlv-form-input" @bind-Value="_statusReason" placeholder="Approval, hold reason, reactivation note..." />
+                        </label>
+                        <PrimaryButton Icon="@Icons.Material.Outlined.PublishedWithChanges"
+                                       Disabled="@(_statusUpdating || string.IsNullOrWhiteSpace(_supplier.RowVersion) || string.Equals(_statusTarget, _supplier.Status, StringComparison.OrdinalIgnoreCase))"
+                                       OnClick="@UpdateSupplierStatusAsync">
+                            @(_statusUpdating ? "Updating..." : "Update status")
+                        </PrimaryButton>
+                    </div>
                 </PanelCard>
 
                 <PanelCard Title="Supplier Documents" Class="supplier-documents-panel">
@@ -203,6 +223,16 @@
     private UpdateSupplierRequest _edit = new();
     private readonly List<CountryDto> _countries = [];
     private string _capabilityText = string.Empty;
+    private string _statusTarget = "PendingApproval";
+    private string? _statusReason;
+    private static readonly string[] SupplierStatuses =
+    [
+        "PendingApproval",
+        "Active",
+        "Inactive",
+        "Blocked",
+        "Suspended"
+    ];
     private static readonly string[] SupplierDocumentTypes =
     [
         "BusinessLicense",
@@ -225,6 +255,7 @@
     private bool _saving;
     private bool _editing;
     private bool _documentUploading;
+    private bool _statusUpdating;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -253,6 +284,10 @@
         try
         {
             _supplier = await Http.GetFromJsonAsync<SupplierDetailDto>($"api/v1/suppliers/{Id}");
+            if (_supplier is not null)
+            {
+                _statusTarget = string.IsNullOrWhiteSpace(_supplier.Status) ? "PendingApproval" : _supplier.Status;
+            }
         }
         catch (Exception ex)
         {
@@ -339,6 +374,51 @@
         finally
         {
             _saving = false;
+        }
+    }
+
+    private async Task UpdateSupplierStatusAsync(MouseEventArgs _)
+    {
+        if (_supplier is null || string.IsNullOrWhiteSpace(_supplier.RowVersion))
+        {
+            Snackbar.Add("Refresh the supplier before changing status.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_statusTarget))
+        {
+            Snackbar.Add("Choose a supplier status.", Severity.Warning);
+            return;
+        }
+
+        _statusUpdating = true;
+        try
+        {
+            var request = new UpdateSupplierStatusRequest
+            {
+                Status = _statusTarget,
+                Reason = string.IsNullOrWhiteSpace(_statusReason) ? $"Set to {DisplaySupplierStatus(_statusTarget)} from Intranet." : _statusReason.Trim(),
+                RowVersion = _supplier.RowVersion
+            };
+
+            var response = await Http.PatchAsJsonAsync($"api/v1/suppliers/{Id}/status", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Supplier status could not be updated. Refresh and try again if another user changed it.", Severity.Warning);
+                return;
+            }
+
+            await LoadAsync();
+            _statusReason = null;
+            Snackbar.Add("Supplier status updated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to update supplier status: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _statusUpdating = false;
         }
     }
 
@@ -597,6 +677,16 @@
         "InsuranceCertificate" => Icons.Material.Outlined.VerifiedUser,
         "QualityCertification" or "ISO9001" or "ISO14001" or "AS9100" => Icons.Material.Outlined.WorkspacePremium,
         _ => Icons.Material.Outlined.Description
+    };
+
+    private static string DisplaySupplierStatus(string value) => value switch
+    {
+        "PendingApproval" => "Pending approval",
+        "Active" => "Active",
+        "Inactive" => "Inactive",
+        "Blocked" => "Blocked",
+        "Suspended" => "Suspended",
+        _ => Display(value)
     };
 
     private static string Display(string? value)

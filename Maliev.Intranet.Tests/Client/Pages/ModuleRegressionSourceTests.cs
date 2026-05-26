@@ -993,6 +993,9 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("api/v1/referenceData/countries", supplierDetail, StringComparison.Ordinal);
         Assert.Contains("<select class=\"mlv-form-input\" @bind=\"_edit.Country\">", supplierDetail, StringComparison.Ordinal);
+        Assert.Contains("Status transition", supplierDetail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/suppliers/{Id}/status", supplierDetail, StringComparison.Ordinal);
+        Assert.Contains("UpdateSupplierStatusRequest", supplierDetail, StringComparison.Ordinal);
         Assert.DoesNotContain("Label=\"Country\"><ImmediateInputText class=\"mlv-form-input\" @bind-Value=\"_edit.Country\"", supplierDetail, StringComparison.Ordinal);
     }
 

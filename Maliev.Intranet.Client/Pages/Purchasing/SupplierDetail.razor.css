@@ -2,6 +2,16 @@
     grid-column: 1 / -1;
 }
 
+.supplier-status-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+    align-items: end;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
 .supplier-document-form {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -105,6 +115,7 @@
 }
 
 @media (max-width: 960px) {
+    .supplier-status-control,
     .supplier-document-form {
         grid-template-columns: 1fr 1fr;
     }
@@ -116,6 +127,7 @@
 }
 
 @media (max-width: 640px) {
+    .supplier-status-control,
     .supplier-document-form,
     .supplier-document-item {
         grid-template-columns: 1fr;
