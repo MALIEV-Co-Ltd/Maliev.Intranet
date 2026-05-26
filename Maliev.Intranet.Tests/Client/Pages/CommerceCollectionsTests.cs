@@ -76,6 +76,16 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_UsesTrashIconForDestructiveRowAction()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var destructiveAction = ExtractElementEndingAt(collections, "OnClick=\"@(() => UnpublishCollectionAsync(collection.Id))\"");
+
+        Assert.Contains("Icon=\"@Icons.Material.Outlined.Delete\"", destructiveAction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Icons.Material.Outlined.Unpublished", destructiveAction, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionEditorState_OpensOnlyForCreateOrEdit()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
@@ -185,6 +195,20 @@ public sealed class CommerceCollectionsTests
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(path)}.");
+    }
+
+    private static string ExtractElementEndingAt(string source, string marker)
+    {
+        var markerIndex = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(markerIndex >= 0, $"Expected marker '{marker}' to exist.");
+
+        var elementStart = source.LastIndexOf("<MudIconButton", markerIndex, StringComparison.Ordinal);
+        Assert.True(elementStart >= 0, $"Expected marker '{marker}' to belong to a MudIconButton.");
+
+        var elementEnd = source.IndexOf("/>", markerIndex, StringComparison.Ordinal);
+        Assert.True(elementEnd > markerIndex, $"Expected marker '{marker}' to end inside a self-closing element.");
+
+        return source[elementStart..(elementEnd + 2)];
     }
 
     private static string GetSourceDirectory([CallerFilePath] string sourceFile = "")
