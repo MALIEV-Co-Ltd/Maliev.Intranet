@@ -102,6 +102,7 @@ public sealed class CurrencyService : IDisposable
         if (currency == null) return;
         if (currency.Code == SelectedCurrency?.Code) return;
 
+        SelectedCurrency = currency;
         IsConverting = true;
         Changed?.Invoke(this, EventArgs.Empty);
 
@@ -127,7 +128,6 @@ public sealed class CurrencyService : IDisposable
                 }
             }
 
-            SelectedCurrency = currency;
             ExchangeRate = rate;
         }
         finally

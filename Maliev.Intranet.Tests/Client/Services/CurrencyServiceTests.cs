@@ -78,6 +78,37 @@ public class CurrencyServiceTests
     }
 
     [Fact]
+    public async Task SetCurrencyAsync_ChangedEventReportsNewCurrency_WhileRateFetchIsPending()
+    {
+        var tcs = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new FakeHandler(HttpStatusCode.OK, new ExchangeRateResponse("THB", "USD", 0.027m), tcs.Task);
+        var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
+        var svc = new CurrencyService(http, NullLogger<CurrencyService>.Instance);
+        svc.Currencies.Add(new CurrencyDto { Code = "THB", Symbol = "฿", Name = "Thai Baht", IsPrimary = true, IsActive = true });
+        svc.Currencies.Add(new CurrencyDto { Code = "USD", Symbol = "$", Name = "US Dollar", IsActive = true });
+
+        await svc.SetCurrencyAsync(svc.Currencies.First(c => c.Code == "THB"));
+
+        var convertingCode = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        svc.Changed += (_, _) =>
+        {
+            if (svc.IsConverting)
+            {
+                convertingCode.TrySetResult(svc.Code);
+            }
+        };
+
+        var task = svc.SetCurrencyAsync(svc.Currencies.First(c => c.Code == "USD"));
+        var code = await convertingCode.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        tcs.SetResult(new HttpResponseMessage(HttpStatusCode.OK));
+        await task;
+
+        Assert.Equal("USD", code);
+        Assert.Equal("USD", svc.Code);
+    }
+
+    [Fact]
     public async Task SetCurrencyAsync_ThbSelection_SetsExchangeRateToOneWithoutHttpCall()
     {
         var handler = new FakeHandler(HttpStatusCode.OK, new ExchangeRateResponse("THB", "THB", 1m));
