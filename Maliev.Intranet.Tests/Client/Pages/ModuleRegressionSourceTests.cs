@@ -637,12 +637,16 @@ public class ModuleRegressionSourceTests
         Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-color-picker", detail, StringComparison.Ordinal);
+        Assert.Contains("material-receive-color-picker", detail, StringComparison.Ordinal);
+        Assert.Contains("ReceiveColorOptions", detail, StringComparison.Ordinal);
+        Assert.Contains("NormalizeReceiveColor(_receiveItem.Color)", detail, StringComparison.Ordinal);
         Assert.Contains("SelectedColorIds", detail, StringComparison.Ordinal);
         Assert.Contains("LoadColorOptionsAsync", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/materials/reference/colors", detail, StringComparison.Ordinal);
         Assert.Contains("ToggleColorSelection", detail, StringComparison.Ordinal);
         Assert.Contains("ColorIds = _editModel.SelectedColorIds.ToList()", detail, StringComparison.Ordinal);
         Assert.Contains("material-color-option", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-receive-color-option", detailStyles, StringComparison.Ordinal);
         Assert.Contains("public List<Guid>? ColorIds { get; set; }", inventoryDtos, StringComparison.Ordinal);
         Assert.Contains("CreateInventoryBatchRequest", inventoryDtos, StringComparison.Ordinal);
         Assert.Contains("CreateInventoryItemRequest", inventoryDtos, StringComparison.Ordinal);

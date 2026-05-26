@@ -397,13 +397,36 @@
                                        placeholder="POM-C, PLA+, 6061-T6"
                                        disabled="@(!_canUpdateMaterial || _receivingItem)" />
                             </label>
-                            <label class="material-edit-field">
+                            <div class="material-edit-field material-receive-color-field">
                                 <span>Color</span>
-                                <input class="material-input"
-                                       @bind="_receiveItem.Color"
-                                       @bind:event="oninput"
-                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
-                            </label>
+                                @if (_colorsLoading)
+                                {
+                                    <span class="material-input material-input-muted">Loading colors...</span>
+                                }
+                                else if (ReceiveColorOptions.Count == 0)
+                                {
+                                    <span class="material-input material-input-muted">No color options configured</span>
+                                }
+                                else
+                                {
+                                    <div class="material-receive-color-picker" role="radiogroup" aria-label="Color">
+                                        @foreach (var color in ReceiveColorOptions)
+                                        {
+                                            <label class="@GetReceiveColorOptionClass(color)">
+                                                <input type="radio"
+                                                       name="receive-material-color"
+                                                       value="@GetReceiveColorValue(color)"
+                                                       checked="@IsReceiveColorSelected(color)"
+                                                       disabled="@(!_canUpdateMaterial || _receivingItem)"
+                                                       @onchange="@(() => SelectReceiveColor(color))" />
+                                                <span class="material-color-dot" style="@ColorSwatchStyle(color)"></span>
+                                                <span class="material-receive-color-name">@color.Name</span>
+                                                <code>@GetReceiveColorValue(color)</code>
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                            </div>
                         </div>
                         <div class="material-dimension-grid" aria-label="Physical dimensions">
                             <label class="material-edit-field">
@@ -702,6 +725,29 @@
         }
     }
 
+    private IReadOnlyList<MaterialColorDto> ReceiveColorOptions
+    {
+        get
+        {
+            var source = _material is { Colors.Count: > 0 } material
+                ? material.Colors
+                : _colorOptions;
+            var options = new List<MaterialColorDto>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var color in source)
+            {
+                var value = GetReceiveColorValue(color);
+                if (!string.IsNullOrWhiteSpace(value) && seen.Add(value))
+                {
+                    options.Add(color);
+                }
+            }
+
+            return options;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -715,6 +761,7 @@
         {
             _material = await Http.GetFromJsonAsync<MaterialDetailDto>($"api/v1/materials/{Id}");
             ResetReceiveItemForm();
+            await LoadColorOptionsAsync();
             await LoadInventoryStatusAsync();
         }
         catch (Exception ex)
@@ -830,7 +877,7 @@
                 SupplierId = _receiveItem.SupplierId,
                 LotNumber = TrimOrNull(_receiveItem.LotNumber),
                 ManufacturerSku = TrimOrNull(_receiveItem.ManufacturerSku),
-                Color = TrimOrNull(_receiveItem.Color),
+                Color = NormalizeReceiveColor(_receiveItem.Color),
                 MaterialGrade = TrimOrNull(_receiveItem.MaterialGrade),
                 LengthMm = PositiveOrNull(_receiveItem.LengthMm),
                 WidthMm = PositiveOrNull(_receiveItem.WidthMm),
@@ -867,7 +914,8 @@
         {
             Location = _receiveItem.Location,
             FormFactor = _receiveItem.FormFactor,
-            QuantityUnit = _receiveItem.QuantityUnit
+            QuantityUnit = _receiveItem.QuantityUnit,
+            Color = _receiveItem.Color
         };
     }
 
@@ -919,9 +967,23 @@
 
     private static string ColorSwatchStyle(MaterialColorDto color)
     {
-        var hex = IsHexColor(color.HexCode) ? color.HexCode : "#f5f5f5";
+        var hex = NormalizeHexColor(color.HexCode) ?? "#f5f5f5";
         return $"background:{hex};";
     }
+
+    private static string GetReceiveColorValue(MaterialColorDto color)
+        => NormalizeHexColor(color.HexCode) ?? color.Name.Trim();
+
+    private bool IsReceiveColorSelected(MaterialColorDto color)
+        => string.Equals(_receiveItem.Color, GetReceiveColorValue(color), StringComparison.OrdinalIgnoreCase);
+
+    private void SelectReceiveColor(MaterialColorDto color)
+        => _receiveItem.Color = GetReceiveColorValue(color);
+
+    private string GetReceiveColorOptionClass(MaterialColorDto color)
+        => IsReceiveColorSelected(color)
+            ? "material-color-option material-receive-color-option selected"
+            : "material-color-option material-receive-color-option";
 
     private async Task LoadColorOptionsAsync()
     {
@@ -972,13 +1034,32 @@
             : "material-color-option";
 
     private static bool IsHexColor(string? value)
+        => NormalizeHexColor(value) is not null;
+
+    private static string? NormalizeHexColor(string? value)
     {
-        if (value is not { Length: 7 } || value[0] != '#')
+        var trimmed = value?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
         {
-            return false;
+            return null;
         }
 
-        return value.Skip(1).All(Uri.IsHexDigit);
+        var digits = trimmed.StartsWith("#", StringComparison.Ordinal)
+            ? trimmed[1..]
+            : trimmed;
+
+        if (digits.Length != 6 || !digits.All(Uri.IsHexDigit))
+        {
+            return null;
+        }
+
+        return $"#{digits.ToUpperInvariant()}";
+    }
+
+    private static string? NormalizeReceiveColor(string? value)
+    {
+        var hex = NormalizeHexColor(value);
+        return hex ?? TrimOrNull(value);
     }
 
     private static IReadOnlyList<string> SplitDisplayList(string? value)
