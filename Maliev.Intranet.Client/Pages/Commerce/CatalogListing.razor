@@ -57,7 +57,9 @@
                 </MudButton>
             </div>
 
-            <MudGrid Spacing="3">
+            <MudTabs Class="commerce-listing-tabs">
+                <MudTabPanel Text="Listing">
+                    <MudGrid Spacing="3">
                 <MudItem xs="12" lg="7">
                     <PanelCard Class="mb-4">
                         <MudText Typo="Typo.h6" Class="mb-3">Listing details</MudText>
@@ -74,111 +76,6 @@
                         </div>
                         <MudTextField @bind-Value="_productForm.Summary" Label="Summary" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="mt-3" />
                         <MudTextField @bind-Value="_productForm.Description" Label="Description / HTML" Lines="8" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="mt-3" />
-                    </PanelCard>
-
-                    <PanelCard Class="mb-4">
-                        <div class="commerce-section-heading">
-                            <div>
-                                <MudText Typo="Typo.h6">Bill of materials</MudText>
-                                <MudText Typo="Typo.caption">Track sourcing, drawings, suppliers, assemblies, costs, and lead times for this listing.</MudText>
-                            </div>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddBomItem">Add item</MudButton>
-                        </div>
-
-                        <div class="commerce-bom-summary-grid">
-                            <div>
-                                <span>Total BOM value</span>
-                                <strong>@BomCurrency @BomTotal.ToString("N2")</strong>
-                            </div>
-                            <div>
-                                <span>Sourcing time</span>
-                                <strong>@BomSourcingLabel</strong>
-                            </div>
-                            <div>
-                                <span>Drawings</span>
-                                <strong>@BomDrawingCount.ToString("N0") linked</strong>
-                            </div>
-                        </div>
-
-                        <div class="commerce-bom-list">
-                            @if (_productForm.BomItems.Count == 0)
-                            {
-                                <div class="commerce-bom-empty">No BOM items yet. Add materials, components, packaging, or consumables used by this listing.</div>
-                            }
-                            else
-                            {
-                                @foreach (var item in _productForm.BomItems.OrderBy(item => item.SortOrder).ToList())
-                                {
-                                    <div class="commerce-bom-card">
-                                        <div class="commerce-bom-card-main">
-                                            <div class="commerce-bom-image">
-                                                @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
-                                                {
-                                                    <img src="@item.ImageUrl" alt="@BuildBomImageAlt(item)" />
-                                                }
-                                                else
-                                                {
-                                                    <MudIcon Icon="@Icons.Material.Outlined.Image" />
-                                                }
-                                            </div>
-                                            <div class="commerce-bom-fields">
-                                                <div class="commerce-bom-name-row">
-                                                    <MudTextField @bind-Value="item.ItemName" Label="Item" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.PartNumber" Label="Part no" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                </div>
-                                                <MudTextField @bind-Value="item.Specification" Label="Specification" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                <div class="commerce-bom-assembly-grid">
-                                                    <MudTextField @bind-Value="item.AssemblyName" Label="Assembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.SubassemblyName" Label="Subassembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.SupplierName" Label="Supplier" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.SupplierUrl" Label="Supplier URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                </div>
-                                            </div>
-                                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveBomItem(item))" />
-                                        </div>
-
-                                        <div class="commerce-bom-detail-grid">
-                                            <MudNumericField @bind-Value="item.Quantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudTextField @bind-Value="item.Unit" Label="Unit" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudNumericField @bind-Value="item.UnitCost" Label="Unit cost" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudSelect T="string" @bind-Value="item.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense">
-                                                @foreach (var currency in CatalogCurrencyOptions())
-                                                {
-                                                    <MudSelectItem Value="@currency.Code">@CurrencyOptionLabel(currency)</MudSelectItem>
-                                                }
-                                            </MudSelect>
-                                            <MudNumericField T="int?" @bind-Value="item.LeadTimeDays" Label="Lead time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
-                                            <MudNumericField T="int?" @bind-Value="item.SourcingTimeDays" Label="Sourcing time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
-                                            <MudTextField @bind-Value="item.ImageUrl" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudTextField @bind-Value="item.DrawingUrl" Label="Drawing URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                        </div>
-
-                                        <div class="commerce-bom-card-footer">
-                                            <div>
-                                                <span>Line total</span>
-                                                <strong>@item.Currency @BomLineTotal(item).ToString("N2")</strong>
-                                            </div>
-                                            <div>
-                                                <span>Sourcing</span>
-                                                <strong>@BomItemSourcingLabel(item)</strong>
-                                            </div>
-                                            <div class="commerce-bom-links">
-                                                @if (!string.IsNullOrWhiteSpace(item.SupplierUrl))
-                                                {
-                                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.OpenInNew" Href="@item.SupplierUrl" Target="_blank">Supplier</MudButton>
-                                                }
-                                                @if (!string.IsNullOrWhiteSpace(item.DrawingUrl))
-                                                {
-                                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Description" Href="@item.DrawingUrl" Target="_blank">Drawing</MudButton>
-                                                }
-                                            </div>
-                                        </div>
-
-                                        <MudTextField @bind-Value="item.Notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" MaxLength="1000" Counter="1000" />
-                                    </div>
-                                }
-                            }
-                        </div>
                     </PanelCard>
                 </MudItem>
 
@@ -308,7 +205,197 @@
                         </div>
                     </PanelCard>
                 </MudItem>
-            </MudGrid>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="BOM">
+                    <PanelCard Class="mb-4">
+                        <div class="commerce-section-heading">
+                            <div>
+                                <MudText Typo="Typo.h6">BOM management</MudText>
+                                <MudText Typo="Typo.caption">Track BOM document issues, sourcing bottlenecks, suppliers, inventory readiness, and order history links.</MudText>
+                            </div>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddBomItem">Add item</MudButton>
+                        </div>
+
+                        <div class="commerce-bom-command-grid">
+                            <div>
+                                <span>Total BOM value</span>
+                                <strong>@BomCurrency @BomTotal.ToString("N2")</strong>
+                            </div>
+                            <div>
+                                <span>Sourcing time</span>
+                                <strong>@BomSourcingLabel</strong>
+                            </div>
+                            <div>
+                                <span>Supplier coverage</span>
+                                <strong>@BomSupplierCount.ToString("N0") supplier(s)</strong>
+                            </div>
+                            <div>
+                                <span>BOM document issues</span>
+                                <strong>@(BomIssueItems().Sum(issueItem => issueItem.Issues.Count).ToString("N0")) issue(s)</strong>
+                            </div>
+                            <div>
+                                <span>Drawings</span>
+                                <strong>@BomDrawingCount.ToString("N0") linked</strong>
+                            </div>
+                        </div>
+                    </PanelCard>
+
+                    <div class="commerce-bom-management-grid">
+                        <PanelCard Class="mb-4">
+                            <MudText Typo="Typo.h6" Class="mb-3">BOM document issues</MudText>
+                            @if (BomIssueItems().Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">No blocking BOM document issues detected.</MudAlert>
+                            }
+                            else
+                            {
+                                <div class="commerce-bom-issue-list">
+                                    @foreach (var issueItem in BomIssueItems())
+                                    {
+                                        <div class="commerce-bom-issue-item">
+                                            <strong>@issueItem.ItemName</strong>
+                                            <ul>
+                                                @foreach (var issue in issueItem.Issues)
+                                                {
+                                                    <li>@issue</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </PanelCard>
+
+                        <PanelCard Class="mb-4">
+                            <MudText Typo="Typo.h6" Class="mb-3">Sourcing bottleneck</MudText>
+                            @if (BomBottleneckItems().Count == 0)
+                            {
+                                <div class="commerce-bom-empty">No lead time or sourcing time is set yet.</div>
+                            }
+                            else
+                            {
+                                <div class="commerce-bom-bottleneck-list">
+                                    @foreach (var item in BomBottleneckItems())
+                                    {
+                                        <div class="commerce-bom-bottleneck-item">
+                                            <div>
+                                                <strong>@BomItemDisplayName(item)</strong>
+                                                <span>@(string.IsNullOrWhiteSpace(item.SupplierName) ? "Supplier not set" : item.SupplierName)</span>
+                                            </div>
+                                            <strong>@BomItemSourcingLabel(item)</strong>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </PanelCard>
+                    </div>
+
+                    <PanelCard>
+                        <div class="commerce-section-heading">
+                            <div>
+                                <MudText Typo="Typo.h6">Bill of materials</MudText>
+                                <MudText Typo="Typo.caption">Manage part images, descriptions, URLs, suppliers, inventory tracking, order history, and source timing.</MudText>
+                            </div>
+                            <MudText Typo="Typo.caption">@_productForm.BomItems.Count.ToString("N0") item(s)</MudText>
+                        </div>
+
+                        <div class="commerce-bom-list">
+                            @if (_productForm.BomItems.Count == 0)
+                            {
+                                <div class="commerce-bom-empty">No BOM items yet. Add materials, components, packaging, or consumables used by this listing.</div>
+                            }
+                            else
+                            {
+                                @foreach (var item in _productForm.BomItems.OrderBy(item => item.SortOrder).ToList())
+                                {
+                                    <div class="commerce-bom-card">
+                                        <div class="commerce-bom-card-main">
+                                            <div class="commerce-bom-image">
+                                                @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                                                {
+                                                    <img src="@item.ImageUrl" alt="@BuildBomImageAlt(item)" />
+                                                }
+                                                else
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                                }
+                                            </div>
+                                            <div class="commerce-bom-fields">
+                                                <div class="commerce-bom-name-row">
+                                                    <MudTextField @bind-Value="item.ItemName" Label="Item" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudTextField @bind-Value="item.PartNumber" Label="Part no" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                </div>
+                                                <MudTextField @bind-Value="item.Specification" Label="Part description / specification" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Lines="2" />
+                                                <div class="commerce-bom-assembly-grid">
+                                                    <MudTextField @bind-Value="item.AssemblyName" Label="Assembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudTextField @bind-Value="item.SubassemblyName" Label="Subassembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudTextField @bind-Value="item.SupplierName" Label="Supplier" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudTextField @bind-Value="item.SupplierUrl" Label="Part URL" HelperText="Supplier URL or part page" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                </div>
+                                            </div>
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveBomItem(item))" />
+                                        </div>
+
+                                        <div class="commerce-bom-detail-grid">
+                                            <MudNumericField @bind-Value="item.Quantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudTextField @bind-Value="item.Unit" Label="Unit" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudNumericField @bind-Value="item.UnitCost" Label="Unit cost" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudSelect T="string" @bind-Value="item.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                                @foreach (var currency in CatalogCurrencyOptions())
+                                                {
+                                                    <MudSelectItem Value="@currency.Code">@CurrencyOptionLabel(currency)</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <MudNumericField T="int?" @bind-Value="item.LeadTimeDays" Label="Lead time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
+                                            <MudNumericField T="int?" @bind-Value="item.SourcingTimeDays" Label="Sourcing time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
+                                            <MudTextField @bind-Value="item.ImageUrl" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudTextField @bind-Value="item.DrawingUrl" Label="Drawing URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                        </div>
+
+                                        <div class="commerce-bom-card-footer">
+                                            <div>
+                                                <span>Line total</span>
+                                                <strong>@item.Currency @BomLineTotal(item).ToString("N2")</strong>
+                                            </div>
+                                            <div>
+                                                <span>Sourcing</span>
+                                                <strong>@BomItemSourcingLabel(item)</strong>
+                                            </div>
+                                            <div class="commerce-bom-links">
+                                                @if (!string.IsNullOrWhiteSpace(item.SupplierUrl))
+                                                {
+                                                    <MudButton Class="commerce-bom-part-link" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.OpenInNew" Href="@item.SupplierUrl" Target="_blank">Part URL</MudButton>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(item.DrawingUrl))
+                                                {
+                                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Description" Href="@item.DrawingUrl" Target="_blank">Drawing</MudButton>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div class="commerce-bom-tracking-grid">
+                                            <div>
+                                                <span>Inventory tracking</span>
+                                                <strong>@BomInventoryReadinessLabel(item)</strong>
+                                                <p>No linked inventory movements yet.</p>
+                                            </div>
+                                            <div>
+                                                <span>Order history</span>
+                                                <strong>Awaiting purchase link</strong>
+                                                <p>No purchase/order history linked yet.</p>
+                                            </div>
+                                        </div>
+
+                                        <MudTextField @bind-Value="item.Notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" MaxLength="1000" Counter="1000" />
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </PanelCard>
+                </MudTabPanel>
+            </MudTabs>
         }
     </PageBody>
 </div>
@@ -349,6 +436,13 @@
     private int BomSourcingDays => _productForm.BomItems.Select(CalculateBomItemSourcingDays).DefaultIfEmpty(0).Max();
 
     private string BomSourcingLabel => BomSourcingDays == 0 ? "Not set" : $"{BomSourcingDays:N0} days";
+
+    private int BomSupplierCount => _productForm.BomItems
+        .Select(item => item.SupplierName?.Trim())
+        .Where(supplier => !string.IsNullOrWhiteSpace(supplier))
+        .Select(supplier => supplier!)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -773,6 +867,114 @@
         return days == 0 ? "Not set" : $"{days:N0} days";
     }
 
+    private IReadOnlyList<BomIssueSummary> BomIssueItems()
+    {
+        return _productForm.BomItems
+            .OrderBy(item => item.SortOrder)
+            .Select(item => new BomIssueSummary(BomItemDisplayName(item), BuildBomIssues(item)))
+            .Where(summary => summary.Issues.Count > 0)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> BuildBomIssues(CommerceProductBomItemMutationRequest item)
+    {
+        var issues = new List<string>();
+        if (string.IsNullOrWhiteSpace(item.ItemName))
+        {
+            issues.Add("Missing item name.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.PartNumber))
+        {
+            issues.Add("Missing part number.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Specification))
+        {
+            issues.Add("Missing part description or specification.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.ImageUrl))
+        {
+            issues.Add("Missing part image.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.DrawingUrl))
+        {
+            issues.Add("No drawing or technical document linked.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.SupplierName))
+        {
+            issues.Add("Missing supplier.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.SupplierUrl))
+        {
+            issues.Add("Missing part URL.");
+        }
+
+        if (item.Quantity <= 0)
+        {
+            issues.Add("Quantity must be greater than zero.");
+        }
+
+        if (item.UnitCost <= 0)
+        {
+            issues.Add("Unit cost is not set.");
+        }
+
+        if (CalculateBomItemSourcingDays(item) == 0)
+        {
+            issues.Add("Lead time or sourcing time is not set.");
+        }
+
+        return issues;
+    }
+
+    private IReadOnlyList<CommerceProductBomItemMutationRequest> BomBottleneckItems()
+    {
+        var sourcedItems = _productForm.BomItems
+            .Where(item => CalculateBomItemSourcingDays(item) > 0)
+            .ToList();
+
+        if (sourcedItems.Count == 0)
+        {
+            return [];
+        }
+
+        var maxSourcingDays = sourcedItems.Max(CalculateBomItemSourcingDays);
+        return sourcedItems
+            .Where(item => CalculateBomItemSourcingDays(item) == maxSourcingDays)
+            .OrderBy(item => item.SortOrder)
+            .ToList();
+    }
+
+    private static string BomInventoryReadinessLabel(CommerceProductBomItemMutationRequest item)
+    {
+        if (item.Quantity <= 0)
+        {
+            return "Quantity missing";
+        }
+
+        if (CalculateBomItemSourcingDays(item) == 0)
+        {
+            return "Timing missing";
+        }
+
+        return "Ready for inventory link";
+    }
+
+    private static string BomItemDisplayName(CommerceProductBomItemMutationRequest item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ItemName))
+        {
+            return item.ItemName;
+        }
+
+        return string.IsNullOrWhiteSpace(item.PartNumber) ? "Unnamed BOM item" : item.PartNumber;
+    }
+
     private static string BuildBomImageAlt(CommerceProductBomItemMutationRequest item)
     {
         return string.IsNullOrWhiteSpace(item.ItemName) ? "BOM item image" : $"{item.ItemName} image";
@@ -818,6 +1020,8 @@
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
+
+    private sealed record BomIssueSummary(string ItemName, IReadOnlyList<string> Issues);
 
     private static CommerceProductMutationRequest MapProduct(CommerceProductDto detail)
     {

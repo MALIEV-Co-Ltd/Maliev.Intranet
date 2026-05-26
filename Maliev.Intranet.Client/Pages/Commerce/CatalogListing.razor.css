@@ -6,6 +6,19 @@
     justify-content: flex-end;
 }
 
+.commerce-listing-tabs {
+    display: block;
+}
+
+.commerce-listing-tabs ::deep .mud-tabs-toolbar {
+    border-bottom: 1px solid var(--maliev-border);
+    margin-bottom: 1rem;
+}
+
+.commerce-listing-tabs ::deep .mud-tab {
+    min-height: 42px;
+}
+
 .commerce-listing-grid {
     display: grid;
     gap: 0.75rem;
@@ -41,6 +54,12 @@
     margin-bottom: 1rem;
 }
 
+.commerce-bom-command-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .commerce-bom-summary-grid > div {
     background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(16, 185, 129, 0.08));
     border: 1px solid rgba(14, 165, 233, 0.2);
@@ -51,16 +70,75 @@
     padding: 0.75rem;
 }
 
+.commerce-bom-command-grid > div {
+    background: var(--maliev-panel-2);
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.75rem;
+}
+
 .commerce-bom-summary-grid span,
+.commerce-bom-command-grid span,
 .commerce-bom-card-footer span {
     color: var(--maliev-muted);
     font-size: var(--mud-typography-caption-size);
 }
 
 .commerce-bom-summary-grid strong,
+.commerce-bom-command-grid strong,
 .commerce-bom-card-footer strong {
     font-family: var(--maliev-font-mono);
     font-size: var(--mud-typography-body2-size);
+}
+
+.commerce-bom-management-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+}
+
+.commerce-bom-issue-list,
+.commerce-bom-bottleneck-list {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.commerce-bom-issue-item,
+.commerce-bom-bottleneck-item,
+.commerce-bom-tracking-grid > div {
+    background: var(--maliev-panel-2);
+    border: 1px solid var(--maliev-border);
+    border-radius: 8px;
+    min-width: 0;
+    padding: 0.75rem;
+}
+
+.commerce-bom-issue-item ul {
+    color: var(--maliev-muted);
+    margin: 0.35rem 0 0;
+    padding-inline-start: 1.1rem;
+}
+
+.commerce-bom-bottleneck-item {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.commerce-bom-bottleneck-item div {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.commerce-bom-bottleneck-item span,
+.commerce-bom-tracking-grid p {
+    color: var(--maliev-muted);
+    font-size: var(--mud-typography-caption-size);
 }
 
 .commerce-bom-list {
@@ -144,6 +222,25 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     justify-content: flex-end;
+}
+
+.commerce-bom-tracking-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commerce-bom-tracking-grid > div {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.commerce-bom-tracking-grid p {
+    margin: 0;
+}
+
+.commerce-bom-part-link {
+    white-space: nowrap;
 }
 
 .commerce-bom-empty {
@@ -264,12 +361,15 @@
 }
 
 @media (max-width: 1100px) {
+    .commerce-bom-command-grid,
+    .commerce-bom-management-grid,
     .commerce-bom-summary-grid,
     .commerce-bom-card-main,
     .commerce-bom-name-row,
     .commerce-bom-assembly-grid,
     .commerce-bom-detail-grid,
     .commerce-bom-card-footer,
+    .commerce-bom-tracking-grid,
     .commerce-variant-row,
     .commerce-media-row,
     .commerce-media-card {

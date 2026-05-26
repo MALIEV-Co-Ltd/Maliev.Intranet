@@ -846,6 +846,36 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalogListing_ProvidesDedicatedBomManagementTab()
+    {
+        var listing = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor.css");
+
+        Assert.Contains("<MudTabs Class=\"commerce-listing-tabs\"", listing, StringComparison.Ordinal);
+        Assert.Contains("<MudTabPanel Text=\"BOM\"", listing, StringComparison.Ordinal);
+        Assert.Contains("BOM document issues", listing, StringComparison.Ordinal);
+        Assert.Contains("Sourcing bottleneck", listing, StringComparison.Ordinal);
+        Assert.Contains("Supplier coverage", listing, StringComparison.Ordinal);
+        Assert.Contains("Inventory tracking", listing, StringComparison.Ordinal);
+        Assert.Contains("Order history", listing, StringComparison.Ordinal);
+        Assert.Contains("Part URL", listing, StringComparison.Ordinal);
+        Assert.Contains("BomIssueItems", listing, StringComparison.Ordinal);
+        Assert.Contains("BuildBomIssues", listing, StringComparison.Ordinal);
+        Assert.Contains("BomBottleneckItems", listing, StringComparison.Ordinal);
+        Assert.Contains("BomSupplierCount", listing, StringComparison.Ordinal);
+        Assert.Contains("BomInventoryReadinessLabel", listing, StringComparison.Ordinal);
+        Assert.Contains("No linked inventory movements yet.", listing, StringComparison.Ordinal);
+        Assert.Contains("No purchase/order history linked yet.", listing, StringComparison.Ordinal);
+
+        Assert.Contains(".commerce-listing-tabs", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-bom-command-grid", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-bom-issue-list", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-bom-management-grid", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-bom-tracking-grid", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-bom-part-link", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CommerceCatalogListing_UsesUploadBasedMediaManager()
     {
         var listing = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor");
