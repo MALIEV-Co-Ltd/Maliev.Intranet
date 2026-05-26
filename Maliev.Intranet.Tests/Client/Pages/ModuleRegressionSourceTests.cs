@@ -1110,6 +1110,35 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void TopBar_UtilityOrder_CentersSearchAndPlacesMenuLast()
+    {
+        var razor = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var leftStart = razor.IndexOf("<div class=\"topbar-left\">", StringComparison.Ordinal);
+        var leftEnd = razor.IndexOf("<div class=\"topbar-logo-divider\"", StringComparison.Ordinal);
+        var searchIndex = razor.IndexOf("class=\"topbar-search\"", StringComparison.Ordinal);
+        var rightIndex = razor.IndexOf("<div class=\"topbar-right\">", StringComparison.Ordinal);
+        var currencyIndex = razor.IndexOf("Class=\"topbar-currency-autocomplete\"", StringComparison.Ordinal);
+        var themeIndex = razor.IndexOf("Class=\"topbar-theme-toggle\"", StringComparison.Ordinal);
+        var chatIndex = razor.IndexOf("Class=\"topbar-chat-toggle\"", StringComparison.Ordinal);
+        var profileIndex = razor.IndexOf("class=\"topbar-profile-menu\"", StringComparison.Ordinal);
+        var menuIndex = razor.LastIndexOf("class=\"topbar-mobile-menu-button\"", StringComparison.Ordinal);
+
+        Assert.True(leftStart >= 0);
+        Assert.True(leftEnd > leftStart);
+        Assert.DoesNotContain("topbar-mobile-menu-button", razor[leftStart..leftEnd], StringComparison.Ordinal);
+        Assert.True(searchIndex >= 0);
+        Assert.True(rightIndex > searchIndex);
+        Assert.True(currencyIndex > rightIndex);
+        Assert.True(themeIndex > currencyIndex);
+        Assert.True(chatIndex > themeIndex);
+        Assert.True(profileIndex > chatIndex);
+        Assert.True(menuIndex > profileIndex);
+        Assert.Contains("justify-content: center;", ExtractCssBlock(source, ".topbar-search"), StringComparison.Ordinal);
+        Assert.Contains("margin-left: 0;", ExtractCssBlock(source, ".topbar-right"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_RightIconButtons_AreBorderless()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
@@ -1157,7 +1186,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("@media (max-width: 1680px)", styles, StringComparison.Ordinal);
         Assert.Contains("overflow: visible;", ExtractCssBlock(styles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
-        Assert.Contains("margin-left: auto;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
+        Assert.Contains("margin-left: 0;", ExtractCssBlock(styles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-more-trigger", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-nav-more-popover", ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css"), StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(wideDesktopStyles, ".topbar-profile-info"), StringComparison.Ordinal);
@@ -1234,8 +1263,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("flex-wrap: nowrap;", styles, StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-nav"), StringComparison.Ordinal);
         Assert.Contains(".topbar-search", styles, StringComparison.Ordinal);
-        Assert.Contains("display: block;", styles, StringComparison.Ordinal);
-        Assert.Contains("flex: 1 1 clamp(160px, 32vw, 260px);", styles, StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(styles, ".topbar-search"), StringComparison.Ordinal);
+        Assert.Contains("justify-content: center;", ExtractCssBlock(styles, ".topbar-search"), StringComparison.Ordinal);
+        Assert.Contains("width: clamp(220px, 32vw, 420px);", ExtractCssBlock(styles, ".topbar-root ::deep .topbar-global-search"), StringComparison.Ordinal);
         Assert.Contains("gap: 6px;", ExtractCssBlock(compactNavStyles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains("width: min(96px, 100%);", ExtractCssBlock(styles, ".topbar-logo-button ::deep img"), StringComparison.Ordinal);
         Assert.Contains("width: clamp(92px, 17vw, 100px);", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
@@ -1272,7 +1302,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("min-width: 0;", navBlock, StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", navBlock, StringComparison.Ordinal);
         Assert.Contains("overflow: visible;", navBlock, StringComparison.Ordinal);
-        Assert.Contains("margin-left: auto;", rightBlock, StringComparison.Ordinal);
+        Assert.Contains("margin-left: 0;", rightBlock, StringComparison.Ordinal);
         Assert.Contains("topbar-nav-more-popover", overrides, StringComparison.Ordinal);
         Assert.Contains("max-height: min(720px, calc(100vh - 78px));", overrides, StringComparison.Ordinal);
         Assert.Contains("display: inline-grid;", ExtractCssBlock(compactNavStyles, ".topbar-mobile-menu-button"), StringComparison.Ordinal);

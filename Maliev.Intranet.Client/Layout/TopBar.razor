@@ -19,15 +19,6 @@
             <MudImage Src="@LogoUrl" Alt="MALIEV" Height="22" />
         </a>
 
-        <button type="button"
-                class="topbar-mobile-menu-button"
-                aria-label="@MobileNavButtonLabel"
-                aria-haspopup="menu"
-                aria-expanded="@_mobileNavOpen.ToString().ToLowerInvariant()"
-                aria-controls="topbar-mobile-nav"
-                @onclick="ToggleMobileNav">
-            <MudIcon Icon="@(_mobileNavOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Size="Size.Small" />
-        </button>
     </div>
 
     @* ── Divider ── *@
@@ -165,15 +156,15 @@
 
     <div class="topbar-spacer" />
 
+    @* Search *@
+    <div class="topbar-search">
+        <GlobalSearchBox Class="topbar-global-search"
+                         Placeholder="Search..."
+                         Limit="8" />
+    </div>
+
     @* ── Right: Actions ── *@
     <div class="topbar-right">
-        @* Search *@
-        <div class="topbar-search">
-            <GlobalSearchBox Class="topbar-global-search"
-                             Placeholder="Search..."
-                             Limit="8" />
-        </div>
-
         @* Currency selector *@
         <MudAutocomplete T="CurrencyDto"
                          Value="@_selectedCurrency"
@@ -271,6 +262,16 @@
                 </div>
             </Authorized>
         </AuthorizeView>
+
+        <button type="button"
+                class="topbar-mobile-menu-button"
+                aria-label="@MobileNavButtonLabel"
+                aria-haspopup="menu"
+                aria-expanded="@_mobileNavOpen.ToString().ToLowerInvariant()"
+                aria-controls="topbar-mobile-nav"
+                @onclick="ToggleMobileNav">
+            <MudIcon Icon="@(_mobileNavOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Size="Size.Small" />
+        </button>
     </div>
 </header>
 
