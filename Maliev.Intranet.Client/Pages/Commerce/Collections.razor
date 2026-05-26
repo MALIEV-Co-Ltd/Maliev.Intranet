@@ -33,167 +33,8 @@
             <StatTile Label="Selected" Value="@SelectedCollectionLabel" />
         </StatBar>
 
-        <MudGrid Spacing="3">
-            <MudItem xs="12" lg="5">
-                <PanelCard Class="commerce-collection-editor">
-                    <div class="commerce-collection-editor-head">
-                        <div>
-                            <MudText Typo="Typo.h6">@EditorTitle</MudText>
-                            <MudText Typo="Typo.caption">@EditorSubtitle</MudText>
-                        </div>
-                        @if (_editingCollectionId.HasValue)
-                        {
-                            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="StartNewCollection">
-                                Clear
-                            </MudButton>
-                        }
-                    </div>
-
-                    <div class="commerce-collection-form-grid">
-                        <MudTextField T="string"
-                                      Value="_collectionForm.Title"
-                                      ValueChanged="@OnCollectionTitleChanged"
-                                      Label="Title"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Required="true"
-                                      Immediate="true" />
-                    </div>
-
-                    <div class="commerce-collection-url-group">
-                        <MudText Typo="Typo.caption">Storefront URL</MudText>
-                        <div class="commerce-collection-url-field">
-                            <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
-                            <span class="commerce-collection-url-prefix">/shop?collection=</span>
-                            <input class="commerce-collection-url-input"
-                                   value="@_collectionForm.Handle"
-                                   @oninput="OnCollectionStorefrontSlugInput"
-                                   placeholder="collection-url-slug"
-                                   required
-                                   aria-label="Storefront collection slug" />
-                        </div>
-                    </div>
-
-                    @if (HandleChangedForPublishedCollection)
-                    {
-                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="commerce-collection-handle-warning">
-                            Changing this slug changes Web collection links and filters. Existing links using the old slug may stop matching this collection.
-                        </MudAlert>
-                    }
-
-                    <div class="commerce-collection-image-uploader">
-                        <div class="commerce-collection-image-heading">
-                            <div>
-                                <MudText Typo="Typo.subtitle2">Collection image</MudText>
-                                <MudText Typo="Typo.caption">Shown on the Web collection section.</MudText>
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
-                            {
-                                <MudButton Variant="Variant.Text"
-                                           Color="Color.Error"
-                                           Size="Size.Small"
-                                           StartIcon="@Icons.Material.Outlined.Delete"
-                                           OnClick="RemoveCollectionImage">
-                                    Remove
-                                </MudButton>
-                            }
-                        </div>
-
-                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                                       FilesChanged="UploadCollectionImageFilesAsync"
-                                       Accept=".jpg,.jpeg,.png,.webp"
-                                       MaximumFileCount="1"
-                                       Disabled="@_collectionImageUploading"
-                                       Class="commerce-collection-image-upload">
-                            <CustomContent Context="uploadContext">
-                                <div class="commerce-collection-image-dropzone">
-                                    <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
-                                                        Icon="@Icons.Material.Outlined.AddPhotoAlternate"
-                                                        Label="Drop collection image here or click to upload"
-                                                        SubLabel="JPG, PNG, WEBP"
-                                                        MaxFileSizeLabel="max 10 MB"
-                                                        OnClick="@uploadContext.OpenFilePickerAsync"
-                                                        OnFilesDropped="@uploadContext.OpenFilePickerAsync" />
-                                </div>
-                            </CustomContent>
-                        </MudFileUpload>
-
-                        @if (_collectionImageUploading)
-                        {
-                            <div class="commerce-collection-image-uploading">
-                                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
-                                <span>Uploading collection image...</span>
-                            </div>
-                        }
-
-                        <div class="commerce-collection-image-preview">
-                            <div class="commerce-collection-image-frame">
-                                @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
-                                {
-                                    <img src="@_collectionForm.ImageUrl" alt="@CollectionImagePreviewAlt" />
-                                }
-                                else
-                                {
-                                    <MudIcon Icon="@Icons.Material.Outlined.Image" />
-                                }
-                            </div>
-                            <div class="commerce-collection-image-fields">
-                                <MudTextField @bind-Value="_collectionForm.ImageAltText"
-                                              Label="Image alt text"
-                                              Variant="Variant.Outlined"
-                                              Margin="Margin.Dense"
-                                              Immediate="true" />
-                                @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
-                                {
-                                    <span class="commerce-collection-image-url" title="@_collectionForm.ImageUrl">@_collectionForm.ImageUrl</span>
-                                }
-                            </div>
-                        </div>
-                    </div>
-
-                    <MudTextField @bind-Value="_collectionForm.Description"
-                                  Label="Description"
-                                  Lines="4"
-                                  MaxLines="8"
-                                  Counter="500"
-                                  MaxLength="500"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  Immediate="true"
-                                  Class="mt-3" />
-
-                    <div class="commerce-collection-publish-row">
-                        <MudSwitch @bind-Value="_collectionForm.IsPublished"
-                                   Color="Color.Primary"
-                                   Label="@PublishLabel" />
-                        <MudText Typo="Typo.caption">
-                            Storefront visibility state
-                        </MudText>
-                    </div>
-
-                    <div class="commerce-collection-actions">
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Outlined.Save"
-                                   OnClick="SaveCollectionAsync"
-                                   Disabled="@(!CanSaveCollection)">
-                            Save collection
-                        </MudButton>
-                        @if (_editingCollectionId.HasValue)
-                        {
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Error"
-                                       StartIcon="@Icons.Material.Outlined.Unpublished"
-                                       OnClick="@(() => UnpublishCollectionAsync(_editingCollectionId.Value))"
-                                       Disabled="@(_saving || !_collectionForm.IsPublished)">
-                                Unpublish
-                            </MudButton>
-                        }
-                    </div>
-                </PanelCard>
-            </MudItem>
-
-            <MudItem xs="12" lg="7">
+        <div class="@CollectionsLayoutClass">
+            <div class="commerce-collections-list-pane">
                 <PanelCard Class="commerce-collections-list-panel">
                     <div class="commerce-collections-list-head">
                         <div>
@@ -277,8 +118,177 @@
                         </div>
                     }
                 </PanelCard>
-            </MudItem>
-        </MudGrid>
+            </div>
+
+            @if (IsCollectionEditorOpen)
+            {
+                <div class="commerce-collection-editor-pane">
+                    <PanelCard Class="commerce-collection-editor">
+                        <div class="commerce-collection-editor-head">
+                            <div>
+                                <MudText Typo="Typo.h6">@EditorTitle</MudText>
+                                <MudText Typo="Typo.caption">@EditorSubtitle</MudText>
+                            </div>
+                            <div class="commerce-collection-editor-head-actions">
+                                @if (_editingCollectionId.HasValue)
+                                {
+                                    <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="StartNewCollection">
+                                        Clear
+                                    </MudButton>
+                                }
+                                <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                               Size="Size.Small"
+                                               Color="Color.Default"
+                                               OnClick="CloseCollectionEditor"
+                                               aria-label="Close collection editor" />
+                            </div>
+                        </div>
+
+                        <div class="commerce-collection-form-grid">
+                            <MudTextField T="string"
+                                          Value="_collectionForm.Title"
+                                          ValueChanged="@OnCollectionTitleChanged"
+                                          Label="Title"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Required="true"
+                                          Immediate="true" />
+                        </div>
+
+                        <div class="commerce-collection-url-group">
+                            <MudText Typo="Typo.caption">Storefront URL</MudText>
+                            <div class="commerce-collection-url-field">
+                                <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
+                                <span class="commerce-collection-url-prefix">/shop?collection=</span>
+                                <input class="commerce-collection-url-input"
+                                       value="@_collectionForm.Handle"
+                                       @oninput="OnCollectionStorefrontSlugInput"
+                                       placeholder="collection-url-slug"
+                                       required
+                                       aria-label="Storefront collection slug" />
+                            </div>
+                        </div>
+
+                        @if (HandleChangedForPublishedCollection)
+                        {
+                            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="commerce-collection-handle-warning">
+                                Changing this slug changes Web collection links and filters. Existing links using the old slug may stop matching this collection.
+                            </MudAlert>
+                        }
+
+                        <div class="commerce-collection-image-uploader">
+                            <div class="commerce-collection-image-heading">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">Collection image</MudText>
+                                    <MudText Typo="Typo.caption">Shown on the Web collection section.</MudText>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                {
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Outlined.Delete"
+                                               OnClick="RemoveCollectionImage">
+                                        Remove
+                                    </MudButton>
+                                }
+                            </div>
+
+                            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                           FilesChanged="UploadCollectionImageFilesAsync"
+                                           Accept=".jpg,.jpeg,.png,.webp"
+                                           MaximumFileCount="1"
+                                           Disabled="@_collectionImageUploading"
+                                           Class="commerce-collection-image-upload">
+                                <CustomContent Context="uploadContext">
+                                    <div class="commerce-collection-image-dropzone">
+                                        <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                                            Icon="@Icons.Material.Outlined.AddPhotoAlternate"
+                                                            Label="Drop collection image here or click to upload"
+                                                            SubLabel="JPG, PNG, WEBP"
+                                                            MaxFileSizeLabel="max 10 MB"
+                                                            OnClick="@uploadContext.OpenFilePickerAsync"
+                                                            OnFilesDropped="@uploadContext.OpenFilePickerAsync" />
+                                    </div>
+                                </CustomContent>
+                            </MudFileUpload>
+
+                            @if (_collectionImageUploading)
+                            {
+                                <div class="commerce-collection-image-uploading">
+                                    <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                                    <span>Uploading collection image...</span>
+                                </div>
+                            }
+
+                            <div class="commerce-collection-image-preview">
+                                <div class="commerce-collection-image-frame">
+                                    @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                    {
+                                        <img src="@_collectionForm.ImageUrl" alt="@CollectionImagePreviewAlt" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                    }
+                                </div>
+                                <div class="commerce-collection-image-fields">
+                                    <MudTextField @bind-Value="_collectionForm.ImageAltText"
+                                                  Label="Image alt text"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+                                    @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                    {
+                                        <span class="commerce-collection-image-url" title="@_collectionForm.ImageUrl">@_collectionForm.ImageUrl</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <MudTextField @bind-Value="_collectionForm.Description"
+                                      Label="Description"
+                                      Lines="4"
+                                      MaxLines="8"
+                                      Counter="500"
+                                      MaxLength="500"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true"
+                                      Class="mt-3" />
+
+                        <div class="commerce-collection-publish-row">
+                            <MudSwitch @bind-Value="_collectionForm.IsPublished"
+                                       Color="Color.Primary"
+                                       Label="@PublishLabel" />
+                            <MudText Typo="Typo.caption">
+                                Storefront visibility state
+                            </MudText>
+                        </div>
+
+                        <div class="commerce-collection-actions">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Outlined.Save"
+                                       OnClick="SaveCollectionAsync"
+                                       Disabled="@(!CanSaveCollection)">
+                                Save collection
+                            </MudButton>
+                            @if (_editingCollectionId.HasValue)
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Error"
+                                           StartIcon="@Icons.Material.Outlined.Unpublished"
+                                           OnClick="@(() => UnpublishCollectionAsync(_editingCollectionId.Value))"
+                                           Disabled="@(_saving || !_collectionForm.IsPublished)">
+                                    Unpublish
+                                </MudButton>
+                            }
+                        </div>
+                    </PanelCard>
+                </div>
+            }
+        </div>
     </PageBody>
 </div>
 
@@ -295,12 +305,21 @@
     private bool _saving;
     private bool _collectionImageUploading;
     private bool _handleManuallyEdited;
+    private bool _collectionEditorOpen;
 
     private int PublishedCount => _collections.Count(collection => collection.IsPublished);
 
     private int DraftCount => _collections.Count - PublishedCount;
 
-    private string SelectedCollectionLabel => _editingCollectionId.HasValue ? "Editing" : "New";
+    private bool IsCollectionEditorOpen => _collectionEditorOpen;
+
+    private string CollectionsLayoutClass => IsCollectionEditorOpen
+        ? "commerce-collections-layout editor-open"
+        : "commerce-collections-layout";
+
+    private string SelectedCollectionLabel => IsCollectionEditorOpen
+        ? (_editingCollectionId.HasValue ? "Editing" : "New")
+        : "None";
 
     private string EditorTitle => _editingCollectionId.HasValue ? "Edit collection" : "New collection";
 
@@ -484,6 +503,7 @@
 
     private void StartNewCollection()
     {
+        _collectionEditorOpen = true;
         _editingCollectionId = null;
         _originalCollectionHandle = null;
         _handleManuallyEdited = false;
@@ -492,6 +512,7 @@
 
     private void SelectCollection(CommerceCollectionDto collection)
     {
+        _collectionEditorOpen = true;
         _editingCollectionId = collection.Id;
         _originalCollectionHandle = collection.Handle;
         _handleManuallyEdited = true;
@@ -504,6 +525,15 @@
             ImageAltText = collection.ImageAltText,
             IsPublished = collection.IsPublished
         };
+    }
+
+    private void CloseCollectionEditor()
+    {
+        _collectionEditorOpen = false;
+        _editingCollectionId = null;
+        _originalCollectionHandle = null;
+        _handleManuallyEdited = false;
+        _collectionForm = new CommerceCollectionMutationRequest();
     }
 
     private void OnCollectionTitleChanged(string title)

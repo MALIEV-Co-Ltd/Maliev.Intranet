@@ -38,6 +38,53 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_ListsCollectionsFirstAndShowsEditorConditionally()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+
+        Assert.Contains("commerce-collections-layout", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collections-list-pane", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-editor-pane", collections, StringComparison.Ordinal);
+        Assert.Contains("@if (IsCollectionEditorOpen)", collections, StringComparison.Ordinal);
+        Assert.True(
+            collections.IndexOf("commerce-collections-list-pane", StringComparison.Ordinal)
+                < collections.IndexOf("commerce-collection-editor-pane", StringComparison.Ordinal));
+        Assert.Contains("CloseCollectionEditor", collections, StringComparison.Ordinal);
+        Assert.Contains("SelectedCollectionLabel => IsCollectionEditorOpen", collections, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collections-layout.editor-open", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CollectionEditorState_OpensOnlyForCreateOrEdit()
+    {
+        var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
+
+        Assert.False(GetPrivateProperty<bool>(page, "IsCollectionEditorOpen"));
+        Assert.Equal("None", GetPrivateProperty<string>(page, "SelectedCollectionLabel"));
+
+        InvokePrivateVoidWithArgs(page, "StartNewCollection");
+
+        Assert.True(GetPrivateProperty<bool>(page, "IsCollectionEditorOpen"));
+        Assert.Equal("New", GetPrivateProperty<string>(page, "SelectedCollectionLabel"));
+
+        InvokePrivateVoidWithArgs(page, "CloseCollectionEditor");
+
+        Assert.False(GetPrivateProperty<bool>(page, "IsCollectionEditorOpen"));
+        Assert.Equal("None", GetPrivateProperty<string>(page, "SelectedCollectionLabel"));
+
+        InvokePrivateVoidWithArgs(page, "SelectCollection", new CommerceCollectionDto
+        {
+            Id = Guid.NewGuid(),
+            Handle = "injection-molding-machines",
+            Title = "Injection molding machines"
+        });
+
+        Assert.True(GetPrivateProperty<bool>(page, "IsCollectionEditorOpen"));
+        Assert.Equal("Editing", GetPrivateProperty<string>(page, "SelectedCollectionLabel"));
+    }
+
+    [Fact]
     public void OnCollectionStorefrontSlugChanged_NormalizesManualSlugAndStopsTitleOverwrite()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
@@ -81,6 +128,16 @@ public sealed class CommerceCollectionsTests
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         return Assert.IsType<T>(field.GetValue(page));
+    }
+
+    private static T GetPrivateProperty<T>(
+        global::Maliev.Intranet.Client.Pages.Commerce.Collections page,
+        string propertyName)
+    {
+        var property = typeof(global::Maliev.Intranet.Client.Pages.Commerce.Collections)
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(property);
+        return Assert.IsType<T>(property.GetValue(page));
     }
 
     private static string ReadRepoFile(params string[] path)

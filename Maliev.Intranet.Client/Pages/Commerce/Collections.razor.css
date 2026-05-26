@@ -1,9 +1,26 @@
+.commerce-collections-layout {
+    align-items: start;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 44rem);
+}
+
+.commerce-collections-layout.editor-open {
+    grid-template-columns: minmax(20rem, 0.9fr) minmax(24rem, 1.1fr);
+}
+
+.commerce-collections-list-pane,
+.commerce-collection-editor-pane {
+    min-width: 0;
+}
+
 .commerce-collection-editor,
 .commerce-collections-list-panel {
     min-height: 100%;
 }
 
 .commerce-collection-editor-head,
+.commerce-collection-editor-head-actions,
 .commerce-collections-list-head,
 .commerce-collection-actions,
 .commerce-collection-image-heading,
@@ -19,6 +36,10 @@
     gap: 1rem;
     justify-content: space-between;
     margin-bottom: 1rem;
+}
+
+.commerce-collection-editor-head-actions {
+    gap: 0.5rem;
 }
 
 .commerce-collection-form-grid {
@@ -273,6 +294,13 @@
 
 .commerce-collection-row-actions {
     gap: 0.25rem;
+}
+
+@media (max-width: 1100px) {
+    .commerce-collections-layout,
+    .commerce-collections-layout.editor-open {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 @media (max-width: 780px) {
