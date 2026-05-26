@@ -846,7 +846,7 @@
         padding: 0 8px env(safe-area-inset-bottom);
         border-top: 1px solid var(--maliev-border);
         background: var(--maliev-panel);
-        box-shadow: 0 -1px 0 var(--maliev-border), 0 -10px 30px color-mix(in oklab, var(--maliev-ink), transparent 88%);
+        box-shadow: 0 -1px 0 var(--maliev-border);
     }
 
     .topbar-mobile-drawer-backdrop {

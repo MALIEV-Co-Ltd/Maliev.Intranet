@@ -1184,6 +1184,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("height: calc(52px + env(safe-area-inset-bottom));", bottomDockedRootBlock, StringComparison.Ordinal);
         Assert.Contains("padding: 0 8px env(safe-area-inset-bottom);", bottomDockedRootBlock, StringComparison.Ordinal);
         Assert.Contains("border-top: 1px solid var(--maliev-border);", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: 0 -1px 0 var(--maliev-border);", bottomDockedRootBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("0 -10px 30px", bottomDockedRootBlock, StringComparison.Ordinal);
         Assert.Contains("padding-bottom: calc(52px + env(safe-area-inset-bottom));", ExtractCssBlock(compactLayoutStyles, ".body-area"), StringComparison.Ordinal);
         Assert.Contains("inset: 0 0 calc(52px + env(safe-area-inset-bottom)) 0;", ExtractCssBlock(compactBottomBarStyles, ".topbar-mobile-drawer-backdrop"), StringComparison.Ordinal);
         Assert.Contains("bottom: calc(52px + env(safe-area-inset-bottom));", ExtractCssBlock(compactBottomBarStyles, ".topbar-mobile-nav-drawer"), StringComparison.Ordinal);
