@@ -58,22 +58,20 @@
                                       Margin="Margin.Dense"
                                       Required="true"
                                       Immediate="true" />
-                        <MudTextField T="string"
-                                      Value="_collectionForm.Handle"
-                                      ValueChanged="@OnCollectionHandleChanged"
-                                      Label="Storefront URL slug"
-                                      HelperText="@CollectionHandleHelperText"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Required="true"
-                                      Immediate="true"
-                                      Error="@ShowCollectionHandleError"
-                                      ErrorText="Use lowercase letters, numbers, and hyphens only." />
                     </div>
 
-                    <div class="commerce-collection-slug-preview">
-                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
-                        <span>@CollectionUrlPreview</span>
+                    <div class="commerce-collection-url-group">
+                        <MudText Typo="Typo.caption">Storefront URL</MudText>
+                        <div class="commerce-collection-url-field">
+                            <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
+                            <span class="commerce-collection-url-prefix">/shop?collection=</span>
+                            <input class="commerce-collection-url-input"
+                                   value="@_collectionForm.Handle"
+                                   @oninput="OnCollectionStorefrontSlugInput"
+                                   placeholder="collection-url-slug"
+                                   required
+                                   aria-label="Storefront collection slug" />
+                        </div>
                     </div>
 
                     @if (HandleChangedForPublishedCollection)
@@ -312,12 +310,6 @@
 
     private string PublishLabel => _collectionForm.IsPublished ? "Published" : "Draft";
 
-    private string CollectionHandleHelperText => "Used by Web collection URLs and filters. Auto-generated from the title; edit only when the storefront URL should change.";
-
-    private string CollectionUrlPreview => string.IsNullOrWhiteSpace(_collectionForm.Handle)
-        ? "/shop?collection=collection-url-slug"
-        : $"/shop?collection={_collectionForm.Handle}";
-
     private string CollectionImagePreviewAlt => string.IsNullOrWhiteSpace(_collectionForm.ImageAltText)
         ? _collectionForm.Title
         : _collectionForm.ImageAltText;
@@ -525,8 +517,18 @@
 
     private void OnCollectionHandleChanged(string handle)
     {
+        OnCollectionStorefrontSlugChanged(handle);
+    }
+
+    private void OnCollectionStorefrontSlugInput(ChangeEventArgs args)
+    {
+        OnCollectionStorefrontSlugChanged(args.Value?.ToString() ?? string.Empty);
+    }
+
+    private void OnCollectionStorefrontSlugChanged(string handle)
+    {
         _handleManuallyEdited = true;
-        _collectionForm.Handle = BuildCollectionHandle(handle);
+        _collectionForm.Handle = BuildCollectionHandle(ExtractCollectionSlugInput(handle));
     }
 
     private void EnsureCollectionHandle()
@@ -566,6 +568,25 @@
         }
 
         return builder.ToString().Trim('-');
+    }
+
+    private static string ExtractCollectionSlugInput(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        const string collectionQueryKey = "collection=";
+        var queryIndex = trimmed.IndexOf(collectionQueryKey, StringComparison.OrdinalIgnoreCase);
+        if (queryIndex >= 0)
+        {
+            trimmed = trimmed[(queryIndex + collectionQueryKey.Length)..];
+        }
+
+        var queryEnd = trimmed.IndexOfAny(['&', '#', '?']);
+        return queryEnd >= 0 ? trimmed[..queryEnd] : trimmed;
     }
 
     private static bool IsAcceptedCollectionImageFile(IBrowserFile file)

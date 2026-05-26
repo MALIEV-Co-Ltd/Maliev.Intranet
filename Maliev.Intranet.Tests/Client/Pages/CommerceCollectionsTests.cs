@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Tests.Client.Pages;
@@ -20,12 +21,29 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
-    public void OnCollectionHandleChanged_NormalizesManualSlugAndStopsTitleOverwrite()
+    public void CollectionsMarkup_EditsSlugInStorefrontUrlField()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+
+        Assert.DoesNotContain("Label=\"Storefront URL slug\"", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-field", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-prefix", collections, StringComparison.Ordinal);
+        Assert.Contains("/shop?collection=", collections, StringComparison.Ordinal);
+        Assert.Contains("OnCollectionStorefrontSlugChanged", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-input", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-field", styles, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-prefix", styles, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-input", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OnCollectionStorefrontSlugChanged_NormalizesManualSlugAndStopsTitleOverwrite()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
         SetPrivateField(page, "_collectionForm", new CommerceCollectionMutationRequest());
 
-        InvokePrivateVoidWithArgs(page, "OnCollectionHandleChanged", "  Custom Machines!!  ");
+        InvokePrivateVoidWithArgs(page, "OnCollectionStorefrontSlugChanged", "  /shop?collection=Custom Machines!!  ");
         InvokePrivateVoidWithArgs(page, "OnCollectionTitleChanged", "Different Title");
 
         var form = GetPrivateField<CommerceCollectionMutationRequest>(page, "_collectionForm");
@@ -64,4 +82,34 @@ public sealed class CommerceCollectionsTests
         Assert.NotNull(field);
         return Assert.IsType<T>(field.GetValue(page));
     }
+
+    private static string ReadRepoFile(params string[] path)
+    {
+        var startDirectories = new[]
+        {
+            GetSourceDirectory(),
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory()
+        };
+
+        foreach (var startDirectory in startDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var current = new DirectoryInfo(startDirectory);
+            while (current is not null)
+            {
+                var candidate = Path.Combine(new[] { current.FullName }.Concat(path).ToArray());
+                if (File.Exists(candidate))
+                {
+                    return File.ReadAllText(candidate);
+                }
+
+                current = current.Parent;
+            }
+        }
+
+        throw new FileNotFoundException($"Unable to locate {Path.Combine(path)}.");
+    }
+
+    private static string GetSourceDirectory([CallerFilePath] string sourceFile = "")
+        => Path.GetDirectoryName(sourceFile) ?? Directory.GetCurrentDirectory();
 }

@@ -963,8 +963,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains("OperationCanceledException", collections, StringComparison.Ordinal);
         Assert.Contains("SaveCollectionAsync", collections, StringComparison.Ordinal);
         Assert.Contains("UnpublishCollectionAsync", collections, StringComparison.Ordinal);
-        Assert.Contains("Storefront URL slug", collections, StringComparison.Ordinal);
-        Assert.Contains("Used by Web collection URLs and filters", collections, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Storefront URL slug\"", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-field", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-url-prefix", collections, StringComparison.Ordinal);
+        Assert.Contains("/shop?collection=", collections, StringComparison.Ordinal);
+        Assert.Contains("OnCollectionStorefrontSlugChanged", collections, StringComparison.Ordinal);
+        Assert.Contains("ExtractCollectionSlugInput", collections, StringComparison.Ordinal);
         Assert.Contains("BuildCollectionHandle", collections, StringComparison.Ordinal);
         Assert.Contains("OnCollectionTitleChanged", collections, StringComparison.Ordinal);
         Assert.Contains("OnCollectionHandleChanged", collections, StringComparison.Ordinal);
