@@ -68,6 +68,9 @@ public class EquipmentDetailDto
     /// <summary>Gets or sets the current operational status as a string.</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the xmin row version for optimistic concurrency control.</summary>
+    public uint RowVersion { get; set; }
+
     /// <summary>Gets or sets the purchase price in Thai Baht.</summary>
     public decimal? PurchasePriceTHB { get; set; }
 

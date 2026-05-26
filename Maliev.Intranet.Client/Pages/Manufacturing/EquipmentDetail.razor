@@ -72,6 +72,109 @@
                 </PanelCard>
             </div>
 
+            <div class="mlv-two-column-grid mt-4">
+                <PanelCard Title="Status transition" Class="equipment-status-transition-card">
+                    <div class="equipment-status-summary">
+                        <div>
+                            <span>Current status</span>
+                            <strong>@FormatStatus(_equipment.Status)</strong>
+                        </div>
+                        <div>
+                            <span>Available transitions</span>
+                            <strong>@GetStatusTransitionOptions(_equipment.Status).Count</strong>
+                        </div>
+                    </div>
+                    @if (GetStatusTransitionOptions(_equipment.Status).Count == 0)
+                    {
+                        <div class="mlv-empty equipment-status-empty">No further status transitions are available for this equipment.</div>
+                    }
+                    else
+                    {
+                        <FormGrid>
+                            <FormField Label="Move to">
+                                <select class="mlv-form-select" @bind="_statusTarget" disabled="@_statusSaving">
+                                    @foreach (var status in GetStatusTransitionOptions(_equipment.Status))
+                                    {
+                                        <option value="@status">@FormatStatus(status)</option>
+                                    }
+                                </select>
+                            </FormField>
+                            <FormField Label="Reason" Class="mlv-span-6">
+                                <ImmediateInputTextArea class="mlv-form-textarea equipment-status-reason" @bind-Value="_statusReason" />
+                            </FormField>
+                        </FormGrid>
+                        <div class="equipment-status-actions">
+                            <PrimaryButton Icon="@Icons.Material.Outlined.SyncAlt" Disabled="@_statusSaving" OnClick="@ChangeStatusAsync">
+                                @(_statusSaving ? "Updating..." : "Update status")
+                            </PrimaryButton>
+                        </div>
+                    }
+                </PanelCard>
+
+                <PanelCard Title="Equipment documents" Class="equipment-document-card">
+                    <FormGrid>
+                        <FormField Label="Document type">
+                            <select class="mlv-form-select" @bind="_documentType" disabled="@_documentSaving">
+                                @foreach (var type in DocumentTypeOptions)
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </select>
+                        </FormField>
+                        <FormField Label="Description" Class="mlv-span-6">
+                            <ImmediateInputTextArea class="mlv-form-textarea equipment-document-description" @bind-Value="_documentDescription" />
+                        </FormField>
+                        <label class="mlv-form-field mlv-span-6 equipment-document-file-input">
+                            <span>Files</span>
+                            <InputFile OnChange="OnDocumentFilesSelected" multiple />
+                            <small>Attach purchase records, warranty documents, manuals, certificates, or safety sheets up to 10 MB each.</small>
+                            @if (_documentFiles.Count > 0)
+                            {
+                                <div class="maintenance-selected-files">
+                                    @foreach (var file in _documentFiles)
+                                    {
+                                        <span>
+                                            <MudIcon Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" />
+                                            @file.Name
+                                            <em>@FormatFileSize(file.Size)</em>
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </label>
+                    </FormGrid>
+                    @if (!string.IsNullOrWhiteSpace(_documentError))
+                    {
+                        <div class="maintenance-error">@_documentError</div>
+                    }
+                    <div class="equipment-document-actions">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.UploadFile" Disabled="@_documentSaving" OnClick="@AddEquipmentDocumentAsync">
+                            @(_documentSaving ? "Uploading..." : "Add document")
+                        </PrimaryButton>
+                    </div>
+                    @if (EquipmentDocuments.Count > 0)
+                    {
+                        <div class="equipment-document-grid">
+                            @foreach (var document in EquipmentDocuments)
+                            {
+                                <button type="button" class="equipment-document-row" @onclick="() => OpenMaintenanceDocumentAsync(document.Document)">
+                                    <MudIcon Icon="@GetDocumentIcon(document.Document.ContentType)" Size="Size.Small" />
+                                    <span>
+                                        <strong>@document.Document.FileName</strong>
+                                        <small>@document.TypeLabel - @document.OccurredAt.ToString("dd MMM yyyy")</small>
+                                    </span>
+                                    <em>@FormatFileSize(document.Document.FileSizeBytes)</em>
+                                </button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty equipment-document-empty">No equipment documents yet.</div>
+                    }
+                </PanelCard>
+            </div>
+
             <PanelCard Title="Maintenance" Class="mt-4">
                 <FormGrid>
                     <FormField Label="Type"><ImmediateInputText class="mlv-form-input" @bind-Value="_maintenance.Type" /></FormField>
@@ -211,10 +314,18 @@
     private List<EquipmentLoanDto> _loans = [];
     private List<EquipmentAttachmentDto> _attachments = [];
     private List<IBrowserFile> _maintenanceFiles = [];
+    private List<IBrowserFile> _documentFiles = [];
     private bool _loading = true;
     private bool _maintenanceSaving;
+    private bool _statusSaving;
+    private bool _documentSaving;
     private string _newNote = string.Empty;
+    private string? _statusTarget;
+    private string _statusReason = string.Empty;
+    private string _documentType = "Instruction manual";
+    private string _documentDescription = string.Empty;
     private string? _maintenanceError;
+    private string? _documentError;
     private DateTime _maintenanceDate = DateTime.Today;
     private AddMaintenanceLogRequest _maintenance = new() { Type = "Preventive", Description = string.Empty, OccurredAt = DateTime.UtcNow };
 
@@ -237,6 +348,7 @@
             _maintenanceLogs = (await maintenanceTask)?.ToList() ?? [];
             _loans = (await loansTask)?.ToList() ?? [];
             _attachments = (await attachmentsTask)?.ToList() ?? [];
+            SyncStatusTarget();
         }
         catch (Exception ex)
         {
@@ -263,6 +375,53 @@
         {
             _newNote = string.Empty;
             await LoadAsync();
+        }
+    }
+
+    private async Task ChangeStatusAsync(MouseEventArgs _)
+    {
+        if (_equipment is null || string.IsNullOrWhiteSpace(_statusTarget))
+        {
+            return;
+        }
+
+        if (string.Equals(_statusTarget, _equipment.Status, StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Add("Choose a different equipment status.", Severity.Warning);
+            return;
+        }
+
+        _statusSaving = true;
+        try
+        {
+            var request = new ChangeEquipmentStatusRequest
+            {
+                NewStatus = _statusTarget,
+                Reason = string.IsNullOrWhiteSpace(_statusReason) ? null : _statusReason.Trim(),
+                RowVersion = _equipment.RowVersion
+            };
+
+            var response = await Http.PatchAsJsonAsync($"api/v1/equipments/{Id}/status", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(
+                    string.IsNullOrWhiteSpace(message) ? "Equipment status could not be updated." : message,
+                    Severity.Warning);
+                return;
+            }
+
+            _statusReason = string.Empty;
+            Snackbar.Add("Equipment status updated.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Equipment status could not be updated: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _statusSaving = false;
         }
     }
 
@@ -333,6 +492,59 @@
         }
     }
 
+    private async Task AddEquipmentDocumentAsync(MouseEventArgs _)
+    {
+        _documentError = null;
+        if (_documentFiles.Count == 0)
+        {
+            _documentError = "Select at least one equipment document.";
+            return;
+        }
+
+        _documentSaving = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent($"Document:{_documentType}"), "type");
+            content.Add(new StringContent(BuildEquipmentDocumentDescription()), "description");
+            content.Add(new StringContent(DateTime.UtcNow.ToString("O")), "occurredAt");
+
+            foreach (var file in _documentFiles)
+            {
+                var stream = file.OpenReadStream(MaxMaintenanceDocumentBytes);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+                    string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var response = await Http.PostAsync($"api/v1/equipments/{Id}/maintenance", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _documentError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_documentError))
+                {
+                    _documentError = "Equipment document could not be added.";
+                }
+
+                return;
+            }
+
+            _documentFiles = [];
+            _documentDescription = string.Empty;
+            Snackbar.Add("Equipment document added.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _documentError = $"Equipment document could not be added: {ex.Message}";
+        }
+        finally
+        {
+            _documentSaving = false;
+        }
+    }
+
     private void OnMaintenanceFilesSelected(InputFileChangeEventArgs args)
     {
         _maintenanceError = null;
@@ -348,6 +560,21 @@
         _maintenanceFiles = files.ToList();
     }
 
+    private void OnDocumentFilesSelected(InputFileChangeEventArgs args)
+    {
+        _documentError = null;
+        var files = args.GetMultipleFiles(8);
+        var oversizedFile = files.FirstOrDefault(file => file.Size > MaxMaintenanceDocumentBytes);
+        if (oversizedFile is not null)
+        {
+            _documentError = $"Equipment document '{oversizedFile.Name}' exceeds the 10 MB limit.";
+            _documentFiles = [];
+            return;
+        }
+
+        _documentFiles = files.ToList();
+    }
+
     private async Task OpenMaintenanceDocumentAsync(MaintenanceLogDocumentDto document)
     {
         if (string.IsNullOrWhiteSpace(document.StoragePath))
@@ -361,6 +588,76 @@
         {
             await JS.InvokeVoidAsync("open", response.Url, "_blank");
         }
+    }
+
+    private IReadOnlyList<EquipmentDocumentView> EquipmentDocuments =>
+        _maintenanceLogs
+            .SelectMany(log => log.Documents.Select(document =>
+                new EquipmentDocumentView(DocumentTypeLabel(log.Type), log.OccurredAt, document)))
+            .ToList();
+
+    private void SyncStatusTarget()
+    {
+        if (_equipment is null)
+        {
+            _statusTarget = null;
+            return;
+        }
+
+        var options = GetStatusTransitionOptions(_equipment.Status);
+        if (options.Count == 0)
+        {
+            _statusTarget = null;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_statusTarget)
+            || !options.Contains(_statusTarget, StringComparer.OrdinalIgnoreCase))
+        {
+            _statusTarget = options[0];
+        }
+    }
+
+    private string BuildEquipmentDocumentDescription()
+    {
+        if (!string.IsNullOrWhiteSpace(_documentDescription))
+        {
+            return _documentDescription.Trim();
+        }
+
+        return $"{_documentType} attached to {_equipment?.AssetCode ?? "equipment"}.";
+    }
+
+    private static IReadOnlyList<string> GetStatusTransitionOptions(string? status) => status?.Trim() switch
+    {
+        "Active" => ["UnderMaintenance", "OnLoan", "Lost", "Decommissioned"],
+        "UnderMaintenance" => ["Active", "Decommissioned"],
+        "OnLoan" => ["Active", "Lost", "Decommissioned"],
+        "Lost" => ["Active", "Decommissioned"],
+        _ => []
+    };
+
+    private static string FormatStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return "-";
+        }
+
+        return string.Concat(status.Select((character, index) =>
+            index > 0 && char.IsUpper(character) ? $" {character}" : character.ToString()));
+    }
+
+    private static string DocumentTypeLabel(string type)
+    {
+        const string prefix = "Document:";
+        if (type.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var label = type[prefix.Length..].Trim();
+            return string.IsNullOrWhiteSpace(label) ? "Equipment document" : label;
+        }
+
+        return "Maintenance record";
     }
 
     private static string FormatFileSize(long bytes)
@@ -390,6 +687,21 @@
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 
     private const long MaxMaintenanceDocumentBytes = 10 * 1024 * 1024;
+    private static readonly string[] DocumentTypeOptions =
+    [
+        "Purchase document",
+        "Warranty document",
+        "Instruction manual",
+        "Safety sheet",
+        "Calibration certificate",
+        "Vendor receipt",
+        "Other"
+    ];
+
+    private sealed record EquipmentDocumentView(
+        string TypeLabel,
+        DateTime OccurredAt,
+        MaintenanceLogDocumentDto Document);
 
     private sealed class DownloadUrlResponse
     {
