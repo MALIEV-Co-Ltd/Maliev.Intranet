@@ -846,6 +846,32 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalogListing_UsesUploadBasedMediaManager()
+    {
+        var listing = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor.css");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "CommerceController.cs");
+
+        Assert.Contains("<MudFileUpload T=\"IReadOnlyList<IBrowserFile>\"", listing, StringComparison.Ordinal);
+        Assert.Contains("FilesChanged=\"UploadMediaFilesAsync\"", listing, StringComparison.Ordinal);
+        Assert.Contains("FileUploadDropzone", listing, StringComparison.Ordinal);
+        Assert.Contains("Drop images here or click to upload", listing, StringComparison.Ordinal);
+        Assert.Contains("Primary image", listing, StringComparison.Ordinal);
+        Assert.Contains("SetPrimaryMedia", listing, StringComparison.Ordinal);
+        Assert.Contains("MoveMedia", listing, StringComparison.Ordinal);
+        Assert.Contains("draggable=\"true\"", listing, StringComparison.Ordinal);
+        Assert.Contains("@ondrop", listing, StringComparison.Ordinal);
+        Assert.DoesNotContain("@bind-Value=\"media.Url\" Label=\"Image URL\"", listing, StringComparison.Ordinal);
+
+        Assert.Contains(".commerce-media-dropzone", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-media-card", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-media-thumb", styles, StringComparison.Ordinal);
+
+        Assert.Contains("[HttpPost(\"products/media\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"products/media/{uploadId}\")]", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CommerceCatalog_UsesDedicatedCollectionsManagementPage()
     {
         var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");

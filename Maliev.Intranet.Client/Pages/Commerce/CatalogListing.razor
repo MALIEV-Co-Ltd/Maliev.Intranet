@@ -1,5 +1,8 @@
 @page "/commerce/catalog/new"
 @page "/commerce/catalog/{Handle}"
+@using System.Net.Http.Headers
+@using Microsoft.AspNetCore.Components.Forms
+@using Maliev.Intranet.Client.Components.Shared
 @attribute [RequirePermission(MalievPermissions.Commerce.ProductsRead)]
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -209,22 +212,88 @@
 
                     <PanelCard>
                         <div class="commerce-section-heading">
-                            <MudText Typo="Typo.h6">Media</MudText>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.AddPhotoAlternate" OnClick="AddMedia">Add image</MudButton>
+                            <div>
+                                <MudText Typo="Typo.h6">Media</MudText>
+                                <MudText Typo="Typo.caption">Primary image is shown first in the storefront.</MudText>
+                            </div>
+                            <MudText Typo="Typo.caption">@_productForm.Media.Count.ToString("N0") image(s)</MudText>
                         </div>
+                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                       FilesChanged="UploadMediaFilesAsync"
+                                       Accept=".jpg,.jpeg,.png,.webp"
+                                       MaximumFileCount="12"
+                                       Class="commerce-media-upload">
+                            <CustomContent Context="uploadContext">
+                                <div class="commerce-media-dropzone">
+                                    <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                                        Icon="@Icons.Material.Outlined.AddPhotoAlternate"
+                                                        Label="Drop images here or click to upload"
+                                                        SubLabel="JPG, PNG, WEBP"
+                                                        MaxFileSizeLabel="max 10 MB each"
+                                                        OnClick="@uploadContext.OpenFilePickerAsync"
+                                                        OnFilesDropped="@uploadContext.OpenFilePickerAsync" />
+                                </div>
+                            </CustomContent>
+                        </MudFileUpload>
+                        @if (_mediaUploading)
+                        {
+                            <div class="commerce-media-uploading">
+                                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                                <span>Uploading image media...</span>
+                            </div>
+                        }
                         @if (_productForm.Media.Count == 0)
                         {
                             <div class="commerce-bom-empty">No listing media configured.</div>
                         }
-                        @foreach (var media in _productForm.Media.OrderBy(media => media.SortOrder).ToList())
+                        <div class="commerce-media-list">
+                        @foreach (var media in OrderedMedia())
                         {
-                            <div class="commerce-media-row">
-                                <MudTextField @bind-Value="media.Url" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                <MudTextField @bind-Value="media.AltText" Label="Alt text" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                <MudNumericField @bind-Value="media.SortOrder" Label="Order" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveMedia(media))" />
+                            <div class="@GetMediaCardClass(media)"
+                                 draggable="true"
+                                 @ondragstart="@(() => OnMediaDragStart(media))"
+                                 @ondragend="ClearMediaDrag"
+                                 @ondragover:preventDefault="true"
+                                 @ondrop="@(() => OnMediaDrop(media))">
+                                <div class="commerce-media-thumb">
+                                    @if (!string.IsNullOrWhiteSpace(media.Url))
+                                    {
+                                        <img src="@media.Url" alt="@BuildMediaAlt(media)" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                    }
+                                    @if (IsPrimaryMedia(media))
+                                    {
+                                        <span class="commerce-media-primary">Primary image</span>
+                                    }
+                                </div>
+                                <div class="commerce-media-fields">
+                                    <MudTextField @bind-Value="media.AltText" Label="Alt text" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                    <span class="commerce-media-url" title="@media.Url">@media.Url</span>
+                                </div>
+                                <div class="commerce-media-actions">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
+                                                   Color="Color.Default"
+                                                   Size="Size.Small"
+                                                   Disabled="@IsPrimaryMedia(media)"
+                                                   OnClick="@(() => MoveMedia(media, -1))" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
+                                                   Color="Color.Default"
+                                                   Size="Size.Small"
+                                                   Disabled="@IsLastMedia(media)"
+                                                   OnClick="@(() => MoveMedia(media, 1))" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Star"
+                                                   Color="@(IsPrimaryMedia(media) ? Color.Primary : Color.Default)"
+                                                   Size="Size.Small"
+                                                   Disabled="@IsPrimaryMedia(media)"
+                                                   OnClick="@(() => SetPrimaryMedia(media))" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveMedia(media))" />
+                                </div>
                             </div>
                         }
+                        </div>
                     </PanelCard>
                 </MudItem>
             </MudGrid>
@@ -257,6 +326,11 @@
     private string BomCurrency => _productForm.BomItems.FirstOrDefault()?.Currency ?? _productForm.Variants.FirstOrDefault()?.Currency ?? "THB";
 
     private decimal BomTotal => _productForm.BomItems.Sum(BomLineTotal);
+
+    private bool _mediaUploading;
+    private CommerceProductMediaMutationRequest? _draggedMedia;
+    private const long MaxCommerceMediaFileSize = 10 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedCommerceMediaExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
 
     private int BomDrawingCount => _productForm.BomItems.Count(item => !string.IsNullOrWhiteSpace(item.DrawingUrl));
 
@@ -412,15 +486,72 @@
         _productForm.Variants.Remove(variant);
     }
 
-    private void AddMedia()
-    {
-        _productForm.Media.Add(new CommerceProductMediaMutationRequest { SortOrder = _productForm.Media.Count });
-    }
-
     private void RemoveMedia(CommerceProductMediaMutationRequest media)
     {
         _productForm.Media.Remove(media);
         NormalizeMediaSortOrders();
+    }
+
+    private async Task UploadMediaFilesAsync(IReadOnlyList<IBrowserFile> files)
+    {
+        var acceptedFiles = files
+            .Where(IsAcceptedCommerceMediaFile)
+            .Take(12)
+            .ToList();
+
+        if (acceptedFiles.Count == 0)
+        {
+            Snackbar.Add("Select JPG, PNG, or WEBP images up to 10 MB each.", Severity.Warning);
+            return;
+        }
+
+        _mediaUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            foreach (var file in acceptedFiles)
+            {
+                var stream = file.OpenReadStream(MaxCommerceMediaFileSize);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(GetCommerceMediaContentType(file));
+                content.Add(fileContent, "files", file.Name);
+            }
+
+            var handle = string.IsNullOrWhiteSpace(_productForm.Handle) ? "draft" : _productForm.Handle;
+            var response = await Http.PostAsync($"api/v1/commerce/products/media?handle={Uri.EscapeDataString(handle)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Image upload failed.", Severity.Warning);
+                return;
+            }
+
+            var uploads = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
+            foreach (var upload in uploads)
+            {
+                var url = FirstNonEmpty(upload.FileReference, upload.SignedUrl, upload.StoragePath);
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    continue;
+                }
+
+                _productForm.Media.Add(new CommerceProductMediaMutationRequest
+                {
+                    Url = url,
+                    AltText = BuildDefaultMediaAltText(upload.FileName),
+                    SortOrder = _productForm.Media.Count
+                });
+            }
+
+            NormalizeMediaSortOrders();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Image upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _mediaUploading = false;
+        }
     }
 
     private void AddBomItem()
@@ -476,6 +607,88 @@
         }
     }
 
+    private IReadOnlyList<CommerceProductMediaMutationRequest> OrderedMedia()
+    {
+        return _productForm.Media.OrderBy(media => media.SortOrder).ToList();
+    }
+
+    private bool IsPrimaryMedia(CommerceProductMediaMutationRequest media)
+    {
+        return ReferenceEquals(OrderedMedia().FirstOrDefault(), media);
+    }
+
+    private bool IsLastMedia(CommerceProductMediaMutationRequest media)
+    {
+        return ReferenceEquals(OrderedMedia().LastOrDefault(), media);
+    }
+
+    private void SetPrimaryMedia(CommerceProductMediaMutationRequest media)
+    {
+        var ordered = OrderedMedia().Where(item => !ReferenceEquals(item, media)).ToList();
+        ordered.Insert(0, media);
+        ApplyMediaOrder(ordered);
+    }
+
+    private void MoveMedia(CommerceProductMediaMutationRequest media, int direction)
+    {
+        var ordered = OrderedMedia().ToList();
+        var index = ordered.FindIndex(item => ReferenceEquals(item, media));
+        var newIndex = index + direction;
+        if (index < 0 || newIndex < 0 || newIndex >= ordered.Count)
+        {
+            return;
+        }
+
+        ordered.RemoveAt(index);
+        ordered.Insert(newIndex, media);
+        ApplyMediaOrder(ordered);
+    }
+
+    private void OnMediaDragStart(CommerceProductMediaMutationRequest media)
+    {
+        _draggedMedia = media;
+    }
+
+    private void OnMediaDrop(CommerceProductMediaMutationRequest media)
+    {
+        if (_draggedMedia is null || ReferenceEquals(_draggedMedia, media))
+        {
+            _draggedMedia = null;
+            return;
+        }
+
+        var ordered = OrderedMedia().ToList();
+        var dragged = _draggedMedia;
+        ordered.RemoveAll(item => ReferenceEquals(item, dragged));
+        var targetIndex = ordered.FindIndex(item => ReferenceEquals(item, media));
+        if (targetIndex < 0)
+        {
+            targetIndex = ordered.Count;
+        }
+
+        ordered.Insert(targetIndex, dragged);
+        ApplyMediaOrder(ordered);
+        _draggedMedia = null;
+    }
+
+    private void ClearMediaDrag()
+    {
+        _draggedMedia = null;
+    }
+
+    private void ApplyMediaOrder(IReadOnlyList<CommerceProductMediaMutationRequest> ordered)
+    {
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].SortOrder = index;
+        }
+    }
+
+    private string GetMediaCardClass(CommerceProductMediaMutationRequest media)
+    {
+        return $"commerce-media-card{(IsPrimaryMedia(media) ? " commerce-media-card--primary" : "")}";
+    }
+
     private static decimal BomLineTotal(CommerceProductBomItemMutationRequest item)
     {
         return decimal.Round(item.Quantity * item.UnitCost, 2, MidpointRounding.AwayFromZero);
@@ -495,6 +708,47 @@
     private static string BuildBomImageAlt(CommerceProductBomItemMutationRequest item)
     {
         return string.IsNullOrWhiteSpace(item.ItemName) ? "BOM item image" : $"{item.ItemName} image";
+    }
+
+    private static string BuildMediaAlt(CommerceProductMediaMutationRequest media)
+    {
+        return string.IsNullOrWhiteSpace(media.AltText) ? "Product image" : media.AltText;
+    }
+
+    private static string BuildDefaultMediaAltText(string fileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        return string.IsNullOrWhiteSpace(name)
+            ? "Product image"
+            : $"{name.Replace('-', ' ').Replace('_', ' ')} image";
+    }
+
+    private static bool IsAcceptedCommerceMediaFile(IBrowserFile file)
+    {
+        return file.Size is > 0 and <= MaxCommerceMediaFileSize
+            && AllowedCommerceMediaExtensions.Contains(Path.GetExtension(file.Name));
+    }
+
+    private static string GetCommerceMediaContentType(IBrowserFile file)
+    {
+        if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+            file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return file.ContentType;
+        }
+
+        return Path.GetExtension(file.Name).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static CommerceProductMutationRequest MapProduct(CommerceProductDto detail)

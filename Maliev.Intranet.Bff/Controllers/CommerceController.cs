@@ -11,6 +11,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Employee Commerce catalog management endpoints.
 /// </summary>
 /// <param name="client">Commerce service client.</param>
+/// <param name="uploadClient">Upload service client for product media assets.</param>
 /// <param name="pdfClient">PDF service client.</param>
 /// <param name="httpClientFactory">HTTP client factory for generated PDF downloads.</param>
 [ApiController]
@@ -18,9 +19,13 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/v{version:apiVersion}/commerce")]
 public sealed class CommerceController(
     CommerceServiceClient client,
+    UploadServiceClient uploadClient,
     PdfServiceClient? pdfClient = null,
     IHttpClientFactory? httpClientFactory = null) : ControllerBase
 {
+    private const long MaxProductMediaBytes = 10 * 1024 * 1024;
+    private static readonly HashSet<string> ProductMediaExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+
     /// <summary>
     /// Lists products, including drafts and archived listings.
     /// </summary>
@@ -127,6 +132,66 @@ public sealed class CommerceController(
     }
 
     /// <summary>
+    /// Uploads product media images to central storage and returns stable media references.
+    /// </summary>
+    [HttpPost("products/media")]
+    [RequirePermission(MalievPermissions.Commerce.ProductsUpdate, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<ActionResult<List<BffUploadResponse>>> UploadProductMedia(
+        [FromForm] List<IFormFile> files,
+        [FromQuery] string? handle,
+        CancellationToken cancellationToken)
+    {
+        if (files.Count == 0)
+        {
+            return BadRequest("No image files uploaded.");
+        }
+
+        var safeHandle = BuildSafeMediaHandle(handle);
+        var results = new List<BffUploadResponse>(files.Count);
+
+        foreach (var file in files)
+        {
+            if (file.Length is <= 0 or > MaxProductMediaBytes)
+            {
+                return BadRequest($"{file.FileName} must be between 1 byte and 10 MB.");
+            }
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!ProductMediaExtensions.Contains(extension))
+            {
+                return BadRequest($"{file.FileName} must be a JPG, PNG, or WEBP image.");
+            }
+
+            var safeFileName = BuildSafeMediaFileName(file.FileName);
+            var storagePath = $"commerce/products/{safeHandle}/media/{Guid.NewGuid():N}_{safeFileName}";
+            var contentType = GetProductMediaContentType(file, extension);
+
+            await using var stream = file.OpenReadStream();
+            var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, cancellationToken);
+            if (upload is null)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, $"Upload failed for {file.FileName}.");
+            }
+
+            upload.FileReference = BuildProductMediaReference(upload.UploadId);
+            results.Add(upload);
+        }
+
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Redirects a stored Commerce product media reference to a fresh signed storage URL.
+    /// </summary>
+    [HttpGet("products/media/{uploadId}")]
+    [RequirePermission(MalievPermissions.Commerce.ProductsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<IActionResult> GetProductMedia(string uploadId, CancellationToken cancellationToken)
+    {
+        var signedUrl = await uploadClient.GetDownloadUrlAsync(uploadId, cancellationToken);
+        return string.IsNullOrWhiteSpace(signedUrl) ? NotFound() : Redirect(signedUrl);
+    }
+
+    /// <summary>
     /// Archives a product listing.
     /// </summary>
     [HttpDelete("products/{id:guid}")]
@@ -228,6 +293,46 @@ public sealed class CommerceController(
     private static int CalculateBomItemSourcingDays(CommerceProductBomItemDto item)
     {
         return Math.Max(0, item.LeadTimeDays.GetValueOrDefault()) + Math.Max(0, item.SourcingTimeDays.GetValueOrDefault());
+    }
+
+    private static string BuildProductMediaReference(string uploadId)
+    {
+        return $"api/v1/commerce/products/media/{Uri.EscapeDataString(uploadId)}";
+    }
+
+    private static string BuildSafeMediaHandle(string? handle)
+    {
+        var source = string.IsNullOrWhiteSpace(handle) ? "draft" : handle;
+        var safe = new string(source
+            .Trim()
+            .ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) || character == '-' ? character : '-')
+            .ToArray());
+
+        return string.IsNullOrWhiteSpace(safe) ? "draft" : safe;
+    }
+
+    private static string BuildSafeMediaFileName(string fileName)
+    {
+        var name = Path.GetFileName(fileName);
+        return string.IsNullOrWhiteSpace(name) ? "product-media" : name;
+    }
+
+    private static string GetProductMediaContentType(IFormFile file, string extension)
+    {
+        if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+            file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return file.ContentType;
+        }
+
+        return extension.ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
     }
 
     private static string BuildBomDownloadFileName(string handle)
