@@ -847,6 +847,8 @@
 <ConfirmModal Open="@(_companyEdit is not null)"
               Title="Link company"
               ConfirmLabel="@CompanyConfirmLabel"
+              ConfirmDisabled="@CompanyConfirmDisabled"
+              ConfirmButtonClass="customer-company-save"
               Class="customer-modal-wide"
               OnCancel="CloseCompanyModalAsync"
               OnConfirm="SaveCompanyAsync">
@@ -920,6 +922,7 @@
     private bool _saving;
     private bool _postingNote;
     private bool _sendingEmail;
+    private bool _savingCompany;
     private bool _emailComposerOpen;
     private bool _emailQueued;
     private bool _emailTemplatesLoading;
@@ -999,7 +1002,10 @@
     private string PaymentTermTriggerUse => SelectedPaymentTerm is { } term
         ? PaymentTermUse(term)
         : "Keep this value when the customer uses a negotiated term that is not in the standard list.";
-    private string CompanyConfirmLabel => _companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link";
+    private string CompanyConfirmLabel => _savingCompany
+        ? (_companyEdit?.ExistingCompanyId is Guid ? "Linking..." : "Creating...")
+        : (_companyEdit?.ExistingCompanyId is Guid ? "Link company" : "Create and link");
+    private bool CompanyConfirmDisabled => _savingCompany || _saving;
     private string EmailConfirmLabel => _sendingEmail ? "Sending..." : _emailQueued ? "Queued" : "Send email";
     private bool EmailConfirmDisabled => _sendingEmail || _emailQueued;
     private bool EmailTemplateIsNew => _selectedEmailTemplateId is null;
@@ -2405,6 +2411,7 @@
 
     private Task CloseCompanyModalAsync()
     {
+        _savingCompany = false;
         _companyEdit = null;
         return Task.CompletedTask;
     }
@@ -2473,11 +2480,12 @@
 
     private async Task SaveCompanyAsync()
     {
-        if (_companyEdit is null || _edit is null)
+        if (_savingCompany || _companyEdit is null || _edit is null)
         {
             return;
         }
 
+        _savingCompany = true;
         try
         {
             Guid? companyId = _companyEdit.ExistingCompanyId;
@@ -2489,15 +2497,26 @@
                     return;
                 }
 
-                var response = await Http.PostAsJsonAsync("api/v1/companies", _companyEdit.ToCreateRequest());
-                if (!response.IsSuccessStatusCode)
+                companyId = await TryResolveExistingCompanyByTaxIdAsync(_companyEdit);
+                if (companyId is null)
                 {
-                    Snackbar.Add("Company could not be created.", Severity.Warning);
-                    return;
-                }
+                    var response = await Http.PostAsJsonAsync("api/v1/companies", _companyEdit.ToCreateRequest());
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        companyId = await TryResolveExistingCompanyByTaxIdAsync(_companyEdit);
+                        if (companyId is null)
+                        {
+                            Snackbar.Add("Company could not be created.", Severity.Warning);
+                            return;
+                        }
+                    }
 
-                var created = await response.Content.ReadFromJsonAsync<CompanyResponse>();
-                companyId = created?.Id;
+                    if (companyId is null)
+                    {
+                        var created = await response.Content.ReadFromJsonAsync<CompanyResponse>();
+                        companyId = created?.Id;
+                    }
+                }
             }
 
             if (companyId is null)
@@ -2518,6 +2537,58 @@
             Snackbar.Add("Company could not be linked.", Severity.Warning);
             Console.WriteLine(ex.Message);
         }
+        finally
+        {
+            _savingCompany = false;
+        }
+    }
+
+    private async Task<Guid?> TryResolveExistingCompanyByTaxIdAsync(CompanyEditModel company)
+    {
+        var taxId = NormalizeCompanyTaxId(company.VatNumber);
+        if (string.IsNullOrWhiteSpace(taxId))
+        {
+            taxId = NormalizeCompanyTaxId(company.RegistrationNumber);
+        }
+
+        if (string.IsNullOrWhiteSpace(taxId))
+        {
+            return null;
+        }
+
+        try
+        {
+            var matches = await Http.GetFromJsonAsync<List<CompanySearchResultDto>>($"api/v1/companies/search?query={Uri.EscapeDataString(taxId)}&limit=8") ?? [];
+            var match = matches.FirstOrDefault(candidate =>
+                candidate.Id is Guid &&
+                (CompanyTaxMatches(candidate.VatNumber, taxId) || CompanyTaxMatches(candidate.RegistrationNumber, taxId)));
+
+            if (match?.Id is Guid id)
+            {
+                ApplyCompany(match);
+                return id;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+
+        return null;
+    }
+
+    private static bool CompanyTaxMatches(string? value, string normalizedTaxId) =>
+        string.Equals(NormalizeCompanyTaxId(value), normalizedTaxId, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeCompanyTaxId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? value.Trim().ToUpperInvariant() : digits;
     }
 
     private static (string FirstName, string LastName) SplitName(string fullName)

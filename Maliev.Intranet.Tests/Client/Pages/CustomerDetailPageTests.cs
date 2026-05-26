@@ -21,12 +21,18 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly List<CustomerEmailRequest> _emailRequests = [];
     private readonly List<JsonDocument> _customerUpdatePayloads = [];
     private readonly List<JsonDocument> _addressCreatePayloads = [];
+    private readonly List<JsonDocument> _companyCreatePayloads = [];
     private readonly List<JsonDocument> _noteCreatePayloads = [];
     private readonly List<CreateNotificationTemplateRequest> _templateCreateRequests = [];
     private readonly List<(Guid Id, UpdateNotificationTemplateRequest Request)> _templateUpdateRequests = [];
+    private readonly Guid _createdCompanyId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    private readonly Guid _existingCompanyId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private readonly List<CompanySearchResultDto> _companySearchResults = [];
     private TaskCompletionSource<object?>? _notePostRelease;
+    private TaskCompletionSource<object?>? _companyCreateRelease;
     private bool _includeDuplicateDefaultBilling;
     private bool _projectResponseIsEmpty;
+    private bool _customerHasCompany = true;
 
     public CustomerDetailPageTests()
     {
@@ -278,6 +284,84 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Recipient name", cut.Markup);
         Assert.Contains("AI address lookup", cut.Markup);
         Assert.Contains("Country", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_CreateCompanyDisablesConfirmAndPreventsDuplicateSubmit()
+    {
+        _customerHasCompany = false;
+        _companyCreateRelease = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find(".customer-split-field .customer-inline-action").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Create and link", cut.Markup));
+
+        IElement CompanyModalInput(int index) => cut.Find(".customer-modal-wide")
+            .QuerySelectorAll("input.customer-input")
+            .ToList()[index];
+
+        CompanyModalInput(1).Input("บริษัท มาลีฟ จำกัด");
+        CompanyModalInput(2).Input("0195564002457");
+        CompanyModalInput(3).Input("0195564002457");
+        CompanyModalInput(4).Input("info@mali.com");
+        CompanyModalInput(5).Input("123124123121");
+
+        cut.Find("button.customer-company-save").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Single(_companyCreatePayloads);
+            var confirm = cut.Find("button.customer-company-save");
+            Assert.True(confirm.HasAttribute("disabled"));
+            Assert.Contains("Creating", confirm.TextContent);
+        });
+
+        _companyCreateRelease.SetResult(null);
+
+        cut.WaitForAssertion(() => Assert.Single(_customerUpdatePayloads));
+
+        var companyRequest = _companyCreatePayloads.Single().RootElement;
+        Assert.Equal("บริษัท มาลีฟ จำกัด", companyRequest.GetProperty("name").GetString());
+        Assert.Equal("0195564002457", companyRequest.GetProperty("vatNumber").GetString());
+
+        var customerUpdate = _customerUpdatePayloads.Single().RootElement;
+        Assert.Equal(_createdCompanyId, customerUpdate.GetProperty("companyId").GetGuid());
+    }
+
+    [Fact]
+    public void CustomerDetail_CreateCompanyLinksExistingCompanyWithMatchingTaxId()
+    {
+        _customerHasCompany = false;
+        _companySearchResults.Add(new CompanySearchResultDto
+        {
+            Id = _existingCompanyId,
+            Name = "บริษัท มาลีฟ จำกัด",
+            VatNumber = "0195564002457",
+            RegistrationNumber = "0195564002457",
+            Segment = "Retail",
+            Tier = "Bronze"
+        });
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find(".customer-split-field .customer-inline-action").Click();
+
+        IElement CompanyModalInput(int index) => cut.Find(".customer-modal-wide")
+            .QuerySelectorAll("input.customer-input")
+            .ToList()[index];
+
+        CompanyModalInput(1).Input("บริษัท มาลีฟ จำกัด");
+        CompanyModalInput(2).Input("0195564002457");
+        CompanyModalInput(3).Input("0195564002457");
+        cut.Find("button.customer-company-save").Click();
+
+        cut.WaitForAssertion(() => Assert.Single(_customerUpdatePayloads));
+
+        Assert.Empty(_companyCreatePayloads);
+        Assert.Contains(_requestedPaths, path => path.StartsWith("/api/v1/companies/search?query=0195564002457", StringComparison.Ordinal));
+        var customerUpdate = _customerUpdatePayloads.Single().RootElement;
+        Assert.Equal(_existingCompanyId, customerUpdate.GetProperty("companyId").GetGuid());
     }
 
     [Fact]
@@ -940,6 +1024,12 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         }
 
         if (request.Method == HttpMethod.Get &&
+            pathAndQuery.StartsWith("/api/v1/companies/search", StringComparison.Ordinal))
+        {
+            return Json(_companySearchResults);
+        }
+
+        if (request.Method == HttpMethod.Get &&
             pathAndQuery.Equals($"/api/v1/customers/{_customerId}", StringComparison.Ordinal))
         {
             var addresses = new List<AddressResponse>
@@ -1012,9 +1102,9 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                 ActiveOrdersCount = 2,
                 OpenQuotationsCount = 1,
                 CreatedAt = new DateTime(2023, 3, 12, 0, 0, 0, DateTimeKind.Utc),
-                CompanyId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
-                CompanyName = "Axion Robotics",
-                CompanyVatNumber = "EIN 87-2341098",
+                CompanyId = _customerHasCompany ? Guid.Parse("33333333-3333-3333-3333-333333333333") : null,
+                CompanyName = _customerHasCompany ? "Axion Robotics" : null,
+                CompanyVatNumber = _customerHasCompany ? "EIN 87-2341098" : null,
                 AccountManagerEmployeeId = _accountManagerId,
                 AccountManagerName = "Mia Wong",
                 CreatedByName = "Alex Kim",
@@ -1029,6 +1119,26 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
                     }
                 ]
             });
+        }
+
+        if (request.Method == HttpMethod.Post &&
+            pathAndQuery.Equals("/api/v1/companies", StringComparison.Ordinal))
+        {
+            var payload = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult() ?? "{}";
+            _companyCreatePayloads.Add(JsonDocument.Parse(payload));
+
+            var releaseTask = _companyCreateRelease?.Task ?? Task.CompletedTask;
+            return releaseTask.ContinueWith(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new CompanyResponse
+                {
+                    Id = _createdCompanyId,
+                    Name = "บริษัท มาลีฟ จำกัด",
+                    VatNumber = "0195564002457",
+                    Segment = "Retail",
+                    Tier = "Bronze"
+                })
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
 
         if (pathAndQuery.Equals($"/api/v1/customers/{_customerId}/email", StringComparison.Ordinal))
