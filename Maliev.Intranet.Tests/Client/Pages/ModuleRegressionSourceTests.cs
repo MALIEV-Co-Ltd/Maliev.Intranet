@@ -616,6 +616,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("<PanelCard Title=\"Suppliers\">", detail, StringComparison.Ordinal);
         Assert.Contains("BuildQrSvg", detail, StringComparison.Ordinal);
         Assert.Contains("QRCodeGenerator.GenerateQrCode", detail, StringComparison.Ordinal);
+        Assert.Contains("InventoryTrackingShortCode", detail, StringComparison.Ordinal);
+        Assert.Contains("Scan QR", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("InventoryTrackingCode", detail, StringComparison.Ordinal);
         Assert.Contains("ReceiveItemAsync", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/inventory/items", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/inventory/batches/status", detail, StringComparison.Ordinal);
@@ -633,6 +636,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("material-batch-summary", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-receive-form", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-qr-shell", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("::deep svg", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("white-space: nowrap;", detailStyles, StringComparison.Ordinal);
         Assert.Contains("50mm", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);

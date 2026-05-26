@@ -476,11 +476,12 @@
                             <strong>@_material.Name</strong>
                         </div>
                         <div class="material-qr-label-body">
-                            <div class="material-qr-shell" aria-label="@($"QR code for {InventoryTrackingCode}")">
+                            <div class="material-qr-shell" aria-label="@($"QR code for {InventoryTrackingShortCode}")">
                                 @MaterialQrSvg
                             </div>
                             <div class="material-label-copy">
-                                <code class="material-tracking-code">@InventoryTrackingCode</code>
+                                <span class="material-label-copy-caption">Scan QR</span>
+                                <code class="material-tracking-code">@InventoryTrackingShortCode</code>
                                 <span>@_material.SKU</span>
                             </div>
                         </div>
@@ -691,9 +692,9 @@
         ? "Not configured"
         : $"{_material.ReorderLevel:N0} {_material.Unit}";
 
-    private string InventoryTrackingCode => _material is null
+    private string InventoryTrackingShortCode => _material is null
         ? string.Empty
-        : $"MALIEV-MAT-{_material.Id:N}".ToUpperInvariant();
+        : $"MAT-{_material.Id:N}".ToUpperInvariant()[..12];
 
     private string MaterialRecordHref => _material is null
         ? $"/mfg/materials/{Id}"
