@@ -30,10 +30,10 @@
 
 .mlv-thumb-placeholder {
     align-items: center;
-    background: var(--mlv-surface-muted, #f3f4f6);
-    border: 1px solid var(--mlv-border, #d7dde6);
+    background: var(--maliev-panel-3);
+    border: 1px solid var(--maliev-border);
     border-radius: 6px;
-    color: var(--mlv-text-muted, #667085);
+    color: var(--maliev-muted);
     display: inline-flex;
     font-size: 0.68rem;
     font-weight: 700;
@@ -48,7 +48,7 @@
 }
 
 .catalog-product-row:hover {
-    background: var(--mlv-surface-muted, #f3f4f6);
+    background: var(--maliev-panel-3);
 }
 
 @media (max-width: 920px) {

@@ -24,6 +24,11 @@
     /* Accent tints */
     --maliev-accent-soft:   #f5f5f5;
     --maliev-accent-softer: #fafafa;
+    --maliev-primary-soft:  color-mix(in srgb, var(--mud-palette-primary) 12%, var(--maliev-panel));
+
+    /* High-contrast functional surfaces */
+    --maliev-barcode-bg:  #ffffff;
+    --maliev-barcode-ink: #111827;
 
     /* Status colours */
     --maliev-ok:          #007a3d;

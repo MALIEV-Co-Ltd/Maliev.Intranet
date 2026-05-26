@@ -1463,6 +1463,40 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ClientThemeInteractiveSurfaces_DoNotUseLightOnlyBackgrounds()
+    {
+        var designTokens = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "design-tokens.css");
+        var clientRoot = FindRepoDirectory("Maliev.Intranet.Client");
+        var offenders = new List<string>();
+        var unsafePrimaryBackgroundPattern = new Regex("background(?:-color)?\\s*:\\s*[^;]*var\\(--mud-palette-primary-lighten\\)[^;]*;", RegexOptions.IgnoreCase);
+        var legacyThemeFallbackPattern = new Regex("var\\(--mlv-(?:surface|surface-muted|border|text-muted|font-mono|shadow-sm)\\b", RegexOptions.IgnoreCase);
+
+        Assert.Contains("--maliev-primary-soft:", designTokens, StringComparison.Ordinal);
+
+        foreach (var file in EnumerateClientThemeSourceFiles(clientRoot))
+        {
+            var source = File.ReadAllText(file);
+
+            foreach (var match in unsafePrimaryBackgroundPattern.Matches(source).Cast<System.Text.RegularExpressions.Match>())
+            {
+                offenders.Add(FormatSourceOffender(clientRoot, file, source, match.Index, "primary-lighten background"));
+            }
+
+            if (source.Contains("mud-bg-primary-hover", StringComparison.Ordinal))
+            {
+                offenders.Add(FormatSourceOffender(clientRoot, file, source, source.IndexOf("mud-bg-primary-hover", StringComparison.Ordinal), "mud-bg-primary-hover"));
+            }
+
+            foreach (var match in legacyThemeFallbackPattern.Matches(source).Cast<System.Text.RegularExpressions.Match>())
+            {
+                offenders.Add(FormatSourceOffender(clientRoot, file, source, match.Index, "legacy mlv theme fallback"));
+            }
+        }
+
+        Assert.True(offenders.Count == 0, $"Interactive surfaces must use MALIEV theme tokens instead of light-only backgrounds:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+    }
+
+    [Fact]
     public void DesignFoundation_UsesGeistFontsAndOperationalAdaptation()
     {
         var clientHost = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "index.html");
@@ -1608,10 +1642,25 @@ public class ModuleRegressionSourceTests
         return Regex.IsMatch(block, "\\btype\\s*=\\s*\"(?:checkbox|radio|file|date|datetime-local|color)\"", RegexOptions.IgnoreCase);
     }
 
+    private static IEnumerable<string> EnumerateClientThemeSourceFiles(string clientRoot)
+    {
+        return Directory.EnumerateFiles(clientRoot, "*.*", SearchOption.AllDirectories)
+            .Where(file => file.EndsWith(".css", StringComparison.OrdinalIgnoreCase)
+                || file.EndsWith(".razor", StringComparison.OrdinalIgnoreCase))
+            .Where(file => !Path.GetRelativePath(clientRoot, file)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Any(part => string.Equals(part, "bin", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(part, "obj", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(part, "lib", StringComparison.OrdinalIgnoreCase)));
+    }
+
     private static string FormatInputOffender(string root, string file, string source, int index, string component)
+        => FormatSourceOffender(root, file, source, index, component);
+
+    private static string FormatSourceOffender(string root, string file, string source, int index, string label)
     {
         var line = source[..index].Count(c => c == '\n') + 1;
-        return $"{Path.GetRelativePath(root, file)}:{line} {component}";
+        return $"{Path.GetRelativePath(root, file)}:{line} {label}";
     }
 
     private static string ExtractCssBlock(string source, string selector)

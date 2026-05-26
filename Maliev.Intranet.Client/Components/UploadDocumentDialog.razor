@@ -19,7 +19,7 @@
                 <CustomContent>
                     <MudPaper Outlined="true"
                               @onclick="@context.OpenFilePickerAsync"
-                              Class="@($"relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "mud-border-primary mud-bg-primary-hover" : "mud-border-lines-default")}")"
+                              Class="@($"upload-document-dropzone relative d-flex flex-column align-center justify-center py-12 px-6 border-dashed border-2 rounded-xl transition-all {(_dragOver ? "upload-document-dropzone--active mud-border-primary" : "mud-border-lines-default")}")"
                               Style="cursor: pointer;"
                               @ondragenter="@(() => _dragOver = true)"
                               @ondragleave="@(() => _dragOver = false)"
@@ -164,6 +164,18 @@
         }
     </DialogActions>
 </MudDialog>
+
+<style>
+    .upload-document-dropzone {
+        background: var(--maliev-panel);
+        transition: border-color 0.15s, background 0.15s;
+    }
+
+    .upload-document-dropzone:hover,
+    .upload-document-dropzone--active {
+        background: var(--maliev-primary-soft);
+    }
+</style>
 
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
