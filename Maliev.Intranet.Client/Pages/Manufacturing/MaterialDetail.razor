@@ -47,7 +47,7 @@
         else
         {
             <StatBar Class="mb-4">
-                <StatTile Label="Stock" Value="@($"{_material.QuantityOnHand:N0} {_material.Unit}")" Color="@StockHealthColor" Subtext="@StockHealthText" />
+                <StatTile Label="Stock" Value="@StockDisplayText" Color="@StockHealthColor" Subtext="@StockHealthText" />
                 <StatTile Label="Unit price" Value="@_material.UnitPrice.ToString("N2")" />
                 <StatTile Label="Processes" Value="">
                     @if (MaterialProcesses.Count == 0)
@@ -91,7 +91,7 @@
                     <div class="material-inventory-status @InventoryStatusClass" role="status" aria-label="@StockHealthText">
                         <div>
                             <span class="material-section-eyebrow">Current stock</span>
-                            <strong>@_material.QuantityOnHand.ToString("N0") @_material.Unit</strong>
+                            <strong>@StockDisplayText</strong>
                         </div>
                         <span class="material-inventory-badge">@StockHealthLabel</span>
                     </div>
@@ -122,6 +122,22 @@
                         {
                             <MudSkeleton Height="16px" Width="75%" />
                             <MudSkeleton Height="16px" Width="45%" />
+                        }
+                        else if (HasTraceableStock)
+                        {
+                            <div>
+                                <span>Active items</span>
+                                <strong>@ActiveTraceableItemCount.ToString("N0")</strong>
+                            </div>
+                            <div>
+                                <span>Available stock</span>
+                                <strong>@TraceableStockDisplayText</strong>
+                            </div>
+                            <div>
+                                <span>Lowest item</span>
+                                <strong>@LowestTraceableItemText</strong>
+                            </div>
+                            <StatusBadge Status="@TraceableStockBadge" />
                         }
                         else if (_inventoryStatus is not null)
                         {
@@ -460,7 +476,7 @@
                         {
                             <div class="material-inventory-error" role="alert">@_inventoryError</div>
                         }
-                        <PrimaryButton Icon="@Icons.Material.Outlined.QrCode2" Disabled="@(!_canUpdateMaterial || _receivingItem)" OnClick="@ReceiveItemAsync">
+                        <PrimaryButton Icon="@Icons.Material.Outlined.QrCode2" Disabled="@(!CanReceiveItem)" OnClick="@ReceiveItemAsync">
                             @(_receivingItem ? "Receiving..." : "Receive item")
                         </PrimaryButton>
                     </div>
@@ -641,15 +657,73 @@
 
     private bool IsActiveMaterial => _material is not null && string.Equals(_material.Status, "Active", StringComparison.OrdinalIgnoreCase);
 
-    private bool IsOutOfStock => _material is { QuantityOnHand: <= 0 } && IsActiveMaterial;
+    private IEnumerable<InventoryItemDto> ActiveTraceableItems => _inventoryItems
+        .Where(item =>
+            item.RemainingQuantity > 0 &&
+            string.Equals(item.Status, "Active", StringComparison.OrdinalIgnoreCase));
+
+    private bool HasTraceableStock => ActiveTraceableItems.Any();
+
+    private int ActiveTraceableItemCount => ActiveTraceableItems.Count();
+
+    private bool IsOutOfStock => _material is { QuantityOnHand: <= 0 } && IsActiveMaterial && !HasTraceableStock;
 
     private bool IsLowStock => _material is not null
         && IsActiveMaterial
+        && !HasTraceableStock
         && _material.ReorderLevel > 0
         && _material.QuantityOnHand > 0
         && _material.QuantityOnHand <= _material.ReorderLevel;
 
     private decimal InventoryValue => (_material?.QuantityOnHand ?? 0) * (_material?.UnitPrice ?? 0);
+
+    private string StockDisplayText => HasTraceableStock
+        ? TraceableStockDisplayText
+        : _material is null
+            ? "-"
+            : $"{_material.QuantityOnHand:N0} {_material.Unit}";
+
+    private string TraceableStockDisplayText
+    {
+        get
+        {
+            var groups = ActiveTraceableItems
+                .GroupBy(item => string.IsNullOrWhiteSpace(item.QuantityUnit) ? "unit" : item.QuantityUnit.Trim())
+                .Select(group => new
+                {
+                    Unit = group.Key,
+                    Quantity = group.Sum(item => item.RemainingQuantity)
+                })
+                .OrderBy(group => group.Unit, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return groups.Count == 0
+                ? "0 stock"
+                : string.Join(" + ", groups.Select(group => FormatItemQuantity(group.Quantity, group.Unit)));
+        }
+    }
+
+    private string LowestTraceableItemText
+    {
+        get
+        {
+            var item = ActiveTraceableItems
+                .OrderBy(item => item.RemainingQuantity)
+                .ThenBy(item => item.TrackingCode, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            return item is null
+                ? "-"
+                : $"{item.TrackingCode} · {FormatItemQuantity(item.RemainingQuantity, item.QuantityUnit)}";
+        }
+    }
+
+    private string TraceableStockBadge => _inventoryStatus?.HasLowStockAlert == true ? "Low stock" : "Traceable";
+
+    private bool CanReceiveItem => _canUpdateMaterial
+        && !_receivingItem
+        && _receiveItem.InitialQuantity > 0
+        && !string.IsNullOrWhiteSpace(_receiveItem.Location);
 
     private string StockHealthLabel => _material switch
     {
@@ -664,6 +738,7 @@
     {
         null => "No material loaded",
         _ when !IsActiveMaterial => "Inactive material",
+        _ when HasTraceableStock => $"Traceable stock: {TraceableStockDisplayText}",
         _ when IsOutOfStock => "No stock available",
         _ when IsLowStock => $"Low stock. Reorder at {_material.ReorderLevel:N0} {_material.Unit}",
         _ when _material.ReorderLevel > 0 => $"Healthy. Reorder at {_material.ReorderLevel:N0} {_material.Unit}",

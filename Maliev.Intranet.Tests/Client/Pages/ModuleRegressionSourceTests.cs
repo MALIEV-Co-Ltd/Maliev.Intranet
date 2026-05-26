@@ -619,6 +619,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains("InventoryTrackingShortCode", detail, StringComparison.Ordinal);
         Assert.Contains("Scan QR", detail, StringComparison.Ordinal);
         Assert.DoesNotContain("InventoryTrackingCode", detail, StringComparison.Ordinal);
+        Assert.Contains("StockDisplayText", detail, StringComparison.Ordinal);
+        Assert.Contains("TraceableStockDisplayText", detail, StringComparison.Ordinal);
+        Assert.Contains("HasTraceableStock", detail, StringComparison.Ordinal);
+        Assert.Contains("CanReceiveItem", detail, StringComparison.Ordinal);
+        Assert.Contains("Active items", detail, StringComparison.Ordinal);
+        Assert.Contains("Available stock", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Disabled=\"@(!_canUpdateMaterial || _receivingItem)\"", detail, StringComparison.Ordinal);
         Assert.Contains("ReceiveItemAsync", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/inventory/items", detail, StringComparison.Ordinal);
         Assert.Contains("api/v1/inventory/batches/status", detail, StringComparison.Ordinal);
