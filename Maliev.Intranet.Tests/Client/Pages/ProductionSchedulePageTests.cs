@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 using Bunit;
@@ -224,6 +225,32 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             invocation => invocation.Identifier == "malievProductionSchedule.scrollCurrentTimeIntoView"));
     }
 
+    [Fact]
+    public void ProductionScheduleBoard_SlotsHaveHoverPreviewAndStayBehindMachineColumn()
+    {
+        var board = BuildBoard();
+
+        var cut = Render<ProductionScheduleBoard>(parameters => parameters
+            .Add(component => component.Board, board));
+        var css = ReadRepoFile("Maliev.Intranet.Client", "Components", "Production", "ProductionScheduleBoard.razor.css")
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains("psb-slot-preview", cut.Markup);
+        Assert.Contains("role=\"tooltip\"", cut.Markup);
+        Assert.Contains("Queue #1", cut.Markup);
+        Assert.Contains("bracket-left.stl", cut.Markup);
+        Assert.Contains("CNC Mill 01", cut.Markup);
+        Assert.Contains("CNC milling", cut.Markup);
+        Assert.Contains("2h", cut.Markup);
+
+        Assert.Contains("isolation: isolate;", ExtractCssBlock(css, ".production-schedule-board-shell {"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 30;", ExtractCssBlock(css, "\n.psb-machine-cell {"), StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;", ExtractCssBlock(css, ".psb-track {"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 18;", ExtractCssBlock(css, ".psb-slot:hover,"), StringComparison.Ordinal);
+        Assert.Contains(".psb-slot:hover .psb-slot-preview,", css, StringComparison.Ordinal);
+        Assert.Contains(".psb-slot:focus-visible .psb-slot-preview", css, StringComparison.Ordinal);
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
@@ -386,4 +413,61 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         {
             Content = JsonContent.Create(body)
         });
+
+    private static string ReadRepoFile(params string[] path)
+    {
+        var startDirectories = new[]
+        {
+            GetSourceDirectory(),
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory()
+        };
+
+        foreach (var startDirectory in startDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var current = new DirectoryInfo(startDirectory);
+            while (current is not null)
+            {
+                var candidate = Path.Combine(new[] { current.FullName }.Concat(path).ToArray());
+                if (File.Exists(candidate))
+                {
+                    return File.ReadAllText(candidate);
+                }
+
+                current = current.Parent;
+            }
+        }
+
+        throw new FileNotFoundException($"Unable to locate {Path.Combine(path)}.");
+    }
+
+    private static string ExtractCssBlock(string source, string marker)
+    {
+        var blockStart = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(blockStart >= 0, $"Expected CSS block '{marker}' to exist.");
+
+        var braceStart = source.IndexOf('{', blockStart);
+        Assert.True(braceStart >= blockStart, $"Expected CSS block '{marker}' to open with a brace.");
+
+        var depth = 0;
+        for (var index = braceStart; index < source.Length; index++)
+        {
+            depth += source[index] switch
+            {
+                '{' => 1,
+                '}' => -1,
+                _ => 0
+            };
+
+            if (depth == 0)
+            {
+                return source[blockStart..(index + 1)];
+            }
+        }
+
+        throw new InvalidOperationException($"Unable to find the end of CSS block '{marker}'.");
+    }
+
+    private static string GetSourceDirectory([CallerFilePath] string sourceFile = "")
+        => Path.GetDirectoryName(sourceFile) ?? Directory.GetCurrentDirectory();
 }

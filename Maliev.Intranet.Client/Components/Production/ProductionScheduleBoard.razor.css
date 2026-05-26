@@ -216,6 +216,7 @@
     flex: 1 1 auto;
     min-height: 260px;
     overflow: auto;
+    isolation: isolate;
     border: 1px solid var(--maliev-border);
     border-radius: var(--maliev-radius-md);
     background: var(--maliev-panel);
@@ -232,7 +233,7 @@
 .psb-grid-header {
     position: sticky;
     top: 0;
-    z-index: 6;
+    z-index: 40;
     min-height: 48px;
     border-bottom: 1px solid var(--maliev-border);
     background: var(--maliev-panel);
@@ -249,7 +250,7 @@
 .psb-machine-heading {
     position: sticky;
     left: 0;
-    z-index: 8;
+    z-index: 50;
     display: flex;
     align-items: center;
     padding: 0 14px;
@@ -291,7 +292,7 @@
 .psb-group-label {
     position: sticky;
     left: 0;
-    z-index: 5;
+    z-index: 30;
     display: flex;
     align-items: center;
     padding: 0 14px;
@@ -322,7 +323,7 @@
 .psb-machine-cell {
     position: sticky;
     left: 0;
-    z-index: 4;
+    z-index: 30;
     display: grid;
     align-content: center;
     gap: 2px;
@@ -356,14 +357,14 @@
     grid-column: 2 / -1;
     position: relative;
     min-height: 70px;
-    overflow: hidden;
+    overflow: visible;
     background: linear-gradient(180deg, rgba(148, 163, 184, 0.05), transparent);
 }
 
 .psb-now-overlay {
     position: absolute;
     inset: 48px 0 0;
-    z-index: 5;
+    z-index: 8;
     display: grid;
     pointer-events: none;
 }
@@ -469,6 +470,7 @@
 
 .psb-slot:hover,
 .psb-slot:focus-visible {
+    z-index: 18;
     outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 30%);
     outline-offset: 2px;
 }
@@ -487,6 +489,75 @@
 
 .psb-slot-time {
     opacity: 0.9;
+}
+
+.psb-slot-preview {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 20;
+    display: none;
+    gap: 8px;
+    width: max-content;
+    min-width: 220px;
+    max-width: min(22rem, 70vw);
+    padding: 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    box-shadow: var(--maliev-shadow-card);
+    pointer-events: none;
+}
+
+.psb-slot:hover .psb-slot-preview,
+.psb-slot:focus-visible .psb-slot-preview {
+    display: grid;
+}
+
+.psb-slot-preview::before {
+    position: absolute;
+    top: -5px;
+    left: 12px;
+    width: 8px;
+    height: 8px;
+    border-top: 1px solid var(--maliev-border);
+    border-left: 1px solid var(--maliev-border);
+    background: var(--maliev-panel);
+    content: "";
+    transform: rotate(45deg);
+}
+
+.psb-slot-preview-title {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.psb-slot-preview span:not(.psb-slot-preview-title) {
+    display: grid;
+    gap: 2px;
+}
+
+.psb-slot-preview strong,
+.psb-slot-preview small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.psb-slot-preview strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+}
+
+.psb-slot-preview small {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
 }
 
 .psb-slot-job {

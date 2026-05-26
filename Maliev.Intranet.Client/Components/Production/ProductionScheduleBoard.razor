@@ -194,6 +194,7 @@
                                         @ondragstart="@(() => StartDrag(slot))"
                                         @ondragend="ClearDrag"
                                         aria-label="@SlotAriaLabel(slot)"
+                                        aria-describedby="@SlotPreviewId(slot)"
                                         aria-disabled="@BoolText(IsLocked(slot))"
                                         data-slot-id="@slot.SlotId"
                                         data-job-id="@slot.JobId"
@@ -210,6 +211,32 @@
                                     {
                                         <span class="psb-slot-live">Now</span>
                                     }
+                                    <span id="@SlotPreviewId(slot)" class="psb-slot-preview" role="tooltip">
+                                        <span class="psb-slot-preview-title">@SlotTypeLabel(slot)</span>
+                                        <span>
+                                            <strong>@SlotLabel(slot)</strong>
+                                            <small>@FormatQueuePosition(slot)</small>
+                                        </span>
+                                        <span>
+                                            <strong>@FormatTechnology(slot.Technology)</strong>
+                                            <small>@slot.Status</small>
+                                        </span>
+                                        <span>
+                                            <strong>@slot.MachineName</strong>
+                                            <small>@FormatSlotDuration(slot)</small>
+                                        </span>
+                                        @if (!string.IsNullOrWhiteSpace(slot.FileName))
+                                        {
+                                            <span>
+                                                <strong>Part</strong>
+                                                <small>@slot.FileName</small>
+                                            </span>
+                                        }
+                                        <span>
+                                            <strong>Window</strong>
+                                            <small>@FormatSlotTime(slot)</small>
+                                        </span>
+                                    </span>
                                 </button>
                             }
                         </div>
@@ -699,6 +726,38 @@
 
     private static string SlotLabel(ProductionScheduleSlotDto slot) =>
         FirstNonEmpty(slot.Label, slot.FileName, FormatShortId(slot.JobId), FormatShortId(slot.HoldId), "Slot");
+
+    private static string SlotPreviewId(ProductionScheduleSlotDto slot) =>
+        $"psb-slot-preview-{slot.SlotId:N}";
+
+    private static string SlotTypeLabel(ProductionScheduleSlotDto slot) =>
+        slot.IsMaintenance
+            ? "Maintenance detail"
+            : slot.IsProposed
+                ? "Proposed slot detail"
+                : slot.IsHold
+                    ? "Planning hold detail"
+                    : "Queue detail";
+
+    private static string FormatQueuePosition(ProductionScheduleSlotDto slot) =>
+        slot.QueuePosition > 0 ? $"Queue #{slot.QueuePosition}" : "Queue position not set";
+
+    private static string FormatSlotDuration(ProductionScheduleSlotDto slot)
+    {
+        var duration = NormalizeUtc(slot.ScheduledEnd) - NormalizeUtc(slot.ScheduledStart);
+        if (duration <= TimeSpan.Zero)
+            return "Duration not set";
+
+        var hours = (int)duration.TotalHours;
+        var minutes = duration.Minutes;
+        return (hours, minutes) switch
+        {
+            (> 0, > 0) => $"{hours}h {minutes}m",
+            (> 0, _) => $"{hours}h",
+            (_, > 0) => $"{minutes}m",
+            _ => "Less than 1m"
+        };
+    }
 
     private static string SlotAriaLabel(ProductionScheduleSlotDto slot) =>
         $"{(slot.IsMaintenance ? "Maintenance" : slot.IsProposed ? "Proposed slot" : slot.IsHold ? "Planning hold" : "Job")} {SlotLabel(slot)} on {slot.MachineName}";
