@@ -43,6 +43,17 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void StatusBadge_UsesSuccessColorForPublishedState()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "StatusBadge.razor.css");
+        var successRule = ExtractRuleContaining(styles, ".status-active,");
+
+        Assert.Contains(".status-published", successRule, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-ok-bg);", successRule, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-ok);", successRule, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SharedSurfaces_UseShadowAsBorderCards()
     {
         var panelCard = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PanelCard.razor.css");
@@ -176,9 +187,26 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
                 return File.ReadAllText(candidate);
             }
 
+            var repoCandidate = Path.Combine(new[] { current.FullName, "Maliev.Intranet" }.Concat(relativeParts).ToArray());
+            if (File.Exists(repoCandidate))
+            {
+                return File.ReadAllText(repoCandidate);
+            }
+
             current = current.Parent;
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
+    }
+
+    private static string ExtractRuleContaining(string styles, string selector)
+    {
+        var ruleStart = styles.IndexOf(selector, StringComparison.Ordinal);
+        Assert.True(ruleStart >= 0, $"Expected selector '{selector}' to exist.");
+
+        var ruleEnd = styles.IndexOf('}', ruleStart);
+        Assert.True(ruleEnd > ruleStart, $"Expected selector '{selector}' to end with a CSS rule block.");
+
+        return styles[ruleStart..(ruleEnd + 1)];
     }
 }
