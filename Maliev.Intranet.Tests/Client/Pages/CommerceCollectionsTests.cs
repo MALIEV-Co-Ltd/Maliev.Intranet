@@ -86,6 +86,20 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsStyles_KeepEditorOpenListReadableAtDesktopWidth()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+        var desktopEditorBlock = ExtractCssBlock(styles, "@media (max-width: 1500px) and (min-width: 1181px) {");
+
+        Assert.Contains("grid-template-columns: minmax(20rem, 22rem) minmax(0, 1fr);", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collections-layout.editor-open .commerce-collection-row", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) auto;", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collections-layout.editor-open .commerce-collection-main", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-column: 1 / -1;", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-row: 1;", desktopEditorBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionEditorState_OpensOnlyForCreateOrEdit()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
@@ -209,6 +223,33 @@ public sealed class CommerceCollectionsTests
         Assert.True(elementEnd > markerIndex, $"Expected marker '{marker}' to end inside a self-closing element.");
 
         return source[elementStart..(elementEnd + 2)];
+    }
+
+    private static string ExtractCssBlock(string source, string marker)
+    {
+        var blockStart = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(blockStart >= 0, $"Expected CSS block '{marker}' to exist.");
+
+        var braceStart = source.IndexOf('{', blockStart);
+        Assert.True(braceStart >= blockStart, $"Expected CSS block '{marker}' to open with a brace.");
+
+        var depth = 0;
+        for (var index = braceStart; index < source.Length; index++)
+        {
+            depth += source[index] switch
+            {
+                '{' => 1,
+                '}' => -1,
+                _ => 0
+            };
+
+            if (depth == 0)
+            {
+                return source[blockStart..(index + 1)];
+            }
+        }
+
+        throw new InvalidOperationException($"Unable to find the end of CSS block '{marker}'.");
     }
 
     private static string GetSourceDirectory([CallerFilePath] string sourceFile = "")

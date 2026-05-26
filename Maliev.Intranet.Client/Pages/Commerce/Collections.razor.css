@@ -429,6 +429,34 @@
     display: none;
 }
 
+@media (max-width: 1500px) and (min-width: 1181px) {
+    .commerce-collections-layout.editor-open {
+        grid-template-columns: minmax(20rem, 22rem) minmax(0, 1fr);
+    }
+
+    .commerce-collections-layout.editor-open .commerce-collection-row {
+        align-items: start;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .commerce-collections-layout.editor-open .commerce-collection-main {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .commerce-collections-layout.editor-open .commerce-collection-thumb {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .commerce-collections-layout.editor-open .commerce-collection-row-actions {
+        align-self: center;
+        grid-column: 2;
+        grid-row: 2;
+        justify-content: flex-end;
+    }
+}
+
 @media (max-width: 1180px) {
     .commerce-collections-layout,
     .commerce-collections-layout.editor-open,
