@@ -436,6 +436,7 @@ public class ModuleRegressionSourceTests
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");
         var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoDetail.razor");
+        var suppliers = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor");
 
         Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
         Assert.Contains("pageSize={_pageSize}", list, StringComparison.Ordinal);
@@ -446,6 +447,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains(".purchasing-filter-left", listStyles, StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(200px, 1fr)", listStyles, StringComparison.Ordinal);
         Assert.Contains("::deep .purchasing-search-box input", listStyles, StringComparison.Ordinal);
+        Assert.Contains("api/v1/suppliers?page=1&pageSize=1", list, StringComparison.Ordinal);
+        Assert.Contains("CanCreatePurchaseOrder", list, StringComparison.Ordinal);
+        Assert.Contains("Create supplier first", list, StringComparison.Ordinal);
+        Assert.Contains("Disabled=\"true\" Class=\"purchasing-disabled-action\"", list, StringComparison.Ordinal);
+        Assert.Contains("purchasing-prerequisite-empty", listStyles, StringComparison.Ordinal);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"create\")]", suppliers, StringComparison.Ordinal);
         Assert.DoesNotContain("page=1&pageSize=50", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/purchasing/{Id:int}\"", detail, StringComparison.Ordinal);
         Assert.Contains("/approve", detail, StringComparison.Ordinal);

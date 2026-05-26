@@ -38,6 +38,31 @@
     min-height: 58px;
 }
 
+.purchasing-disabled-action {
+    pointer-events: none;
+}
+
+.purchasing-prerequisite-empty {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    max-width: 460px;
+    margin: 0 auto;
+    color: var(--maliev-muted);
+    line-height: 1.45;
+}
+
+.purchasing-prerequisite-empty strong {
+    color: var(--maliev-ink);
+}
+
+.purchasing-empty-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
 @media (max-width: 920px) {
     .purchasing-filter-toolbar {
         align-items: stretch;

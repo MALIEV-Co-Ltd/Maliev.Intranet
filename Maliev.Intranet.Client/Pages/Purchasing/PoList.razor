@@ -10,8 +10,15 @@
 
 <div class="mlv-module-shell">
     <ModuleHeader Title="Purchasing" Subtitle="Purchase orders, supplier commitments, approvals, and inbound receiving.">
-        <SecondaryButton Icon="@Icons.Material.Outlined.Business" Href="/purchasing/suppliers">Supplier Profiles</SecondaryButton>
-        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">New PO</PrimaryButton>
+        <SecondaryButton Icon="@Icons.Material.Outlined.Business" Href="@SupplierSetupHref">@SupplierActionLabel</SecondaryButton>
+        @if (CanCreatePurchaseOrder)
+        {
+            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">New PO</PrimaryButton>
+        }
+        else
+        {
+            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Disabled="true" Class="purchasing-disabled-action">New PO</PrimaryButton>
+        }
     </ModuleHeader>
 
     <PageBody>
@@ -19,7 +26,7 @@
             <StatTile Label="Matching POs" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="Page spend" Value="@_orders.Sum(o => o.TotalAmount).ToString("N2")" />
             <StatTile Label="Open" Value="@_orders.Count(o => IsOpenStatus(o.Status)).ToString("N0")" />
-            <StatTile Label="Suppliers" Value="@_orders.Select(o => o.SupplierId).Where(id => id > 0).Distinct().Count().ToString("N0")" />
+            <StatTile Label="Suppliers" Value="@_supplierTotal.ToString("N0")" />
         </StatBar>
 
         <div class="mlv-toolbar purchasing-filter-toolbar">
@@ -104,9 +111,30 @@
             else
             {
                 <div class="mlv-empty">
-                    No purchase orders match this view.
+                    @if (CanCreatePurchaseOrder)
+                    {
+                        <span>No purchase orders match this view.</span>
+                    }
+                    else
+                    {
+                        <div class="purchasing-prerequisite-empty">
+                            <MudIcon Icon="@Icons.Material.Outlined.Business" Size="Size.Medium" />
+                            <strong>Create a supplier before starting a purchase order.</strong>
+                            <span>Purchase orders need an approved supplier profile for routing, contact details, and procurement history.</span>
+                        </div>
+                    }
                     <div class="mt-3">
-                        <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">Create Purchase Order</PrimaryButton>
+                        @if (CanCreatePurchaseOrder)
+                        {
+                            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">Create Purchase Order</PrimaryButton>
+                        }
+                        else
+                        {
+                            <div class="purchasing-empty-actions">
+                                <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Disabled="true" Class="purchasing-disabled-action">Create Purchase Order</PrimaryButton>
+                                <SecondaryButton Icon="@Icons.Material.Outlined.AddBusiness" Href="@SupplierSetupHref">Create supplier first</SecondaryButton>
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -155,10 +183,17 @@
     private string? _orderType;
     private string? _search;
     private string _supplierIdText = string.Empty;
+    private int _supplierTotal;
     private int? _supplierId;
     private int? _orderId;
     private int _page = 1;
     private int _pageSize = 20;
+
+    private bool CanCreatePurchaseOrder => !_loading && _supplierTotal > 0;
+
+    private string SupplierActionLabel => _supplierTotal > 0 ? "Supplier Profiles" : "Create supplier first";
+
+    private const string SupplierSetupHref = "/purchasing/suppliers?create=true";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -245,11 +280,18 @@
 
         try
         {
-            var response = await Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>(BuildApiUrl(), ct);
+            var ordersTask = Http.GetFromJsonAsync<PagedResponse<PurchaseOrderDto>>(BuildApiUrl(), ct);
+            var suppliersTask = Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>("api/v1/suppliers?page=1&pageSize=1", ct);
+
+            await Task.WhenAll(ordersTask!, suppliersTask!);
+
+            var response = ordersTask.Result;
+            var supplierResponse = suppliersTask.Result;
             _orders = response?.Data.ToList() ?? [];
             _meta = response?.Meta ?? new();
             _meta.CurrentPage = _meta.CurrentPage == 0 ? _page : _meta.CurrentPage;
             _meta.PageSize = _meta.PageSize == 0 ? _pageSize : _meta.PageSize;
+            _supplierTotal = supplierResponse?.Meta.TotalItems ?? supplierResponse?.Data.Count() ?? 0;
         }
         catch (Exception ex)
         {
