@@ -26,12 +26,53 @@
     </PageHeader>
 
     <PageBody>
-        <StatBar Class="mb-4">
-            <StatTile Label="Collections" Value="@_collections.Count.ToString("N0")" />
-            <StatTile Label="Published" Value="@PublishedCount.ToString("N0")" />
-            <StatTile Label="Drafts" Value="@DraftCount.ToString("N0")" />
-            <StatTile Label="Selected" Value="@SelectedCollectionLabel" />
-        </StatBar>
+        <div class="commerce-collections-command-bar">
+            <div class="commerce-collections-status-group">
+                <span class="@WorkspaceStatusDotClass"></span>
+                <span class="commerce-collections-status-label">@WorkspaceStatusLabel</span>
+                <span class="commerce-collections-status-separator">+</span>
+                <span class="commerce-collections-saved-state">@WorkspaceSavedLabel</span>
+            </div>
+
+            <div class="commerce-collections-command-actions">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Outlined.OpenInNew"
+                           Disabled="@(!CanPreviewStorefront)"
+                           OnClick="PreviewStorefront">
+                    Preview storefront
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           EndIcon="@Icons.Material.Outlined.KeyboardArrowDown">
+                    More actions
+                </MudButton>
+                @if (IsCollectionEditorOpen)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="CloseCollectionEditor">
+                        Discard changes
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Outlined.Save"
+                               OnClick="SaveCollectionAsync"
+                               Disabled="@(!CanSaveCollection)">
+                        Save changes
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Outlined.Add"
+                               OnClick="StartNewCollection">
+                        New collection
+                    </MudButton>
+                }
+            </div>
+        </div>
 
         <div class="@CollectionsLayoutClass">
             <div class="commerce-collections-list-pane">
@@ -123,7 +164,8 @@
             @if (IsCollectionEditorOpen)
             {
                 <div class="commerce-collection-editor-pane">
-                    <PanelCard Class="commerce-collection-editor">
+                    <div class="commerce-collection-editor-grid">
+                    <PanelCard Class="commerce-collection-details-card">
                         <div class="commerce-collection-editor-head">
                             <div>
                                 <MudText Typo="Typo.h6">@EditorTitle</MudText>
@@ -256,36 +298,86 @@
                                       Margin="Margin.Dense"
                                       Immediate="true"
                                       Class="mt-3" />
-
-                        <div class="commerce-collection-publish-row">
-                            <MudSwitch @bind-Value="_collectionForm.IsPublished"
-                                       Color="Color.Primary"
-                                       Label="@PublishLabel" />
-                            <MudText Typo="Typo.caption">
-                                Storefront visibility state
-                            </MudText>
-                        </div>
-
-                        <div class="commerce-collection-actions">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Outlined.Save"
-                                       OnClick="SaveCollectionAsync"
-                                       Disabled="@(!CanSaveCollection)">
-                                Save collection
-                            </MudButton>
-                            @if (_editingCollectionId.HasValue)
-                            {
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Error"
-                                           StartIcon="@Icons.Material.Outlined.Unpublished"
-                                           OnClick="@(() => UnpublishCollectionAsync(_editingCollectionId.Value))"
-                                           Disabled="@(_saving || !_collectionForm.IsPublished)">
-                                    Unpublish
-                                </MudButton>
-                            }
-                        </div>
                     </PanelCard>
+
+                    <aside class="commerce-collection-side-rail">
+                        <section class="commerce-collection-side-section">
+                            <div class="commerce-collection-side-heading">
+                                <MudText Typo="Typo.subtitle2">Publishing status</MudText>
+                                <StatusBadge Status="@PublishLabel" />
+                            </div>
+                            <div class="commerce-collection-publish-row">
+                                <MudSwitch @bind-Value="_collectionForm.IsPublished"
+                                           Color="Color.Primary"
+                                           Label="@PublishLabel" />
+                                <MudText Typo="Typo.caption">
+                                    Storefront visibility state
+                                </MudText>
+                            </div>
+                        </section>
+
+                        <section class="commerce-collection-side-section">
+                            <div class="commerce-collection-side-heading">
+                                <MudText Typo="Typo.subtitle2">Storefront preview</MudText>
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Disabled="@(!CanPreviewStorefront)"
+                                           OnClick="PreviewStorefront">
+                                    View preview
+                                </MudButton>
+                            </div>
+                            <div class="commerce-collection-preview-card">
+                                <span class="commerce-collection-preview-thumb">
+                                    @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                    {
+                                        <img src="@_collectionForm.ImageUrl" alt="@CollectionImagePreviewAlt" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                    }
+                                </span>
+                                <div>
+                                    <MudText Typo="Typo.body2">@ActiveCollectionTitle</MudText>
+                                    <span class="commerce-collection-preview-url">@StorefrontPreviewUrl</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="commerce-collection-side-section">
+                            <div class="commerce-collection-side-heading">
+                                <MudText Typo="Typo.subtitle2">Collection health</MudText>
+                                <StatusBadge Status="@($"{_collections.Count:N0} total")" />
+                            </div>
+                            <div class="commerce-collection-metrics-grid">
+                                <span>
+                                    <strong>@PublishedCount.ToString("N0")</strong>
+                                    <small>Published</small>
+                                </span>
+                                <span>
+                                    <strong>@DraftCount.ToString("N0")</strong>
+                                    <small>Drafts</small>
+                                </span>
+                            </div>
+                        </section>
+                    </aside>
+                    </div>
+
+                    <div class="commerce-collection-mobile-actions">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   OnClick="CloseCollectionEditor">
+                            Discard
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Save"
+                                   OnClick="SaveCollectionAsync"
+                                   Disabled="@(!CanSaveCollection)">
+                            Save changes
+                        </MudButton>
+                    </div>
                 </div>
             }
         </div>
@@ -321,6 +413,24 @@
         ? (_editingCollectionId.HasValue ? "Editing" : "New")
         : "None";
 
+    private string WorkspaceStatusLabel => IsCollectionEditorOpen
+        ? PublishLabel
+        : $"{_collections.Count:N0} collections";
+
+    private string WorkspaceSavedLabel => _saving ? "Saving..." : "Saved just now";
+
+    private string WorkspaceStatusDotClass => _collectionForm.IsPublished
+        ? "commerce-collections-status-dot published"
+        : "commerce-collections-status-dot";
+
+    private string StorefrontPreviewUrl => string.IsNullOrWhiteSpace(_collectionForm.Handle)
+        ? "/shop?collection=collection-url-slug"
+        : $"/shop?collection={_collectionForm.Handle}";
+
+    private string ActiveCollectionTitle => string.IsNullOrWhiteSpace(_collectionForm.Title)
+        ? "Untitled collection"
+        : _collectionForm.Title;
+
     private string EditorTitle => _editingCollectionId.HasValue ? "Edit collection" : "New collection";
 
     private string EditorSubtitle => _editingCollectionId.HasValue
@@ -345,6 +455,9 @@
         && !string.IsNullOrWhiteSpace(_collectionForm.Title)
         && !string.IsNullOrWhiteSpace(_collectionForm.Handle)
         && !ShowCollectionHandleError;
+
+    private bool CanPreviewStorefront => IsCollectionEditorOpen
+        && !string.IsNullOrWhiteSpace(_collectionForm.Handle);
 
     protected override async Task OnInitializedAsync()
     {
@@ -671,6 +784,16 @@
     private void BackToCatalog()
     {
         Navigation.NavigateTo("/commerce/catalog");
+    }
+
+    private void PreviewStorefront()
+    {
+        if (!CanPreviewStorefront)
+        {
+            return;
+        }
+
+        Navigation.NavigateTo($"/shop?collection={Uri.EscapeDataString(_collectionForm.Handle)}", forceLoad: true);
     }
 
     private string CollectionRowClass(CommerceCollectionDto collection)

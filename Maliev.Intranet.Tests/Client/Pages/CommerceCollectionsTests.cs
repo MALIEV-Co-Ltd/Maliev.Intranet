@@ -56,6 +56,26 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_UsesReferenceManagementShell()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+
+        Assert.DoesNotContain("<StatBar Class=\"mb-4\">", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collections-command-bar", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collections-status-dot", collections, StringComparison.Ordinal);
+        Assert.Contains("Preview storefront", collections, StringComparison.Ordinal);
+        Assert.Contains("Save changes", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-details-card", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-editor-grid", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-side-rail", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-side-section", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-mobile-actions", collections, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 1180px)", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 640px)", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionEditorState_OpensOnlyForCreateOrEdit()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
