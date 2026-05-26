@@ -162,6 +162,9 @@
                             <strong>@machine.MachineName</strong>
                             <span>@FirstNonEmpty(machine.MachineId, machine.Category)</span>
                             <small>@FormatTechnology(machine.Technology)</small>
+                            <small class="psb-machine-availability" data-availability-state="@MachineAvailabilityState(machine)">
+                                @MachineAvailabilityText(machine)
+                            </small>
                         </div>
                         <div class="psb-track">
                             @if (IsDayView)
@@ -472,6 +475,30 @@
         machine.Slots
             .Where(slot => NormalizeUtc(slot.ScheduledEnd) > VisibleRangeStart && NormalizeUtc(slot.ScheduledStart) < VisibleRangeEnd)
             .OrderBy(slot => NormalizeUtc(slot.ScheduledStart));
+
+    private string MachineAvailabilityText(ProductionScheduleMachineDto machine)
+    {
+        var nextAvailableUtc = MachineNextAvailableUtc(machine);
+        if (nextAvailableUtc <= CurrentScheduleTimeUtc)
+            return "Ready now";
+
+        var local = nextAvailableUtc.ToLocalTime();
+        return $"Next free {local:MMM d, HH:mm}";
+    }
+
+    private string MachineAvailabilityState(ProductionScheduleMachineDto machine) =>
+        MachineNextAvailableUtc(machine) <= CurrentScheduleTimeUtc ? "ready" : "busy";
+
+    private DateTime MachineNextAvailableUtc(ProductionScheduleMachineDto machine)
+    {
+        var blockingSlots = machine.Slots
+            .Where(slot => !slot.IsProposed)
+            .Select(slot => NormalizeUtc(slot.ScheduledEnd))
+            .Where(end => end > CurrentScheduleTimeUtc)
+            .ToList();
+
+        return blockingSlots.Count == 0 ? CurrentScheduleTimeUtc : blockingSlots.Max();
+    }
 
     private string MachineRowClass(ProductionScheduleMachineDto machine) =>
         string.Equals(machine.MachineId, ResolvedFocusMachineId, StringComparison.OrdinalIgnoreCase)

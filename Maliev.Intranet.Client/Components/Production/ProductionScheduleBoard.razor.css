@@ -181,11 +181,12 @@
 }
 
 .psb-legend .job {
-    background: #4f46e5;
+    border-color: color-mix(in oklab, var(--maliev-info) 50%, var(--maliev-border));
+    background: color-mix(in oklab, var(--maliev-info) 48%, var(--maliev-panel));
 }
 
 .psb-legend .hold {
-    background: #0f766e;
+    background: color-mix(in oklab, var(--maliev-ok) 38%, var(--maliev-panel));
 }
 
 .psb-legend .now {
@@ -194,21 +195,21 @@
 }
 
 .psb-legend .maintenance {
-    background: #b45309;
+    background: color-mix(in oklab, var(--maliev-warn) 42%, var(--maliev-panel));
 }
 
 .psb-legend .proposed {
     border-style: dashed;
-    border-color: #2563eb;
-    background: rgba(37, 99, 235, 0.12);
+    border-color: color-mix(in oklab, var(--maliev-info) 70%, transparent);
+    background: color-mix(in oklab, var(--maliev-info) 12%, var(--maliev-panel));
 }
 
 .psb-legend .locked {
-    background: #94a3b8;
+    background: color-mix(in oklab, var(--maliev-muted) 42%, var(--maliev-panel));
 }
 
 .psb-legend .current {
-    background: #f59e0b;
+    background: color-mix(in oklab, var(--maliev-warn) 58%, var(--maliev-panel));
 }
 
 .production-schedule-board-shell {
@@ -323,7 +324,7 @@
 .psb-machine-cell {
     position: sticky;
     left: 0;
-    z-index: 30;
+    z-index: 80;
     display: grid;
     align-content: center;
     gap: 2px;
@@ -351,6 +352,17 @@
 .psb-machine-cell small {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
+}
+
+.psb-machine-availability {
+    margin-top: 3px;
+    color: var(--maliev-info) !important;
+    font-size: var(--maliev-font-nano) !important;
+    font-weight: 800;
+}
+
+.psb-machine-availability[data-availability-state="ready"] {
+    color: var(--maliev-ok) !important;
 }
 
 .psb-track {
@@ -450,7 +462,7 @@
 .psb-slot {
     position: absolute;
     top: 18px;
-    z-index: 2;
+    z-index: 4;
     display: grid;
     align-content: center;
     min-width: 28px;
@@ -458,6 +470,7 @@
     height: 34px;
     padding: 3px 7px;
     border: 1px solid transparent;
+    border-color: transparent;
     border-radius: var(--maliev-radius-sm);
     color: #fff;
     font: inherit;
@@ -470,9 +483,10 @@
 
 .psb-slot:hover,
 .psb-slot:focus-visible {
-    z-index: 18;
-    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 30%);
-    outline-offset: 2px;
+    z-index: 120;
+    border-color: color-mix(in oklab, var(--maliev-info) 60%, var(--maliev-border));
+    outline: 0;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
 }
 
 .psb-slot-label,
@@ -495,7 +509,7 @@
     position: absolute;
     top: calc(100% + 8px);
     left: 0;
-    z-index: 20;
+    z-index: 130;
     display: none;
     gap: 8px;
     width: max-content;
@@ -561,23 +575,24 @@
 }
 
 .psb-slot-job {
-    background: #4f46e5;
+    background: color-mix(in oklab, var(--maliev-info) 48%, var(--maliev-panel));
+    color: color-mix(in oklab, var(--maliev-ink) 90%, var(--maliev-info));
 }
 
 .psb-slot-hold {
-    background: #0f766e;
+    background: color-mix(in oklab, var(--maliev-ok) 38%, var(--maliev-panel));
+    color: color-mix(in oklab, var(--maliev-ink) 88%, var(--maliev-ok));
 }
 
 .psb-slot-maintenance {
-    border-color: #92400e;
-    background: #b45309;
+    background: color-mix(in oklab, var(--maliev-warn) 42%, var(--maliev-panel));
+    color: color-mix(in oklab, var(--maliev-ink) 86%, var(--maliev-warn));
 }
 
 .psb-slot-proposed {
-    border-color: #2563eb;
     border-style: dashed;
-    background: rgba(37, 99, 235, 0.15);
-    color: #1d4ed8;
+    background: color-mix(in oklab, var(--maliev-info) 14%, var(--maliev-panel));
+    color: var(--maliev-info);
     box-shadow: none;
 }
 
@@ -590,9 +605,8 @@
 }
 
 .psb-slot-running-now {
-    z-index: 4;
-    border-color: #dc2626;
-    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.46), 0 8px 18px rgba(15, 23, 42, 0.22);
+    z-index: 6;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
 }
 
 .psb-slot-live {
@@ -611,13 +625,13 @@
 }
 
 .psb-slot-locked {
-    background: #94a3b8;
+    background: color-mix(in oklab, var(--maliev-muted) 36%, var(--maliev-panel));
+    color: var(--maliev-ink);
     cursor: not-allowed;
 }
 
 .psb-slot-maintenance.psb-slot-locked {
-    border-color: #92400e;
-    background: #b45309;
+    background: color-mix(in oklab, var(--maliev-warn) 42%, var(--maliev-panel));
 }
 
 .psb-slot-move {

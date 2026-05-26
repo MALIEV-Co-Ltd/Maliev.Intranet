@@ -242,13 +242,26 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Contains("CNC Mill 01", cut.Markup);
         Assert.Contains("CNC milling", cut.Markup);
         Assert.Contains("2h", cut.Markup);
+        Assert.Contains("psb-machine-availability", cut.Markup);
+        Assert.Contains("data-availability-state=\"busy\"", cut.Markup);
+        Assert.Contains("Next free", cut.Markup);
 
         Assert.Contains("isolation: isolate;", ExtractCssBlock(css, ".production-schedule-board-shell {"), StringComparison.Ordinal);
-        Assert.Contains("z-index: 30;", ExtractCssBlock(css, "\n.psb-machine-cell {"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 80;", ExtractCssBlock(css, "\n.psb-machine-cell {"), StringComparison.Ordinal);
         Assert.Contains("overflow: visible;", ExtractCssBlock(css, ".psb-track {"), StringComparison.Ordinal);
-        Assert.Contains("z-index: 18;", ExtractCssBlock(css, ".psb-slot:hover,"), StringComparison.Ordinal);
+        Assert.Contains("border-color: transparent;", ExtractCssBlock(css, ".psb-slot {"), StringComparison.Ordinal);
+        Assert.Contains("background: color-mix(in oklab, var(--maliev-info) 48%, var(--maliev-panel));", ExtractCssBlock(css, ".psb-slot-job {"), StringComparison.Ordinal);
+        Assert.Contains("border-color: color-mix(in oklab, var(--maliev-info) 60%, var(--maliev-border));", ExtractCssBlock(css, ".psb-slot:hover,"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 120;", ExtractCssBlock(css, ".psb-slot:hover,"), StringComparison.Ordinal);
+        Assert.DoesNotContain("background: #4f46e5;", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("border-color: #92400e;", css, StringComparison.Ordinal);
         Assert.Contains(".psb-slot:hover .psb-slot-preview,", css, StringComparison.Ordinal);
         Assert.Contains(".psb-slot:focus-visible .psb-slot-preview", css, StringComparison.Ordinal);
+
+        var pageCss = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "ProductionSchedule.razor.css")
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains("z-index: 320;", ExtractCssBlock(pageCss, ".production-move-panel {"), StringComparison.Ordinal);
+        Assert.Contains("z-index: 310;", ExtractCssBlock(pageCss, ".production-slot-panel {"), StringComparison.Ordinal);
     }
 
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
