@@ -49,19 +49,38 @@
                     </div>
 
                     <div class="commerce-collection-form-grid">
-                        <MudTextField @bind-Value="_collectionForm.Title"
+                        <MudTextField T="string"
+                                      Value="_collectionForm.Title"
+                                      ValueChanged="OnCollectionTitleChanged"
                                       Label="Title"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
                                       Required="true"
                                       Immediate="true" />
-                        <MudTextField @bind-Value="_collectionForm.Handle"
-                                      Label="Handle"
+                        <MudTextField T="string"
+                                      Value="_collectionForm.Handle"
+                                      ValueChanged="OnCollectionHandleChanged"
+                                      Label="Storefront URL slug"
+                                      HelperText="@CollectionHandleHelperText"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
                                       Required="true"
-                                      Immediate="true" />
+                                      Immediate="true"
+                                      Error="@ShowCollectionHandleError"
+                                      ErrorText="Use lowercase letters, numbers, and hyphens only." />
                     </div>
+
+                    <div class="commerce-collection-slug-preview">
+                        <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
+                        <span>@CollectionUrlPreview</span>
+                    </div>
+
+                    @if (HandleChangedForPublishedCollection)
+                    {
+                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="commerce-collection-handle-warning">
+                            Changing this slug changes Web collection links and filters. Existing links using the old slug may stop matching this collection.
+                        </MudAlert>
+                    }
 
                     <MudTextField @bind-Value="_collectionForm.Description"
                                   Label="Description"
@@ -110,7 +129,7 @@
                     <div class="commerce-collections-list-head">
                         <div>
                             <MudText Typo="Typo.h6">Product collections</MudText>
-                            <MudText Typo="Typo.caption">Handles, descriptions, and publishing state</MudText>
+                            <MudText Typo="Typo.caption">URL slugs, descriptions, and publishing state</MudText>
                         </div>
                         <StatusBadge Status="@($"{_collections.Count:N0} total")" />
                     </div>
@@ -190,9 +209,11 @@
     private readonly List<CommerceCollectionDto> _collections = [];
     private CommerceCollectionMutationRequest _collectionForm = new();
     private Guid? _editingCollectionId;
+    private string? _originalCollectionHandle;
     private string? _collectionsLoadError;
     private bool _loadingCollections = true;
     private bool _saving;
+    private bool _handleManuallyEdited;
 
     private int PublishedCount => _collections.Count(collection => collection.IsPublished);
 
@@ -203,14 +224,29 @@
     private string EditorTitle => _editingCollectionId.HasValue ? "Edit collection" : "New collection";
 
     private string EditorSubtitle => _editingCollectionId.HasValue
-        ? "Title, handle, description, and publishing state."
+        ? "Title, URL slug, description, and publishing state."
         : "Collection identity and publishing state.";
 
     private string PublishLabel => _collectionForm.IsPublished ? "Published" : "Draft";
 
+    private string CollectionHandleHelperText => "Used by Web collection URLs and filters. Auto-generated from the title; edit only when the storefront URL should change.";
+
+    private string CollectionUrlPreview => string.IsNullOrWhiteSpace(_collectionForm.Handle)
+        ? "/shop?collection=collection-url-slug"
+        : $"/shop?collection={_collectionForm.Handle}";
+
+    private bool ShowCollectionHandleError => !string.IsNullOrWhiteSpace(_collectionForm.Handle)
+        && !string.Equals(_collectionForm.Handle, BuildCollectionHandle(_collectionForm.Handle), StringComparison.Ordinal);
+
+    private bool HandleChangedForPublishedCollection => _editingCollectionId.HasValue
+        && _collectionForm.IsPublished
+        && !string.IsNullOrWhiteSpace(_originalCollectionHandle)
+        && !string.Equals(_originalCollectionHandle, _collectionForm.Handle, StringComparison.OrdinalIgnoreCase);
+
     private bool CanSaveCollection => !_saving
         && !string.IsNullOrWhiteSpace(_collectionForm.Title)
-        && !string.IsNullOrWhiteSpace(_collectionForm.Handle);
+        && !string.IsNullOrWhiteSpace(_collectionForm.Handle)
+        && !ShowCollectionHandleError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -245,6 +281,7 @@
 
     private async Task SaveCollectionAsync()
     {
+        EnsureCollectionHandle();
         if (!CanSaveCollection)
         {
             return;
@@ -311,12 +348,16 @@
     private void StartNewCollection()
     {
         _editingCollectionId = null;
+        _originalCollectionHandle = null;
+        _handleManuallyEdited = false;
         _collectionForm = new CommerceCollectionMutationRequest();
     }
 
     private void SelectCollection(CommerceCollectionDto collection)
     {
         _editingCollectionId = collection.Id;
+        _originalCollectionHandle = collection.Handle;
+        _handleManuallyEdited = true;
         _collectionForm = new CommerceCollectionMutationRequest
         {
             Handle = collection.Handle,
@@ -324,6 +365,60 @@
             Description = collection.Description,
             IsPublished = collection.IsPublished
         };
+    }
+
+    private void OnCollectionTitleChanged(string title)
+    {
+        _collectionForm.Title = title ?? string.Empty;
+        if ((!_editingCollectionId.HasValue && !_handleManuallyEdited) || string.IsNullOrWhiteSpace(_collectionForm.Handle))
+        {
+            _collectionForm.Handle = BuildCollectionHandle(_collectionForm.Title);
+        }
+    }
+
+    private void OnCollectionHandleChanged(string handle)
+    {
+        _handleManuallyEdited = true;
+        _collectionForm.Handle = BuildCollectionHandle(handle);
+    }
+
+    private void EnsureCollectionHandle()
+    {
+        var normalized = BuildCollectionHandle(_collectionForm.Handle);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            normalized = BuildCollectionHandle(_collectionForm.Title);
+        }
+
+        _collectionForm.Handle = normalized;
+    }
+
+    private static string BuildCollectionHandle(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new System.Text.StringBuilder();
+        var lastWasHyphen = false;
+        foreach (var character in value.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(character);
+                lastWasHyphen = false;
+                continue;
+            }
+
+            if ((char.IsWhiteSpace(character) || character is '-' or '_') && !lastWasHyphen && builder.Length > 0)
+            {
+                builder.Append('-');
+                lastWasHyphen = true;
+            }
+        }
+
+        return builder.ToString().Trim('-');
     }
 
     private void BackToCatalog()
