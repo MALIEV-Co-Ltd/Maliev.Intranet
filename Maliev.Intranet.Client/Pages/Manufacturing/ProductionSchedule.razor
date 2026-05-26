@@ -239,6 +239,100 @@
                             }
                         </div>
 
+                        <div class="production-material-item-workflow" aria-label="Exact material item traceability">
+                            <div class="production-slot-section-title">
+                                <MudIcon Icon="@Icons.Material.Outlined.QrCodeScanner" Size="Size.Small" />
+                                <span>Exact stock item</span>
+                            </div>
+
+                            <div class="production-material-scan-row">
+                                <label class="production-job-field">
+                                    <span>Scan QR / tracking code</span>
+                                    <input value="@_materialScanCode"
+                                           @oninput="OnMaterialScanChanged"
+                                           placeholder="Scan item QR or paste tracking code"
+                                           disabled="@(_scanningMaterialItem || _recordingMaterialUse)" />
+                                </label>
+                                <SecondaryButton Icon="@Icons.Material.Outlined.QrCodeScanner"
+                                                 Disabled="@(_scanningMaterialItem || string.IsNullOrWhiteSpace(_materialScanCode))"
+                                                 OnClick="@ScanMaterialItemAsync">
+                                    @(_scanningMaterialItem ? "Scanning..." : "Scan item")
+                                </SecondaryButton>
+                            </div>
+
+                            <label class="production-job-field">
+                                <span>Active item</span>
+                                <select value="@SelectedInventoryItemValue"
+                                        @onchange="OnJobInventoryItemChanged"
+                                        disabled="@(_recordingMaterialUse || _jobInventoryItems.Count == 0)">
+                                    <option value="">Select stock item</option>
+                                    @foreach (var inventoryItem in _jobInventoryItems)
+                                    {
+                                        <option value="@inventoryItem.TrackingCode">@InventoryItemOptionLabel(inventoryItem)</option>
+                                    }
+                                </select>
+                            </label>
+
+                            @if (!string.IsNullOrWhiteSpace(_materialTraceError))
+                            {
+                                <div class="production-slot-error" role="alert">@_materialTraceError</div>
+                            }
+
+                            @if (_selectedInventoryItem is { } selectedItem)
+                            {
+                                <div class="production-material-item-card">
+                                    <div>
+                                        <span>Tracking code</span>
+                                        <strong>@selectedItem.TrackingCode</strong>
+                                        <small>@FormatInventoryItemSummary(selectedItem)</small>
+                                    </div>
+                                    <dl class="production-slot-facts">
+                                        <div>
+                                            <dt>Remaining</dt>
+                                            <dd>@FormatInventoryQuantity(selectedItem.RemainingQuantity, selectedItem.QuantityUnit)</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Location</dt>
+                                            <dd>@FirstNonEmpty(selectedItem.Location, "Not stored")</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Lot</dt>
+                                            <dd>@FirstNonEmpty(selectedItem.LotNumber, "Not recorded")</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Dimensions</dt>
+                                            <dd>@FormatInventoryDimensions(selectedItem)</dd>
+                                        </div>
+                                    </dl>
+                                </div>
+
+                                <div class="production-material-use-row">
+                                    <label class="production-job-field">
+                                        <span>Quantity used (@selectedItem.QuantityUnit)</span>
+                                        <input type="number"
+                                               min="0.01"
+                                               step="0.01"
+                                               value="@FormatDecimalInput(_materialConsumeQuantity)"
+                                               @oninput="OnMaterialConsumeQuantityChanged"
+                                               disabled="@_recordingMaterialUse" />
+                                    </label>
+                                    <PrimaryButton Icon="@Icons.Material.Outlined.Inventory2"
+                                                   Busy="@_recordingMaterialUse"
+                                                   BusyLabel="Recording..."
+                                                   Disabled="@(!CanRecordMaterialUse)"
+                                                   OnClick="@RecordMaterialUseAsync">
+                                        Record material use
+                                    </PrimaryButton>
+                                </div>
+                            }
+                            else if (_jobEditModel?.MaterialId is not null)
+                            {
+                                <div class="production-material-item-empty">
+                                    No active QR-labeled stock item is selected for this job material.
+                                </div>
+                            }
+                        </div>
+
                         <div class="production-job-actions">
                             <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@(!CanSaveJobDetails)" OnClick="@SaveJobDetailsAsync">
                                 @(_savingJobDetails ? "Saving..." : "Save job details")
@@ -348,20 +442,27 @@
     private CustomerSummaryDto? _jobCustomer;
     private List<MaterialSummaryDto> _materialOptions = [];
     private List<EmployeeSummaryDto> _employeeOptions = [];
+    private List<InventoryItemDto> _jobInventoryItems = [];
     private MaterialInventoryStatusDto? _jobInventoryStatus;
+    private InventoryItemDto? _selectedInventoryItem;
     private string _moveMachineId = string.Empty;
+    private string _materialScanCode = string.Empty;
     private DateTime _moveStartLocal;
     private DateTime _moveEndLocal;
     private int? _moveQueuePosition;
+    private decimal? _materialConsumeQuantity;
     private bool _moveCascade = true;
     private bool _loading = true;
     private bool _loadingSlotDetails;
     private bool _loadingJobReferences;
     private bool _savingMove;
     private bool _savingJobDetails;
+    private bool _scanningMaterialItem;
+    private bool _recordingMaterialUse;
     private string? _error;
     private string? _slotDetailsError;
     private string? _jobDetailsEditError;
+    private string? _materialTraceError;
     private string? _moveError;
     private DateTime _rangeStartUtc = DateTime.UtcNow.Date;
 
@@ -400,6 +501,14 @@
         && _jobEditModel is not null
         && !_savingJobDetails
         && !_loadingJobReferences;
+
+    private bool CanRecordMaterialUse => _selectedJobDetail is not null
+        && _selectedInventoryItem is not null
+        && !_recordingMaterialUse
+        && _materialConsumeQuantity is > 0
+        && _materialConsumeQuantity <= _selectedInventoryItem.RemainingQuantity;
+
+    private string SelectedInventoryItemValue => _selectedInventoryItem?.TrackingCode ?? string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -447,8 +556,13 @@
         _jobEditModel = null;
         _jobCustomer = null;
         _jobInventoryStatus = null;
+        _jobInventoryItems = [];
+        _selectedInventoryItem = null;
+        _materialScanCode = string.Empty;
+        _materialConsumeQuantity = null;
         _slotDetailsError = null;
         _jobDetailsEditError = null;
+        _materialTraceError = null;
 
         if (slot.JobId is not Guid jobId)
             return;
@@ -504,10 +618,17 @@
         _jobEditModel = null;
         _jobCustomer = null;
         _jobInventoryStatus = null;
+        _jobInventoryItems = [];
+        _selectedInventoryItem = null;
+        _materialScanCode = string.Empty;
+        _materialConsumeQuantity = null;
         _jobDetailsEditError = null;
+        _materialTraceError = null;
         _slotDetailsError = null;
         _loadingSlotDetails = false;
         _loadingJobReferences = false;
+        _scanningMaterialItem = false;
+        _recordingMaterialUse = false;
     }
 
     private async Task CancelMoveClickedAsync(MouseEventArgs _)
@@ -618,6 +739,11 @@
             _jobEditModel = null;
             _jobCustomer = null;
             _jobInventoryStatus = null;
+            _jobInventoryItems = [];
+            _selectedInventoryItem = null;
+            _materialScanCode = string.Empty;
+            _materialConsumeQuantity = null;
+            _materialTraceError = null;
             return;
         }
 
@@ -680,20 +806,44 @@
     private async Task LoadJobMaterialInventoryAsync(Guid? materialId)
     {
         _jobInventoryStatus = null;
+        _jobInventoryItems = [];
         if (materialId is not { } value)
         {
+            _selectedInventoryItem = null;
             return;
         }
 
         try
         {
-            var response = await Http.GetFromJsonAsync<List<MaterialInventoryStatusDto>>(
-                $"api/v1/inventory/batches/status?materialId={Uri.EscapeDataString(value.ToString())}&status=Active");
-            _jobInventoryStatus = response?.FirstOrDefault(status => status.MaterialId == value);
+            var encodedMaterialId = Uri.EscapeDataString(value.ToString());
+            var statusTask = Http.GetFromJsonAsync<List<MaterialInventoryStatusDto>>(
+                $"api/v1/inventory/batches/status?materialId={encodedMaterialId}&status=Active");
+            var itemsTask = Http.GetFromJsonAsync<List<InventoryItemDto>>(
+                $"api/v1/inventory/items?materialId={encodedMaterialId}&status=Active");
+
+            await Task.WhenAll(statusTask, itemsTask);
+
+            _jobInventoryStatus = statusTask.Result?.FirstOrDefault(status => status.MaterialId == value);
+            _jobInventoryItems = (itemsTask.Result ?? [])
+                .OrderBy(item => item.Location, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.TrackingCode, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (_selectedInventoryItem is { } selected)
+            {
+                _selectedInventoryItem = _jobInventoryItems.FirstOrDefault(item =>
+                    string.Equals(item.TrackingCode, selected.TrackingCode, StringComparison.OrdinalIgnoreCase));
+                if (_selectedInventoryItem is null)
+                {
+                    _materialScanCode = string.Empty;
+                    _materialConsumeQuantity = null;
+                }
+            }
         }
         catch
         {
             _jobInventoryStatus = null;
+            _jobInventoryItems = [];
         }
     }
 
@@ -744,6 +894,10 @@
         _jobEditModel.MaterialId = Guid.TryParse(e.Value?.ToString(), out var materialId)
             ? materialId
             : null;
+        _selectedInventoryItem = null;
+        _materialScanCode = string.Empty;
+        _materialConsumeQuantity = null;
+        _materialTraceError = null;
         await LoadJobMaterialInventoryAsync(_jobEditModel.MaterialId);
     }
 
@@ -754,6 +908,163 @@
             _jobEditModel.Operator = string.IsNullOrWhiteSpace(e.Value?.ToString())
                 ? null
                 : e.Value.ToString();
+        }
+    }
+
+    private void OnMaterialScanChanged(ChangeEventArgs e)
+    {
+        _materialScanCode = e.Value?.ToString() ?? string.Empty;
+        _materialTraceError = null;
+    }
+
+    private void OnMaterialConsumeQuantityChanged(ChangeEventArgs e)
+    {
+        _materialTraceError = null;
+        _materialConsumeQuantity = decimal.TryParse(e.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
+    }
+
+    private async Task OnJobInventoryItemChanged(ChangeEventArgs e)
+    {
+        _materialTraceError = null;
+        var trackingCode = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(trackingCode))
+        {
+            _selectedInventoryItem = null;
+            _materialScanCode = string.Empty;
+            _materialConsumeQuantity = null;
+            return;
+        }
+
+        var item = _jobInventoryItems.FirstOrDefault(candidate =>
+            string.Equals(candidate.TrackingCode, trackingCode, StringComparison.OrdinalIgnoreCase));
+        if (item is not null)
+        {
+            await AcceptInventoryItemAsync(item, loadMaterialInventory: false);
+        }
+    }
+
+    private async Task ScanMaterialItemAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_materialScanCode))
+        {
+            _materialTraceError = "Scan the QR label or enter the printed tracking code.";
+            return;
+        }
+
+        _scanningMaterialItem = true;
+        _materialTraceError = null;
+        try
+        {
+            var item = await Http.GetFromJsonAsync<InventoryItemDto>(
+                $"api/v1/inventory/items/lookup?code={Uri.EscapeDataString(_materialScanCode.Trim())}");
+
+            if (item is null)
+            {
+                _materialTraceError = "No inventory item matched that scan.";
+                return;
+            }
+
+            await AcceptInventoryItemAsync(item, loadMaterialInventory: true);
+        }
+        catch (Exception ex)
+        {
+            _materialTraceError = $"Material item could not be scanned: {ex.Message}";
+        }
+        finally
+        {
+            _scanningMaterialItem = false;
+        }
+    }
+
+    private async Task AcceptInventoryItemAsync(InventoryItemDto item, bool loadMaterialInventory)
+    {
+        if (_jobEditModel is not null)
+        {
+            if (_jobEditModel.MaterialId is { } selectedMaterialId && selectedMaterialId != item.MaterialId)
+            {
+                _materialTraceError = "The scanned item belongs to a different material. Change the job material before recording usage.";
+                return;
+            }
+
+            if (_jobEditModel.MaterialId is null)
+            {
+                _jobEditModel.MaterialId = item.MaterialId;
+                loadMaterialInventory = true;
+            }
+        }
+
+        if (loadMaterialInventory)
+        {
+            await LoadJobMaterialInventoryAsync(item.MaterialId);
+        }
+
+        _selectedInventoryItem = _jobInventoryItems.FirstOrDefault(candidate =>
+                string.Equals(candidate.TrackingCode, item.TrackingCode, StringComparison.OrdinalIgnoreCase))
+            ?? item;
+        _materialScanCode = item.TrackingCode;
+        _materialConsumeQuantity = null;
+        _materialTraceError = null;
+    }
+
+    private async Task RecordMaterialUseAsync(MouseEventArgs _)
+    {
+        if (_selectedJobDetail is null || _selectedInventoryItem is null || _materialConsumeQuantity is not > 0)
+        {
+            _materialTraceError = "Select a material item and enter the quantity used.";
+            return;
+        }
+
+        if (_materialConsumeQuantity > _selectedInventoryItem.RemainingQuantity)
+        {
+            _materialTraceError = "Quantity used cannot exceed the selected item's remaining stock.";
+            return;
+        }
+
+        _recordingMaterialUse = true;
+        _materialTraceError = null;
+        try
+        {
+            var trackingCode = Uri.EscapeDataString(_selectedInventoryItem.TrackingCode);
+            var response = await Http.PostAsJsonAsync(
+                $"api/v1/inventory/items/{trackingCode}/consume",
+                new ConsumeInventoryItemRequest
+                {
+                    JobId = _selectedJobDetail.Id,
+                    OperatorId = _jobEditModel?.Operator,
+                    MachineId = _selectedSlot?.MachineId,
+                    QuantityConsumed = _materialConsumeQuantity.Value,
+                    Notes = $"Consumed for job {FirstNonEmpty(_selectedJobDetail.JobNumber, _selectedJobDetail.Id.ToString("N")[..8].ToUpperInvariant())}."
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _materialTraceError = await ReadScheduleErrorAsync(response);
+                return;
+            }
+
+            var updatedItem = await response.Content.ReadFromJsonAsync<InventoryItemDto>();
+            if (updatedItem is not null)
+            {
+                _selectedInventoryItem = updatedItem;
+                _materialScanCode = updatedItem.TrackingCode;
+                await LoadJobMaterialInventoryAsync(updatedItem.MaterialId);
+                _selectedInventoryItem = _jobInventoryItems.FirstOrDefault(item =>
+                        string.Equals(item.TrackingCode, updatedItem.TrackingCode, StringComparison.OrdinalIgnoreCase))
+                    ?? updatedItem;
+            }
+
+            _materialConsumeQuantity = null;
+            Snackbar.Add("Material use recorded for this job.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _materialTraceError = $"Material use could not be recorded: {ex.Message}";
+        }
+        finally
+        {
+            _recordingMaterialUse = false;
         }
     }
 
@@ -949,6 +1260,36 @@
         var alert = status.HasLowStockAlert ? " Low-stock alert active." : string.Empty;
         return $"{status.ActiveBatches:N0} active batch(es), {remaining} g remaining. Lowest batch {lowest} g.{alert}";
     }
+
+    private static string InventoryItemOptionLabel(InventoryItemDto item) =>
+        $"{item.TrackingCode} - {FirstNonEmpty(item.FormFactor, "Stock item")} - {FormatInventoryQuantity(item.RemainingQuantity, item.QuantityUnit)} - {FirstNonEmpty(item.Location, "No location")}";
+
+    private static string FormatInventoryItemSummary(InventoryItemDto item)
+    {
+        var grade = FirstNonEmpty(item.MaterialGrade, item.Color, item.ManufacturerSku, item.FormFactor);
+        return $"{FirstNonEmpty(item.FormFactor, "Stock item")} - {grade} - {FormatInventoryQuantity(item.RemainingQuantity, item.QuantityUnit)} remaining";
+    }
+
+    private static string FormatInventoryQuantity(decimal quantity, string? unit) =>
+        $"{quantity.ToString("N2", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.')} {FirstNonEmpty(unit, "unit")}";
+
+    private static string FormatInventoryDimensions(InventoryItemDto item)
+    {
+        var dimensions = new List<string>();
+        if (item.LengthMm is { } length) dimensions.Add($"{FormatDimension(length)} L");
+        if (item.WidthMm is { } width) dimensions.Add($"{FormatDimension(width)} W");
+        if (item.HeightMm is { } height) dimensions.Add($"{FormatDimension(height)} H");
+        if (item.DiameterMm is { } diameter) dimensions.Add($"Dia {FormatDimension(diameter)}");
+        if (item.ThicknessMm is { } thickness) dimensions.Add($"{FormatDimension(thickness)} thick");
+
+        return dimensions.Count == 0 ? "Not specified" : string.Join(" x ", dimensions);
+    }
+
+    private static string FormatDimension(decimal value) =>
+        $"{value.ToString("N2", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.')} mm";
+
+    private static string FormatDecimalInput(decimal? value) =>
+        value?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
 
     private static string FormatExpectedFinish(ProductionScheduleSlotDto slot, JobDetailDto? job)
     {

@@ -228,7 +228,8 @@
     text-transform: uppercase;
 }
 
-.production-job-field select {
+.production-job-field select,
+.production-job-field input {
     width: 100%;
     min-height: 36px;
     min-width: 0;
@@ -241,7 +242,8 @@
     padding: 0 10px;
 }
 
-.production-job-field select:disabled {
+.production-job-field select:disabled,
+.production-job-field input:disabled {
     background: var(--maliev-panel-2);
     color: var(--maliev-muted);
     cursor: not-allowed;
@@ -289,6 +291,67 @@
     justify-content: flex-end;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.production-material-item-workflow {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+}
+
+.production-material-scan-row,
+.production-material-use-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 10px;
+}
+
+.production-material-item-card {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid color-mix(in oklab, var(--maliev-info) 26%, var(--maliev-border-subtle));
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-info) 8%, var(--maliev-panel));
+}
+
+.production-material-item-card > div:first-child {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.production-material-item-card span,
+.production-material-item-card small {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    line-height: 1.35;
+}
+
+.production-material-item-card span {
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-material-item-card strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+
+.production-material-item-empty {
+    padding: 10px;
+    border: 1px dashed var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    text-align: center;
 }
 
 .production-slot-capacity {
@@ -390,7 +453,9 @@
     .production-slot-overview,
     .production-slot-facts,
     .production-job-editor,
-    .production-material-trace {
+    .production-material-trace,
+    .production-material-scan-row,
+    .production-material-use-row {
         grid-template-columns: 1fr;
     }
 }

@@ -30,6 +30,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private readonly List<string> _requestedRequests = [];
     private JsonDocument? _rescheduleRequest;
     private JsonDocument? _jobDetailsRequest;
+    private JsonDocument? _materialConsumeRequest;
     private DateTime? _boardRangeStart;
 
     public ProductionSchedulePageTests()
@@ -167,10 +168,52 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("Editable job production details", cut.Markup);
             Assert.Contains("Material traceability", cut.Markup);
             Assert.Contains("2 active batch(es), 1,250 g remaining.", cut.Markup);
+            Assert.Contains("Exact stock item", cut.Markup);
+            Assert.Contains("MAT-26-000001", cut.Markup);
+            Assert.Contains("Aisle A-1", cut.Markup);
             Assert.Contains("Expected finish", cut.Markup);
             Assert.Contains("View project", cut.Markup);
         });
         Assert.Contains(_requestedRequests, request => request == $"GET /api/v1/jobs/{_jobId}");
+    }
+
+    [Fact]
+    public void ProductionSchedule_RecordMaterialUse_PostsExactInventoryItemConsumption()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Exact stock item", cut.Markup));
+        var scanInput = cut.Find("input[placeholder='Scan item QR or paste tracking code']");
+        scanInput.Input("https://intranet.maliev.com/mfg/material-items/MAT-26-000001");
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Scan item", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request.Contains("/api/v1/inventory/items/lookup?code=", StringComparison.Ordinal));
+            Assert.Contains("MAT-26-000001", cut.Markup);
+        });
+
+        cut.Find(".production-material-use-row input[type='number']").Input("125");
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Record material use", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == "POST /api/v1/inventory/items/MAT-26-000001/consume");
+            Assert.NotNull(_materialConsumeRequest);
+        });
+
+        var root = _materialConsumeRequest!.RootElement;
+        Assert.Equal(_jobId, root.GetProperty("jobId").GetGuid());
+        Assert.Equal("Natt Operator", root.GetProperty("operatorId").GetString());
+        Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
+        Assert.Equal(125m, root.GetProperty("quantityConsumed").GetDecimal());
     }
 
     [Fact]
@@ -369,6 +412,25 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             });
         }
 
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.StartsWith("/api/v1/inventory/items?materialId=", StringComparison.Ordinal))
+        {
+            return Json(new List<InventoryItemDto> { BuildInventoryItem() });
+        }
+
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.StartsWith("/api/v1/inventory/items/lookup", StringComparison.Ordinal))
+        {
+            return Json(BuildInventoryItem());
+        }
+
+        if (request.Method == HttpMethod.Post
+            && pathAndQuery.Equals("/api/v1/inventory/items/MAT-26-000001/consume", StringComparison.Ordinal))
+        {
+            _materialConsumeRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Json(BuildInventoryItem(remainingQuantity: 325m));
+        }
+
         if (request.Method == HttpMethod.Patch
             && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}/schedule", StringComparison.Ordinal))
         {
@@ -524,6 +586,29 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         QueuePosition = 1,
         AssignedTo = "Natt Operator",
         UpdatedAt = new DateTime(2026, 5, 7, 8, 0, 0, DateTimeKind.Utc)
+    };
+
+    private InventoryItemDto BuildInventoryItem(decimal remainingQuantity = 450m) => new()
+    {
+        Id = Guid.Parse("dddddddd-eeee-ffff-0000-111111111111"),
+        MaterialId = _materialId,
+        TrackingCode = "MAT-26-000001",
+        QrPayload = "https://intranet.maliev.com/mfg/material-items/MAT-26-000001",
+        InitialQuantity = 500m,
+        RemainingQuantity = remainingQuantity,
+        QuantityUnit = "g",
+        InitialWeightGrams = 500m,
+        RemainingWeightGrams = remainingQuantity,
+        Status = "Active",
+        Location = "Aisle A-1",
+        FormFactor = "Block",
+        LotNumber = "LOT-42",
+        ManufacturerSku = "AL6061-BLOCK",
+        MaterialGrade = "6061-T6",
+        LengthMm = 100m,
+        WidthMm = 100m,
+        HeightMm = 50m,
+        ReceivedAt = new DateTimeOffset(2026, 5, 6, 8, 0, 0, TimeSpan.Zero)
     };
 
     private static Task<HttpResponseMessage> Json<T>(T body) =>
