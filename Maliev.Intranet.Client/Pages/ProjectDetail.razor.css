@@ -615,6 +615,17 @@
     word-break: break-word;
 }
 
+.project-record-shell ::deep .project-dfm-cell {
+    position: relative;
+    overflow: visible;
+    isolation: isolate;
+}
+
+.project-record-shell ::deep .project-dfm-cell:hover,
+.project-record-shell ::deep .project-dfm-cell:focus-within {
+    z-index: 30;
+}
+
 .project-record-shell ::deep .project-dfm-hover {
     position: relative;
     display: block;
@@ -692,7 +703,7 @@
 
 .project-record-shell ::deep .project-dfm-issue-card {
     position: absolute;
-    z-index: 20;
+    z-index: 100;
     top: calc(100% + 8px);
     left: 0;
     display: grid;
@@ -702,8 +713,8 @@
     padding: 10px 12px;
     border: 1px solid var(--maliev-border-subtle);
     border-radius: var(--maliev-radius-sm);
-    background: var(--mud-palette-surface);
-    box-shadow: var(--mud-elevation-8);
+    background: var(--maliev-panel);
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.22);
     opacity: 0;
     pointer-events: none;
     transform: translateY(-4px);
@@ -722,7 +733,8 @@
 .project-record-shell ::deep .project-dfm-issue-card.dfm-warning,
 .project-record-shell ::deep .project-dfm-issue-card.dfm-ack {
     border-color: color-mix(in srgb, var(--maliev-warning) 46%, var(--maliev-border-subtle));
-    background: color-mix(in srgb, var(--maliev-warning) 7%, var(--mud-palette-surface));
+    background: var(--maliev-panel);
+    background: color-mix(in srgb, var(--maliev-warning) 9%, var(--maliev-panel));
 }
 
 .project-record-shell ::deep .project-dfm-issue-title {

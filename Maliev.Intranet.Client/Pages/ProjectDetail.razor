@@ -2369,6 +2369,7 @@
         var acknowledging = _acknowledgingDfmPartIds.Contains(part.Id);
 
         builder.OpenElement(sequence++, "td");
+        builder.AddAttribute(sequence++, "class", "project-dfm-cell");
         builder.OpenElement(sequence++, "div");
         builder.AddAttribute(sequence++, "class", "project-dfm-hover");
         builder.OpenElement(sequence++, "div");

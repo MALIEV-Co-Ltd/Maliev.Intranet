@@ -399,6 +399,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("DFM warnings", cut.Markup);
         Assert.Contains("Requires acknowledgement", cut.Markup);
         Assert.Contains("project-dfm-copy", cut.Markup);
+        Assert.Contains("project-dfm-cell", cut.Markup);
         Assert.Contains("project-dfm-ack-button", cut.Markup);
         Assert.Contains("Acknowledge", cut.Markup);
         Assert.Contains("DFM issue results", cut.Markup);
@@ -530,9 +531,14 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains(".project-thumbnail-viewer-frame", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-copy", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-hover", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-dfm-cell", css, StringComparison.Ordinal);
+        Assert.Contains("isolation: isolate", css, StringComparison.Ordinal);
         Assert.Contains("cursor: pointer", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-dfm-ack-button", css, StringComparison.Ordinal);
         Assert.Contains(".project-dfm-issue-card", css, StringComparison.Ordinal);
+        Assert.Contains("z-index: 100", css, StringComparison.Ordinal);
+        Assert.Contains("var(--maliev-panel)", css, StringComparison.Ordinal);
+        Assert.Contains("0 18px 44px", css, StringComparison.Ordinal);
         Assert.DoesNotContain("project-dfm-icon", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-notes-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
