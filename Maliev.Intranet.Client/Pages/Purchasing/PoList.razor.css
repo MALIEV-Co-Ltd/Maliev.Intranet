@@ -1,0 +1,66 @@
+.purchasing-filter-toolbar {
+    align-items: end;
+}
+
+.purchasing-filter-left {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) minmax(160px, 0.8fr) minmax(130px, 0.65fr) minmax(130px, 0.65fr);
+    align-items: end;
+    gap: 8px;
+    flex: 1 1 auto;
+}
+
+.purchasing-filter-left .mlv-filter-field {
+    min-width: 0;
+}
+
+.purchasing-order-filter {
+    min-width: 200px;
+}
+
+::deep .purchasing-search-box {
+    width: 100%;
+    height: 36px;
+    min-width: 0;
+}
+
+::deep .purchasing-search-box input {
+    height: auto;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.purchasing-filter-toolbar .mlv-toolbar-right {
+    align-items: end;
+    min-height: 58px;
+}
+
+@media (max-width: 920px) {
+    .purchasing-filter-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .purchasing-filter-left {
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+    }
+
+    .purchasing-order-filter {
+        min-width: 0;
+    }
+
+    .purchasing-filter-toolbar .mlv-toolbar-right {
+        justify-content: flex-start;
+        min-height: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .purchasing-filter-left {
+        grid-template-columns: 1fr;
+    }
+}

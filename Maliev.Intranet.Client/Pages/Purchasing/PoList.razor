@@ -22,9 +22,12 @@
             <StatTile Label="Suppliers" Value="@_orders.Select(o => o.SupplierId).Where(id => id > 0).Distinct().Count().ToString("N0")" />
         </StatBar>
 
-        <div class="mlv-toolbar">
-            <div class="mlv-toolbar-left">
-                <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Order ID..." OnEnter="SearchAsync" />
+        <div class="mlv-toolbar purchasing-filter-toolbar">
+            <div class="mlv-toolbar-left purchasing-filter-left">
+                <label class="mlv-filter-field purchasing-order-filter">
+                    <span>Order ID</span>
+                    <SearchBox Class="purchasing-search-box" Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Order ID..." OnEnter="SearchAsync" />
+                </label>
                 <label class="mlv-filter-field">
                     <span>Status</span>
                     <select value="@(_status ?? string.Empty)" @onchange="OnStatusChanged">

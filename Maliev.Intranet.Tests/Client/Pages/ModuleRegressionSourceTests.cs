@@ -434,10 +434,18 @@ public class ModuleRegressionSourceTests
     public void PurchasingPages_UseIntIdsAndServerPagination()
     {
         var list = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");
+        var listStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor.css");
         var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoDetail.razor");
 
         Assert.Contains("PaginationFooter", list, StringComparison.Ordinal);
         Assert.Contains("pageSize={_pageSize}", list, StringComparison.Ordinal);
+        Assert.Contains("purchasing-filter-toolbar", list, StringComparison.Ordinal);
+        Assert.Contains("purchasing-filter-left", list, StringComparison.Ordinal);
+        Assert.Contains("<span>Order ID</span>", list, StringComparison.Ordinal);
+        Assert.Contains("Class=\"purchasing-search-box\"", list, StringComparison.Ordinal);
+        Assert.Contains(".purchasing-filter-left", listStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(200px, 1fr)", listStyles, StringComparison.Ordinal);
+        Assert.Contains("::deep .purchasing-search-box input", listStyles, StringComparison.Ordinal);
         Assert.DoesNotContain("page=1&pageSize=50", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/purchasing/{Id:int}\"", detail, StringComparison.Ordinal);
         Assert.Contains("/approve", detail, StringComparison.Ordinal);
