@@ -247,6 +247,27 @@
     min-height: 5.25rem;
 }
 
+.commerce-collection-image-button {
+    appearance: none;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.commerce-collection-image-button:hover:not(:disabled),
+.commerce-collection-image-button:focus-visible {
+    border-color: var(--mud-palette-primary);
+    box-shadow: var(--maliev-shadow-ring);
+    color: var(--mud-palette-primary);
+    outline: none;
+}
+
+.commerce-collection-image-button:disabled {
+    cursor: progress;
+    opacity: 0.72;
+}
+
 .commerce-collection-image-frame img,
 .commerce-collection-thumb img,
 .commerce-collection-preview-thumb img {

@@ -237,6 +237,7 @@
                             </div>
 
                             <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                           @ref="_collectionImageUpload"
                                            FilesChanged="UploadCollectionImageFilesAsync"
                                            Accept=".jpg,.jpeg,.png,.webp"
                                            MaximumFileCount="1"
@@ -264,7 +265,12 @@
                             }
 
                             <div class="commerce-collection-image-preview">
-                                <div class="commerce-collection-image-frame">
+                                <button type="button"
+                                        class="commerce-collection-image-frame commerce-collection-image-button"
+                                        @onclick="OpenCollectionImagePickerAsync"
+                                        disabled="@_collectionImageUploading"
+                                        aria-label="Select collection image"
+                                        title="Select collection image">
                                     @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
                                     {
                                         <img src="@_collectionForm.ImageUrl" alt="@CollectionImagePreviewAlt" />
@@ -273,7 +279,7 @@
                                     {
                                         <MudIcon Icon="@Icons.Material.Outlined.Image" />
                                     }
-                                </div>
+                                </button>
                                 <div class="commerce-collection-image-fields">
                                     <MudTextField @bind-Value="_collectionForm.ImageAltText"
                                                   Label="Image alt text"
@@ -389,6 +395,7 @@
     private const long MaxCollectionImageFileSize = 10 * 1024 * 1024;
 
     private readonly List<CommerceCollectionDto> _collections = [];
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? _collectionImageUpload;
     private CommerceCollectionMutationRequest _collectionForm = new();
     private Guid? _editingCollectionId;
     private string? _originalCollectionHandle;
@@ -612,6 +619,13 @@
     {
         _collectionForm.ImageUrl = null;
         _collectionForm.ImageAltText = null;
+    }
+
+    private Task OpenCollectionImagePickerAsync()
+    {
+        return _collectionImageUploading
+            ? Task.CompletedTask
+            : _collectionImageUpload?.OpenFilePickerAsync() ?? Task.CompletedTask;
     }
 
     private void StartNewCollection()

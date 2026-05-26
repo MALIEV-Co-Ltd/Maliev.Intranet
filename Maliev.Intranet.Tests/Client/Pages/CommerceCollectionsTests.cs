@@ -100,6 +100,23 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_UsesImageThumbnailAsUploadButton()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+
+        Assert.Contains("@ref=\"_collectionImageUpload\"", collections, StringComparison.Ordinal);
+        Assert.Contains("@onclick=\"OpenCollectionImagePickerAsync\"", collections, StringComparison.Ordinal);
+        Assert.Contains("class=\"commerce-collection-image-frame commerce-collection-image-button\"", collections, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Select collection image\"", collections, StringComparison.Ordinal);
+        Assert.Contains("title=\"Select collection image\"", collections, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-image-button", styles, StringComparison.Ordinal);
+        Assert.Contains("cursor: pointer;", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-image-button:focus-visible", styles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionEditorState_OpensOnlyForCreateOrEdit()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();
