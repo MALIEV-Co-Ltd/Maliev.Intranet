@@ -149,6 +149,110 @@ public sealed class CommerceCatalogListingTests : BunitContext, IAsyncLifetime
             });
     }
 
+    [Fact]
+    public async Task SaveListingAsync_RemovesBlankMediaBeforeCallingBff()
+    {
+        var productId = Guid.NewGuid();
+        string? savedRequestBody = null;
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests)
+            {
+                _sentRequests.Add(request);
+            }
+
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri?.AbsolutePath == $"/api/v1/commerce/products/{productId}")
+            {
+                savedRequestBody = request.Content is null
+                    ? null
+                    : await request.Content.ReadAsStringAsync(ct);
+
+                var saved = new CommerceProductDto
+                {
+                    Id = productId,
+                    Handle = "pneumatic-injection-molding-machine-30g",
+                    Title = "Pneumatic Injection Molding Machine 30g",
+                    Summary = "Compact pneumatic injection molding machine.",
+                    Description = "Draft listing.",
+                    ProductType = "Injection molding machine",
+                    Status = "Draft",
+                    Variants =
+                    [
+                        new CommerceProductVariantDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Sku = "PIMM-30-125-200",
+                            Title = "30g starter package",
+                            PriceAmount = 99000m,
+                            Currency = "THB"
+                        }
+                    ],
+                    Media =
+                    [
+                        new CommerceProductMediaDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Url = "api/v1/commerce/products/media/front-upload",
+                            AltText = "front image",
+                            SortOrder = 0
+                        }
+                    ]
+                };
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(saved), Encoding.UTF8, "application/json")
+                };
+            }
+
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.Commerce.CatalogListing>();
+        SetPrivateField<Guid?>(cut.Instance, "_editingProductId", productId);
+        SetPrivateField(cut.Instance, "_productForm", new CommerceProductMutationRequest
+        {
+            Handle = "pneumatic-injection-molding-machine-30g",
+            Title = "Pneumatic Injection Molding Machine 30g",
+            Summary = "Compact pneumatic injection molding machine.",
+            Description = "Draft listing.",
+            ProductType = "Injection molding machine",
+            Status = "Draft",
+            Variants =
+            [
+                new CommerceProductVariantMutationRequest
+                {
+                    Sku = "PIMM-30-125-200",
+                    Title = "30g starter package",
+                    PriceAmount = 99000m,
+                    Currency = "THB"
+                }
+            ],
+            Media =
+            [
+                new CommerceProductMediaMutationRequest { Url = "   ", SortOrder = 0 },
+                new CommerceProductMediaMutationRequest
+                {
+                    Url = "api/v1/commerce/products/media/front-upload",
+                    AltText = "front image",
+                    SortOrder = 1
+                }
+            ]
+        });
+
+        await InvokePrivateTaskWithArgsAsync(cut, "SaveListingAsync");
+
+        Assert.NotNull(savedRequestBody);
+        var payload = JsonSerializer.Deserialize<CommerceProductMutationRequest>(
+            savedRequestBody!,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(payload);
+        var media = Assert.Single(payload.Media);
+        Assert.Equal("api/v1/commerce/products/media/front-upload", media.Url);
+        Assert.Equal(0, media.SortOrder);
+    }
+
     private Task<HttpResponseMessage> DefaultHandler(HttpRequestMessage request, CancellationToken ct)
     {
         lock (_sentRequests)

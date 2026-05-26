@@ -600,6 +600,7 @@
 
     private void NormalizeMediaSortOrders()
     {
+        _productForm.Media.RemoveAll(media => string.IsNullOrWhiteSpace(media.Url));
         var mediaItems = _productForm.Media.OrderBy(media => media.SortOrder).ToList();
         for (var index = 0; index < mediaItems.Count; index++)
         {
