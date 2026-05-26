@@ -102,6 +102,63 @@ public class ProjectsControllerTests
     }
 
     [Fact]
+    public async Task GetById_WhenCustomerServiceAvailable_ShouldEnrichCustomerProfileImage()
+    {
+        var customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        const string ProfileImageUrl = "https://lh3.googleusercontent.com/a/axion";
+        var project = new ProjectDetailDto
+        {
+            Id = Guid.NewGuid(),
+            ProjectNumber = "PRJ-001",
+            CustomerId = customerId,
+            CustomerName = "Axion Robotics"
+        };
+        var customerHandler = new MockHttpMessageHandler((request, _) =>
+        {
+            var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
+            if (pathAndQuery.Equals($"/customer/v1/customers/{customerId}", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new CustomerDetailDto
+                    {
+                        Id = customerId,
+                        Name = "Axion Robotics",
+                        ProfileImageUrl = ProfileImageUrl
+                    })
+                });
+            }
+
+            if (pathAndQuery.StartsWith("/customer/v1/addresses", StringComparison.Ordinal)
+                || pathAndQuery.StartsWith("/customer/v1/internal-notes", StringComparison.Ordinal)
+                || pathAndQuery.StartsWith("/customer/v1/ndas", StringComparison.Ordinal)
+                || pathAndQuery.StartsWith("/customer/v1/documents", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(Array.Empty<object>())
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var controller = new ProjectsController(
+            CreateClient(project),
+            StubJobClient(),
+            StubFacilityClient(),
+            Logger,
+            customerClient: new CustomerServiceClient(
+                new HttpClient(customerHandler) { BaseAddress = new Uri("http://test") },
+                NullLogger<CustomerServiceClient>.Instance));
+
+        var result = await controller.GetById(project.Id, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<ProjectDetailDto>(ok.Value);
+        Assert.Equal(ProfileImageUrl, dto.CustomerProfileImageUrl);
+    }
+
+    [Fact]
     public async Task GetById_WhenNotFound_ShouldReturnNotFound()
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.NotFound), StubJobClient(), StubFacilityClient(), Logger);

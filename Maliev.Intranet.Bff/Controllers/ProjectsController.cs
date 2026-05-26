@@ -1430,6 +1430,7 @@ public class ProjectsController(
                 return;
 
             project.CustomerName = FirstNonEmpty(detail.Name, project.CustomerName) ?? project.CustomerName;
+            project.CustomerProfileImageUrl = FirstNonEmpty(detail.ProfileImageUrl, project.CustomerProfileImageUrl);
             project.CustomerEmail = FirstNonEmpty(detail.Email);
             project.CustomerPhone = FirstNonEmpty(detail.Mobile, detail.Landline, detail.CompanyPhone);
             project.CustomerStatus = FirstNonEmpty(detail.Status);

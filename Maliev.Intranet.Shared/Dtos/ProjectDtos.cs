@@ -56,6 +56,9 @@ public class ProjectDetailDto
     /// <summary>Gets or sets the customer name.</summary>
     public string CustomerName { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the customer's profile image URL.</summary>
+    public string? CustomerProfileImageUrl { get; set; }
+
     /// <summary>Gets or sets the customer email address.</summary>
     public string? CustomerEmail { get; set; }
 

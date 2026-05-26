@@ -422,77 +422,115 @@
         builder.AddAttribute(1, "Title", "Customer");
         builder.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
         {
-            content.OpenElement(3, "div");
-            content.AddAttribute(4, "class", "project-customer-panel");
+            var sequence = 3;
+            content.OpenElement(sequence++, "div");
+            content.AddAttribute(sequence++, "class", "project-customer-panel");
 
-            content.OpenElement(5, "div");
-            content.AddAttribute(6, "class", "project-customer-heading");
-            content.OpenElement(7, "strong");
-            content.AddContent(8, _project?.CustomerName ?? "Unknown customer");
+            content.OpenElement(sequence++, "div");
+            content.AddAttribute(sequence++, "class", "project-customer-heading");
+            content.OpenElement(sequence++, "div");
+            content.AddAttribute(sequence++, "class", "project-customer-identity");
+            AddCustomerAvatar(content, ref sequence);
+            content.OpenElement(sequence++, "strong");
+            content.AddContent(sequence++, _project?.CustomerName ?? "Unknown customer");
             content.CloseElement();
-            content.OpenElement(9, "span");
-            content.AddAttribute(10, "class", "project-customer-id");
-            content.AddContent(11, $"Customer ID {_project?.CustomerId.ToString("N")[..8].ToUpperInvariant()}");
             content.CloseElement();
+            content.OpenElement(sequence++, "span");
+            content.AddAttribute(sequence++, "class", "project-customer-id");
+            content.AddContent(sequence++, FormatCustomerId(_project?.CustomerId));
             content.CloseElement();
-
-            content.OpenElement(12, "dl");
-            content.AddAttribute(13, "class", "project-customer-detail-grid");
-            AddCustomerDetail(content, 14, "Company", _project?.CustomerCompanyName);
-            AddCustomerDetail(content, 18, "Email", _project?.CustomerEmail);
-            AddCustomerDetail(content, 22, "Phone", _project?.CustomerPhone);
-            AddCustomerDetail(content, 26, "Status", FormatStatus(_project?.CustomerStatus));
-            AddCustomerDetail(content, 30, "Segment", _project?.CustomerSegment);
-            AddCustomerDetail(content, 34, "Tier", _project?.CustomerTier);
-            AddCustomerDetail(content, 38, "Language", _project?.CustomerPreferredLanguage?.ToUpperInvariant());
-            AddCustomerDetail(content, 42, "Timezone", _project?.CustomerTimezone);
             content.CloseElement();
 
-            content.OpenElement(46, "div");
-            content.AddAttribute(47, "class", "project-customer-address-block");
-            content.OpenElement(48, "span");
-            content.AddContent(49, "Shipping");
+            content.OpenElement(sequence++, "dl");
+            content.AddAttribute(sequence++, "class", "project-customer-detail-grid");
+            AddCustomerDetail(content, sequence, "Company", _project?.CustomerCompanyName);
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Email", _project?.CustomerEmail);
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Phone", _project?.CustomerPhone);
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Status", FormatStatus(_project?.CustomerStatus));
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Segment", _project?.CustomerSegment);
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Tier", _project?.CustomerTier);
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Language", _project?.CustomerPreferredLanguage?.ToUpperInvariant());
+            sequence += 5;
+            AddCustomerDetail(content, sequence, "Timezone", _project?.CustomerTimezone);
+            sequence += 5;
             content.CloseElement();
-            content.OpenElement(50, "strong");
-            content.AddContent(51, _project?.ShippingRecipientName ?? "-");
+
+            content.OpenElement(sequence++, "div");
+            content.AddAttribute(sequence++, "class", "project-customer-address-block");
+            content.OpenElement(sequence++, "span");
+            content.AddContent(sequence++, "Shipping");
             content.CloseElement();
-            content.OpenElement(52, "p");
-            content.AddContent(53, _project?.ShippingAddressLine ?? "-");
+            content.OpenElement(sequence++, "strong");
+            content.AddContent(sequence++, _project?.ShippingRecipientName ?? "-");
+            content.CloseElement();
+            content.OpenElement(sequence++, "p");
+            content.AddContent(sequence++, _project?.ShippingAddressLine ?? "-");
             content.CloseElement();
             if (!string.IsNullOrWhiteSpace(_project?.ShippingRecipientPhone))
             {
-                content.OpenElement(54, "small");
-                content.AddContent(55, _project.ShippingRecipientPhone);
+                content.OpenElement(sequence++, "small");
+                content.AddContent(sequence++, _project.ShippingRecipientPhone);
                 content.CloseElement();
             }
             content.CloseElement();
 
             if (!string.IsNullOrWhiteSpace(_project?.BillingAddressLine))
             {
-                content.OpenElement(56, "div");
-                content.AddAttribute(57, "class", "project-customer-address-block");
-                content.OpenElement(58, "span");
-                content.AddContent(59, "Billing");
+                content.OpenElement(sequence++, "div");
+                content.AddAttribute(sequence++, "class", "project-customer-address-block");
+                content.OpenElement(sequence++, "span");
+                content.AddContent(sequence++, "Billing");
                 content.CloseElement();
-                content.OpenElement(60, "strong");
-                content.AddContent(61, FirstNonEmpty(_project.CustomerCompanyName, _project.CustomerName, "-"));
+                content.OpenElement(sequence++, "strong");
+                content.AddContent(sequence++, FirstNonEmpty(_project.CustomerCompanyName, _project.CustomerName, "-"));
                 content.CloseElement();
-                AddBillingIdentityLine(content, 62, "Tax ID", _project.CustomerTaxId);
-                AddBillingIdentityLine(content, 65, null, _project.CustomerBranch);
-                content.OpenElement(68, "p");
-                content.AddContent(69, _project.BillingAddressLine);
+                AddBillingIdentityLine(content, sequence, "Tax ID", _project.CustomerTaxId);
+                sequence += 2;
+                AddBillingIdentityLine(content, sequence, null, _project.CustomerBranch);
+                sequence += 2;
+                content.OpenElement(sequence++, "p");
+                content.AddContent(sequence++, _project.BillingAddressLine);
                 content.CloseElement();
                 content.CloseElement();
             }
 
-            content.OpenElement(64, "a");
-            content.AddAttribute(65, "href", $"/customers/{_project?.CustomerId}");
-            content.AddContent(66, "Open customer record");
+            content.OpenElement(sequence++, "a");
+            content.AddAttribute(sequence++, "href", $"/customers/{_project?.CustomerId}");
+            content.AddContent(sequence++, "Open customer record");
             content.CloseElement();
             content.CloseElement();
         }));
         builder.CloseComponent();
     };
+
+    private void AddCustomerAvatar(RenderTreeBuilder builder, ref int sequence)
+    {
+        var imageUrl = FirstNonEmpty(_project?.CustomerProfileImageUrl);
+        builder.OpenElement(sequence++, "span");
+        builder.AddAttribute(sequence++, "class", "project-customer-avatar");
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            builder.OpenElement(sequence++, "img");
+            builder.AddAttribute(sequence++, "class", "project-customer-avatar-image");
+            builder.AddAttribute(sequence++, "src", imageUrl);
+            builder.AddAttribute(sequence++, "alt", string.Empty);
+            builder.AddAttribute(sequence++, "aria-hidden", "true");
+            builder.AddAttribute(sequence++, "referrerpolicy", "no-referrer");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.AddContent(sequence++, GetCustomerInitials(_project?.CustomerName));
+        }
+
+        builder.CloseElement();
+    }
 
     private RenderFragment RenderQuote() => builder =>
     {
@@ -2717,6 +2755,25 @@
             return string.Empty;
 
         return $"{dimensions.X:0.#} x {dimensions.Y:0.#} x {dimensions.Z:0.#} mm";
+    }
+
+    private static string FormatCustomerId(Guid? customerId) =>
+        customerId.HasValue
+            ? $"Customer ID {customerId.Value.ToString("N")[..8].ToUpperInvariant()}"
+            : "Customer ID -";
+
+    private static string GetCustomerInitials(string? name)
+    {
+        var value = FirstNonEmpty(name);
+        if (string.IsNullOrWhiteSpace(value))
+            return "?";
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : value.Length >= 2
+                ? $"{value[0]}{value[1]}".ToUpperInvariant()
+                : value[0].ToString().ToUpperInvariant();
     }
 
     private IEnumerable<ProjectTimelineEventDto> GetTimelineEvents()

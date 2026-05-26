@@ -108,6 +108,20 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectDetail_RendersCustomerProfileImageInCustomerCard()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("project-customer-avatar-image", cut.Markup));
+
+        var avatar = cut.Find(".project-customer-avatar-image");
+        Assert.Equal("https://lh3.googleusercontent.com/a/axion", avatar.GetAttribute("src"));
+        Assert.Equal("no-referrer", avatar.GetAttribute("referrerpolicy"));
+        Assert.Equal("true", avatar.GetAttribute("aria-hidden"));
+        Assert.Contains("project-customer-identity", cut.Markup);
+    }
+
+    [Fact]
     public void ProjectDetail_EditProject_NavigatesBackToProjectNewResumeRoute()
     {
         var navigation = Services.GetRequiredService<NavigationManager>();
@@ -528,6 +542,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-terms", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-heading", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-identity", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-avatar", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-customer-avatar-image", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-detail-grid", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-customer-address-block", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-workspace", css, StringComparison.Ordinal);
@@ -564,6 +581,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
                 ProjectNumber = "PRJ-2026-0184",
                 CustomerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 CustomerName = "Axion Robotics",
+                CustomerProfileImageUrl = "https://lh3.googleusercontent.com/a/axion",
                 CustomerEmail = "engineering@axion.example",
                 CustomerPhone = "+66 2 555 0101",
                 CustomerStatus = "Active",
