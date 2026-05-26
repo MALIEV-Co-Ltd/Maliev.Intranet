@@ -29,6 +29,7 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
     private readonly Guid _existingCompanyId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private readonly List<CompanySearchResultDto> _companySearchResults = [];
     private TaskCompletionSource<object?>? _notePostRelease;
+    private TaskCompletionSource<object?>? _companySearchRelease;
     private TaskCompletionSource<object?>? _companyCreateRelease;
     private bool _includeDuplicateDefaultBilling;
     private bool _projectResponseIsEmpty;
@@ -284,6 +285,37 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("Recipient name", cut.Markup);
         Assert.Contains("AI address lookup", cut.Markup);
         Assert.Contains("Country", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerDetail_SearchCompanyShowsSearchingStatus()
+    {
+        _companySearchRelease = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cut = Render<CustomerDetail>(parameters => parameters.Add(page => page.Id, _customerId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup));
+        cut.Find(".customer-split-field .customer-inline-action").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Company lookup", cut.Markup));
+
+        var lookupInput = cut.Find(".customer-modal-wide .customer-split-field input.customer-input");
+        lookupInput.Input("มะลิ");
+        cut.Find(".customer-modal-wide .customer-split-field .customer-inline-action").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var search = cut.Find(".customer-modal-wide .customer-split-field .customer-inline-action");
+            Assert.True(search.HasAttribute("disabled"));
+            Assert.Contains("Searching", search.TextContent);
+        });
+
+        _companySearchRelease.SetResult(null);
+
+        cut.WaitForAssertion(() =>
+        {
+            var search = cut.Find(".customer-modal-wide .customer-split-field .customer-inline-action");
+            Assert.False(search.HasAttribute("disabled"));
+            Assert.Equal("Search", search.TextContent.Trim());
+        });
     }
 
     [Fact]
@@ -1026,7 +1058,18 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         if (request.Method == HttpMethod.Get &&
             pathAndQuery.StartsWith("/api/v1/companies/search", StringComparison.Ordinal))
         {
+            if (_companySearchRelease is not null)
+            {
+                return JsonAfterAsync(_companySearchRelease.Task, _companySearchResults);
+            }
+
             return Json(_companySearchResults);
+        }
+
+        if (request.Method == HttpMethod.Get &&
+            pathAndQuery.StartsWith("/api/v1/customers/companies/search", StringComparison.Ordinal))
+        {
+            return Json(new List<RegistryCompanyProfile>());
         }
 
         if (request.Method == HttpMethod.Get &&
@@ -1215,6 +1258,16 @@ public sealed class CustomerDetailPageTests : BunitContext, IAsyncLifetime
         {
             Content = JsonContent.Create(body)
         });
+
+    private static async Task<HttpResponseMessage> JsonAfterAsync<T>(Task release, T body)
+    {
+        await release;
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(body)
+        };
+    }
 
     private static string TextAreaValue(IElement element) =>
         element.GetAttribute("value") ?? element.TextContent;

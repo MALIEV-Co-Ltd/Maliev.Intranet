@@ -860,7 +860,21 @@
                     <span>Company lookup</span>
                     <div class="customer-split-field">
                         <input class="customer-input" placeholder="Name or tax ID..." @bind="_companyLookupQuery" @bind:event="oninput" />
-                        <button type="button" class="customer-inline-action" @onclick="SearchCompaniesAsync">Search</button>
+                        <button type="button"
+                                class="customer-inline-action customer-company-search"
+                                @onclick="SearchCompaniesAsync"
+                                disabled="@_companyLookupLoading"
+                                aria-busy="@_companyLookupLoading">
+                            @if (_companyLookupLoading)
+                            {
+                                <span class="customer-button-spinner" aria-hidden="true"></span>
+                                <span>Searching...</span>
+                            }
+                            else
+                            {
+                                <span>Search</span>
+                            }
+                        </button>
                     </div>
                 </label>
                 @if (_companyMatches.Count > 0 || _registryCompanyMatches.Count > 0)
@@ -922,6 +936,7 @@
     private bool _saving;
     private bool _postingNote;
     private bool _sendingEmail;
+    private bool _companyLookupLoading;
     private bool _savingCompany;
     private bool _emailComposerOpen;
     private bool _emailQueued;
@@ -2404,6 +2419,7 @@
     {
         _companyEdit = CompanyEditModel.FromCustomer(_customer);
         _companyLookupQuery = _customer?.CompanyName ?? string.Empty;
+        _companyLookupLoading = false;
         _companyMatches.Clear();
         _registryCompanyMatches.Clear();
         return Task.CompletedTask;
@@ -2411,6 +2427,7 @@
 
     private Task CloseCompanyModalAsync()
     {
+        _companyLookupLoading = false;
         _savingCompany = false;
         _companyEdit = null;
         return Task.CompletedTask;
@@ -2418,6 +2435,11 @@
 
     private async Task SearchCompaniesAsync()
     {
+        if (_companyLookupLoading)
+        {
+            return;
+        }
+
         _companyMatches.Clear();
         _registryCompanyMatches.Clear();
         if (string.IsNullOrWhiteSpace(_companyLookupQuery) || _companyLookupQuery.Trim().Length < 2)
@@ -2425,6 +2447,7 @@
             return;
         }
 
+        _companyLookupLoading = true;
         try
         {
             var query = Uri.EscapeDataString(_companyLookupQuery.Trim());
@@ -2439,6 +2462,10 @@
         {
             Snackbar.Add("Company lookup could not be loaded.", Severity.Warning);
             Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _companyLookupLoading = false;
         }
     }
 

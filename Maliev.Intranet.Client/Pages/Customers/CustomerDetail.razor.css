@@ -734,6 +734,29 @@ select.customer-input {
     width: min(980px, 100%);
 }
 
+.customer-company-search {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 96px;
+}
+
+.customer-button-spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: customer-spin 0.75s linear infinite;
+}
+
+@keyframes customer-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .customer-email-modal {
     display: grid;
     grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
