@@ -122,31 +122,37 @@
                 </button>
             </div>
             <nav class="topbar-mobile-nav-list" aria-label="Primary navigation links">
-                <NavLink href="@_quoteNavItem.Href"
-                         Match="@_quoteNavItem.Match"
-                         class="@GetMobileNavClass(_quoteNavItem)"
-                         @onclick="CloseMobileNav">
-                    <MudIcon Icon="@_quoteNavItem.Icon" Size="Size.Small" />
-                    <span>@_quoteNavItem.Label</span>
-                </NavLink>
+                <a href="@_quoteNavItem.Href"
+                   class="@GetMobileNavClass(_quoteNavItem)"
+                   aria-current="@GetMobileNavAriaCurrent(_quoteNavItem)"
+                   @onclick="CloseMobileNav">
+                    <span class="topbar-mobile-nav-icon" aria-hidden="true">
+                        <MudIcon Icon="@_quoteNavItem.Icon" Size="Size.Small" />
+                    </span>
+                    <span class="topbar-mobile-nav-label">@_quoteNavItem.Label</span>
+                </a>
 
                 @foreach (var group in _navGroups)
                 {
                     <section class="topbar-mobile-nav-group" aria-label="@($"{group.Label} navigation")">
                         <div class="topbar-mobile-nav-group-title">
-                            <MudIcon Icon="@group.Icon" Size="Size.Small" />
-                            <span>@group.Label</span>
+                            <span class="topbar-mobile-nav-group-icon" aria-hidden="true">
+                                <MudIcon Icon="@group.Icon" Size="Size.Small" />
+                            </span>
+                            <span class="topbar-mobile-nav-group-label">@group.Label</span>
                         </div>
 
                         @foreach (var item in group.Items)
                         {
-                            <NavLink href="@item.Href"
-                                     Match="@item.Match"
-                                     class="@GetMobileNavClass(item)"
-                                     @onclick="CloseMobileNav">
-                                <MudIcon Icon="@item.Icon" Size="Size.Small" />
-                                <span>@item.Label</span>
-                            </NavLink>
+                            <a href="@item.Href"
+                               class="@GetMobileNavClass(item)"
+                               aria-current="@GetMobileNavAriaCurrent(item)"
+                               @onclick="CloseMobileNav">
+                                <span class="topbar-mobile-nav-icon" aria-hidden="true">
+                                    <MudIcon Icon="@item.Icon" Size="Size.Small" />
+                                </span>
+                                <span class="topbar-mobile-nav-label">@item.Label</span>
+                            </a>
                         }
                     </section>
                 }
@@ -434,8 +440,14 @@
                 currentPath.StartsWith($"{itemPath}/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetMobileNavClass(AppNavItem item) =>
-        string.IsNullOrWhiteSpace(item.Class) ? "topbar-mobile-nav-link" : $"topbar-mobile-nav-link {item.Class}";
+    private string GetMobileNavClass(AppNavItem item)
+    {
+        var itemClass = string.IsNullOrWhiteSpace(item.Class) ? string.Empty : $" {item.Class}";
+        var activeClass = IsNavItemActive(item) ? " active" : string.Empty;
+        return $"topbar-mobile-nav-link{itemClass}{activeClass}";
+    }
+
+    private string? GetMobileNavAriaCurrent(AppNavItem item) => IsNavItemActive(item) ? "page" : null;
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {

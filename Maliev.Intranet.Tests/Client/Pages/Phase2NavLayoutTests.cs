@@ -119,6 +119,29 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_MobileNavigationLinks_UseStableIconAndLabelRows()
+    {
+        var cut = Render<TopBar>();
+        cut.Find("button.topbar-mobile-menu-button").Click();
+
+        var mobileLinks = cut.FindAll("nav.topbar-mobile-nav-list a.topbar-mobile-nav-link");
+        Assert.NotEmpty(mobileLinks);
+        Assert.All(mobileLinks, link =>
+        {
+            Assert.NotNull(link.QuerySelector(".topbar-mobile-nav-icon"));
+            Assert.NotNull(link.QuerySelector(".topbar-mobile-nav-label"));
+        });
+
+        var groupTitles = cut.FindAll(".topbar-mobile-nav-group-title");
+        Assert.NotEmpty(groupTitles);
+        Assert.All(groupTitles, title =>
+        {
+            Assert.NotNull(title.QuerySelector(".topbar-mobile-nav-group-icon"));
+            Assert.NotNull(title.QuerySelector(".topbar-mobile-nav-group-label"));
+        });
+    }
+
+    [Fact]
     public void TopBar_ShouldContain_ServiceManagementNavigation()
     {
         var cut = Render<TopBar>();

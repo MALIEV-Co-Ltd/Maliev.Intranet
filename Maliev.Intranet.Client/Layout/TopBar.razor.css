@@ -726,7 +726,7 @@
 
     .topbar-mobile-nav-link {
         display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
+        grid-template-columns: 28px minmax(0, 1fr);
         align-items: center;
         column-gap: 10px;
         box-sizing: border-box;
@@ -741,22 +741,29 @@
         text-decoration: none;
     }
 
-    .topbar-mobile-nav-link ::deep .mud-icon-root {
-        display: inline-flex;
-        width: 22px;
-        height: 22px;
-        align-items: center;
-        justify-content: center;
-        justify-self: center;
-        flex: 0 0 22px;
+    .topbar-mobile-nav-icon {
+        display: inline-grid;
+        width: 28px;
+        height: 24px;
+        min-width: 28px;
+        place-items: center;
         color: currentColor;
         line-height: 1;
     }
 
-    .topbar-mobile-nav-link > span {
+    .topbar-mobile-nav-icon ::deep .mud-icon-root {
+        display: block;
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+        color: currentColor;
+        line-height: 1;
+    }
+
+    .topbar-mobile-nav-label {
         display: block;
         min-width: 0;
-        line-height: 1.1;
+        line-height: 1.2;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -768,6 +775,10 @@
         background: var(--maliev-panel-3);
         color: var(--maliev-ink);
         outline: none;
+    }
+
+    .topbar-mobile-nav-link:focus-visible {
+        box-shadow: var(--maliev-focus-ring);
     }
 
     .topbar-mobile-nav-link.topbar-nav-quote,
@@ -788,7 +799,7 @@
 
     .topbar-mobile-nav-group-title {
         display: grid;
-        grid-template-columns: 24px minmax(0, 1fr);
+        grid-template-columns: 28px minmax(0, 1fr);
         align-items: center;
         column-gap: 10px;
         min-height: 28px;
@@ -800,18 +811,27 @@
         text-transform: uppercase;
     }
 
-    .topbar-mobile-nav-group-title ::deep .mud-icon-root {
-        display: inline-flex;
-        width: 22px;
+    .topbar-mobile-nav-group-icon {
+        display: inline-grid;
+        width: 28px;
         height: 22px;
-        align-items: center;
-        justify-content: center;
-        justify-self: center;
-        flex: 0 0 22px;
+        min-width: 28px;
+        place-items: center;
         color: currentColor;
+        line-height: 1;
     }
 
-    .topbar-mobile-nav-group-title > span {
+    .topbar-mobile-nav-group-icon ::deep .mud-icon-root {
+        display: block;
+        width: 20px;
+        height: 20px;
+        font-size: 20px;
+        color: currentColor;
+        line-height: 1;
+    }
+
+    .topbar-mobile-nav-group-label {
+        display: block;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
