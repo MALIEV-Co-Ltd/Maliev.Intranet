@@ -1,4 +1,5 @@
 using System.Net;
+using Maliev.Intranet.Bff.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -583,6 +584,11 @@ public sealed class LoginPageController : Controller
         if (string.Equals(normalized, InvalidCredentialsMessage, StringComparison.Ordinal))
         {
             return InvalidCredentialsMessage;
+        }
+
+        if (string.Equals(normalized, WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage, StringComparison.Ordinal))
+        {
+            return WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage;
         }
 
         if (normalized.Contains("cancel", StringComparison.OrdinalIgnoreCase) ||

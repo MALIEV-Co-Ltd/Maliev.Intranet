@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -40,8 +41,13 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     [HttpPost("login")]
     public async Task<IActionResult> LoginStandard([FromBody] InternalLoginRequest request)
     {
-        var signedIn = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
-        return signedIn ? Ok() : Unauthorized("Invalid corporate credentials.");
+        var result = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
+        return result switch
+        {
+            LoginAttemptResult.SignedIn => Ok(),
+            LoginAttemptResult.InvalidWorkspaceEmail => Unauthorized(WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage),
+            _ => Unauthorized("Invalid corporate credentials.")
+        };
     }
 
     /// <summary>
@@ -52,20 +58,29 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     public async Task<IActionResult> LoginForm([FromForm] InternalLoginFormRequest request)
     {
         var returnUrl = Url.IsLocalUrl(request.ReturnUrl) ? request.ReturnUrl : "/";
-        var signedIn = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
+        var result = await TrySignInWithCorporateCredentialsAsync(request.Username, request.Password, request.RememberMe);
 
-        if (signedIn)
+        if (result == LoginAttemptResult.SignedIn)
         {
             return LocalRedirect(returnUrl);
         }
 
         var encodedReturnUrl = System.Net.WebUtility.UrlEncode(returnUrl);
-        var encodedError = System.Net.WebUtility.UrlEncode("Invalid credentials. Please try again.");
+        var message = result == LoginAttemptResult.InvalidWorkspaceEmail
+            ? WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage
+            : "Invalid credentials. Please try again.";
+        var encodedError = System.Net.WebUtility.UrlEncode(message);
         return Redirect($"/login?returnUrl={encodedReturnUrl}&error={encodedError}");
     }
 
-    private async Task<bool> TrySignInWithCorporateCredentialsAsync(string username, string password, bool rememberMe)
+    private async Task<LoginAttemptResult> TrySignInWithCorporateCredentialsAsync(string username, string password, bool rememberMe)
     {
+        if (!WorkspaceEmailDomainPolicy.IsAllowedEmployeeEmail(username))
+        {
+            logger.LogWarning("Rejected Intranet login attempt for non-workspace username {Username}", username);
+            return LoginAttemptResult.InvalidWorkspaceEmail;
+        }
+
         var authClient = httpClientFactory.CreateClient("AuthService");
 
         // Proxy request to the real AuthService (snake_case property names)
@@ -79,7 +94,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Login failed for {Username}. Status: {StatusCode}", username, response.StatusCode);
-            return false;
+            return LoginAttemptResult.InvalidCredentials;
         }
 
         // Read and deserialize response (AuthService returns snake_case)
@@ -93,18 +108,27 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         if (authResult?.User == null || string.IsNullOrEmpty(authResult.AccessToken))
         {
             logger.LogWarning("Login failed for {Username}: Invalid response from AuthService", username);
-            return false;
+            return LoginAttemptResult.InvalidCredentials;
         }
 
         // Parse JWT to extract claims
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(authResult.AccessToken);
+        var identityEmail = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email;
+
+        if (!WorkspaceEmailDomainPolicy.IsAllowedEmployeeEmail(identityEmail))
+        {
+            logger.LogWarning("Rejected Intranet login for {Username}: AuthService returned non-workspace email", username);
+            return LoginAttemptResult.InvalidWorkspaceEmail;
+        }
+
+        var workspaceEmail = identityEmail!.Trim();
 
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? authResult.User.UserId),
             new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? username),
-            new Claim("email", jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email ?? username),
+            new Claim("email", workspaceEmail),
             new Claim("user_type", jwtToken.Claims.FirstOrDefault(c => c.Type == "user_type")?.Value ?? authResult.User.UserType),
             new Claim("permissions", MalievPermissions.Auth.SessionsRead),
             new Claim("access_token", authResult.AccessToken)
@@ -164,7 +188,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             }
         }
 
-        return true;
+        return LoginAttemptResult.SignedIn;
     }
 
     /// <summary>
@@ -279,5 +303,12 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         public string UserType { get; set; } = string.Empty;
         public string? Email { get; set; }
         public string? Name { get; set; }
+    }
+
+    private enum LoginAttemptResult
+    {
+        SignedIn,
+        InvalidCredentials,
+        InvalidWorkspaceEmail
     }
 }

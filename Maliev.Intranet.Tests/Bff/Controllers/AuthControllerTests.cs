@@ -109,19 +109,58 @@ public class AuthControllerTests
         _httpContextMock.Setup(x => x.RequestServices.GetService(typeof(IAuthenticationService)))
             .Returns(authServiceMock.Object);
 
-        var request = new AuthController.InternalLoginRequest { Username = "user", Password = "password" };
+        var request = new AuthController.InternalLoginRequest { Username = "user@maliev.com", Password = "password" };
         var result = await _controller.LoginStandard(request);
 
         Assert.IsType<OkResult>(result);
         authServiceMock.Verify(x => x.SignInAsync(It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()), Times.Once);
     }
 
-    private string CreateTestToken()
+    [Fact]
+    public async Task LoginStandard_AuthServiceReturnsExternalEmail_ReturnsUnauthorizedWithoutSigningIn()
+    {
+        var token = CreateTestToken("contractor@example.com");
+
+        var authResponse = new
+        {
+            access_token = token,
+            user = new { user_id = "123", user_type = "employee", email = "contractor@example.com", name = "Contractor User" }
+        };
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(authResponse) });
+
+        _httpClientFactoryMock.Setup(x => x.CreateClient("AuthService"))
+            .Returns(new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://auth") });
+
+        var authServiceMock = new Mock<IAuthenticationService>();
+        _httpContextMock.Setup(x => x.RequestServices.GetService(typeof(IAuthenticationService)))
+            .Returns(authServiceMock.Object);
+
+        var request = new AuthController.InternalLoginRequest { Username = "employee@maliev.com", Password = "password" };
+
+        var result = await _controller.LoginStandard(request);
+
+        var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Equal("Use your @maliev.com workspace email to sign in.", unauthorizedResult.Value);
+        authServiceMock.Verify(
+            x => x.SignInAsync(It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()),
+            Times.Never);
+    }
+
+    private string CreateTestToken(string email = "test@maliev.com")
     {
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
         var key = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes("test-secret-key-at-least-32-chars-long"));
         var creds = new Microsoft.IdentityModel.Tokens.SigningCredentials(key, Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256);
-        var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken("test", "test", new[] { new Claim("sub", "123") }, expires: DateTime.Now.AddMinutes(30), signingCredentials: creds);
+        var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+            "test",
+            "test",
+            [new Claim("sub", "123"), new Claim("email", email)],
+            expires: DateTime.Now.AddMinutes(30),
+            signingCredentials: creds);
         return handler.WriteToken(token);
     }
 }

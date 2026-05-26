@@ -5,6 +5,7 @@ using Maliev.Intranet.Bff.Consumers;
 using Maliev.Intranet.Bff.Data;
 using Maliev.Intranet.Bff.Extensions;
 using Maliev.Intranet.Bff.Middleware;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
@@ -219,9 +220,9 @@ try
             if (!string.IsNullOrEmpty(email) && identity != null && !identity.HasClaim(c => c.Type == "email"))
                 identity.AddClaim(new System.Security.Claims.Claim("email", email));
 
-            if (string.IsNullOrEmpty(email) || !email.EndsWith("@maliev.com"))
+            if (!WorkspaceEmailDomainPolicy.IsAllowedEmployeeEmail(email))
             {
-                context.Fail("Unauthorized domain.");
+                context.Fail(WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage);
                 return;
             }
 
@@ -658,6 +659,8 @@ try
     // DO NOT delete the auth cookie unconditionally — it destroys valid sessions after login.
 
     app.UseAuthentication();
+
+    app.UseMiddleware<WorkspaceEmailDomainEnforcementMiddleware>();
 
     // Apply JWT claims enrichment only to non-static requests
     app.UseWhen(

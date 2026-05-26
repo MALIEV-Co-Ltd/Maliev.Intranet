@@ -75,4 +75,22 @@ public class LoginPageControllerTests
         Assert.Contains("We couldn't complete sign-in right now. Please try again in a moment.", decodedContent);
         Assert.DoesNotContain("Correlation failed", content.Content, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Login_WhenWorkspaceEmailIsRejected_ShowsWorkspaceEmailMessage()
+    {
+        var controller = new LoginPageController
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        var result = controller.Login("/accounting", "Use your @maliev.com workspace email to sign in.");
+
+        var content = Assert.IsType<ContentResult>(result);
+        var decodedContent = WebUtility.HtmlDecode(content.Content);
+        Assert.Contains("Use your @maliev.com workspace email to sign in.", decodedContent);
+    }
 }
