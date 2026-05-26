@@ -76,6 +76,29 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_UsesSinglePrimaryCreateActionOutsideMenu()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var headerStart = collections.IndexOf("<PageHeader", StringComparison.Ordinal);
+        var headerEnd = collections.IndexOf("</PageHeader>", StringComparison.Ordinal);
+        var commandStart = collections.IndexOf("<div class=\"commerce-collections-command-actions\">", StringComparison.Ordinal);
+        var commandEnd = collections.IndexOf("<div class=\"@CollectionsLayoutClass\">", commandStart, StringComparison.Ordinal);
+
+        Assert.True(headerStart >= 0);
+        Assert.True(headerEnd > headerStart);
+        Assert.True(commandStart >= 0);
+        Assert.True(commandEnd > commandStart);
+
+        var headerActions = collections[headerStart..headerEnd];
+        var commandActions = collections[commandStart..commandEnd];
+
+        Assert.DoesNotContain("OnClick=\"StartNewCollection\"", headerActions, StringComparison.Ordinal);
+        Assert.DoesNotContain(">New collection", headerActions, StringComparison.Ordinal);
+        Assert.Contains("OnClick=\"StartNewCollection\"", commandActions, StringComparison.Ordinal);
+        Assert.Contains("New collection", commandActions, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionsMarkup_MoreActionsOpensActionMenu()
     {
         var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
@@ -108,14 +131,14 @@ public sealed class CommerceCollectionsTests
     public void CollectionsStyles_KeepEditorOpenListReadableAtDesktopWidth()
     {
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
-        var desktopEditorBlock = ExtractCssBlock(styles, "@media (max-width: 1500px) and (min-width: 1181px) {");
+        var desktopEditorBlock = ExtractCssBlock(styles, "@media (max-width: 1600px) and (min-width: 1181px) {");
 
-        Assert.Contains("grid-template-columns: minmax(20rem, 22rem) minmax(0, 1fr);", desktopEditorBlock, StringComparison.Ordinal);
-        Assert.Contains(".commerce-collections-layout.editor-open .commerce-collection-row", desktopEditorBlock, StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: minmax(0, 1fr) auto;", desktopEditorBlock, StringComparison.Ordinal);
-        Assert.Contains(".commerce-collections-layout.editor-open .commerce-collection-main", desktopEditorBlock, StringComparison.Ordinal);
-        Assert.Contains("grid-column: 1 / -1;", desktopEditorBlock, StringComparison.Ordinal);
-        Assert.Contains("grid-row: 1;", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(24rem, 26rem) minmax(0, 1fr);", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-editor-grid", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr);", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-side-rail", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr));", desktopEditorBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain(".commerce-collections-layout.editor-open .commerce-collection-main", desktopEditorBlock, StringComparison.Ordinal);
     }
 
     [Fact]
