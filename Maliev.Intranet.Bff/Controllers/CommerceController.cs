@@ -11,7 +11,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// Employee Commerce catalog management endpoints.
 /// </summary>
 /// <param name="client">Commerce service client.</param>
-/// <param name="uploadClient">Upload service client for product media assets.</param>
+/// <param name="uploadClient">Upload service client for product and collection media assets.</param>
 /// <param name="pdfClient">PDF service client.</param>
 /// <param name="httpClientFactory">HTTP client factory for generated PDF downloads.</param>
 [ApiController]
@@ -192,6 +192,66 @@ public sealed class CommerceController(
     }
 
     /// <summary>
+    /// Uploads collection media images to central storage and returns stable media references.
+    /// </summary>
+    [HttpPost("collections/media")]
+    [RequirePermission(MalievPermissions.Commerce.CollectionsUpdate, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<ActionResult<List<BffUploadResponse>>> UploadCollectionMedia(
+        [FromForm] List<IFormFile> files,
+        [FromQuery] string? handle,
+        CancellationToken cancellationToken)
+    {
+        if (files.Count == 0)
+        {
+            return BadRequest("No image files uploaded.");
+        }
+
+        var safeHandle = BuildSafeMediaHandle(handle);
+        var results = new List<BffUploadResponse>(files.Count);
+
+        foreach (var file in files)
+        {
+            if (file.Length is <= 0 or > MaxProductMediaBytes)
+            {
+                return BadRequest($"{file.FileName} must be between 1 byte and 10 MB.");
+            }
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!ProductMediaExtensions.Contains(extension))
+            {
+                return BadRequest($"{file.FileName} must be a JPG, PNG, or WEBP image.");
+            }
+
+            var safeFileName = BuildSafeMediaFileName(file.FileName);
+            var storagePath = $"commerce/collections/{safeHandle}/media/{Guid.NewGuid():N}_{safeFileName}";
+            var contentType = GetProductMediaContentType(file, extension);
+
+            await using var stream = file.OpenReadStream();
+            var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, cancellationToken);
+            if (upload is null)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, $"Upload failed for {file.FileName}.");
+            }
+
+            upload.FileReference = BuildCollectionMediaReference(upload.UploadId);
+            results.Add(upload);
+        }
+
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Redirects a stored Commerce collection media reference to a fresh signed storage URL.
+    /// </summary>
+    [HttpGet("collections/media/{uploadId}")]
+    [RequirePermission(MalievPermissions.Commerce.CollectionsRead, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<IActionResult> GetCollectionMedia(string uploadId, CancellationToken cancellationToken)
+    {
+        var signedUrl = await uploadClient.GetDownloadUrlAsync(uploadId, cancellationToken);
+        return string.IsNullOrWhiteSpace(signedUrl) ? NotFound() : Redirect(signedUrl);
+    }
+
+    /// <summary>
     /// Archives a product listing.
     /// </summary>
     [HttpDelete("products/{id:guid}")]
@@ -298,6 +358,11 @@ public sealed class CommerceController(
     private static string BuildProductMediaReference(string uploadId)
     {
         return $"api/v1/commerce/products/media/{Uri.EscapeDataString(uploadId)}";
+    }
+
+    private static string BuildCollectionMediaReference(string uploadId)
+    {
+        return $"api/v1/commerce/collections/media/{Uri.EscapeDataString(uploadId)}";
     }
 
     private static string BuildSafeMediaHandle(string? handle)

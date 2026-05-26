@@ -975,6 +975,29 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCollections_ManagesCollectionImagesForStorefront()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+        var commerceDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "CommerceDtos.cs");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "CommerceController.cs");
+
+        Assert.Contains("<MudFileUpload T=\"IReadOnlyList<IBrowserFile>\"", collections, StringComparison.Ordinal);
+        Assert.Contains("UploadCollectionImageFilesAsync", collections, StringComparison.Ordinal);
+        Assert.Contains("Drop collection image here or click to upload", collections, StringComparison.Ordinal);
+        Assert.Contains("ImageAltText", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-image-preview", collections, StringComparison.Ordinal);
+        Assert.Contains("collection.ImageUrl", collections, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-image-uploader", styles, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-image-preview", styles, StringComparison.Ordinal);
+        Assert.Contains("commerce-collection-thumb", styles, StringComparison.Ordinal);
+        Assert.Contains("public string? ImageUrl", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("public string? ImageAltText", commerceDtos, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"collections/media\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildCollectionMediaReference", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IamUserList_UsesPagedBffUsersEndpoint()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor");

@@ -1,4 +1,5 @@
 @page "/commerce/collections"
+@using System.Net.Http.Headers
 @attribute [RequirePermission(MalievPermissions.Commerce.CollectionsRead)]
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -51,7 +52,7 @@
                     <div class="commerce-collection-form-grid">
                         <MudTextField T="string"
                                       Value="_collectionForm.Title"
-                                      ValueChanged="OnCollectionTitleChanged"
+                                      ValueChanged="@OnCollectionTitleChanged"
                                       Label="Title"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
@@ -59,7 +60,7 @@
                                       Immediate="true" />
                         <MudTextField T="string"
                                       Value="_collectionForm.Handle"
-                                      ValueChanged="OnCollectionHandleChanged"
+                                      ValueChanged="@OnCollectionHandleChanged"
                                       Label="Storefront URL slug"
                                       HelperText="@CollectionHandleHelperText"
                                       Variant="Variant.Outlined"
@@ -81,6 +82,76 @@
                             Changing this slug changes Web collection links and filters. Existing links using the old slug may stop matching this collection.
                         </MudAlert>
                     }
+
+                    <div class="commerce-collection-image-uploader">
+                        <div class="commerce-collection-image-heading">
+                            <div>
+                                <MudText Typo="Typo.subtitle2">Collection image</MudText>
+                                <MudText Typo="Typo.caption">Shown on the Web collection section.</MudText>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           StartIcon="@Icons.Material.Outlined.Delete"
+                                           OnClick="RemoveCollectionImage">
+                                    Remove
+                                </MudButton>
+                            }
+                        </div>
+
+                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                       FilesChanged="UploadCollectionImageFilesAsync"
+                                       Accept=".jpg,.jpeg,.png,.webp"
+                                       MaximumFileCount="1"
+                                       Disabled="@_collectionImageUploading"
+                                       Class="commerce-collection-image-upload">
+                            <CustomContent Context="uploadContext">
+                                <div class="commerce-collection-image-dropzone">
+                                    <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
+                                                        Icon="@Icons.Material.Outlined.AddPhotoAlternate"
+                                                        Label="Drop collection image here or click to upload"
+                                                        SubLabel="JPG, PNG, WEBP"
+                                                        MaxFileSizeLabel="max 10 MB"
+                                                        OnClick="@uploadContext.OpenFilePickerAsync"
+                                                        OnFilesDropped="@uploadContext.OpenFilePickerAsync" />
+                                </div>
+                            </CustomContent>
+                        </MudFileUpload>
+
+                        @if (_collectionImageUploading)
+                        {
+                            <div class="commerce-collection-image-uploading">
+                                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                                <span>Uploading collection image...</span>
+                            </div>
+                        }
+
+                        <div class="commerce-collection-image-preview">
+                            <div class="commerce-collection-image-frame">
+                                @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                {
+                                    <img src="@_collectionForm.ImageUrl" alt="@CollectionImagePreviewAlt" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                }
+                            </div>
+                            <div class="commerce-collection-image-fields">
+                                <MudTextField @bind-Value="_collectionForm.ImageAltText"
+                                              Label="Image alt text"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Immediate="true" />
+                                @if (!string.IsNullOrWhiteSpace(_collectionForm.ImageUrl))
+                                {
+                                    <span class="commerce-collection-image-url" title="@_collectionForm.ImageUrl">@_collectionForm.ImageUrl</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
 
                     <MudTextField @bind-Value="_collectionForm.Description"
                                   Label="Description"
@@ -174,6 +245,16 @@
                             @foreach (var collection in _collections.OrderBy(collection => collection.Title))
                             {
                                 <div class="@CollectionRowClass(collection)" role="listitem">
+                                    <span class="commerce-collection-thumb">
+                                        @if (!string.IsNullOrWhiteSpace(collection.ImageUrl))
+                                        {
+                                            <img src="@collection.ImageUrl" alt="@CollectionImageAlt(collection)" />
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Outlined.Image" />
+                                        }
+                                    </span>
                                     <button type="button" class="commerce-collection-main" @onclick="@(() => SelectCollection(collection))">
                                         <span class="commerce-collection-title-row">
                                             <span class="commerce-collection-title">@collection.Title</span>
@@ -205,6 +286,7 @@
 
 @code {
     private static readonly TimeSpan CollectionsLoadTimeout = TimeSpan.FromSeconds(15);
+    private const long MaxCollectionImageFileSize = 10 * 1024 * 1024;
 
     private readonly List<CommerceCollectionDto> _collections = [];
     private CommerceCollectionMutationRequest _collectionForm = new();
@@ -213,6 +295,7 @@
     private string? _collectionsLoadError;
     private bool _loadingCollections = true;
     private bool _saving;
+    private bool _collectionImageUploading;
     private bool _handleManuallyEdited;
 
     private int PublishedCount => _collections.Count(collection => collection.IsPublished);
@@ -234,6 +317,10 @@
     private string CollectionUrlPreview => string.IsNullOrWhiteSpace(_collectionForm.Handle)
         ? "/shop?collection=collection-url-slug"
         : $"/shop?collection={_collectionForm.Handle}";
+
+    private string CollectionImagePreviewAlt => string.IsNullOrWhiteSpace(_collectionForm.ImageAltText)
+        ? _collectionForm.Title
+        : _collectionForm.ImageAltText;
 
     private bool ShowCollectionHandleError => !string.IsNullOrWhiteSpace(_collectionForm.Handle)
         && !string.Equals(_collectionForm.Handle, BuildCollectionHandle(_collectionForm.Handle), StringComparison.Ordinal);
@@ -345,6 +432,64 @@
         }
     }
 
+    private async Task UploadCollectionImageFilesAsync(IReadOnlyList<IBrowserFile> files)
+    {
+        var file = files.FirstOrDefault(IsAcceptedCollectionImageFile);
+        if (file is null)
+        {
+            Snackbar.Add("Select a JPG, PNG, or WEBP image up to 10 MB.", Severity.Warning);
+            return;
+        }
+
+        _collectionImageUploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(MaxCollectionImageFileSize);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(GetCollectionImageContentType(file));
+            content.Add(fileContent, "files", file.Name);
+
+            EnsureCollectionHandle();
+            var handle = string.IsNullOrWhiteSpace(_collectionForm.Handle) ? "draft" : _collectionForm.Handle;
+            var response = await Http.PostAsync($"api/v1/commerce/collections/media?handle={Uri.EscapeDataString(handle)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Collection image upload failed.", Severity.Warning);
+                return;
+            }
+
+            var uploads = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
+            var upload = uploads.FirstOrDefault();
+            var imageUrl = FirstNonEmpty(upload?.FileReference, upload?.SignedUrl, upload?.StoragePath);
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                Snackbar.Add("Collection image upload returned no image reference.", Severity.Warning);
+                return;
+            }
+
+            _collectionForm.ImageUrl = imageUrl;
+            if (string.IsNullOrWhiteSpace(_collectionForm.ImageAltText))
+            {
+                _collectionForm.ImageAltText = BuildDefaultCollectionImageAltText(upload?.FileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Collection image upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _collectionImageUploading = false;
+        }
+    }
+
+    private void RemoveCollectionImage()
+    {
+        _collectionForm.ImageUrl = null;
+        _collectionForm.ImageAltText = null;
+    }
+
     private void StartNewCollection()
     {
         _editingCollectionId = null;
@@ -363,6 +508,8 @@
             Handle = collection.Handle,
             Title = collection.Title,
             Description = collection.Description,
+            ImageUrl = collection.ImageUrl,
+            ImageAltText = collection.ImageAltText,
             IsPublished = collection.IsPublished
         };
     }
@@ -421,6 +568,55 @@
         return builder.ToString().Trim('-');
     }
 
+    private static bool IsAcceptedCollectionImageFile(IBrowserFile file)
+    {
+        if (file.Size is <= 0 or > MaxCollectionImageFileSize)
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(file.Name);
+        return extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetCollectionImageContentType(IBrowserFile file)
+    {
+        if (!string.IsNullOrWhiteSpace(file.ContentType)
+            && file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return file.ContentType;
+        }
+
+        return Path.GetExtension(file.Name).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private string BuildDefaultCollectionImageAltText(string? fileName)
+    {
+        if (!string.IsNullOrWhiteSpace(_collectionForm.Title))
+        {
+            return $"{_collectionForm.Title} collection image";
+        }
+
+        var name = Path.GetFileNameWithoutExtension(fileName);
+        return string.IsNullOrWhiteSpace(name)
+            ? "Collection image"
+            : $"{name.Replace('-', ' ').Replace('_', ' ')} image";
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
     private void BackToCatalog()
     {
         Navigation.NavigateTo("/commerce/catalog");
@@ -443,5 +639,12 @@
         return string.IsNullOrWhiteSpace(collection.Description)
             ? "No description set."
             : collection.Description;
+    }
+
+    private static string CollectionImageAlt(CommerceCollectionDto collection)
+    {
+        return string.IsNullOrWhiteSpace(collection.ImageAltText)
+            ? collection.Title
+            : collection.ImageAltText;
     }
 }

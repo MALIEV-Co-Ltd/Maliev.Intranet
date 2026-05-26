@@ -206,6 +206,12 @@ public sealed class CommerceCollectionDto
     /// <summary>Gets or sets the collection description.</summary>
     public string? Description { get; set; }
 
+    /// <summary>Gets or sets the collection image URL.</summary>
+    public string? ImageUrl { get; set; }
+
+    /// <summary>Gets or sets the collection image alternative text.</summary>
+    public string? ImageAltText { get; set; }
+
     /// <summary>Gets or sets whether the collection is published.</summary>
     public bool IsPublished { get; set; } = true;
 }
@@ -373,6 +379,12 @@ public sealed class CommerceCollectionMutationRequest
 
     /// <summary>Gets or sets the collection description.</summary>
     public string? Description { get; set; }
+
+    /// <summary>Gets or sets the collection image URL.</summary>
+    public string? ImageUrl { get; set; }
+
+    /// <summary>Gets or sets the collection image alternative text.</summary>
+    public string? ImageAltText { get; set; }
 
     /// <summary>Gets or sets whether the collection is published.</summary>
     public bool IsPublished { get; set; } = true;
