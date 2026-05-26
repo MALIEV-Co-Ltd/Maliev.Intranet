@@ -1,3 +1,8 @@
+::deep .purchasing-page-body {
+    display: flex;
+    flex-direction: column;
+}
+
 .purchasing-filter-toolbar {
     align-items: end;
 }
@@ -36,6 +41,19 @@
 .purchasing-filter-toolbar .mlv-toolbar-right {
     align-items: end;
     min-height: 58px;
+}
+
+::deep .purchasing-results-panel {
+    flex: 1 1 auto;
+    min-height: clamp(360px, 52dvh, 720px);
+    display: flex;
+    flex-direction: column;
+}
+
+.purchasing-results-empty {
+    flex: 1 1 auto;
+    min-height: 100%;
+    align-content: center;
 }
 
 .purchasing-disabled-action {

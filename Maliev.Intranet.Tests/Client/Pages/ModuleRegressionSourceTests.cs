@@ -442,9 +442,16 @@ public class ModuleRegressionSourceTests
         Assert.Contains("pageSize={_pageSize}", list, StringComparison.Ordinal);
         Assert.Contains("purchasing-filter-toolbar", list, StringComparison.Ordinal);
         Assert.Contains("purchasing-filter-left", list, StringComparison.Ordinal);
+        Assert.Contains("Class=\"purchasing-page-body\"", list, StringComparison.Ordinal);
+        Assert.Contains("Class=\"purchasing-results-panel\"", list, StringComparison.Ordinal);
+        Assert.Contains("mlv-empty purchasing-results-empty", list, StringComparison.Ordinal);
         Assert.Contains("<span>Order ID</span>", list, StringComparison.Ordinal);
         Assert.Contains("Class=\"purchasing-search-box\"", list, StringComparison.Ordinal);
+        Assert.Contains(".purchasing-page-body", listStyles, StringComparison.Ordinal);
         Assert.Contains(".purchasing-filter-left", listStyles, StringComparison.Ordinal);
+        Assert.Contains(".purchasing-results-panel", listStyles, StringComparison.Ordinal);
+        Assert.Contains("min-height: clamp(360px, 52dvh, 720px);", listStyles, StringComparison.Ordinal);
+        Assert.Contains(".purchasing-results-empty", listStyles, StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(200px, 1fr)", listStyles, StringComparison.Ordinal);
         Assert.Contains("::deep .purchasing-search-box input", listStyles, StringComparison.Ordinal);
         Assert.Contains("api/v1/suppliers?page=1&pageSize=1", list, StringComparison.Ordinal);

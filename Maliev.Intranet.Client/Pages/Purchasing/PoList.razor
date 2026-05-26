@@ -21,7 +21,7 @@
         }
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="purchasing-page-body">
         <StatBar Class="mb-4">
             <StatTile Label="Matching POs" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="Page spend" Value="@_orders.Sum(o => o.TotalAmount).ToString("N2")" />
@@ -74,7 +74,7 @@
             <ProgressiveSkeleton Layout="table" Rows="6" Columns="7" ShowFilters="false" Class="mb-3" Label="Loading purchase orders" />
         }
 
-        <PanelCard>
+        <PanelCard Class="purchasing-results-panel">
             @if (_orders.Count > 0)
             {
                 <table class="mlv-table">
@@ -110,7 +110,7 @@
             }
             else
             {
-                <div class="mlv-empty">
+                <div class="mlv-empty purchasing-results-empty">
                     @if (CanCreatePurchaseOrder)
                     {
                         <span>No purchase orders match this view.</span>
