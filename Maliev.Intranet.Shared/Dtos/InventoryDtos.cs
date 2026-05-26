@@ -123,6 +123,80 @@ public class StockTransactionDto
 }
 
 /// <summary>
+/// Request model for receiving a managed inventory batch from purchasing, supplier delivery, or manual stock intake.
+/// </summary>
+public sealed record CreateInventoryBatchRequest
+{
+    /// <summary>The material identifier this physical batch belongs to.</summary>
+    [Required]
+    public Guid MaterialId { get; set; }
+
+    /// <summary>The received batch quantity measured in grams for traceable raw stock deduction.</summary>
+    [Range(0.01, double.MaxValue)]
+    public decimal InitialWeightGrams { get; set; }
+
+    /// <summary>The storage location where the batch is physically kept.</summary>
+    [Required]
+    [StringLength(200)]
+    public string Location { get; set; } = string.Empty;
+
+    /// <summary>The optional low-stock threshold for the batch in grams.</summary>
+    [Range(0, double.MaxValue)]
+    public decimal? LowStockThresholdGrams { get; set; }
+}
+
+/// <summary>
+/// Response DTO for a traceable physical material batch managed by InventoryService.
+/// </summary>
+public sealed record InventoryBatchDto
+{
+    /// <summary>The unique batch identifier used for QR or barcode labels.</summary>
+    public Guid Id { get; init; }
+
+    /// <summary>The material identifier this batch belongs to.</summary>
+    public Guid MaterialId { get; init; }
+
+    /// <summary>The originally received batch weight in grams.</summary>
+    public decimal InitialWeightGrams { get; init; }
+
+    /// <summary>The current remaining batch weight in grams.</summary>
+    public decimal RemainingWeightGrams { get; init; }
+
+    /// <summary>The current batch lifecycle status.</summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>The physical storage location for this batch.</summary>
+    public string Location { get; init; } = string.Empty;
+
+    /// <summary>The low-stock threshold for alerting on this batch.</summary>
+    public decimal LowStockThresholdGrams { get; init; }
+
+    /// <summary>The timestamp when the batch was received.</summary>
+    public DateTimeOffset ReceivedAt { get; init; }
+}
+
+/// <summary>
+/// Summary of active inventory batches for one material.
+/// </summary>
+public sealed record MaterialInventoryStatusDto
+{
+    /// <summary>The material identifier being summarized.</summary>
+    public Guid MaterialId { get; init; }
+
+    /// <summary>The number of active batches that still have stock.</summary>
+    public int ActiveBatches { get; init; }
+
+    /// <summary>The total remaining active stock in grams.</summary>
+    public decimal TotalRemainingGrams { get; init; }
+
+    /// <summary>The remaining grams of the lowest active batch.</summary>
+    public decimal LowestBatchGrams { get; init; }
+
+    /// <summary>Whether any active batch has crossed its low-stock threshold.</summary>
+    public bool HasLowStockAlert { get; init; }
+}
+
+/// <summary>
 /// Summary DTO for a material supplier, used in lists and selection.
 /// </summary>
 public class SupplierSummaryDto

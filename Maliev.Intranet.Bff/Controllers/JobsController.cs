@@ -147,12 +147,35 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
         CancellationToken ct)
     {
-        var response = await client.UpdateStatusAsync(id, request.Status, ct);
+        var response = await client.UpdateStatusAsync(id, request.Status, request.MachineId, ct);
         if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
 
         // Broadcast to all connected production queue clients
         await hub.Clients.All.SendAsync("JobStatusChanged", new { JobId = id, Status = request.Status });
 
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates editable production details on a job and broadcasts the detail change.
+    /// </summary>
+    /// <param name="id">The job GUID.</param>
+    /// <param name="request">The editable job details.</param>
+    /// <param name="hub">The ProductionHub context for broadcasting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>204 No Content on success.</returns>
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPatch("{id:guid}/details")]
+    public async Task<IActionResult> UpdateDetails(
+        Guid id,
+        [FromBody] UpdateJobDetailsRequest request,
+        [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
+        CancellationToken ct)
+    {
+        var response = await client.UpdateDetailsAsync(id, request, ct);
+        if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
+
+        await hub.Clients.All.SendAsync("JobDetailsChanged", new { JobId = id });
         return NoContent();
     }
 

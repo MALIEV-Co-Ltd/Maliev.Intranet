@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
@@ -151,9 +152,12 @@ public class JobsControllerTests
             OrderId = Guid.Empty,
             OrderItemId = Guid.Empty,
             MaterialId = Guid.Empty,
+            CustomerId = (string?)null,
+            CustomerName = (string?)null,
             Technology = "FDM",
             EstimatedPrintTimeMinutes = 90,
             AssignedMachineId = (string?)null,
+            AssignedOperator = (string?)null,
             Priority = 3,
             Status = "Queued",
             Notes = (string?)null,
@@ -176,6 +180,7 @@ public class JobsControllerTests
         var orderId = Guid.NewGuid();
         var orderItemId = Guid.NewGuid();
         var materialId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
         var projectPartId = Guid.NewGuid();
         var scheduledStart = DateTime.UtcNow.AddHours(2);
@@ -188,10 +193,13 @@ public class JobsControllerTests
             SourceProjectId = projectId,
             SourceProjectPartId = projectPartId,
             MaterialId = materialId,
+            CustomerId = customerId.ToString(),
+            CustomerName = "Bangkok Precision Parts",
             Technology = "CNC_MILL",
             VolumeCm3 = 12.5m,
             EstimatedPrintTimeMinutes = 240,
             AssignedMachineId = "MAL-CNC-001",
+            AssignedOperator = "Natt Operator",
             Priority = 2,
             Status = "Queued",
             Notes = "Inspect threaded holes before finishing.",
@@ -218,18 +226,64 @@ public class JobsControllerTests
         Assert.Equal(JobId.ToString("N")[..8].ToUpperInvariant(), dto.JobNumber);
         Assert.Equal(orderId, dto.OrderId);
         Assert.Equal(orderId.ToString("N")[..8].ToUpperInvariant(), dto.OrderNumber);
+        Assert.Equal(customerId.ToString(), dto.CustomerId);
+        Assert.Equal("Bangkok Precision Parts", dto.CustomerName);
         Assert.Equal($"Project part {projectPartId.ToString("N")[..8].ToUpperInvariant()}", dto.PartDescription);
         Assert.Equal("CNC_MILL", dto.ProcessType);
         Assert.Equal(materialId.ToString(), dto.Material);
+        Assert.Equal(materialId, dto.MaterialId);
         Assert.Equal("High", dto.Priority);
         Assert.Equal("Queued", dto.Status);
         Assert.Equal("MAL-CNC-001", dto.MachineName);
+        Assert.Equal("Natt Operator", dto.AssignedTo);
         Assert.Equal(1, dto.Quantity);
         Assert.Equal(scheduledStart, dto.ScheduledStartTime);
         Assert.Equal(scheduledEnd, dto.ScheduledEndTime);
         Assert.Equal(scheduledEnd, dto.EstimatedCompletionAt);
         Assert.Equal(5, dto.QueuePosition);
         Assert.Equal("Inspect threaded holes before finishing.", dto.Notes);
+    }
+
+    [Fact]
+    public async Task UpdateDetails_WhenSuccess_ShouldPatchJobServiceAndBroadcast()
+    {
+        string? capturedPath = null;
+        JsonDocument? capturedBody = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            capturedBody = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+        var (hub, allProxy) = MockHub();
+        var materialId = Guid.NewGuid();
+
+        var result = await controller.UpdateDetails(
+            JobId,
+            new UpdateJobDetailsRequest
+            {
+                CustomerId = "C-1001",
+                CustomerName = "Bangkok Precision Parts",
+                MaterialId = materialId,
+                AssignedOperator = "Natt Operator",
+                Priority = 2
+            },
+            hub,
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal($"/job/v1/jobs/{JobId}/details", capturedPath);
+        Assert.NotNull(capturedBody);
+        Assert.Equal("C-1001", capturedBody!.RootElement.GetProperty("customerId").GetString());
+        Assert.Equal("Bangkok Precision Parts", capturedBody.RootElement.GetProperty("customerName").GetString());
+        Assert.Equal(materialId, capturedBody.RootElement.GetProperty("materialId").GetGuid());
+        Assert.Equal("Natt Operator", capturedBody.RootElement.GetProperty("assignedOperator").GetString());
+        Assert.Equal(2, capturedBody.RootElement.GetProperty("priority").GetInt32());
+        allProxy.Verify(c => c.SendCoreAsync(
+            "JobDetailsChanged",
+            It.IsAny<object?[]>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

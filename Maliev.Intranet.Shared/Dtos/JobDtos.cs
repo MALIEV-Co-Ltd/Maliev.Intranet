@@ -14,6 +14,12 @@ public class JobSummaryDto
     /// <summary>Gets or sets the customer name.</summary>
     public string CustomerName { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the linked customer identifier when the job is associated with a customer profile.</summary>
+    public string? CustomerId { get; set; }
+
+    /// <summary>Gets or sets the customer profile image URL, when available from CustomerService.</summary>
+    public string? CustomerProfileImageUrl { get; set; }
+
     /// <summary>Gets or sets the linked order ID.</summary>
     public Guid? OrderId { get; set; }
 
@@ -28,6 +34,12 @@ public class JobSummaryDto
 
     /// <summary>Gets or sets the material name.</summary>
     public string? Material { get; set; }
+
+    /// <summary>Gets or sets the inventory-managed material identifier used by the job.</summary>
+    public Guid? MaterialId { get; set; }
+
+    /// <summary>Gets or sets the inventory-managed material SKU or stock code used by the job.</summary>
+    public string? MaterialSku { get; set; }
 
     /// <summary>Gets or sets the job priority: "Urgent", "High", "Normal", or "Low".</summary>
     public string Priority { get; set; } = "Normal";
@@ -176,6 +188,28 @@ public sealed record UpdateJobStatusRequest
 {
     /// <summary>Gets or sets the new status.</summary>
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the machine identifier required when moving a pending job into the queue.</summary>
+    public string? MachineId { get; set; }
+}
+
+/// <summary>Request model for updating editable production job details.</summary>
+public sealed record UpdateJobDetailsRequest
+{
+    /// <summary>Gets or sets the linked customer identifier.</summary>
+    public string? CustomerId { get; set; }
+
+    /// <summary>Gets or sets the linked customer display name.</summary>
+    public string? CustomerName { get; set; }
+
+    /// <summary>Gets or sets the selected inventory-managed material identifier.</summary>
+    public Guid? MaterialId { get; set; }
+
+    /// <summary>Gets or sets the assigned operator display name.</summary>
+    public string? AssignedOperator { get; set; }
+
+    /// <summary>Gets or sets the production priority. Lower values are higher priority.</summary>
+    public int? Priority { get; set; }
 }
 
 /// <summary>Request model for assigning a machine to a job.</summary>

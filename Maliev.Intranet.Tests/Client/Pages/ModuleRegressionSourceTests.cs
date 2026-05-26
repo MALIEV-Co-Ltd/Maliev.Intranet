@@ -577,7 +577,10 @@ public class ModuleRegressionSourceTests
         var detailStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor.css");
         var inventoryDtos = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "InventoryDtos.cs");
         var materialClient = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "MaterialServiceClient.cs");
+        var inventoryClient = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "InventoryServiceClient.cs");
         var materialsController = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "MaterialsController.cs");
+        var inventoryController = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "InventoryController.cs");
+        var bffProgram = ReadRepoFile("Maliev.Intranet.Bff", "Program.cs");
 
         Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/mfg/materials/{Id:guid}\"", detail, StringComparison.Ordinal);
@@ -595,12 +598,19 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("Aggregate stock; barcode lots pending", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard>", list, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Inventory control\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Receive stock batch\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Properties\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Stock audit\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Inventory label\">", detail, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard Title=\"Latest batch label\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Suppliers\">", detail, StringComparison.Ordinal);
         Assert.Contains("BuildCode39Svg", detail, StringComparison.Ordinal);
+        Assert.Contains("BatchTrackingCode", detail, StringComparison.Ordinal);
+        Assert.Contains("ReceiveBatchAsync", detail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/inventory/batches", detail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/inventory/batches/status", detail, StringComparison.Ordinal);
+        Assert.Contains("Storage location", detail, StringComparison.Ordinal);
         Assert.Contains("RecentTransactions", detail, StringComparison.Ordinal);
         Assert.Contains("Suppliers", detail, StringComparison.Ordinal);
         Assert.Contains("CreatePurchaseOrder", detail, StringComparison.Ordinal);
@@ -608,6 +618,8 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain("MaterialService does not currently", detail, StringComparison.Ordinal);
         Assert.Contains("material-detail-layout", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-inventory-status", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-batch-summary", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("material-receive-form", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-barcode-svg", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);
@@ -619,9 +631,18 @@ public class ModuleRegressionSourceTests
         Assert.Contains("ColorIds = _editModel.SelectedColorIds.ToList()", detail, StringComparison.Ordinal);
         Assert.Contains("material-color-option", detailStyles, StringComparison.Ordinal);
         Assert.Contains("public List<Guid>? ColorIds { get; set; }", inventoryDtos, StringComparison.Ordinal);
+        Assert.Contains("CreateInventoryBatchRequest", inventoryDtos, StringComparison.Ordinal);
+        Assert.Contains("InventoryBatchDto", inventoryDtos, StringComparison.Ordinal);
+        Assert.Contains("MaterialInventoryStatusDto", inventoryDtos, StringComparison.Ordinal);
         Assert.Contains("GetColorsAsync", materialClient, StringComparison.Ordinal);
+        Assert.Contains("CreateBatchAsync", inventoryClient, StringComparison.Ordinal);
+        Assert.Contains("/inventory/v1/stock/batches", inventoryClient, StringComparison.Ordinal);
+        Assert.Contains("/inventory/v1/stock/batches/status", inventoryClient, StringComparison.Ordinal);
         Assert.Contains("request.ColorIds ?? current.AvailableColors.Select(color => color.Id).ToList()", materialClient, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"reference/colors\")]", materialsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"batches\")]", inventoryController, StringComparison.Ordinal);
+        Assert.Contains("MalievPermissions.Inventory.BatchesWrite", inventoryController, StringComparison.Ordinal);
+        Assert.Contains("AddBffServiceClient<InventoryServiceClient>(\"InventoryService\")", bffProgram, StringComparison.Ordinal);
         Assert.Contains("class=\"mlv-table\"", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<th>Code</th>", list, StringComparison.Ordinal);
         Assert.DoesNotContain("<td class=\"mlv-mono\">@material.SKU</td>", list, StringComparison.Ordinal);

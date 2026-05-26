@@ -71,17 +71,32 @@ public class JobServiceClient(HttpClient httpClient)
     // ── Status & assignment ───────────────────────────────────────────────────
 
     /// <summary>
+    /// Updates editable details for a manufacturing job.
+    /// </summary>
+    /// <param name="id">The job GUID.</param>
+    /// <param name="request">The editable detail changes.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The HTTP response from JobService.</returns>
+    public async Task<HttpResponseMessage> UpdateDetailsAsync(Guid id, UpdateJobDetailsRequest request, CancellationToken ct = default) =>
+        await httpClient.PatchAsJsonAsync($"/job/v1/jobs/{id}/details", request, ct);
+
+    /// <summary>
     /// Updates the status of a job (e.g. from Kanban drag-and-drop).
     /// </summary>
     /// <param name="id">The job GUID.</param>
     /// <param name="newStatus">The new status string.</param>
+    /// <param name="machineId">The machine identifier required when queueing a pending job.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The HTTP response.</returns>
-    public async Task<HttpResponseMessage> UpdateStatusAsync(Guid id, string newStatus, CancellationToken ct = default)
+    public async Task<HttpResponseMessage> UpdateStatusAsync(Guid id, string newStatus, string? machineId = null, CancellationToken ct = default)
     {
         return newStatus.Trim().ToLowerInvariant() switch
         {
-            "queued" or "queue" => await httpClient.PostAsJsonAsync($"/job/v1/jobs/{id}/queue", new { MachineId = string.Empty }, ct),
+            "queued" or "queue" when !string.IsNullOrWhiteSpace(machineId) => await httpClient.PostAsJsonAsync($"/job/v1/jobs/{id}/queue", new { MachineId = machineId }, ct),
+            "queued" or "queue" => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
+            {
+                ReasonPhrase = "MachineId is required to queue a job."
+            },
             "inprogress" or "in progress" or "started" or "start" => await httpClient.PostAsync($"/job/v1/jobs/{id}/start", null, ct),
             "finishing" or "qualitycheck" or "quality check" or "packaging" => await httpClient.PostAsync($"/job/v1/jobs/{id}/finish", null, ct),
             "completed" or "complete" => await httpClient.PostAsync($"/job/v1/jobs/{id}/complete", null, ct),
@@ -302,11 +317,17 @@ public class JobServiceClient(HttpClient httpClient)
 
         public Guid MaterialId { get; init; }
 
+        public string? CustomerId { get; init; }
+
+        public string? CustomerName { get; init; }
+
         public string? Technology { get; init; }
 
         public int EstimatedPrintTimeMinutes { get; init; }
 
         public string? AssignedMachineId { get; init; }
+
+        public string? AssignedOperator { get; init; }
 
         public int Priority { get; init; }
 
@@ -335,12 +356,14 @@ public class JobServiceClient(HttpClient httpClient)
             {
                 Id = JobId,
                 JobNumber = FormatShortId(JobId),
-                CustomerName = string.Empty,
+                CustomerId = string.IsNullOrWhiteSpace(CustomerId) ? null : CustomerId,
+                CustomerName = CustomerName ?? string.Empty,
                 OrderId = OrderId == Guid.Empty ? null : OrderId,
                 OrderNumber = OrderId == Guid.Empty ? null : FormatShortId(OrderId),
                 PartDescription = FormatPartDescription(SourceProjectPartId, OrderItemId),
                 ProcessType = processType,
                 Material = MaterialId == Guid.Empty ? null : MaterialId.ToString(),
+                MaterialId = MaterialId == Guid.Empty ? null : MaterialId,
                 Priority = FormatPriority(Priority),
                 Status = Status ?? string.Empty,
                 MachineName = AssignedMachineId,
@@ -351,6 +374,7 @@ public class JobServiceClient(HttpClient httpClient)
                 ScheduledStartTime = ScheduledStartTime,
                 ScheduledEndTime = ScheduledEndTime,
                 QueuePosition = QueuePosition,
+                AssignedTo = AssignedOperator,
                 Notes = Notes,
                 UpdatedAt = UpdatedAt
             };

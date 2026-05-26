@@ -8,6 +8,7 @@ using Bunit;
 using Maliev.Intranet.Client.Components.Production;
 using Maliev.Intranet.Client.Pages.Manufacturing;
 using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components.Web;
@@ -24,8 +25,11 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private readonly Guid _partId = Guid.Parse("22222222-3333-4444-5555-666666666666");
     private readonly Guid _jobId = Guid.Parse("33333333-4444-5555-6666-777777777777");
     private readonly Guid _holdId = Guid.Parse("44444444-5555-6666-7777-888888888888");
+    private readonly Guid _customerId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    private readonly Guid _materialId = Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
     private readonly List<string> _requestedRequests = [];
     private JsonDocument? _rescheduleRequest;
+    private JsonDocument? _jobDetailsRequest;
     private DateTime? _boardRangeStart;
 
     public ProductionSchedulePageTests()
@@ -160,9 +164,41 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             Assert.Contains("CNC milling", cut.Markup);
             Assert.Contains("CNC Mill 01", cut.Markup);
             Assert.Contains("bracket-left.stl", cut.Markup);
+            Assert.Contains("Editable job production details", cut.Markup);
+            Assert.Contains("Material traceability", cut.Markup);
+            Assert.Contains("2 active batch(es), 1,250 g remaining.", cut.Markup);
+            Assert.Contains("Expected finish", cut.Markup);
             Assert.Contains("View project", cut.Markup);
         });
         Assert.Contains(_requestedRequests, request => request == $"GET /api/v1/jobs/{_jobId}");
+    }
+
+    [Fact]
+    public void ProductionSchedule_SaveJobDetails_PatchesEditableProductionFields()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Save job details", cut.Markup));
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Save job details", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/details");
+            Assert.NotNull(_jobDetailsRequest);
+        });
+
+        var root = _jobDetailsRequest!.RootElement;
+        Assert.Equal(_customerId.ToString(), root.GetProperty("customerId").GetString());
+        Assert.Equal("Bangkok Precision Parts", root.GetProperty("customerName").GetString());
+        Assert.Equal(_materialId, root.GetProperty("materialId").GetGuid());
+        Assert.Equal("Natt Operator", root.GetProperty("assignedOperator").GetString());
+        Assert.Equal(2, root.GetProperty("priority").GetInt32());
+        Assert.DoesNotContain(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/status");
     }
 
     [Fact]
@@ -281,10 +317,75 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             return Json(BuildJobDetail());
         }
 
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.StartsWith("/api/v1/materials", StringComparison.Ordinal))
+        {
+            return Json(new PagedResponse<MaterialSummaryDto>
+            {
+                Data =
+                [
+                    new MaterialSummaryDto
+                    {
+                        Id = _materialId,
+                        Name = "Aluminum 6061-T6",
+                        SKU = "AL-6061-T6",
+                        Status = "Active"
+                    }
+                ]
+            });
+        }
+
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.StartsWith("/api/v1/employees", StringComparison.Ordinal))
+        {
+            return Json(new PagedResponse<EmployeeSummaryDto>
+            {
+                Data =
+                [
+                    new EmployeeSummaryDto
+                    {
+                        Id = Guid.Parse("cccccccc-dddd-eeee-ffff-000000000000"),
+                        Name = "Natt Operator",
+                        Email = "operator@maliev.com",
+                        Status = "Active"
+                    }
+                ]
+            });
+        }
+
+        if (request.Method == HttpMethod.Get
+            && pathAndQuery.StartsWith("/api/v1/inventory/batches/status", StringComparison.Ordinal))
+        {
+            return Json(new List<MaterialInventoryStatusDto>
+            {
+                new()
+                {
+                    MaterialId = _materialId,
+                    ActiveBatches = 2,
+                    TotalRemainingGrams = 1250m,
+                    LowestBatchGrams = 450m,
+                    HasLowStockAlert = false
+                }
+            });
+        }
+
         if (request.Method == HttpMethod.Patch
             && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}/schedule", StringComparison.Ordinal))
         {
             _rescheduleRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }
+
+        if (request.Method == HttpMethod.Patch
+            && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}/details", StringComparison.Ordinal))
+        {
+            _jobDetailsRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }
+
+        if (request.Method == HttpMethod.Patch
+            && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}/status", StringComparison.Ordinal))
+        {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }
 
@@ -403,12 +504,16 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     {
         Id = _jobId,
         JobNumber = "JOB-2001",
+        CustomerId = _customerId.ToString(),
         CustomerName = "Bangkok Precision Parts",
+        CustomerProfileImageUrl = "https://example.test/customer.png",
         OrderId = Guid.Parse("88888888-9999-aaaa-bbbb-cccccccccccc"),
         OrderNumber = "SO-5005",
         PartDescription = "Bracket left machining",
         ProcessType = "CNC_MILL",
         Material = "Aluminum 6061-T6",
+        MaterialId = _materialId,
+        MaterialSku = "AL-6061-T6",
         Priority = "High",
         Status = "Queued",
         MachineName = "CNC Mill 01",

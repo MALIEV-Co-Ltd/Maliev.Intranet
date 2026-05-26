@@ -393,6 +393,7 @@ try
     builder.AddBffServiceClient<OrderServiceClient>("OrderService");
     builder.AddBffServiceClient<QuotationServiceClient>("QuotationService");
     builder.AddBffServiceClient<MaterialServiceClient>("MaterialService");
+    builder.AddBffServiceClient<InventoryServiceClient>("InventoryService");
     builder.AddBffServiceClient<EmployeeServiceClient>("EmployeeService");
     builder.AddBffServiceClient<InvoiceServiceClient>("InvoiceService");
     builder.AddBffServiceClient<PaymentServiceClient>("PaymentService");

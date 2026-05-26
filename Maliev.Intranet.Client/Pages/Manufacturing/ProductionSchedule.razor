@@ -141,11 +141,13 @@
                             <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
                             <span>Job information</span>
                         </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_jobDetailsEditError))
+                        {
+                            <div class="production-slot-error" role="alert">@_jobDetailsEditError</div>
+                        }
+
                         <dl class="production-slot-facts">
-                            <div>
-                                <dt>Customer</dt>
-                                <dd>@FirstNonEmpty(job.CustomerName, "Not assigned")</dd>
-                            </div>
                             <div>
                                 <dt>Order</dt>
                                 <dd>@FormatOrder(job)</dd>
@@ -159,22 +161,89 @@
                                 <dd>@FormatQuantity(job.Quantity)</dd>
                             </div>
                             <div>
-                                <dt>Status</dt>
-                                <dd>@FirstNonEmpty(job.Status, selectedSlot.Status, "Untracked")</dd>
-                            </div>
-                            <div>
-                                <dt>Priority</dt>
-                                <dd>@FirstNonEmpty(job.Priority, "Normal")</dd>
-                            </div>
-                            <div>
-                                <dt>Material</dt>
-                                <dd>@FirstNonEmpty(job.Material, "Not set")</dd>
-                            </div>
-                            <div>
-                                <dt>Operator</dt>
-                                <dd>@FirstNonEmpty(job.AssignedTo, "Unassigned")</dd>
+                                <dt>Process</dt>
+                                <dd>@FormatTechnology(job.ProcessType)</dd>
                             </div>
                         </dl>
+
+                        <div class="production-job-editor" aria-label="Editable job production details">
+                            <label class="production-job-field production-job-field-wide">
+                                <span>Customer</span>
+                                <CustomerPicker SelectedCustomer="@_jobCustomer"
+                                                SearchCustomers="@SearchCustomersAsync"
+                                                OnCustomerSelected="@OnJobCustomerSelectedAsync"
+                                                OpenBelow="true" />
+                            </label>
+
+                            <label class="production-job-field">
+                                <span>Priority</span>
+                                <select value="@(_jobEditModel?.PriorityValue.ToString(CultureInfo.InvariantCulture) ?? "3")"
+                                        @onchange="OnJobPriorityChanged"
+                                        disabled="@(_savingJobDetails || _jobEditModel is null)">
+                                    <option value="1">Urgent</option>
+                                    <option value="2">High</option>
+                                    <option value="3">Normal</option>
+                                    <option value="4">Low</option>
+                                </select>
+                            </label>
+
+                            <label class="production-job-field">
+                                <span>Queue status</span>
+                                <select value="@(_jobEditModel?.Status ?? job.Status)"
+                                        @onchange="OnJobStatusChanged"
+                                        disabled="@(_savingJobDetails || _jobEditModel is null)">
+                                    @foreach (var status in JobStatusOptions(job.Status))
+                                    {
+                                        <option value="@status">@FormatStatus(status)</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="production-job-field">
+                                <span>Material</span>
+                                <select value="@FormatGuidValue(_jobEditModel?.MaterialId)"
+                                        @onchange="OnJobMaterialChanged"
+                                        disabled="@(_savingJobDetails || _loadingJobReferences || _jobEditModel is null)">
+                                    <option value="">Not set</option>
+                                    @foreach (var material in _materialOptions)
+                                    {
+                                        <option value="@material.Id.ToString()">@MaterialOptionLabel(material)</option>
+                                    }
+                                </select>
+                            </label>
+
+                            <label class="production-job-field">
+                                <span>Operator</span>
+                                <select value="@(_jobEditModel?.Operator ?? string.Empty)"
+                                        @onchange="OnJobOperatorChanged"
+                                        disabled="@(_savingJobDetails || _loadingJobReferences || _jobEditModel is null)">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var employee in _employeeOptions)
+                                    {
+                                        var label = EmployeeOptionLabel(employee);
+                                        <option value="@label">@label</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="production-material-trace" aria-label="Material traceability">
+                            <div>
+                                <span>Material traceability</span>
+                                <strong>@SelectedMaterialLabel(job)</strong>
+                                <small>@FormatInventoryAvailability(_jobInventoryStatus)</small>
+                            </div>
+                            @if (_jobEditModel?.MaterialId is Guid materialId)
+                            {
+                                <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@MaterialHref(materialId)">Open material</SecondaryButton>
+                            }
+                        </div>
+
+                        <div class="production-job-actions">
+                            <PrimaryButton Icon="@Icons.Material.Outlined.Save" Disabled="@(!CanSaveJobDetails)" OnClick="@SaveJobDetailsAsync">
+                                @(_savingJobDetails ? "Saving..." : "Save job details")
+                            </PrimaryButton>
+                        </div>
                     </div>
                 }
                 else if (!_loadingSlotDetails && selectedSlot.IsHold)
@@ -246,6 +315,10 @@
                         <dd>@FormatMinutes(selectedSlot.SetupMinutes + selectedSlot.ProductionMinutes)</dd>
                     </div>
                     <div>
+                        <dt>Expected finish</dt>
+                        <dd>@FormatExpectedFinish(selectedSlot, _selectedJobDetail)</dd>
+                    </div>
+                    <div>
                         <dt>File</dt>
                         <dd>@FirstNonEmpty(selectedSlot.FileName, "Not attached")</dd>
                     </div>
@@ -271,6 +344,11 @@
     private ProductionScheduleSlotDto? _moveSlot;
     private ProductionScheduleSlotDto? _selectedSlot;
     private JobDetailDto? _selectedJobDetail;
+    private JobDetailEditModel? _jobEditModel;
+    private CustomerSummaryDto? _jobCustomer;
+    private List<MaterialSummaryDto> _materialOptions = [];
+    private List<EmployeeSummaryDto> _employeeOptions = [];
+    private MaterialInventoryStatusDto? _jobInventoryStatus;
     private string _moveMachineId = string.Empty;
     private DateTime _moveStartLocal;
     private DateTime _moveEndLocal;
@@ -278,9 +356,12 @@
     private bool _moveCascade = true;
     private bool _loading = true;
     private bool _loadingSlotDetails;
+    private bool _loadingJobReferences;
     private bool _savingMove;
+    private bool _savingJobDetails;
     private string? _error;
     private string? _slotDetailsError;
+    private string? _jobDetailsEditError;
     private string? _moveError;
     private DateTime _rangeStartUtc = DateTime.UtcNow.Date;
 
@@ -314,6 +395,11 @@
     private bool CanSaveMove => _moveSlot is not null
         && !_savingMove
         && string.IsNullOrWhiteSpace(MoveValidationMessage);
+
+    private bool CanSaveJobDetails => _selectedJobDetail is not null
+        && _jobEditModel is not null
+        && !_savingJobDetails
+        && !_loadingJobReferences;
 
     protected override async Task OnInitializedAsync()
     {
@@ -358,7 +444,11 @@
         CloseMovePanel();
         _selectedSlot = slot;
         _selectedJobDetail = null;
+        _jobEditModel = null;
+        _jobCustomer = null;
+        _jobInventoryStatus = null;
         _slotDetailsError = null;
+        _jobDetailsEditError = null;
 
         if (slot.JobId is not Guid jobId)
             return;
@@ -369,7 +459,11 @@
         {
             var job = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{jobId}");
             if (_selectedSlot?.SlotId == slot.SlotId)
+            {
                 _selectedJobDetail = job;
+                InitializeJobEditor(job);
+                await LoadJobReferenceDataAsync(job);
+            }
         }
         catch (Exception ex)
         {
@@ -407,8 +501,13 @@
     {
         _selectedSlot = null;
         _selectedJobDetail = null;
+        _jobEditModel = null;
+        _jobCustomer = null;
+        _jobInventoryStatus = null;
+        _jobDetailsEditError = null;
         _slotDetailsError = null;
         _loadingSlotDetails = false;
+        _loadingJobReferences = false;
     }
 
     private async Task CancelMoveClickedAsync(MouseEventArgs _)
@@ -512,6 +611,224 @@
         }
     }
 
+    private void InitializeJobEditor(JobDetailDto? job)
+    {
+        if (job is null)
+        {
+            _jobEditModel = null;
+            _jobCustomer = null;
+            _jobInventoryStatus = null;
+            return;
+        }
+
+        var materialId = job.MaterialId;
+        if (!materialId.HasValue && Guid.TryParse(job.Material, out var parsedMaterialId))
+        {
+            materialId = parsedMaterialId;
+        }
+
+        _jobEditModel = new JobDetailEditModel
+        {
+            CustomerId = string.IsNullOrWhiteSpace(job.CustomerId) ? null : job.CustomerId,
+            CustomerName = string.IsNullOrWhiteSpace(job.CustomerName) ? null : job.CustomerName,
+            MaterialId = materialId,
+            Operator = string.IsNullOrWhiteSpace(job.AssignedTo) ? null : job.AssignedTo,
+            PriorityValue = PriorityToValue(job.Priority),
+            Status = FirstNonEmpty(job.Status, "Queued")
+        };
+
+        _jobCustomer = string.IsNullOrWhiteSpace(job.CustomerName)
+            ? null
+            : new CustomerSummaryDto
+            {
+                Id = Guid.TryParse(job.CustomerId, out var customerId) ? customerId : Guid.Empty,
+                Name = job.CustomerName,
+                Email = string.Empty,
+                ProfileImageUrl = job.CustomerProfileImageUrl
+            };
+    }
+
+    private async Task LoadJobReferenceDataAsync(JobDetailDto? job)
+    {
+        _loadingJobReferences = true;
+        try
+        {
+            var materialTask = Http.GetFromJsonAsync<PagedResponse<MaterialSummaryDto>>("api/v1/materials?page=1&pageSize=100");
+            var employeeTask = Http.GetFromJsonAsync<PagedResponse<EmployeeSummaryDto>>("api/v1/employees?page=1&pageSize=100");
+
+            await Task.WhenAll(materialTask, employeeTask);
+
+            _materialOptions = (materialTask.Result?.Data ?? Enumerable.Empty<MaterialSummaryDto>())
+                .OrderBy(material => material.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _employeeOptions = (employeeTask.Result?.Data ?? Enumerable.Empty<EmployeeSummaryDto>())
+                .OrderBy(employee => employee.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            await LoadJobMaterialInventoryAsync(_jobEditModel?.MaterialId ?? job?.MaterialId);
+        }
+        catch (Exception ex)
+        {
+            _jobDetailsEditError = $"Job reference data could not be loaded: {ex.Message}";
+        }
+        finally
+        {
+            _loadingJobReferences = false;
+        }
+    }
+
+    private async Task LoadJobMaterialInventoryAsync(Guid? materialId)
+    {
+        _jobInventoryStatus = null;
+        if (materialId is not { } value)
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<MaterialInventoryStatusDto>>(
+                $"api/v1/inventory/batches/status?materialId={Uri.EscapeDataString(value.ToString())}&status=Active");
+            _jobInventoryStatus = response?.FirstOrDefault(status => status.MaterialId == value);
+        }
+        catch
+        {
+            _jobInventoryStatus = null;
+        }
+    }
+
+    private async Task<IEnumerable<CustomerSummaryDto>> SearchCustomersAsync(string query, CancellationToken ct)
+    {
+        var url = string.IsNullOrWhiteSpace(query)
+            ? "api/v1/customers?page=1&pageSize=8"
+            : $"api/v1/customers?query={Uri.EscapeDataString(query)}&page=1&pageSize=8";
+        var response = await Http.GetFromJsonAsync<PagedResponse<CustomerSummaryDto>>(url, ct);
+        return response?.Data ?? Enumerable.Empty<CustomerSummaryDto>();
+    }
+
+    private Task OnJobCustomerSelectedAsync(CustomerSummaryDto? customer)
+    {
+        _jobCustomer = customer;
+        if (_jobEditModel is not null)
+        {
+            _jobEditModel.CustomerId = customer?.Id == Guid.Empty ? null : customer?.Id.ToString();
+            _jobEditModel.CustomerName = customer?.Name;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void OnJobPriorityChanged(ChangeEventArgs e)
+    {
+        if (_jobEditModel is not null && int.TryParse(e.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            _jobEditModel.PriorityValue = Math.Clamp(value, 1, 4);
+        }
+    }
+
+    private void OnJobStatusChanged(ChangeEventArgs e)
+    {
+        if (_jobEditModel is not null)
+        {
+            _jobEditModel.Status = e.Value?.ToString() ?? _jobEditModel.Status;
+        }
+    }
+
+    private async Task OnJobMaterialChanged(ChangeEventArgs e)
+    {
+        if (_jobEditModel is null)
+        {
+            return;
+        }
+
+        _jobEditModel.MaterialId = Guid.TryParse(e.Value?.ToString(), out var materialId)
+            ? materialId
+            : null;
+        await LoadJobMaterialInventoryAsync(_jobEditModel.MaterialId);
+    }
+
+    private void OnJobOperatorChanged(ChangeEventArgs e)
+    {
+        if (_jobEditModel is not null)
+        {
+            _jobEditModel.Operator = string.IsNullOrWhiteSpace(e.Value?.ToString())
+                ? null
+                : e.Value.ToString();
+        }
+    }
+
+    private async Task SaveJobDetailsAsync(MouseEventArgs _)
+    {
+        if (_selectedJobDetail is null || _jobEditModel is null || _selectedSlot is null)
+        {
+            return;
+        }
+
+        _savingJobDetails = true;
+        _jobDetailsEditError = null;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync(
+                $"api/v1/jobs/{_selectedJobDetail.Id}/details",
+                new UpdateJobDetailsRequest
+                {
+                    CustomerId = _jobEditModel.CustomerId,
+                    CustomerName = _jobEditModel.CustomerName,
+                    MaterialId = _jobEditModel.MaterialId,
+                    AssignedOperator = _jobEditModel.Operator,
+                    Priority = _jobEditModel.PriorityValue
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _jobDetailsEditError = await ReadScheduleErrorAsync(response);
+                return;
+            }
+
+            if (!string.Equals(_jobEditModel.Status, _selectedJobDetail.Status, StringComparison.OrdinalIgnoreCase))
+            {
+                var statusResponse = await Http.PatchAsJsonAsync(
+                    $"api/v1/jobs/{_selectedJobDetail.Id}/status",
+                    new UpdateJobStatusRequest
+                    {
+                        Status = _jobEditModel.Status,
+                        MachineId = _selectedSlot.MachineId
+                    });
+
+                if (!statusResponse.IsSuccessStatusCode)
+                {
+                    _jobDetailsEditError = await ReadScheduleErrorAsync(statusResponse);
+                    return;
+                }
+            }
+
+            Snackbar.Add("Job details updated.", Severity.Success);
+            await ReloadSelectedJobAsync(_selectedJobDetail.Id, _selectedSlot);
+            await LoadBoardAsync();
+        }
+        catch (Exception ex)
+        {
+            _jobDetailsEditError = $"Job details could not be updated: {ex.Message}";
+        }
+        finally
+        {
+            _savingJobDetails = false;
+        }
+    }
+
+    private async Task ReloadSelectedJobAsync(Guid jobId, ProductionScheduleSlotDto selectedSlot)
+    {
+        var job = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{jobId}");
+        if (_selectedSlot?.SlotId != selectedSlot.SlotId)
+        {
+            return;
+        }
+
+        _selectedJobDetail = job;
+        InitializeJobEditor(job);
+        await LoadJobMaterialInventoryAsync(_jobEditModel?.MaterialId ?? job?.MaterialId);
+    }
+
     private void OnMoveMachineChanged(ChangeEventArgs e)
     {
         _moveError = null;
@@ -573,6 +890,9 @@
     private static string FormatQueue(int queuePosition) =>
         queuePosition > 0 ? $"#{queuePosition}" : "Unpositioned";
 
+    private static string FormatGuidValue(Guid? value) =>
+        value?.ToString() ?? string.Empty;
+
     private static string FormatQuantity(int quantity) =>
         quantity > 0 ? $"{quantity.ToString("N0", CultureInfo.InvariantCulture)} pcs" : "Not set";
 
@@ -595,6 +915,106 @@
 
     private static string ProjectHref(Guid projectId) =>
         $"/sales/projects/{projectId}";
+
+    private static string MaterialHref(Guid materialId) =>
+        $"/mfg/materials/{materialId}";
+
+    private static string MaterialOptionLabel(MaterialSummaryDto material) =>
+        string.IsNullOrWhiteSpace(material.SKU)
+            ? material.Name
+            : $"{material.Name} ({material.SKU})";
+
+    private static string EmployeeOptionLabel(EmployeeSummaryDto employee) =>
+        FirstNonEmpty(employee.Name, employee.Email, employee.Id.ToString());
+
+    private string SelectedMaterialLabel(JobDetailDto job)
+    {
+        var materialId = _jobEditModel?.MaterialId ?? job.MaterialId;
+        var material = materialId is { } value
+            ? _materialOptions.FirstOrDefault(option => option.Id == value)
+            : null;
+
+        return material is not null
+            ? MaterialOptionLabel(material)
+            : FirstNonEmpty(job.Material, materialId?.ToString(), "Not selected");
+    }
+
+    private static string FormatInventoryAvailability(MaterialInventoryStatusDto? status)
+    {
+        if (status is null)
+            return "No active stock batch reported for this material.";
+
+        var remaining = status.TotalRemainingGrams.ToString("N0", CultureInfo.InvariantCulture);
+        var lowest = status.LowestBatchGrams.ToString("N0", CultureInfo.InvariantCulture);
+        var alert = status.HasLowStockAlert ? " Low-stock alert active." : string.Empty;
+        return $"{status.ActiveBatches:N0} active batch(es), {remaining} g remaining. Lowest batch {lowest} g.{alert}";
+    }
+
+    private static string FormatExpectedFinish(ProductionScheduleSlotDto slot, JobDetailDto? job)
+    {
+        var finish = job?.ScheduledEndTime ?? job?.EstimatedCompletionAt ?? slot.ScheduledEnd;
+        return FormatOptionalDateTime(finish);
+    }
+
+    private static IReadOnlyList<string> JobStatusOptions(string? currentStatus)
+    {
+        var current = NormalizeStatus(currentStatus);
+        var options = new List<string> { current };
+
+        switch (current)
+        {
+            case "Pending":
+                options.AddRange(["Queued", "Cancelled"]);
+                break;
+            case "Queued":
+                options.AddRange(["InProgress", "Cancelled"]);
+                break;
+            case "InProgress":
+            case "InProduction":
+                options.AddRange(["Finishing", "Cancelled"]);
+                break;
+            case "Finishing":
+            case "QualityCheck":
+            case "Packaging":
+                options.AddRange(["Completed", "Cancelled"]);
+                break;
+        }
+
+        return options
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string NormalizeStatus(string? status) =>
+        status?.Trim() switch
+        {
+            null or "" => "Pending",
+            "In Production" => "InProduction",
+            "In progress" => "InProgress",
+            "Complete" => "Completed",
+            "Canceled" => "Cancelled",
+            var value => value
+        };
+
+    private static string FormatStatus(string status) => status switch
+    {
+        "InProgress" or "InProduction" => "In progress",
+        "QualityCheck" => "Quality check",
+        _ => string.Join(" ", status.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()))
+    };
+
+    private static int PriorityToValue(string? priority)
+    {
+        return priority?.Trim().ToLowerInvariant() switch
+        {
+            "urgent" => 1,
+            "high" => 2,
+            "low" => 4,
+            _ => 3
+        };
+    }
 
     private static string FormatTechnology(string? technology)
     {
@@ -696,5 +1116,20 @@
             return value.ToUniversalTime();
 
         return DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    }
+
+    private sealed class JobDetailEditModel
+    {
+        public string? CustomerId { get; set; }
+
+        public string? CustomerName { get; set; }
+
+        public Guid? MaterialId { get; set; }
+
+        public string? Operator { get; set; }
+
+        public int PriorityValue { get; set; } = 3;
+
+        public string Status { get; set; } = "Queued";
     }
 }

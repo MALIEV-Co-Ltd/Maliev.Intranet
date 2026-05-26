@@ -203,6 +203,94 @@
     font-weight: 700;
 }
 
+.production-job-editor {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.production-job-field {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.production-job-field-wide {
+    grid-column: 1 / -1;
+}
+
+.production-job-field > span,
+.production-material-trace span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-job-field select {
+    width: 100%;
+    min-height: 36px;
+    min-width: 0;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+    font: inherit;
+    font-size: var(--maliev-font-small);
+    padding: 0 10px;
+}
+
+.production-job-field select:disabled {
+    background: var(--maliev-panel-2);
+    color: var(--maliev-muted);
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.production-material-trace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.production-material-trace > div {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.production-material-trace strong,
+.production-material-trace small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.production-material-trace strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-small);
+    font-weight: 800;
+}
+
+.production-material-trace small {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    line-height: 1.35;
+}
+
+.production-job-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .production-slot-capacity {
     background: var(--maliev-panel-2);
 }
@@ -300,7 +388,9 @@
 
     .production-move-grid,
     .production-slot-overview,
-    .production-slot-facts {
+    .production-slot-facts,
+    .production-job-editor,
+    .production-material-trace {
         grid-template-columns: 1fr;
     }
 }

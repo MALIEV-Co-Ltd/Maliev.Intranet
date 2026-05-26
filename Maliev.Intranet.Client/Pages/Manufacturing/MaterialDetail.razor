@@ -115,6 +115,39 @@
                         <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" OnClick="@CreatePurchaseOrder">Order more</PrimaryButton>
                         <SecondaryButton Icon="@Icons.Material.Outlined.Handshake" Href="/purchasing/suppliers">Supplier Profiles</SecondaryButton>
                     </div>
+                    <div class="material-batch-summary" aria-label="Traceable batch inventory">
+                        @if (_loadingInventory)
+                        {
+                            <MudSkeleton Height="16px" Width="75%" />
+                            <MudSkeleton Height="16px" Width="45%" />
+                        }
+                        else if (_inventoryStatus is not null)
+                        {
+                            <div>
+                                <span>Active batches</span>
+                                <strong>@_inventoryStatus.ActiveBatches.ToString("N0")</strong>
+                            </div>
+                            <div>
+                                <span>Remaining stock</span>
+                                <strong>@FormatGrams(_inventoryStatus.TotalRemainingGrams)</strong>
+                            </div>
+                            <div>
+                                <span>Lowest batch</span>
+                                <strong>@FormatGrams(_inventoryStatus.LowestBatchGrams)</strong>
+                            </div>
+                            <StatusBadge Status="@(_inventoryStatus.HasLowStockAlert ? "Low stock" : "Traceable")" />
+                        }
+                        else
+                        {
+                            <div class="material-empty-state material-batch-empty">
+                                <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Size="Size.Small" />
+                                <div>
+                                    <strong>No active traceable batches</strong>
+                                    <span>Receive raw stock to create QR or barcode labels for physical material handling.</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
             </PanelCard>
 
@@ -276,6 +309,49 @@
         </div>
 
         <aside class="material-detail-side" aria-label="Material inventory operations">
+            <PanelCard Title="Receive stock batch">
+                @if (_material is not null)
+                {
+                    <div class="material-receive-form">
+                        <label class="material-edit-field">
+                            <span>Quantity received (g)</span>
+                            <input class="material-input"
+                                   type="number"
+                                   min="0.01"
+                                   step="0.01"
+                                   @bind="_receiveBatch.InitialWeightGrams"
+                                   @bind:event="oninput"
+                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                        </label>
+                        <label class="material-edit-field">
+                            <span>Storage location</span>
+                            <input class="material-input"
+                                   @bind="_receiveBatch.Location"
+                                   @bind:event="oninput"
+                                   placeholder="Rack A / Bin 03"
+                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                        </label>
+                        <label class="material-edit-field">
+                            <span>Low-stock threshold (g)</span>
+                            <input class="material-input"
+                                   type="number"
+                                   min="0"
+                                   step="0.01"
+                                   @bind="_receiveBatch.LowStockThresholdGrams"
+                                   @bind:event="oninput"
+                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                        </label>
+                        @if (!string.IsNullOrWhiteSpace(_inventoryError))
+                        {
+                            <div class="material-inventory-error" role="alert">@_inventoryError</div>
+                        }
+                        <PrimaryButton Icon="@Icons.Material.Outlined.QrCode2" Disabled="@(!_canUpdateMaterial || _receivingBatch)" OnClick="@ReceiveBatchAsync">
+                            @(_receivingBatch ? "Receiving..." : "Receive and label")
+                        </PrimaryButton>
+                    </div>
+                }
+            </PanelCard>
+
             <PanelCard Title="Inventory label">
                 @if (_material is not null)
                 {
@@ -292,6 +368,27 @@
                     </div>
                 }
             </PanelCard>
+
+            @if (_createdBatch is not null)
+            {
+                <PanelCard Title="Latest batch label">
+                    <div class="material-label-panel">
+                        <div class="material-label-heading">
+                            <span>Apply to raw stock</span>
+                            <strong>@_createdBatch.Location</strong>
+                        </div>
+                        <div class="material-barcode-shell" aria-label="@($"Barcode for {BatchTrackingCode}")">
+                            @BatchBarcodeSvg
+                        </div>
+                        <code class="material-tracking-code">@BatchTrackingCode</code>
+                        <dl class="mlv-detail-list material-batch-detail-list">
+                            <dt>Initial</dt><dd>@FormatGrams(_createdBatch.InitialWeightGrams)</dd>
+                            <dt>Remaining</dt><dd>@FormatGrams(_createdBatch.RemainingWeightGrams)</dd>
+                            <dt>Received</dt><dd>@_createdBatch.ReceivedAt.LocalDateTime.ToString("dd MMM yyyy HH:mm")</dd>
+                        </dl>
+                    </div>
+                </PanelCard>
+            }
 
             <PanelCard Title="Suppliers">
                 @if (_material?.Suppliers.Count > 0)
@@ -332,11 +429,17 @@
     private MaterialDetailDto? _material;
     private MaterialEditModel? _editModel;
     private EditContext? _editContext;
+    private MaterialInventoryStatusDto? _inventoryStatus;
+    private InventoryBatchDto? _createdBatch;
+    private ReceiveBatchModel _receiveBatch = new();
     private bool _loading = true;
+    private bool _loadingInventory;
     private bool _saving;
     private bool _editing;
+    private bool _receivingBatch;
     private bool _canUpdateMaterial;
     private bool _colorsLoading;
+    private string? _inventoryError;
     private List<MaterialColorDto> _colorOptions = [];
 
     private static readonly IReadOnlyDictionary<char, string> Code39Patterns = new Dictionary<char, string>
@@ -455,6 +558,12 @@
 
     private MarkupString BarcodeSvg => new(BuildCode39Svg(InventoryTrackingCode));
 
+    private string BatchTrackingCode => _createdBatch is null
+        ? string.Empty
+        : $"MALIEV-BATCH-{_createdBatch.Id:N}".ToUpperInvariant();
+
+    private MarkupString BatchBarcodeSvg => new(BuildCode39Svg(BatchTrackingCode));
+
     private IReadOnlyList<MaterialColorDto> EditableColorOptions
     {
         get
@@ -485,6 +594,8 @@
         try
         {
             _material = await Http.GetFromJsonAsync<MaterialDetailDto>($"api/v1/materials/{Id}");
+            ResetReceiveBatchForm();
+            await LoadInventoryStatusAsync();
         }
         catch (Exception ex)
         {
@@ -534,6 +645,92 @@
 
         var query = $"materialId={Uri.EscapeDataString(_material.Id.ToString())}&materialName={Uri.EscapeDataString(_material.Name)}";
         Navigation.NavigateTo($"/purchasing/new?{query}");
+    }
+
+    private async Task LoadInventoryStatusAsync()
+    {
+        _inventoryStatus = null;
+        if (_material is null)
+        {
+            return;
+        }
+
+        _loadingInventory = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<MaterialInventoryStatusDto>>(
+                $"api/v1/inventory/batches/status?materialId={Uri.EscapeDataString(_material.Id.ToString())}&status=Active");
+            _inventoryStatus = response?.FirstOrDefault(status => status.MaterialId == _material.Id);
+        }
+        catch (Exception ex)
+        {
+            _inventoryError = $"Unable to load inventory batches: {ex.Message}";
+        }
+        finally
+        {
+            _loadingInventory = false;
+        }
+    }
+
+    private async Task ReceiveBatchAsync(MouseEventArgs _)
+    {
+        if (_material is null)
+        {
+            return;
+        }
+
+        _inventoryError = null;
+        if (_receiveBatch.InitialWeightGrams <= 0)
+        {
+            _inventoryError = "Quantity received must be greater than zero.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_receiveBatch.Location))
+        {
+            _inventoryError = "Storage location is required.";
+            return;
+        }
+
+        _receivingBatch = true;
+        try
+        {
+            var request = new CreateInventoryBatchRequest
+            {
+                MaterialId = _material.Id,
+                InitialWeightGrams = _receiveBatch.InitialWeightGrams,
+                Location = _receiveBatch.Location.Trim(),
+                LowStockThresholdGrams = _receiveBatch.LowStockThresholdGrams > 0 ? _receiveBatch.LowStockThresholdGrams : null
+            };
+
+            var response = await Http.PostAsJsonAsync("api/v1/inventory/batches", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _inventoryError = "Unable to receive material batch.";
+                return;
+            }
+
+            _createdBatch = await response.Content.ReadFromJsonAsync<InventoryBatchDto>();
+            ResetReceiveBatchForm();
+            await LoadInventoryStatusAsync();
+            Snackbar.Add("Material batch received. Apply the generated label to the raw stock.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _inventoryError = $"Unable to receive material batch: {ex.Message}";
+        }
+        finally
+        {
+            _receivingBatch = false;
+        }
+    }
+
+    private void ResetReceiveBatchForm()
+    {
+        _receiveBatch = new ReceiveBatchModel
+        {
+            Location = _receiveBatch.Location
+        };
     }
 
     private async Task SaveMaterialAsync()
@@ -668,6 +865,9 @@
 
     private static string FormatQuantity(int quantity)
         => quantity > 0 ? $"+{quantity:N0}" : quantity.ToString("N0");
+
+    private static string FormatGrams(decimal grams)
+        => $"{grams.ToString("N0", CultureInfo.InvariantCulture)} g";
 
     private static string GetTransactionQuantityClass(int quantity)
         => quantity >= 0 ? "material-audit-quantity positive" : "material-audit-quantity negative";
@@ -810,5 +1010,14 @@
         public int QuantityOnHand { get; set; }
 
         public List<Guid> SelectedColorIds { get; set; } = [];
+    }
+
+    private sealed class ReceiveBatchModel
+    {
+        public decimal InitialWeightGrams { get; set; }
+
+        public string Location { get; set; } = string.Empty;
+
+        public decimal? LowStockThresholdGrams { get; set; }
     }
 }

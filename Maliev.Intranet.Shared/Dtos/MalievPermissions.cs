@@ -297,6 +297,21 @@ public static class MalievPermissions
     }
 
     /// <summary>
+    /// Permissions for traceable inventory stock and material batches.
+    /// </summary>
+    public static class Inventory
+    {
+        /// <summary>Permission to read material stock and batch status.</summary>
+        public const string StockRead = "inventory.stock.read";
+        /// <summary>Permission to receive or adjust material stock.</summary>
+        public const string StockWrite = "inventory.stock.write";
+        /// <summary>Permission to read material batch records.</summary>
+        public const string BatchesRead = "inventory.batches.read";
+        /// <summary>Permission to create and manage material batches.</summary>
+        public const string BatchesWrite = "inventory.batches.write";
+    }
+
+    /// <summary>
     /// Permissions for financial invoice processing.
     /// </summary>
     public static class Invoice
