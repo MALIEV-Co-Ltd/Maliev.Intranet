@@ -654,7 +654,7 @@
 
         if (isRetryable)
         {
-            var storagePath = Part.GlbStoragePath ?? Part.StoragePath;
+            var storagePath = Part.StoragePath ?? Part.GlbStoragePath;
             if (!string.IsNullOrEmpty(storagePath) && OnRequestFreshViewerUrl.HasDelegate)
             {
                 await OnRequestFreshViewerUrl.InvokeAsync(storagePath);

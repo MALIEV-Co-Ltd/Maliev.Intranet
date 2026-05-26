@@ -1205,8 +1205,9 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         // Fallback: Call viewer-url API for backward compatibility (drafts created before this fix)
-        // Prefer GlbStoragePath (already has _viewer.glb suffix) over StoragePath to avoid double-suffix bug
-        var storagePath = part.GlbStoragePath ?? BuildViewerGlbStoragePath(part.StoragePath);
+        // Use StoragePath (original uploaded file path); the BFF caches status keyed by that path,
+        // not by GlbStoragePath which ends in _viewer.glb.
+        var storagePath = part.StoragePath;
         if (string.IsNullOrEmpty(storagePath)) return;
 
         try
@@ -1351,9 +1352,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         try
         {
-            var refreshStoragePath = part.GlbStoragePath
-                ?? BuildViewerGlbStoragePath(part.StoragePath)
-                ?? storagePath;
+            var refreshStoragePath = part.StoragePath ?? storagePath;
             var viewerResp = await Http.GetAsync(
                 $"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(refreshStoragePath)}");
             if (viewerResp.IsSuccessStatusCode)
@@ -3434,9 +3433,9 @@ public partial class ProjectNew : IAsyncDisposable
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(part.GlbStoragePath)) return;
+        if (string.IsNullOrWhiteSpace(part.StoragePath)) return;
 
-        var resp = await Http.GetAsync($"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.GlbStoragePath)}");
+        var resp = await Http.GetAsync($"api/v1/uploads/viewer-url?storagePath={Uri.EscapeDataString(part.StoragePath)}");
         if (!resp.IsSuccessStatusCode)
         {
             Snackbar.Add("Failed to load 3D viewer URL.", Severity.Error);

@@ -3,10 +3,14 @@ using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
+using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -20,11 +24,9 @@ public class UploadAnalysisStatusTests
     private readonly Mock<IFileAnalysisStatusService> _statusServiceMock = new();
     private readonly Mock<ILogger<UploadsController>> _loggerMock = new();
 
-    private UploadsController CreateController()
+    private UploadsController CreateController(UploadServiceClient? uploadClient = null)
     {
-        // Create a minimal HttpClient (won't be used in GetAnalysisStatusAsync)
-        var httpClient = new HttpClient();
-        var uploadClient = new UploadServiceClient(httpClient);
+        uploadClient ??= new UploadServiceClient(new HttpClient());
 
         var fileTypesSettings = new FileTypesSettings
         {
@@ -132,6 +134,58 @@ public class UploadAnalysisStatusTests
         var returnedStatus = Assert.IsType<FileAnalysisStatusDto>(okResult.Value);
         Assert.Equal(FileAnalysisStatus.Processing, returnedStatus.Status);
         Assert.Null(returnedStatus.GlbStoragePath);
+    }
+
+    /// <summary>
+    /// Tests that the viewer URL endpoint resolves status by the original source path,
+    /// then signs the generated GLB artifact path.
+    /// </summary>
+    [Fact]
+    public async Task GetViewerUrl_UsesSourceStoragePathStatus_AndSignsGlbArtifact()
+    {
+        var storagePath = "projects/test/model.step";
+        var glbStoragePath = "projects/test/model.step_viewer.glb";
+        var signedUrl = "https://storage.example/model.glb?signature=fresh";
+        var signedUrlRequests = new List<HttpRequestMessage>();
+        var signedUrlRequestBodies = new List<string>();
+
+        var uploadClient = new UploadServiceClient(new HttpClient(new MockHttpMessageHandler(async (request, _) =>
+        {
+            var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync();
+            lock (signedUrlRequests) { signedUrlRequests.Add(request); }
+            lock (signedUrlRequestBodies) { signedUrlRequestBodies.Add(body); }
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { signedUrl })
+            };
+        }))
+        {
+            BaseAddress = new Uri("http://upload-service")
+        });
+
+        _statusServiceMock
+            .Setup(x => x.GetStatusAsync(storagePath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FileAnalysisStatusDto
+            {
+                UploadId = storagePath,
+                Status = FileAnalysisStatus.Completed,
+                GlbStoragePath = glbStoragePath
+            });
+
+        var controller = CreateController(uploadClient);
+
+        var result = await controller.GetViewerUrlAsync(storagePath, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var json = JsonSerializer.Serialize(okResult.Value);
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(signedUrl, document.RootElement.GetProperty("Url").GetString());
+        Assert.Contains(signedUrlRequests, request =>
+            request.RequestUri?.AbsolutePath == "/upload/v1/files/by-path/signed-url");
+        var signedUrlRequestBody = Assert.Single(signedUrlRequestBodies);
+        using var signedUrlRequestJson = JsonDocument.Parse(signedUrlRequestBody);
+        Assert.True(signedUrlRequestJson.RootElement.TryGetProperty("storagePath", out var signedStoragePath));
+        Assert.Equal(glbStoragePath, signedStoragePath.GetString());
     }
 
     /// <summary>

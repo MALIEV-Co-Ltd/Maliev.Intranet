@@ -222,6 +222,150 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task OpenBabylonViewer_WhenViewerUrlEmpty_CallsViewerUrlEndpointWithStoragePath()
+    {
+        const string storagePath = "projects/temp/review.stp";
+        const string glbStoragePath = "projects/temp/review.stp_viewer.glb";
+        const string signedUrl = "https://signed.example/review.glb";
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+            if (request.RequestUri?.AbsolutePath.Contains("viewer-url") == true)
+            {
+                var query = request.RequestUri.Query;
+                if (query.Contains(Uri.EscapeDataString(storagePath)))
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            JsonSerializer.Serialize(new { url = signedUrl }),
+                            Encoding.UTF8, "application/json")
+                    };
+                // Fail if GlbStoragePath (with _viewer.glb suffix) was passed instead
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "review.stp",
+            StoragePath = storagePath,
+            GlbStoragePath = glbStoragePath,
+        };
+        ClearRequests();
+
+        await InvokePrivateTaskWithArgsAsync(cut, "OpenBabylonViewer", part);
+
+        Assert.Equal(signedUrl, part.ViewerUrl);
+        Assert.Contains(_sentRequests, request =>
+            request.RequestUri?.AbsolutePath.Contains("viewer-url", StringComparison.OrdinalIgnoreCase) == true &&
+            request.RequestUri.Query.Contains(Uri.EscapeDataString(storagePath)));
+        Assert.DoesNotContain(_sentRequests, request =>
+            request.RequestUri?.Query.Contains(Uri.EscapeDataString(glbStoragePath)) == true);
+    }
+
+    [Fact]
+    public async Task RequestFreshViewerUrlAsync_WhenSignedUrlExpired_CallsViewerUrlEndpointWithStoragePath()
+    {
+        const string storagePath = "projects/temp/review.stp";
+        const string glbStoragePath = "projects/temp/review.stp_viewer.glb";
+        const string freshSignedUrl = "https://signed.example/review-fresh.glb";
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+            if (request.RequestUri?.AbsolutePath.Contains("viewer-url") == true)
+            {
+                var query = request.RequestUri.Query;
+                if (query.Contains(Uri.EscapeDataString(storagePath)))
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            JsonSerializer.Serialize(new { url = freshSignedUrl }),
+                            Encoding.UTF8, "application/json")
+                    };
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var parts = GetParts(cut.Instance);
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "review.stp",
+            StoragePath = storagePath,
+            GlbStoragePath = glbStoragePath,
+            ViewerUrl = "https://signed.example/review-expired.glb",
+        };
+        parts.Add(part);
+        ClearRequests();
+
+        await InvokePrivateTaskWithArgsAsync(cut, "RequestFreshViewerUrlAsync", storagePath);
+
+        Assert.Equal(freshSignedUrl, part.ViewerUrl);
+        Assert.Equal(freshSignedUrl, part.GlbSignedUrl);
+        Assert.Contains(_sentRequests, request =>
+            request.RequestUri?.AbsolutePath.Contains("viewer-url", StringComparison.OrdinalIgnoreCase) == true &&
+            request.RequestUri.Query.Contains(Uri.EscapeDataString(storagePath)));
+        Assert.DoesNotContain(_sentRequests, request =>
+            request.RequestUri?.Query.Contains(Uri.EscapeDataString(glbStoragePath)) == true);
+    }
+
+    [Fact]
+    public async Task RequestFreshViewerUrlAsync_WhenCalledWithGlbStoragePath_UsesSourceStoragePath()
+    {
+        const string storagePath = "projects/temp/review.stp";
+        const string glbStoragePath = "projects/temp/review.stp_viewer.glb";
+        const string freshSignedUrl = "https://signed.example/review-fresh.glb";
+
+        _httpHandler.HandlerFunc = async (request, ct) =>
+        {
+            lock (_sentRequests) { _sentRequests.Add(request); }
+            if (request.RequestUri?.AbsolutePath.Contains("viewer-url") == true)
+            {
+                var query = request.RequestUri.Query;
+                if (query.Contains(Uri.EscapeDataString(storagePath)))
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            JsonSerializer.Serialize(new { url = freshSignedUrl }),
+                            Encoding.UTF8, "application/json")
+                    };
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+            return await DefaultHandler(request, ct);
+        };
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var parts = GetParts(cut.Instance);
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "review.stp",
+            StoragePath = storagePath,
+            GlbStoragePath = glbStoragePath,
+            ViewerUrl = "https://signed.example/review-expired.glb",
+        };
+        parts.Add(part);
+        ClearRequests();
+
+        await InvokePrivateTaskWithArgsAsync(cut, "RequestFreshViewerUrlAsync", glbStoragePath);
+
+        Assert.Equal(freshSignedUrl, part.ViewerUrl);
+        Assert.Equal(freshSignedUrl, part.GlbSignedUrl);
+        Assert.Contains(_sentRequests, request =>
+            request.RequestUri?.AbsolutePath.Contains("viewer-url", StringComparison.OrdinalIgnoreCase) == true &&
+            request.RequestUri.Query.Contains(Uri.EscapeDataString(storagePath)));
+        Assert.DoesNotContain(_sentRequests, request =>
+            request.RequestUri?.Query.Contains(Uri.EscapeDataString(glbStoragePath)) == true);
+    }
+
+    [Fact]
     public async Task HandleFileSelectedAsync_WhenTwoValidFilesSelected_StartsBothUploads()
     {
         var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
