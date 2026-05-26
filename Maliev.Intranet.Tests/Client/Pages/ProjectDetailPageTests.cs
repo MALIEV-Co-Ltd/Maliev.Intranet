@@ -544,6 +544,10 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-note-audit", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-overview-sidebar", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-manufacturing-card", css, StringComparison.Ordinal);
+        var recordColumnRuleStart = css.IndexOf("::deep .project-record-main,", StringComparison.Ordinal);
+        var recordColumnRuleEnd = css.IndexOf('}', recordColumnRuleStart);
+        var recordColumnRule = css[recordColumnRuleStart..recordColumnRuleEnd];
+        Assert.Contains("min-width: 0", recordColumnRule, StringComparison.Ordinal);
         Assert.Contains("::deep .project-field-grid-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-snapshot-compact", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-quote-terms", css, StringComparison.Ordinal);
