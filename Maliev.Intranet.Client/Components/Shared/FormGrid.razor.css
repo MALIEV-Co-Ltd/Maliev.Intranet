@@ -1,10 +1,26 @@
 .mlv-form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    min-width: 0;
     gap: 14px 20px;
 }
 
-@media (max-width: 720px) {
+.mlv-form-grid ::deep .mlv-form-field {
+    min-width: 0;
+}
+
+.mlv-form-grid ::deep .mlv-span-3,
+.mlv-form-grid ::deep .mlv-span-4,
+.mlv-form-grid ::deep .mlv-span-5,
+.mlv-form-grid ::deep .mlv-span-6,
+.mlv-form-grid ::deep .mlv-span-7,
+.mlv-form-grid ::deep .mlv-span-8,
+.mlv-form-grid ::deep .mlv-span-12 {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
     .mlv-form-grid {
         grid-template-columns: 1fr;
     }

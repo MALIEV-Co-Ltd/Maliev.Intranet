@@ -1,5 +1,6 @@
 .mlv-form-field {
     display: grid;
+    min-width: 0;
     gap: 6px;
 }
 
@@ -9,6 +10,7 @@
     font-weight: 600;
     letter-spacing: 0;
     text-transform: uppercase;
+    overflow-wrap: anywhere;
 }
 
 .mlv-form-field ::deep input,

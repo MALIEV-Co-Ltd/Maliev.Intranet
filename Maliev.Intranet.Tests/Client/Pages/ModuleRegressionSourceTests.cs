@@ -58,6 +58,34 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void SharedFormGrid_PreventsGlobalSpanUtilitiesFromBreakingFieldLayout()
+    {
+        var gridStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "FormGrid.razor.css");
+        var fieldStyles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "FormField.razor.css");
+        var supplierPage = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor");
+        var gridBlock = ExtractCssBlock(gridStyles, ".mlv-form-grid {");
+        var fieldBlock = ExtractCssBlock(fieldStyles, ".mlv-form-field {");
+        var labelBlock = ExtractCssBlock(fieldStyles, ".mlv-form-field span {");
+        var nestedFieldBlock = ExtractCssBlock(gridStyles, ".mlv-form-grid ::deep .mlv-form-field {");
+        var spanGuardBlock = ExtractCssBlock(gridStyles, ".mlv-form-grid ::deep .mlv-span-3,");
+
+        Assert.Contains("min-width: 0;", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("align-items: start;", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", nestedFieldBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-column: 1 / -1;", spanGuardBlock, StringComparison.Ordinal);
+        foreach (var spanClass in new[] { "mlv-span-3", "mlv-span-4", "mlv-span-5", "mlv-span-6", "mlv-span-7", "mlv-span-8", "mlv-span-12" })
+        {
+            Assert.Contains($".mlv-form-grid ::deep .{spanClass}", gridStyles, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("@media (max-width: 900px)", gridStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(gridStyles, "@media (max-width: 900px)"), StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", fieldBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: anywhere;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("FormField Label=\"Address\" Class=\"mlv-span-6\"", supplierPage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerList_SubscribesToCustomerChangedRealtimeSignal()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
