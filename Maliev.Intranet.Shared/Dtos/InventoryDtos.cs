@@ -408,6 +408,10 @@ public class SupplierSummaryDto
     public string Status { get; set; } = string.Empty;
     /// <summary>The calculated rating or performance score of the supplier (0.0 to 5.0).</summary>
     public decimal Rating { get; set; }
+    /// <summary>The supplier capability names that matched this material search.</summary>
+    public List<string> Capabilities { get; set; } = [];
+    /// <summary>The reason this supplier is shown for the current material.</summary>
+    public string? MatchReason { get; set; }
 }
 
 /// <summary>

@@ -159,6 +159,18 @@
     gap: 12px;
 }
 
+.material-inline-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.material-dimension-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
 .material-inventory-error {
     padding: 10px 12px;
     border: 1px solid color-mix(in srgb, var(--mud-palette-error) 38%, var(--maliev-border));
@@ -195,20 +207,44 @@
     line-height: 1.25;
 }
 
-.material-barcode-shell {
+.material-qr-label-body {
     display: grid;
+    grid-template-columns: 24mm minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
     min-width: 0;
-    padding: 12px;
-    border-radius: var(--maliev-radius-sm);
-    background: var(--maliev-barcode-bg);
+}
+
+.material-qr-shell {
+    display: grid;
+    place-items: center;
+    width: 24mm;
+    height: 24mm;
+    padding: 2mm;
+    border-radius: 4px;
+    background: #fff;
     box-shadow: var(--maliev-shadow-ring);
 }
 
-.material-barcode-svg {
+.material-qr-shell svg {
     display: block;
     width: 100%;
-    height: 72px;
-    fill: var(--maliev-barcode-ink);
+    height: 100%;
+}
+
+.material-label-copy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.material-label-copy span {
+    overflow: hidden;
+    color: var(--maliev-muted);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-caption-size);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .material-tracking-code {
@@ -224,18 +260,35 @@
     line-height: 1.3;
 }
 
+.material-label-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.material-print-label {
+    width: min(100%, 50mm);
+    min-height: 30mm;
+    padding: 8px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+}
+
 .material-batch-detail-list {
     margin-top: 4px;
 }
 
 .material-audit-list,
-.material-supplier-list {
+.material-supplier-list,
+.material-item-list {
     display: grid;
     gap: 10px;
 }
 
 .material-audit-entry,
-.material-supplier-entry {
+.material-supplier-entry,
+.material-item-entry {
     display: grid;
     min-width: 0;
     border-radius: var(--maliev-radius-sm);
@@ -309,8 +362,19 @@
     padding: 10px;
 }
 
+.material-item-entry {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    padding: 10px;
+}
+
 .material-supplier-entry strong,
-.material-supplier-entry span {
+.material-supplier-entry span,
+.material-supplier-entry small,
+.material-item-entry strong,
+.material-item-entry span,
+.material-item-entry small {
     display: block;
     min-width: 0;
     overflow: hidden;
@@ -318,14 +382,18 @@
     white-space: nowrap;
 }
 
-.material-supplier-entry strong {
+.material-supplier-entry strong,
+.material-item-entry strong {
     color: var(--maliev-ink);
     font-family: var(--mud-typography-default-family);
     font-size: var(--mud-typography-body2-size);
     font-weight: 700;
 }
 
-.material-supplier-entry span {
+.material-supplier-entry span,
+.material-supplier-entry small,
+.material-item-entry span,
+.material-item-entry small {
     color: var(--maliev-muted);
     font-family: var(--mud-typography-default-family);
     font-size: var(--mud-typography-caption-size);
@@ -504,7 +572,9 @@
         grid-template-columns: 1fr;
     }
 
-    .material-batch-summary {
+    .material-batch-summary,
+    .material-inline-grid,
+    .material-dimension-grid {
         grid-template-columns: 1fr;
     }
 
@@ -516,5 +586,31 @@
     .material-inventory-status {
         align-items: flex-start;
         flex-direction: column;
+    }
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .material-print-label,
+    .material-print-label * {
+        visibility: visible;
+    }
+
+    .material-print-label {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 50mm;
+        min-height: 30mm;
+        color: #111;
+        background: #fff;
+        box-shadow: none;
+    }
+
+    .material-label-actions {
+        display: none;
     }
 }

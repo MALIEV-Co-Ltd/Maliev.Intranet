@@ -1,4 +1,5 @@
 using Maliev.Intranet.Shared;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Bff.Clients;
@@ -14,11 +15,30 @@ public class SupplierServiceClient(HttpClient httpClient)
     /// </summary>
     /// <param name="page">The page number to retrieve.</param>
     /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="status">Optional supplier lifecycle status filter.</param>
+    /// <param name="capability">Optional capability filter.</param>
+    /// <param name="search">Optional supplier search term.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>A paged response containing supplier summaries.</returns>
-    public async Task<PagedResponse<SupplierSummaryDto>?> GetSuppliersAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
+    public async Task<PagedResponse<SupplierSummaryDto>?> GetSuppliersAsync(
+        int page = 1,
+        int pageSize = 20,
+        string? status = null,
+        string? capability = null,
+        string? search = null,
+        CancellationToken ct = default)
     {
-        var response = await httpClient.GetAsync($"/supplier/v1/suppliers?page={page}&pageSize={pageSize}", ct);
+        var query = new List<string>
+        {
+            $"page={page.ToString(CultureInfo.InvariantCulture)}",
+            $"pageSize={pageSize.ToString(CultureInfo.InvariantCulture)}"
+        };
+
+        AddQueryParameter(query, "status", status);
+        AddQueryParameter(query, "capability", capability);
+        AddQueryParameter(query, "search", search);
+
+        var response = await httpClient.GetAsync($"/supplier/v1/suppliers?{string.Join("&", query)}", ct);
         if (!response.IsSuccessStatusCode)
         {
             return null;
@@ -26,6 +46,64 @@ public class SupplierServiceClient(HttpClient httpClient)
 
         var downstream = await response.Content.ReadFromJsonAsync<SupplierListResponse>(cancellationToken: ct);
         return downstream?.ToPagedResponse();
+    }
+
+    /// <summary>
+    /// Finds active suppliers that can supply a material based on process and category capabilities.
+    /// </summary>
+    /// <param name="capabilities">Capability names inferred from the material.</param>
+    /// <param name="fallbackSearch">Fallback supplier search text when capability matches are empty.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>Supplier summaries that match the material.</returns>
+    public async Task<List<SupplierSummaryDto>> FindMaterialSuppliersAsync(
+        IEnumerable<string> capabilities,
+        string? fallbackSearch = null,
+        CancellationToken ct = default)
+    {
+        var matches = new Dictionary<Guid, SupplierSummaryDto>();
+        foreach (var capability in capabilities.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).Take(6))
+        {
+            var response = await GetSuppliersAsync(1, 50, "Active", capability, null, ct);
+            if (response is null)
+            {
+                continue;
+            }
+
+            foreach (var supplier in response.Data)
+            {
+                if (!matches.TryGetValue(supplier.Id, out var existing))
+                {
+                    supplier.Capabilities = [capability];
+                    supplier.MatchReason = $"Matches {capability}";
+                    matches[supplier.Id] = supplier;
+                    continue;
+                }
+
+                if (!existing.Capabilities.Contains(capability, StringComparer.OrdinalIgnoreCase))
+                {
+                    existing.Capabilities.Add(capability);
+                    existing.MatchReason = $"Matches {string.Join(", ", existing.Capabilities)}";
+                }
+            }
+        }
+
+        if (matches.Count == 0 && !string.IsNullOrWhiteSpace(fallbackSearch))
+        {
+            var response = await GetSuppliersAsync(1, 20, "Active", null, fallbackSearch, ct);
+            if (response is not null)
+            {
+                foreach (var supplier in response.Data)
+                {
+                    supplier.MatchReason = "Matches material search";
+                    matches.TryAdd(supplier.Id, supplier);
+                }
+            }
+        }
+
+        return matches.Values
+            .OrderByDescending(supplier => supplier.Capabilities.Count)
+            .ThenBy(supplier => supplier.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>
@@ -120,6 +198,16 @@ public class SupplierServiceClient(HttpClient httpClient)
     public async Task<HttpResponseMessage> DeleteSupplierDocumentAsync(Guid supplierId, Guid documentId, CancellationToken ct = default)
     {
         return await httpClient.DeleteAsync($"/supplier/v1/suppliers/{supplierId}/certifications/{documentId}", ct);
+    }
+
+    private static void AddQueryParameter(List<string> query, string name, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        query.Add($"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value.Trim())}");
     }
 
     private sealed record SupplierListResponse(

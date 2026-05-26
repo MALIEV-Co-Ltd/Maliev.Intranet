@@ -28,12 +28,20 @@ public class SuppliersController(
     /// </summary>
     /// <param name="page">The page number.</param>
     /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="status">Optional supplier lifecycle status filter.</param>
+    /// <param name="capability">Optional supplier capability filter.</param>
+    /// <param name="search">Optional supplier search text.</param>
     /// <returns>A paged list of suppliers.</returns>
     [RequirePermission(MalievPermissions.Supplier.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<SupplierSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<ActionResult<PagedResponse<SupplierSummaryDto>>> Get(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? status = null,
+        [FromQuery] string? capability = null,
+        [FromQuery] string? search = null)
     {
-        var result = await client.GetSuppliersAsync(page, pageSize);
+        var result = await client.GetSuppliersAsync(page, pageSize, status, capability, search);
         return result != null ? Ok(result) : Ok(new PagedResponse<SupplierSummaryDto>());
     }
 

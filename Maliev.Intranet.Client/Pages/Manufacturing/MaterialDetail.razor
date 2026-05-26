@@ -2,14 +2,16 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Globalization
 @using System.Security.Claims
-@using System.Text
 @using Maliev.Intranet.Shared
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using QRCoder
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime Js
 
 <PageTitle>Material | MALIEV Intranet</PageTitle>
 
@@ -142,8 +144,8 @@
                             <div class="material-empty-state material-batch-empty">
                                 <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Size="Size.Small" />
                                 <div>
-                                    <strong>No active traceable batches</strong>
-                                    <span>Receive raw stock to create QR or barcode labels for physical material handling.</span>
+                                    <strong>No active traceable items</strong>
+                                    <span>Receive raw stock to create QR labels for each physical spool, block, sheet, or piece.</span>
                                 </div>
                             </div>
                         }
@@ -309,44 +311,134 @@
         </div>
 
         <aside class="material-detail-side" aria-label="Material inventory operations">
-            <PanelCard Title="Receive stock batch">
+            <PanelCard Title="Receive material item">
                 @if (_material is not null)
                 {
                     <div class="material-receive-form">
-                        <label class="material-edit-field">
-                            <span>Quantity received (g)</span>
-                            <input class="material-input"
-                                   type="number"
-                                   min="0.01"
-                                   step="0.01"
-                                   @bind="_receiveBatch.InitialWeightGrams"
-                                   @bind:event="oninput"
-                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                        <label class="material-edit-field material-edit-field-wide">
+                            <span>Form factor</span>
+                            <select class="material-input"
+                                    @bind="_receiveItem.FormFactor"
+                                    disabled="@(!_canUpdateMaterial || _receivingItem)">
+                                @foreach (var option in MaterialFormFactors)
+                                {
+                                    <option value="@option">@option</option>
+                                }
+                            </select>
                         </label>
+                        <div class="material-inline-grid">
+                            <label class="material-edit-field">
+                                <span>Quantity</span>
+                                <input class="material-input"
+                                       type="number"
+                                       min="0.01"
+                                       step="0.01"
+                                       @bind="_receiveItem.InitialQuantity"
+                                       @bind:event="oninput"
+                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Unit</span>
+                                <select class="material-input"
+                                        @bind="_receiveItem.QuantityUnit"
+                                        disabled="@(!_canUpdateMaterial || _receivingItem)">
+                                    @foreach (var unit in MaterialQuantityUnits)
+                                    {
+                                        <option value="@unit">@unit</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
                         <label class="material-edit-field">
                             <span>Storage location</span>
                             <input class="material-input"
-                                   @bind="_receiveBatch.Location"
+                                   @bind="_receiveItem.Location"
                                    @bind:event="oninput"
                                    placeholder="Rack A / Bin 03"
-                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                                   disabled="@(!_canUpdateMaterial || _receivingItem)" />
                         </label>
+                        @if (_material.Suppliers.Count > 0)
+                        {
+                            <label class="material-edit-field">
+                                <span>Supplier</span>
+                                <select class="material-input"
+                                        @bind="_receiveItem.SupplierId"
+                                        disabled="@(!_canUpdateMaterial || _receivingItem)">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var supplier in _material.Suppliers)
+                                    {
+                                        <option value="@supplier.Id">@supplier.Name</option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                        <div class="material-inline-grid">
+                            <label class="material-edit-field">
+                                <span>Lot</span>
+                                <input class="material-input"
+                                       @bind="_receiveItem.LotNumber"
+                                       @bind:event="oninput"
+                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>SKU</span>
+                                <input class="material-input"
+                                       @bind="_receiveItem.ManufacturerSku"
+                                       @bind:event="oninput"
+                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                        </div>
+                        <div class="material-inline-grid">
+                            <label class="material-edit-field">
+                                <span>Grade</span>
+                                <input class="material-input"
+                                       @bind="_receiveItem.MaterialGrade"
+                                       @bind:event="oninput"
+                                       placeholder="POM-C, PLA+, 6061-T6"
+                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Color</span>
+                                <input class="material-input"
+                                       @bind="_receiveItem.Color"
+                                       @bind:event="oninput"
+                                       disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                        </div>
+                        <div class="material-dimension-grid" aria-label="Physical dimensions">
+                            <label class="material-edit-field">
+                                <span>L mm</span>
+                                <input class="material-input" type="number" min="0" step="0.01" @bind="_receiveItem.LengthMm" @bind:event="oninput" disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>W mm</span>
+                                <input class="material-input" type="number" min="0" step="0.01" @bind="_receiveItem.WidthMm" @bind:event="oninput" disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>H mm</span>
+                                <input class="material-input" type="number" min="0" step="0.01" @bind="_receiveItem.HeightMm" @bind:event="oninput" disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                            <label class="material-edit-field">
+                                <span>Dia mm</span>
+                                <input class="material-input" type="number" min="0" step="0.01" @bind="_receiveItem.DiameterMm" @bind:event="oninput" disabled="@(!_canUpdateMaterial || _receivingItem)" />
+                            </label>
+                        </div>
                         <label class="material-edit-field">
-                            <span>Low-stock threshold (g)</span>
+                            <span>Low-stock threshold</span>
                             <input class="material-input"
                                    type="number"
                                    min="0"
                                    step="0.01"
-                                   @bind="_receiveBatch.LowStockThresholdGrams"
+                                   @bind="_receiveItem.LowStockThresholdQuantity"
                                    @bind:event="oninput"
-                                   disabled="@(!_canUpdateMaterial || _receivingBatch)" />
+                                   disabled="@(!_canUpdateMaterial || _receivingItem)" />
                         </label>
                         @if (!string.IsNullOrWhiteSpace(_inventoryError))
                         {
                             <div class="material-inventory-error" role="alert">@_inventoryError</div>
                         }
-                        <PrimaryButton Icon="@Icons.Material.Outlined.QrCode2" Disabled="@(!_canUpdateMaterial || _receivingBatch)" OnClick="@ReceiveBatchAsync">
-                            @(_receivingBatch ? "Receiving..." : "Receive and label")
+                        <PrimaryButton Icon="@Icons.Material.Outlined.QrCode2" Disabled="@(!_canUpdateMaterial || _receivingItem)" OnClick="@ReceiveItemAsync">
+                            @(_receivingItem ? "Receiving..." : "Receive item")
                         </PrimaryButton>
                     </div>
                 }
@@ -355,40 +447,89 @@
             <PanelCard Title="Inventory label">
                 @if (_material is not null)
                 {
-                    <div class="material-label-panel">
+                    <div class="material-label-panel material-print-label">
                         <div class="material-label-heading">
-                            <span>Scan code</span>
+                            <span>Material record</span>
                             <strong>@_material.Name</strong>
                         </div>
-                        <div class="material-barcode-shell" aria-label="@($"Barcode for {InventoryTrackingCode}")">
-                            @BarcodeSvg
+                        <div class="material-qr-label-body">
+                            <div class="material-qr-shell" aria-label="@($"QR code for {InventoryTrackingCode}")">
+                                @MaterialQrSvg
+                            </div>
+                            <div class="material-label-copy">
+                                <code class="material-tracking-code">@InventoryTrackingCode</code>
+                                <span>@_material.SKU</span>
+                            </div>
                         </div>
-                        <code class="material-tracking-code">@InventoryTrackingCode</code>
-                        <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@MaterialRecordHref">Open material record</SecondaryButton>
+                        <div class="material-label-actions">
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@PrintLabelsAsync">Print label</SecondaryButton>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@MaterialRecordHref">Open material</SecondaryButton>
+                        </div>
                     </div>
                 }
             </PanelCard>
 
-            @if (_createdBatch is not null)
+            @if (_createdItem is not null)
             {
-                <PanelCard Title="Latest batch label">
-                    <div class="material-label-panel">
+                <PanelCard Title="Latest item label">
+                    <div class="material-label-panel material-print-label">
                         <div class="material-label-heading">
                             <span>Apply to raw stock</span>
-                            <strong>@_createdBatch.Location</strong>
+                            <strong>@_createdItem.Location</strong>
                         </div>
-                        <div class="material-barcode-shell" aria-label="@($"Barcode for {BatchTrackingCode}")">
-                            @BatchBarcodeSvg
+                        <div class="material-qr-label-body">
+                            <div class="material-qr-shell" aria-label="@($"QR code for {_createdItem.TrackingCode}")">
+                                @CreatedItemQrSvg
+                            </div>
+                            <div class="material-label-copy">
+                                <code class="material-tracking-code">@_createdItem.TrackingCode</code>
+                                <span>@_createdItem.FormFactor</span>
+                                <span>@FormatItemQuantity(_createdItem.RemainingQuantity, _createdItem.QuantityUnit)</span>
+                            </div>
                         </div>
-                        <code class="material-tracking-code">@BatchTrackingCode</code>
                         <dl class="mlv-detail-list material-batch-detail-list">
-                            <dt>Initial</dt><dd>@FormatGrams(_createdBatch.InitialWeightGrams)</dd>
-                            <dt>Remaining</dt><dd>@FormatGrams(_createdBatch.RemainingWeightGrams)</dd>
-                            <dt>Received</dt><dd>@_createdBatch.ReceivedAt.LocalDateTime.ToString("dd MMM yyyy HH:mm")</dd>
+                            <dt>Lot</dt><dd>@DisplayNullable(_createdItem.LotNumber)</dd>
+                            <dt>Grade</dt><dd>@DisplayNullable(_createdItem.MaterialGrade)</dd>
+                            <dt>Received</dt><dd>@_createdItem.ReceivedAt.LocalDateTime.ToString("dd MMM yyyy HH:mm")</dd>
                         </dl>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@PrintLabelsAsync">Print label</SecondaryButton>
                     </div>
                 </PanelCard>
             }
+
+            <PanelCard Title="Physical stock items">
+                @if (_loadingInventory)
+                {
+                    <MudSkeleton Height="54px" />
+                    <MudSkeleton Height="54px" />
+                }
+                else if (_inventoryItems.Count > 0)
+                {
+                    <div class="material-item-list">
+                        @foreach (var item in _inventoryItems)
+                        {
+                            <div class="material-item-entry">
+                                <div>
+                                    <strong>@item.TrackingCode</strong>
+                                    <span>@item.FormFactor · @FormatItemQuantity(item.RemainingQuantity, item.QuantityUnit) · @item.Location</span>
+                                    <small>@FormatItemDimensions(item)</small>
+                                </div>
+                                <StatusBadge Status="@item.Status" />
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="material-empty-state">
+                        <MudIcon Icon="@Icons.Material.Outlined.QrCode2" Size="Size.Small" />
+                        <div>
+                            <strong>No item labels yet</strong>
+                            <span>Receive each spool, block, sheet, or piece to make it individually traceable.</span>
+                        </div>
+                    </div>
+                }
+            </PanelCard>
 
             <PanelCard Title="Suppliers">
                 @if (_material?.Suppliers.Count > 0)
@@ -400,6 +541,10 @@
                                 <div>
                                     <strong>@supplier.Name</strong>
                                     <span>@DisplaySupplierLocation(supplier)</span>
+                                    @if (!string.IsNullOrWhiteSpace(supplier.MatchReason))
+                                    {
+                                        <small>@supplier.MatchReason</small>
+                                    }
                                 </div>
                                 <StatusBadge Status="@supplier.Status" />
                             </div>
@@ -411,8 +556,8 @@
                     <div class="material-empty-state">
                         <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
                         <div>
-                            <strong>No suppliers linked</strong>
-                            <span>Connect supplier profiles to complete the procurement circuit.</span>
+                            <strong>No supplier candidates</strong>
+                            <span>Add supplier capabilities that match this material or manufacturing process.</span>
                         </div>
                     </div>
                 }
@@ -430,65 +575,40 @@
     private MaterialEditModel? _editModel;
     private EditContext? _editContext;
     private MaterialInventoryStatusDto? _inventoryStatus;
-    private InventoryBatchDto? _createdBatch;
-    private ReceiveBatchModel _receiveBatch = new();
+    private List<InventoryItemDto> _inventoryItems = [];
+    private InventoryItemDto? _createdItem;
+    private ReceiveItemModel _receiveItem = new();
     private bool _loading = true;
     private bool _loadingInventory;
     private bool _saving;
     private bool _editing;
-    private bool _receivingBatch;
+    private bool _receivingItem;
     private bool _canUpdateMaterial;
     private bool _colorsLoading;
     private string? _inventoryError;
     private List<MaterialColorDto> _colorOptions = [];
 
-    private static readonly IReadOnlyDictionary<char, string> Code39Patterns = new Dictionary<char, string>
-    {
-        ['0'] = "nnnwwnwnn",
-        ['1'] = "wnnwnnnnw",
-        ['2'] = "nnwwnnnnw",
-        ['3'] = "wnwwnnnnn",
-        ['4'] = "nnnwwnnnw",
-        ['5'] = "wnnwwnnnn",
-        ['6'] = "nnwwwnnnn",
-        ['7'] = "nnnwnnwnw",
-        ['8'] = "wnnwnnwnn",
-        ['9'] = "nnwwnnwnn",
-        ['A'] = "wnnnnwnnw",
-        ['B'] = "nnwnnwnnw",
-        ['C'] = "wnwnnwnnn",
-        ['D'] = "nnnnwwnnw",
-        ['E'] = "wnnnwwnnn",
-        ['F'] = "nnwnwwnnn",
-        ['G'] = "nnnnnwwnw",
-        ['H'] = "wnnnnwwnn",
-        ['I'] = "nnwnnwwnn",
-        ['J'] = "nnnnwwwnn",
-        ['K'] = "wnnnnnnww",
-        ['L'] = "nnwnnnnww",
-        ['M'] = "wnwnnnnwn",
-        ['N'] = "nnnnwnnww",
-        ['O'] = "wnnnwnnwn",
-        ['P'] = "nnwnwnnwn",
-        ['Q'] = "nnnnnnwww",
-        ['R'] = "wnnnnnwwn",
-        ['S'] = "nnwnnnwwn",
-        ['T'] = "nnnnwnwwn",
-        ['U'] = "wwnnnnnnw",
-        ['V'] = "nwwnnnnnw",
-        ['W'] = "wwwnnnnnn",
-        ['X'] = "nwnnwnnnw",
-        ['Y'] = "wwnnwnnnn",
-        ['Z'] = "nwwnwnnnn",
-        ['-'] = "nwnnnnwnw",
-        ['.'] = "wwnnnnwnn",
-        [' '] = "nwwnnnwnn",
-        ['$'] = "nwnwnwnnn",
-        ['/'] = "nwnwnnnwn",
-        ['+'] = "nwnnnwnwn",
-        ['%'] = "nnnwnwnwn",
-        ['*'] = "nwnnwnwnn"
-    };
+    private static readonly IReadOnlyList<string> MaterialFormFactors =
+    [
+        "Spool",
+        "Block",
+        "Sheet",
+        "Bar",
+        "Rod",
+        "Bottle",
+        "Bag",
+        "Piece"
+    ];
+
+    private static readonly IReadOnlyList<string> MaterialQuantityUnits =
+    [
+        "g",
+        "kg",
+        "m",
+        "pcs",
+        "spool",
+        "block"
+    ];
 
     private IReadOnlyList<string> MaterialProcesses =>
         _material?.ManufacturingProcesses.Count > 0
@@ -556,13 +676,13 @@
         ? $"/mfg/materials/{Id}"
         : $"/mfg/materials/{_material.Id}";
 
-    private MarkupString BarcodeSvg => new(BuildCode39Svg(InventoryTrackingCode));
+    private string MaterialQrPayload => _material is null
+        ? MaterialRecordHref
+        : $"/mfg/materials/{_material.Id}";
 
-    private string BatchTrackingCode => _createdBatch is null
-        ? string.Empty
-        : $"MALIEV-BATCH-{_createdBatch.Id:N}".ToUpperInvariant();
+    private MarkupString MaterialQrSvg => new(BuildQrSvg(MaterialQrPayload));
 
-    private MarkupString BatchBarcodeSvg => new(BuildCode39Svg(BatchTrackingCode));
+    private MarkupString CreatedItemQrSvg => new(BuildQrSvg(_createdItem?.QrPayload ?? string.Empty));
 
     private IReadOnlyList<MaterialColorDto> EditableColorOptions
     {
@@ -594,7 +714,7 @@
         try
         {
             _material = await Http.GetFromJsonAsync<MaterialDetailDto>($"api/v1/materials/{Id}");
-            ResetReceiveBatchForm();
+            ResetReceiveItemForm();
             await LoadInventoryStatusAsync();
         }
         catch (Exception ex)
@@ -650,6 +770,7 @@
     private async Task LoadInventoryStatusAsync()
     {
         _inventoryStatus = null;
+        _inventoryItems = [];
         if (_material is null)
         {
             return;
@@ -661,10 +782,13 @@
             var response = await Http.GetFromJsonAsync<List<MaterialInventoryStatusDto>>(
                 $"api/v1/inventory/batches/status?materialId={Uri.EscapeDataString(_material.Id.ToString())}&status=Active");
             _inventoryStatus = response?.FirstOrDefault(status => status.MaterialId == _material.Id);
+
+            _inventoryItems = await Http.GetFromJsonAsync<List<InventoryItemDto>>(
+                $"api/v1/inventory/items?materialId={Uri.EscapeDataString(_material.Id.ToString())}&status=Active") ?? [];
         }
         catch (Exception ex)
         {
-            _inventoryError = $"Unable to load inventory batches: {ex.Message}";
+            _inventoryError = $"Unable to load inventory items: {ex.Message}";
         }
         finally
         {
@@ -672,7 +796,7 @@
         }
     }
 
-    private async Task ReceiveBatchAsync(MouseEventArgs _)
+    private async Task ReceiveItemAsync(MouseEventArgs _)
     {
         if (_material is null)
         {
@@ -680,56 +804,70 @@
         }
 
         _inventoryError = null;
-        if (_receiveBatch.InitialWeightGrams <= 0)
+        if (_receiveItem.InitialQuantity <= 0)
         {
             _inventoryError = "Quantity received must be greater than zero.";
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_receiveBatch.Location))
+        if (string.IsNullOrWhiteSpace(_receiveItem.Location))
         {
             _inventoryError = "Storage location is required.";
             return;
         }
 
-        _receivingBatch = true;
+        _receivingItem = true;
         try
         {
-            var request = new CreateInventoryBatchRequest
+            var request = new CreateInventoryItemRequest
             {
                 MaterialId = _material.Id,
-                InitialWeightGrams = _receiveBatch.InitialWeightGrams,
-                Location = _receiveBatch.Location.Trim(),
-                LowStockThresholdGrams = _receiveBatch.LowStockThresholdGrams > 0 ? _receiveBatch.LowStockThresholdGrams : null
+                InitialQuantity = _receiveItem.InitialQuantity,
+                QuantityUnit = _receiveItem.QuantityUnit,
+                Location = _receiveItem.Location.Trim(),
+                FormFactor = _receiveItem.FormFactor,
+                LowStockThresholdQuantity = _receiveItem.LowStockThresholdQuantity > 0 ? _receiveItem.LowStockThresholdQuantity : null,
+                SupplierId = _receiveItem.SupplierId,
+                LotNumber = TrimOrNull(_receiveItem.LotNumber),
+                ManufacturerSku = TrimOrNull(_receiveItem.ManufacturerSku),
+                Color = TrimOrNull(_receiveItem.Color),
+                MaterialGrade = TrimOrNull(_receiveItem.MaterialGrade),
+                LengthMm = PositiveOrNull(_receiveItem.LengthMm),
+                WidthMm = PositiveOrNull(_receiveItem.WidthMm),
+                HeightMm = PositiveOrNull(_receiveItem.HeightMm),
+                DiameterMm = PositiveOrNull(_receiveItem.DiameterMm),
+                ThicknessMm = PositiveOrNull(_receiveItem.ThicknessMm)
             };
 
-            var response = await Http.PostAsJsonAsync("api/v1/inventory/batches", request);
+            var response = await Http.PostAsJsonAsync("api/v1/inventory/items", request);
             if (!response.IsSuccessStatusCode)
             {
-                _inventoryError = "Unable to receive material batch.";
+                _inventoryError = "Unable to receive material item.";
                 return;
             }
 
-            _createdBatch = await response.Content.ReadFromJsonAsync<InventoryBatchDto>();
-            ResetReceiveBatchForm();
+            _createdItem = await response.Content.ReadFromJsonAsync<InventoryItemDto>();
+            ResetReceiveItemForm();
             await LoadInventoryStatusAsync();
-            Snackbar.Add("Material batch received. Apply the generated label to the raw stock.", Severity.Success);
+            Snackbar.Add("Material item received. Apply the QR label to the exact stock item.", Severity.Success);
         }
         catch (Exception ex)
         {
-            _inventoryError = $"Unable to receive material batch: {ex.Message}";
+            _inventoryError = $"Unable to receive material item: {ex.Message}";
         }
         finally
         {
-            _receivingBatch = false;
+            _receivingItem = false;
         }
     }
 
-    private void ResetReceiveBatchForm()
+    private void ResetReceiveItemForm()
     {
-        _receiveBatch = new ReceiveBatchModel
+        _receiveItem = new ReceiveItemModel
         {
-            Location = _receiveBatch.Location
+            Location = _receiveItem.Location,
+            FormFactor = _receiveItem.FormFactor,
+            QuantityUnit = _receiveItem.QuantityUnit
         };
     }
 
@@ -869,6 +1007,44 @@
     private static string FormatGrams(decimal grams)
         => $"{grams.ToString("N0", CultureInfo.InvariantCulture)} g";
 
+    private static string FormatItemQuantity(decimal quantity, string unit)
+        => $"{quantity.ToString("N2", CultureInfo.InvariantCulture).TrimEnd('0').TrimEnd('.')} {unit}";
+
+    private static string FormatItemDimensions(InventoryItemDto item)
+    {
+        var dimensions = new List<string>();
+        if (item.LengthMm is > 0)
+        {
+            dimensions.Add($"L {item.LengthMm.Value.ToString("N0", CultureInfo.InvariantCulture)}");
+        }
+
+        if (item.WidthMm is > 0)
+        {
+            dimensions.Add($"W {item.WidthMm.Value.ToString("N0", CultureInfo.InvariantCulture)}");
+        }
+
+        if (item.HeightMm is > 0)
+        {
+            dimensions.Add($"H {item.HeightMm.Value.ToString("N0", CultureInfo.InvariantCulture)}");
+        }
+
+        if (item.DiameterMm is > 0)
+        {
+            dimensions.Add($"Dia {item.DiameterMm.Value.ToString("N2", CultureInfo.InvariantCulture)}");
+        }
+
+        return dimensions.Count == 0 ? "Dimensions not set" : string.Join(" x ", dimensions) + " mm";
+    }
+
+    private static string DisplayNullable(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+
+    private static string? TrimOrNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static decimal? PositiveOrNull(decimal? value)
+        => value is > 0 ? value : null;
+
     private static string GetTransactionQuantityClass(int quantity)
         => quantity >= 0 ? "material-audit-quantity positive" : "material-audit-quantity negative";
 
@@ -881,56 +1057,21 @@
             _ => Icons.Material.Outlined.Tune
         };
 
-    private static string NormalizeCode39(string value)
+    private async Task PrintLabelsAsync(MouseEventArgs _)
     {
-        var normalized = value.ToUpperInvariant();
-        var builder = new StringBuilder(normalized.Length);
-        foreach (var character in normalized)
-        {
-            builder.Append(Code39Patterns.ContainsKey(character) && character != '*' ? character : '-');
-        }
-
-        return builder.ToString().Trim('-');
+        await Js.InvokeVoidAsync("print");
     }
 
-    private static string BuildCode39Svg(string value)
+    private static string BuildQrSvg(string value)
     {
-        var normalized = NormalizeCode39(value);
-        if (string.IsNullOrWhiteSpace(normalized))
+        if (string.IsNullOrWhiteSpace(value))
         {
             return string.Empty;
         }
 
-        const int narrow = 2;
-        const int wide = 5;
-        const int gap = 2;
-        const int height = 72;
-        var encoded = $"*{normalized}*";
-        var x = 0;
-        var bars = new StringBuilder();
-
-        foreach (var character in encoded)
-        {
-            var pattern = Code39Patterns[character];
-            for (var index = 0; index < pattern.Length; index++)
-            {
-                var width = pattern[index] == 'w' ? wide : narrow;
-                if (index % 2 == 0)
-                {
-                    bars.Append(CultureInfo.InvariantCulture, $"<rect x=\"{x}\" y=\"0\" width=\"{width}\" height=\"{height}\" />");
-                }
-
-                x += width;
-            }
-
-            x += gap;
-        }
-
-        return $"""
-            <svg class="material-barcode-svg" viewBox="0 0 {x} {height}" role="img" aria-label="Inventory barcode" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-                {bars}
-            </svg>
-            """;
+        using var qrCodeData = QRCodeGenerator.GenerateQrCode(value, QRCodeGenerator.ECCLevel.Q);
+        using var renderer = new SvgQRCode(qrCodeData);
+        return renderer.GetGraphic(4);
     }
 
     private static bool HasPermission(ClaimsPrincipal user, string permission)
@@ -1012,12 +1153,36 @@
         public List<Guid> SelectedColorIds { get; set; } = [];
     }
 
-    private sealed class ReceiveBatchModel
+    private sealed class ReceiveItemModel
     {
-        public decimal InitialWeightGrams { get; set; }
+        public decimal InitialQuantity { get; set; }
+
+        public string QuantityUnit { get; set; } = "g";
 
         public string Location { get; set; } = string.Empty;
 
-        public decimal? LowStockThresholdGrams { get; set; }
+        public string FormFactor { get; set; } = "Spool";
+
+        public decimal? LowStockThresholdQuantity { get; set; }
+
+        public Guid? SupplierId { get; set; }
+
+        public string? LotNumber { get; set; }
+
+        public string? ManufacturerSku { get; set; }
+
+        public string? Color { get; set; }
+
+        public string? MaterialGrade { get; set; }
+
+        public decimal? LengthMm { get; set; }
+
+        public decimal? WidthMm { get; set; }
+
+        public decimal? HeightMm { get; set; }
+
+        public decimal? DiameterMm { get; set; }
+
+        public decimal? ThicknessMm { get; set; }
     }
 }

@@ -11,10 +11,11 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for material-related operations, proxying to the Material Service.
 /// </summary>
 /// <param name="client">The material service client.</param>
+/// <param name="supplierClient">The supplier service client.</param>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class MaterialsController(MaterialServiceClient client) : ControllerBase
+public class MaterialsController(MaterialServiceClient client, SupplierServiceClient supplierClient) : ControllerBase
 {
     /// <summary>
     /// Retrieves a paged list of materials.
@@ -52,12 +53,18 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     /// Retrieves detailed information for a single material.
     /// </summary>
     /// <param name="id">The material ID.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>The material details.</returns>
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<MaterialDetailDto>> GetById(Guid id)
+    public async Task<ActionResult<MaterialDetailDto>> GetById(Guid id, CancellationToken ct)
     {
-        var result = await client.GetMaterialByIdAsync(id);
+        var result = await client.GetMaterialByIdAsync(id, ct);
+        if (result is not null)
+        {
+            await EnrichSupplierMatchesAsync(result, ct);
+        }
+
         return result != null ? Ok(result) : NotFound();
     }
 
@@ -99,6 +106,11 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
     public async Task<ActionResult<MaterialDetailDto>> Update(Guid id, [FromBody] UpdateMaterialRequest request, CancellationToken ct)
     {
         var result = await client.UpdateMaterialAsync(id, request, ct);
+        if (result is not null)
+        {
+            await EnrichSupplierMatchesAsync(result, ct);
+        }
+
         return result != null ? Ok(result) : NotFound();
     }
 
@@ -115,4 +127,43 @@ public class MaterialsController(MaterialServiceClient client) : ControllerBase
         var success = await client.DeleteMaterialAsync(id, ct);
         return success ? NoContent() : NotFound();
     }
+
+    private async Task EnrichSupplierMatchesAsync(MaterialDetailDto material, CancellationToken ct)
+    {
+        var capabilityCandidates = material.ManufacturingProcesses
+            .Concat(SplitDisplayList(material.Category))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var supplierMatches = await supplierClient.FindMaterialSuppliersAsync(
+            capabilityCandidates,
+            material.Name,
+            ct);
+
+        if (supplierMatches.Count == 0)
+        {
+            return;
+        }
+
+        var suppliers = new Dictionary<Guid, SupplierSummaryDto>();
+        foreach (var supplier in material.Suppliers.Concat(supplierMatches))
+        {
+            if (!suppliers.TryAdd(supplier.Id, supplier) &&
+                supplier.Capabilities.Count > suppliers[supplier.Id].Capabilities.Count)
+            {
+                suppliers[supplier.Id] = supplier;
+            }
+        }
+
+        material.Suppliers = suppliers.Values
+            .OrderByDescending(supplier => supplier.Capabilities.Count)
+            .ThenBy(supplier => supplier.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IEnumerable<string> SplitDisplayList(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 }
