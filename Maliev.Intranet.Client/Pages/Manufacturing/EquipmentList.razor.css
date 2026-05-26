@@ -24,6 +24,15 @@
     min-width: 0;
 }
 
+::deep .equipment-search-box input {
+    height: auto;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
 .equipment-filter-toolbar .mlv-toolbar-right {
     align-items: end;
     min-height: 58px;

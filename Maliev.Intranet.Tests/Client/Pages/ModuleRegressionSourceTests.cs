@@ -522,6 +522,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("align-items: end;", listStyles, StringComparison.Ordinal);
         Assert.Contains("::deep .equipment-search-box", listStyles, StringComparison.Ordinal);
         Assert.Contains("height: 36px;", listStyles, StringComparison.Ordinal);
+        Assert.Contains("::deep .equipment-search-box input", listStyles, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: none !important;", ExtractCssBlock(listStyles, "::deep .equipment-search-box input"), StringComparison.Ordinal);
+        Assert.Contains("background: transparent !important;", ExtractCssBlock(listStyles, "::deep .equipment-search-box input"), StringComparison.Ordinal);
         Assert.Contains("grid-template-columns: minmax(220px, 1.1fr) repeat(2, minmax(140px, 0.75fr));", listStyles, StringComparison.Ordinal);
         Assert.Contains("/notes", detail, StringComparison.Ordinal);
         Assert.Contains("/maintenance", detail, StringComparison.Ordinal);
