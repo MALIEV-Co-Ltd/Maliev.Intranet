@@ -171,6 +171,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
                     Id = customerId,
                     Name = "Sarah Chen",
                     Email = "sarah@example.com",
+                    ProfileImageUrl = "https://lh3.googleusercontent.com/a/sarah",
                     CompanyName = "Maliev Test Company",
                     Status = "Active",
                     Segment = "Retail",
@@ -193,6 +194,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
 
         cut.WaitForAssertion(() => Assert.Contains("Sarah Chen", cut.Markup), TimeSpan.FromSeconds(5));
+        cut.WaitForAssertion(() => Assert.Contains("https://lh3.googleusercontent.com/a/sarah", cut.Markup), TimeSpan.FromSeconds(5));
         Assert.Contains(_sentRequests, request =>
             request.RequestUri?.AbsolutePath.Equals($"/api/v1/customers/{customerId}", StringComparison.Ordinal) == true);
         Assert.Contains($"customerId={customerId}", navigation.Uri);
@@ -961,21 +963,39 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     {
         var projectId = Guid.NewGuid();
         var quotationId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
         var partId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
+        const string customerProfileImageUrl = "https://lh3.googleusercontent.com/a/maliev-manufacturing";
 
         _httpHandler.HandlerFunc = async (request, ct) =>
         {
             lock (_sentRequests) { _sentRequests.Add(request); }
 
             var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (path == $"/api/v1/customers/{customerId}" && request.Method == HttpMethod.Get)
+            {
+                var customer = new CustomerDetailDto
+                {
+                    Id = customerId,
+                    Name = "MaliEV Manufacturing",
+                    Email = "orders@maliev.com",
+                    ProfileImageUrl = customerProfileImageUrl
+                };
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(customer), Encoding.UTF8, "application/json")
+                };
+            }
+
             if (path == $"/api/v1/quotations/{quotationId}" && request.Method == HttpMethod.Get)
             {
                 var quotation = new QuotationDetailDto
                 {
                     Id = quotationId,
                     QuotationNumber = "QT-RESTORE-001",
-                    CustomerId = Guid.NewGuid(),
+                    CustomerId = customerId,
                     CustomerName = "MaliEV Manufacturing",
                     CurrentVersionNumber = 2,
                     CurrencyCode = "THB",
@@ -1011,7 +1031,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var project = new ProjectDetailDto
         {
             Id = projectId,
-            CustomerId = Guid.NewGuid(),
+            CustomerId = customerId,
             CustomerName = "MaliEV Manufacturing",
             Title = "Repeat bracket",
             Status = "QuotationGenerated",
@@ -1038,6 +1058,9 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.Equal(125m, GetPrivateField<decimal>(cut.Instance, "_manualDiscountAmount"));
         Assert.Equal("50% deposit before production.", GetPrivateField<string?>(cut.Instance, "_quotationTerms"));
         Assert.Equal("Deburr all edges before anodizing.", Assert.Single(GetParts(cut.Instance)).PartNotes);
+        var selectedCustomer = GetPrivateField<CustomerSummaryDto?>(cut.Instance, "_selectedCustomer");
+        Assert.NotNull(selectedCustomer);
+        Assert.Equal(customerProfileImageUrl, selectedCustomer.ProfileImageUrl);
     }
 
     [Fact]

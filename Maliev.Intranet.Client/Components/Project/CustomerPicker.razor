@@ -64,7 +64,18 @@
                                     class="customer-picker-option"
                                     role="option"
                                     @onclick="@(() => SelectCustomerAsync(customer))">
-                                <span class="@GetAvatarClass(customer)">@GetInitials(customer.Name)</span>
+                                @if (!string.IsNullOrWhiteSpace(customer.ProfileImageUrl))
+                                {
+                                    <img class="customer-picker-avatar customer-picker-avatar-image"
+                                         src="@customer.ProfileImageUrl"
+                                         alt=""
+                                         aria-hidden="true"
+                                         referrerpolicy="no-referrer" />
+                                }
+                                else
+                                {
+                                    <span class="@GetAvatarClass(customer)">@GetInitials(customer.Name)</span>
+                                }
                                 <span class="customer-picker-copy">
                                     <span class="customer-picker-name">@customer.Name</span>
                                     @if (!string.IsNullOrWhiteSpace(customer.CompanyName))

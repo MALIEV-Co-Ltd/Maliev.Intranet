@@ -1,5 +1,6 @@
 using Bunit;
 using Maliev.Intranet.Client.Components.Shared;
+using Maliev.Intranet.Shared;
 using MudBlazor.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -118,6 +119,23 @@ public class SharedDesignComponentTests : BunitContext, IAsyncLifetime
         var cut = Render<Avatar>(parameters => parameters.Add(p => p.Name, "Nattapol Thanakit"));
 
         Assert.Contains("NT", cut.Markup);
+    }
+
+    [Fact]
+    public void CustomerCardCompact_RendersProfileImageWhenAvailable()
+    {
+        var cut = Render<CustomerCardCompact>(parameters => parameters
+            .Add(p => p.Customer, new CustomerSummaryDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "AsianRider",
+                Email = "shoung0690@gmail.com",
+                ProfileImageUrl = "https://lh3.googleusercontent.com/a/asian-rider"
+            }));
+
+        var image = cut.Find(".ccc-avatar-image");
+        Assert.Equal("https://lh3.googleusercontent.com/a/asian-rider", image.GetAttribute("src"));
+        Assert.Equal("no-referrer", image.GetAttribute("referrerpolicy"));
     }
 
     [Fact]

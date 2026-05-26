@@ -46,6 +46,8 @@ public class CustomerSummaryDto
     public string? CompanyName { get; set; }
     /// <summary>The primary email address for communication.</summary>
     public string Email { get; set; } = string.Empty;
+    /// <summary>The customer's profile image URL imported from an external identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>The mobile phone number of the customer.</summary>
     public string? Mobile { get; set; }
     /// <summary>The internal extension number for landline calls.</summary>
@@ -87,6 +89,8 @@ public class CustomerDetailDto
     public string LastName { get; set; } = string.Empty;
     /// <summary>The primary email address for communication.</summary>
     public string Email { get; set; } = string.Empty;
+    /// <summary>The customer's profile image URL imported from an external identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>The mobile phone number of the customer.</summary>
     public string? Mobile { get; set; }
     /// <summary>The internal extension number for landline calls.</summary>
@@ -872,6 +876,8 @@ public class CustomerResponse
     public string Name { get; set; } = string.Empty;
     /// <summary>The primary email address.</summary>
     public string Email { get; set; } = string.Empty;
+    /// <summary>The customer's profile image URL imported from an external identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>The mobile phone number.</summary>
     public string? Mobile { get; set; }
     /// <summary>The landline extension number.</summary>

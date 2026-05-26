@@ -715,6 +715,44 @@ public class CustomerServiceClientTests
     }
 
     [Fact]
+    public async Task GetCustomersAsync_MapsProfileImageUrlFromCustomerService()
+    {
+        var profileImageUrl = "https://lh3.googleusercontent.com/a/customer-photo";
+        var response = new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = Guid.NewGuid(),
+                    name = "AsianRider",
+                    email = "shoung0690@gmail.com",
+                    profileImageUrl
+                }
+            },
+            totalCount = 1,
+            page = 1,
+            pageSize = 10,
+            totalPages = 1
+        };
+
+        _httpMessageHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(m => m.RequestUri!.PathAndQuery.Contains("/customers")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(response)
+            });
+
+        var result = await _client.GetCustomersAsync();
+
+        Assert.NotNull(result);
+        Assert.Equal(profileImageUrl, Assert.Single(result.Data).ProfileImageUrl);
+    }
+
+    [Fact]
     public async Task GetCustomersAsync_ForwardsPaginationAndSupportedFilters()
     {
         var response = new

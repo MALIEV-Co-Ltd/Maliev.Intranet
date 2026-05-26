@@ -754,17 +754,29 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task LoadRequestedCustomerAsync(Guid customerId)
     {
+        var customer = await TryLoadCustomerSummaryAsync(customerId);
+        if (customer is null)
+            return;
+
+        await OnCustomerSelected(customer);
+    }
+
+    private async Task<CustomerSummaryDto?> TryLoadCustomerSummaryAsync(Guid customerId)
+    {
+        if (customerId == Guid.Empty)
+            return null;
+
         try
         {
             var customer = await Http.GetFromJsonAsync<CustomerDetailDto>($"api/v1/customers/{customerId}");
-            if (customer is null || customer.Id == Guid.Empty)
-                return;
-
-            await OnCustomerSelected(ToCustomerSummary(customer));
+            return customer is null || customer.Id == Guid.Empty
+                ? null
+                : ToCustomerSummary(customer);
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Could not preload customer {CustomerId} for new project.", customerId);
+            Logger.LogWarning(ex, "Could not load customer details for {CustomerId}.", customerId);
+            return null;
         }
     }
 
@@ -775,6 +787,7 @@ public partial class ProjectNew : IAsyncDisposable
         CompanyId = customer.CompanyId,
         CompanyName = customer.CompanyName,
         Email = customer.Email,
+        ProfileImageUrl = customer.ProfileImageUrl,
         Mobile = customer.Mobile,
         Extension = customer.Extension,
         Landline = customer.Landline,
@@ -2179,6 +2192,7 @@ public partial class ProjectNew : IAsyncDisposable
                 CustomerName = _selectedCustomer?.Name,
                 CustomerCompanyName = _selectedCustomer?.CompanyName,
                 CustomerEmail = _selectedCustomer?.Email,
+                CustomerProfileImageUrl = _selectedCustomer?.ProfileImageUrl,
                 CustomerMobile = _selectedCustomer?.Mobile,
                 CustomerLandline = _selectedCustomer?.Landline,
                 CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
@@ -2287,6 +2301,7 @@ public partial class ProjectNew : IAsyncDisposable
                             CustomerName = _selectedCustomer?.Name,
                             CustomerCompanyName = _selectedCustomer?.CompanyName,
                             CustomerEmail = _selectedCustomer?.Email,
+                            CustomerProfileImageUrl = _selectedCustomer?.ProfileImageUrl,
                             CustomerMobile = _selectedCustomer?.Mobile,
                             CustomerLandline = _selectedCustomer?.Landline,
                             CustomerCompanyPhone = _selectedCustomer?.CompanyPhone,
@@ -2436,10 +2451,16 @@ public partial class ProjectNew : IAsyncDisposable
                     Name = draft.CustomerName ?? string.Empty,
                     CompanyName = draft.CustomerCompanyName,
                     Email = draft.CustomerEmail ?? string.Empty,
+                    ProfileImageUrl = draft.CustomerProfileImageUrl,
                     Mobile = draft.CustomerMobile,
                     Landline = draft.CustomerLandline,
                     CompanyPhone = draft.CustomerCompanyPhone,
                 };
+
+                if (string.IsNullOrWhiteSpace(_selectedCustomer.ProfileImageUrl))
+                {
+                    _selectedCustomer = await TryLoadCustomerSummaryAsync(_selectedCustomer.Id) ?? _selectedCustomer;
+                }
             }
 
             _parts.Clear();
@@ -2511,7 +2532,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         await RestoreQuotationCommercialFieldsAsync(project.QuotationId);
 
-        _selectedCustomer = new CustomerSummaryDto
+        _selectedCustomer = await TryLoadCustomerSummaryAsync(project.CustomerId) ?? new CustomerSummaryDto
         {
             Id = project.CustomerId,
             Name = project.CustomerName,

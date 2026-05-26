@@ -16,7 +16,8 @@ public sealed class CustomerPickerTests : BunitContext, IAsyncLifetime
             Id = Guid.NewGuid(),
             Name = "Sarah Chen",
             CompanyName = "Axion Robotics",
-            Tier = "Active"
+            Tier = "Active",
+            ProfileImageUrl = "https://lh3.googleusercontent.com/a/sarah"
         },
         new()
         {
@@ -75,6 +76,22 @@ public sealed class CustomerPickerTests : BunitContext, IAsyncLifetime
         cut.Find(".customer-picker-search-input").Input("mar");
 
         cut.WaitForAssertion(() => Assert.Equal(["", "mar"], queries));
+    }
+
+    [Fact]
+    public async Task OpenPicker_RendersCustomerProfileImageWhenAvailable()
+    {
+        var cut = Render<CustomerPicker>(parameters => parameters
+            .Add(p => p.SearchCustomers, (_, _) => Task.FromResult<IEnumerable<CustomerSummaryDto>>(_customers)));
+
+        await cut.Find(".customer-picker-trigger").ClickAsync(new MouseEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            var image = cut.Find(".customer-picker-avatar-image");
+            Assert.Equal("https://lh3.googleusercontent.com/a/sarah", image.GetAttribute("src"));
+            Assert.Equal("no-referrer", image.GetAttribute("referrerpolicy"));
+        });
     }
 
     [Fact]

@@ -29,6 +29,9 @@ public sealed class DraftProjectState
     /// <summary>The selected customer's email address.</summary>
     public string? CustomerEmail { get; set; }
 
+    /// <summary>The selected customer's profile image URL.</summary>
+    public string? CustomerProfileImageUrl { get; set; }
+
     /// <summary>The selected customer's mobile phone number.</summary>
     public string? CustomerMobile { get; set; }
 

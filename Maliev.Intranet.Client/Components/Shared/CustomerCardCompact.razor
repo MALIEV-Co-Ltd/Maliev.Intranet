@@ -2,7 +2,18 @@
 @using Maliev.Intranet.Shared.Dtos
 
 <div class="ccc-root">
-    <div class="ccc-avatar">@GetInitials(Customer.Name)</div>
+    @if (!string.IsNullOrWhiteSpace(Customer.ProfileImageUrl))
+    {
+        <img class="ccc-avatar ccc-avatar-image"
+             src="@Customer.ProfileImageUrl"
+             alt=""
+             aria-hidden="true"
+             referrerpolicy="no-referrer" />
+    }
+    else
+    {
+        <div class="ccc-avatar">@GetInitials(Customer.Name)</div>
+    }
     <div class="ccc-info">
         <div class="ccc-name">@Customer.Name</div>
         @if (!string.IsNullOrEmpty(Customer.CompanyName))

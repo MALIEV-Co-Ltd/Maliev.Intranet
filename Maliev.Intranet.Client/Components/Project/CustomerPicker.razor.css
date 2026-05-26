@@ -167,6 +167,12 @@
     letter-spacing: 0;
 }
 
+.customer-picker-avatar-image {
+    display: block;
+    object-fit: cover;
+    background: var(--maliev-panel-3);
+}
+
 .customer-picker-avatar--0 {
     background: var(--mud-palette-primary);
 }

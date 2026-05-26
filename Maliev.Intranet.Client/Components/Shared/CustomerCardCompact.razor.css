@@ -23,6 +23,12 @@
     letter-spacing: 0;
 }
 
+.ccc-avatar-image {
+    display: block;
+    object-fit: cover;
+    background: var(--maliev-panel-3);
+}
+
 .ccc-info {
     flex: 1;
     min-width: 0;
