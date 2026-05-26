@@ -3,8 +3,10 @@
 @using System.Net.Http.Headers
 @using Microsoft.AspNetCore.Components.Forms
 @using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Services
 @attribute [RequirePermission(MalievPermissions.Commerce.ProductsRead)]
 @inject HttpClient Http
+@inject CurrencyService CurrencyService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
@@ -139,7 +141,12 @@
                                             <MudNumericField @bind-Value="item.Quantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                             <MudTextField @bind-Value="item.Unit" Label="Unit" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                             <MudNumericField @bind-Value="item.UnitCost" Label="Unit cost" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudTextField @bind-Value="item.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <MudSelect T="string" @bind-Value="item.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                                @foreach (var currency in CatalogCurrencyOptions())
+                                                {
+                                                    <MudSelectItem Value="@currency.Code">@CurrencyOptionLabel(currency)</MudSelectItem>
+                                                }
+                                            </MudSelect>
                                             <MudNumericField T="int?" @bind-Value="item.LeadTimeDays" Label="Lead time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
                                             <MudNumericField T="int?" @bind-Value="item.SourcingTimeDays" Label="Sourcing time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
                                             <MudTextField @bind-Value="item.ImageUrl" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
@@ -203,7 +210,12 @@
                                 <MudTextField @bind-Value="variant.Sku" Label="SKU" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                 <MudTextField @bind-Value="variant.Title" Label="Variant" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                 <MudNumericField @bind-Value="variant.PriceAmount" Label="Price" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                <MudTextField @bind-Value="variant.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                <MudSelect T="string" @bind-Value="variant.Currency" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    @foreach (var currency in CatalogCurrencyOptions())
+                                    {
+                                        <MudSelectItem Value="@currency.Code">@CurrencyOptionLabel(currency)</MudSelectItem>
+                                    }
+                                </MudSelect>
                                 <MudNumericField @bind-Value="variant.InventoryQuantity" Label="Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                 <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveVariant(variant))" />
                             </div>
@@ -343,6 +355,8 @@
         _loading = true;
         try
         {
+            await CurrencyService.InitializeAsync();
+
             if (_collections.Count == 0)
             {
                 await LoadCollectionsAsync();
@@ -353,6 +367,7 @@
                 _editingProductId = null;
                 _loadedHandle = null;
                 _productForm = NewProductForm();
+                NormalizeFormCurrencies();
                 return;
             }
 
@@ -393,6 +408,7 @@
             _editingProductId = detail.Id;
             _loadedHandle = detail.Handle;
             _productForm = MapProduct(detail);
+            NormalizeFormCurrencies();
         }
         catch (Exception ex)
         {
@@ -478,7 +494,7 @@
 
     private void AddVariant()
     {
-        _productForm.Variants.Add(new CommerceProductVariantMutationRequest { Title = "Default", Currency = "THB", InventoryQuantity = 1 });
+        _productForm.Variants.Add(new CommerceProductVariantMutationRequest { Title = "Default", Currency = DefaultCatalogCurrencyCode(), InventoryQuantity = 1 });
     }
 
     private void RemoveVariant(CommerceProductVariantMutationRequest variant)
@@ -561,7 +577,7 @@
             ItemName = "New BOM item",
             Quantity = 1,
             Unit = "pcs",
-            Currency = BomCurrency,
+            Currency = NormalizeCurrencyCode(BomCurrency),
             SortOrder = _productForm.BomItems.Count
         });
     }
@@ -606,6 +622,57 @@
         {
             mediaItems[index].SortOrder = index;
         }
+    }
+
+    private void NormalizeFormCurrencies()
+    {
+        foreach (var variant in _productForm.Variants)
+        {
+            variant.Currency = NormalizeCurrencyCode(variant.Currency);
+        }
+
+        foreach (var item in _productForm.BomItems)
+        {
+            item.Currency = NormalizeCurrencyCode(item.Currency);
+        }
+    }
+
+    private IReadOnlyList<CurrencyDto> CatalogCurrencyOptions()
+    {
+        return CurrencyService.Currencies
+            .Where(currency => currency.IsActive && !string.IsNullOrWhiteSpace(currency.Code))
+            .OrderByDescending(currency => currency.IsPrimary)
+            .ThenBy(currency => currency.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string DefaultCatalogCurrencyCode()
+    {
+        var options = CatalogCurrencyOptions();
+        return options.FirstOrDefault(currency => currency.IsPrimary)?.Code
+            ?? options.FirstOrDefault(currency => string.Equals(currency.Code, "THB", StringComparison.OrdinalIgnoreCase))?.Code
+            ?? options.FirstOrDefault()?.Code
+            ?? "THB";
+    }
+
+    private string NormalizeCurrencyCode(string? currencyCode)
+    {
+        var normalized = currencyCode?.Trim();
+        var options = CatalogCurrencyOptions();
+        if (options.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(normalized) ? "THB" : normalized.ToUpperInvariant();
+        }
+
+        return options.FirstOrDefault(currency => string.Equals(currency.Code, normalized, StringComparison.OrdinalIgnoreCase))?.Code
+            ?? DefaultCatalogCurrencyCode();
+    }
+
+    private static string CurrencyOptionLabel(CurrencyDto currency)
+    {
+        return string.IsNullOrWhiteSpace(currency.Symbol)
+            ? currency.Code
+            : $"{currency.Code} {currency.Symbol}";
     }
 
     private IReadOnlyList<CommerceProductMediaMutationRequest> OrderedMedia()

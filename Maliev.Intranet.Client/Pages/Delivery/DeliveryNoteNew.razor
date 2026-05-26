@@ -26,7 +26,14 @@
                 <FormField Label="Carrier"><input class="mlv-form-input" @bind="_request.CarrierName" @bind:event="oninput" /></FormField>
                 <FormField Label="Tracking number"><input class="mlv-form-input" @bind="_request.TrackingNumber" @bind:event="oninput" /></FormField>
                 <FormField Label="Shipping cost"><input type="number" step="0.01" class="mlv-form-input" @bind="_request.ShippingCost" @bind:event="oninput" /></FormField>
-                <FormField Label="Shipping currency"><input class="mlv-form-input" @bind="_request.ShippingCostCurrency" @bind:event="oninput" /></FormField>
+                <FormField Label="Shipping currency">
+                    <select class="mlv-form-input" @bind="_request.ShippingCostCurrency">
+                        @foreach (var currency in CurrencyOptions())
+                        {
+                            <option value="@currency.Code">@CurrencyOptionLabel(currency)</option>
+                        }
+                    </select>
+                </FormField>
             </FormGrid>
         </PanelCard>
 
@@ -37,7 +44,14 @@
                 <FormField Label="City"><input class="mlv-form-input" @bind="_request.ShippingCity" @bind:event="oninput" /></FormField>
                 <FormField Label="Province"><input class="mlv-form-input" @bind="_request.ShippingProvince" @bind:event="oninput" /></FormField>
                 <FormField Label="Postal code"><input class="mlv-form-input" @bind="_request.ShippingPostalCode" @bind:event="oninput" /></FormField>
-                <FormField Label="Country"><input class="mlv-form-input" @bind="_request.ShippingCountry" @bind:event="oninput" /></FormField>
+                <FormField Label="Country">
+                    <select class="mlv-form-input" @bind="_request.ShippingCountry">
+                        @foreach (var country in CountryOptions())
+                        {
+                            <option value="@country.Name">@CountryOptionLabel(country)</option>
+                        }
+                    </select>
+                </FormField>
                 <FormField Label="Contact name"><input class="mlv-form-input" @bind="_request.DeliveryContactName" @bind:event="oninput" /></FormField>
                 <FormField Label="Contact phone"><input class="mlv-form-input" @bind="_request.DeliveryContactPhone" @bind:event="oninput" /></FormField>
                 <FormField Label="Contact email"><input type="email" class="mlv-form-input" @bind="_request.DeliveryContactEmail" @bind:event="oninput" /></FormField>
@@ -71,6 +85,8 @@
         ShippingCountry = "Thailand",
         ShippingCostCurrency = "THB"
     };
+    private readonly List<CountryDto> _countries = [];
+    private readonly List<CurrencyDto> _currencies = [];
     private CreateDeliveryNoteItemRequest _item = new()
     {
         UnitOfMeasure = "pcs",
@@ -82,6 +98,33 @@
     private string _purchaseOrderIdText = string.Empty;
     private string? _error;
     private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReferenceDataAsync();
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        try
+        {
+            var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/referenceData/currencies");
+            var countriesTask = Http.GetFromJsonAsync<List<CountryDto>>("api/v1/referenceData/countries");
+            await Task.WhenAll(currenciesTask, countriesTask);
+
+            _currencies.Clear();
+            _currencies.AddRange(currenciesTask.Result ?? []);
+            _countries.Clear();
+            _countries.AddRange(countriesTask.Result ?? []);
+
+            _request.ShippingCostCurrency = NormalizeCurrencyCode(_request.ShippingCostCurrency);
+            _request.ShippingCountry = NormalizeCountryName(_request.ShippingCountry);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load reference data: {ex.Message}", Severity.Warning);
+        }
+    }
 
     private async Task CreateAsync(MouseEventArgs _)
     {
@@ -144,6 +187,8 @@
         }
 
         _request.CustomerId = customerId;
+        _request.ShippingCostCurrency = NormalizeCurrencyCode(_request.ShippingCostCurrency);
+        _request.ShippingCountry = NormalizeCountryName(_request.ShippingCountry);
 
         if (string.IsNullOrWhiteSpace(_request.CustomerName))
         {
@@ -162,5 +207,74 @@
 
         _item.OrderId = _request.OrderId;
         return null;
+    }
+
+    private IReadOnlyList<CurrencyDto> CurrencyOptions()
+    {
+        return _currencies
+            .Where(currency => currency.IsActive && !string.IsNullOrWhiteSpace(currency.Code))
+            .OrderByDescending(currency => currency.IsPrimary)
+            .ThenBy(currency => currency.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private IReadOnlyList<CountryDto> CountryOptions()
+    {
+        return _countries
+            .Where(country => country.IsActive && !string.IsNullOrWhiteSpace(country.Name))
+            .OrderBy(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(country => country.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string NormalizeCurrencyCode(string? currencyCode)
+    {
+        var options = CurrencyOptions();
+        var normalized = currencyCode?.Trim();
+        if (options.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(normalized) ? "THB" : normalized.ToUpperInvariant();
+        }
+
+        return options.FirstOrDefault(currency => string.Equals(currency.Code, normalized, StringComparison.OrdinalIgnoreCase))?.Code
+            ?? options.FirstOrDefault(currency => currency.IsPrimary)?.Code
+            ?? options.FirstOrDefault(currency => string.Equals(currency.Code, "THB", StringComparison.OrdinalIgnoreCase))?.Code
+            ?? options[0].Code;
+    }
+
+    private string NormalizeCountryName(string? countryName)
+    {
+        var options = CountryOptions();
+        var normalized = countryName?.Trim();
+        if (options.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(normalized) ? "Thailand" : normalized;
+        }
+
+        return options.FirstOrDefault(country => IsCountryMatch(country, normalized))?.Name
+            ?? options.FirstOrDefault(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase))?.Name
+            ?? options[0].Name;
+    }
+
+    private static bool IsCountryMatch(CountryDto country, string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && (string.Equals(country.Name, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Code, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Iso3, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string CurrencyOptionLabel(CurrencyDto currency)
+    {
+        return string.IsNullOrWhiteSpace(currency.Symbol)
+            ? currency.Code
+            : $"{currency.Code} {currency.Symbol}";
+    }
+
+    private static string CountryOptionLabel(CountryDto country)
+    {
+        return string.IsNullOrWhiteSpace(country.Code)
+            ? country.Name
+            : $"{country.Name} ({country.Code})";
     }
 }

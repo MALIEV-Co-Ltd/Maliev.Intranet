@@ -49,7 +49,14 @@
                     {
                         <FormGrid>
                             <FormField Label="Supplier name"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.Name" /></FormField>
-                            <FormField Label="Country"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.Country" /></FormField>
+                            <FormField Label="Country">
+                                <select class="mlv-form-input" @bind="_edit.Country">
+                                    @foreach (var country in CountryOptions())
+                                    {
+                                        <option value="@country.Name">@CountryOptionLabel(country)</option>
+                                    }
+                                </select>
+                            </FormField>
                             <FormField Label="City"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.City" /></FormField>
                             <FormField Label="Postal code"><ImmediateInputText class="mlv-form-input" @bind-Value="_edit.PostalCode" /></FormField>
                             <FormField Label="Address" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_edit.Address" /></FormField>
@@ -194,6 +201,7 @@
 
     private SupplierDetailDto? _supplier;
     private UpdateSupplierRequest _edit = new();
+    private readonly List<CountryDto> _countries = [];
     private string _capabilityText = string.Empty;
     private static readonly string[] SupplierDocumentTypes =
     [
@@ -220,7 +228,23 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        await LoadReferenceDataAsync();
         await LoadAsync();
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        try
+        {
+            var countries = await Http.GetFromJsonAsync<List<CountryDto>>("api/v1/referenceData/countries");
+            _countries.Clear();
+            _countries.AddRange(countries ?? []);
+            _edit.Country = NormalizeCountryName(_edit.Country);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load country reference data: {ex.Message}", Severity.Warning);
+        }
     }
 
     private async Task LoadAsync()
@@ -252,7 +276,7 @@
             Name = _supplier.Name,
             Address = _supplier.Address,
             City = _supplier.City,
-            Country = _supplier.Country,
+            Country = NormalizeCountryName(_supplier.Country),
             PostalCode = _supplier.PostalCode,
             RowVersion = _supplier.RowVersion,
             Capabilities = _supplier.Capabilities.ToList()
@@ -293,7 +317,7 @@
             _edit.Name = _edit.Name.Trim();
             _edit.Address = _edit.Address?.Trim();
             _edit.City = _edit.City?.Trim();
-            _edit.Country = _edit.Country?.Trim();
+            _edit.Country = NormalizeCountryName(_edit.Country);
             _edit.PostalCode = _edit.PostalCode?.Trim();
             _edit.Capabilities = SplitDisplayList(_capabilityText).ToList();
 
@@ -322,6 +346,44 @@
         => string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private IReadOnlyList<CountryDto> CountryOptions()
+    {
+        return _countries
+            .Where(country => country.IsActive && !string.IsNullOrWhiteSpace(country.Name))
+            .OrderBy(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(country => country.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string NormalizeCountryName(string? countryName)
+    {
+        var options = CountryOptions();
+        var normalized = countryName?.Trim();
+        if (options.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(normalized) ? "Thailand" : normalized;
+        }
+
+        return options.FirstOrDefault(country => IsCountryMatch(country, normalized))?.Name
+            ?? options.FirstOrDefault(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase))?.Name
+            ?? options[0].Name;
+    }
+
+    private static bool IsCountryMatch(CountryDto country, string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && (string.Equals(country.Name, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Code, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Iso3, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string CountryOptionLabel(CountryDto country)
+    {
+        return string.IsNullOrWhiteSpace(country.Code)
+            ? country.Name
+            : $"{country.Name} ({country.Code})";
+    }
 
     private void OnDocumentFileSelected(InputFileChangeEventArgs args)
     {

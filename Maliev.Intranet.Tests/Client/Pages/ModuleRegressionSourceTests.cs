@@ -872,6 +872,44 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CommerceCatalogListing_UsesCurrencyServiceBackedCurrencyDropdowns()
+    {
+        var listing = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor");
+
+        Assert.Contains("@inject CurrencyService CurrencyService", listing, StringComparison.Ordinal);
+        Assert.Contains("await CurrencyService.InitializeAsync()", listing, StringComparison.Ordinal);
+        Assert.Contains("CatalogCurrencyOptions", listing, StringComparison.Ordinal);
+        Assert.Contains("<MudSelect T=\"string\" @bind-Value=\"item.Currency\" Label=\"Currency\"", listing, StringComparison.Ordinal);
+        Assert.Contains("<MudSelect T=\"string\" @bind-Value=\"variant.Currency\" Label=\"Currency\"", listing, StringComparison.Ordinal);
+        Assert.Contains("@foreach (var currency in CatalogCurrencyOptions())", listing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MudTextField @bind-Value=\"item.Currency\" Label=\"Currency\"", listing, StringComparison.Ordinal);
+        Assert.DoesNotContain("<MudTextField @bind-Value=\"variant.Currency\" Label=\"Currency\"", listing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OperationalForms_UseReferenceDataDropdownsForCurrencyAndCountry()
+    {
+        var delivery = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Delivery", "DeliveryNoteNew.razor");
+        var supplierList = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor");
+        var supplierDetail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierDetail.razor");
+
+        Assert.Contains("api/v1/referenceData/currencies", delivery, StringComparison.Ordinal);
+        Assert.Contains("api/v1/referenceData/countries", delivery, StringComparison.Ordinal);
+        Assert.Contains("<select class=\"mlv-form-input\" @bind=\"_request.ShippingCostCurrency\">", delivery, StringComparison.Ordinal);
+        Assert.Contains("<select class=\"mlv-form-input\" @bind=\"_request.ShippingCountry\">", delivery, StringComparison.Ordinal);
+        Assert.DoesNotContain("<input class=\"mlv-form-input\" @bind=\"_request.ShippingCostCurrency\"", delivery, StringComparison.Ordinal);
+        Assert.DoesNotContain("<input class=\"mlv-form-input\" @bind=\"_request.ShippingCountry\"", delivery, StringComparison.Ordinal);
+
+        Assert.Contains("api/v1/referenceData/countries", supplierList, StringComparison.Ordinal);
+        Assert.Contains("<select class=\"mlv-form-input\" @bind=\"_newSupplier.Country\">", supplierList, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Country\"><ImmediateInputText class=\"mlv-form-input\" @bind-Value=\"_newSupplier.Country\"", supplierList, StringComparison.Ordinal);
+
+        Assert.Contains("api/v1/referenceData/countries", supplierDetail, StringComparison.Ordinal);
+        Assert.Contains("<select class=\"mlv-form-input\" @bind=\"_edit.Country\">", supplierDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label=\"Country\"><ImmediateInputText class=\"mlv-form-input\" @bind-Value=\"_edit.Country\"", supplierDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CommerceCatalog_UsesDedicatedCollectionsManagementPage()
     {
         var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");

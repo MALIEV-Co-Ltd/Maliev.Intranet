@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Bunit;
+using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Components.Forms;
@@ -22,6 +23,7 @@ public sealed class CommerceCatalogListingTests : BunitContext, IAsyncLifetime
         Services.AddMudServices();
         Services.AddLogging();
         Services.AddSingleton(new HttpClient(_httpHandler) { BaseAddress = new Uri("http://test/") });
+        Services.AddScoped<CurrencyService>();
         JSInterop.Mode = JSRuntimeMode.Loose;
         Render<MudPopoverProvider>();
 

@@ -116,7 +116,14 @@
                     <FormField Label="Email"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Email" /></FormField>
                     <FormField Label="Phone"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Phone" /></FormField>
                     <FormField Label="Contact person"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.ContactPerson" /></FormField>
-                    <FormField Label="Country"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.Country" /></FormField>
+                    <FormField Label="Country">
+                        <select class="mlv-form-input" @bind="_newSupplier.Country">
+                            @foreach (var country in CountryOptions())
+                            {
+                                <option value="@country.Name">@CountryOptionLabel(country)</option>
+                            }
+                        </select>
+                    </FormField>
                     <FormField Label="City"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.City" /></FormField>
                     <FormField Label="Postal code"><ImmediateInputText class="mlv-form-input" @bind-Value="_newSupplier.PostalCode" /></FormField>
                     <FormField Label="Address" Class="mlv-span-6"><ImmediateInputTextArea class="mlv-form-textarea" @bind-Value="_newSupplier.Address" /></FormField>
@@ -186,6 +193,7 @@
         Country = "Thailand",
         City = "Bangkok"
     };
+    private readonly List<CountryDto> _countries = [];
     private string _capabilityText = string.Empty;
     private string _supplierExtractionText = string.Empty;
     private string _registryQuery = string.Empty;
@@ -205,7 +213,23 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadReferenceDataAsync();
         await LoadAsync();
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        try
+        {
+            var countries = await Http.GetFromJsonAsync<List<CountryDto>>("api/v1/referenceData/countries");
+            _countries.Clear();
+            _countries.AddRange(countries ?? []);
+            _newSupplier.Country = NormalizeCountryName(_newSupplier.Country);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to load country reference data: {ex.Message}", Severity.Warning);
+        }
     }
 
     private async Task LoadAsync()
@@ -377,7 +401,7 @@
         SetIfPresent(value => _newSupplier.Email = value, extracted.Email);
         SetIfPresent(value => _newSupplier.Phone = value, extracted.Phone);
         SetIfPresent(value => _newSupplier.ContactPerson = value, extracted.ContactPerson);
-        SetIfPresent(value => _newSupplier.Country = value, extracted.Country);
+        SetIfPresent(value => _newSupplier.Country = NormalizeCountryName(value), extracted.Country);
 
         if (extracted.Address is not null)
         {
@@ -419,7 +443,7 @@
             _newSupplier.Email = _newSupplier.Email.Trim();
             _newSupplier.Address = _newSupplier.Address?.Trim();
             _newSupplier.City = _newSupplier.City.Trim();
-            _newSupplier.Country = _newSupplier.Country.Trim();
+            _newSupplier.Country = NormalizeCountryName(_newSupplier.Country);
             _newSupplier.PostalCode = _newSupplier.PostalCode?.Trim();
             _newSupplier.ContactPerson = _newSupplier.ContactPerson?.Trim();
 
@@ -433,7 +457,7 @@
 
             var supplierId = await ReadSupplierIdAsync(response);
             Snackbar.Add("Supplier created.", Severity.Success);
-            _newSupplier = new CreateSupplierRequest { Country = "Thailand", City = "Bangkok" };
+            _newSupplier = new CreateSupplierRequest { Country = NormalizeCountryName("Thailand"), City = "Bangkok" };
             _capabilityText = string.Empty;
             _supplierExtractionText = string.Empty;
             _extractionFiles.Clear();
@@ -472,6 +496,44 @@
         => string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private IReadOnlyList<CountryDto> CountryOptions()
+    {
+        return _countries
+            .Where(country => country.IsActive && !string.IsNullOrWhiteSpace(country.Name))
+            .OrderBy(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(country => country.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string NormalizeCountryName(string? countryName)
+    {
+        var options = CountryOptions();
+        var normalized = countryName?.Trim();
+        if (options.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(normalized) ? "Thailand" : normalized;
+        }
+
+        return options.FirstOrDefault(country => IsCountryMatch(country, normalized))?.Name
+            ?? options.FirstOrDefault(country => string.Equals(country.Code, "TH", StringComparison.OrdinalIgnoreCase))?.Name
+            ?? options[0].Name;
+    }
+
+    private static bool IsCountryMatch(CountryDto country, string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && (string.Equals(country.Name, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Code, value, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(country.Iso3, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string CountryOptionLabel(CountryDto country)
+    {
+        return string.IsNullOrWhiteSpace(country.Code)
+            ? country.Name
+            : $"{country.Name} ({country.Code})";
+    }
 
     private static void SetIfPresent(Action<string> setter, string? value)
     {
