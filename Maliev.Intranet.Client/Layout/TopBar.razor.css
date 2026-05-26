@@ -653,33 +653,42 @@
         z-index: 2600;
         display: flex;
         box-sizing: border-box;
-        width: min(390px, calc(100vw - 52px));
-        padding: 10px 12px calc(16px + env(safe-area-inset-bottom));
+        width: min(360px, calc(100vw - 16px));
+        padding: 0;
         border-radius: 0;
         background: var(--maliev-panel);
         box-shadow: var(--maliev-shadow-card);
         flex-direction: column;
-        gap: 8px;
-        overflow-y: auto;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .topbar-mobile-drawer-head {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 36px;
         align-items: center;
-        justify-content: space-between;
-        min-height: 48px;
-        padding: 0 2px 8px 4px;
+        gap: 8px;
+        min-height: 52px;
+        padding: 8px 12px;
         border-bottom: 1px solid var(--maliev-border);
         color: var(--maliev-ink);
         font-size: var(--maliev-font-small);
         font-weight: 700;
     }
 
+    .topbar-mobile-drawer-head > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .topbar-mobile-drawer-close {
         display: inline-grid;
         place-items: center;
-        width: 44px;
-        height: 44px;
+        width: 36px;
+        height: 36px;
+        justify-self: end;
         padding: 0;
         border: 0;
         border-radius: var(--maliev-radius-xs);
@@ -700,20 +709,23 @@
     }
 
     .topbar-mobile-nav-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        padding: 4px 0 18px;
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        min-height: 0;
+        padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
+        overflow-y: auto;
     }
 
     .topbar-mobile-nav-link {
-        display: flex;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
         align-items: center;
-        gap: 10px;
+        column-gap: 10px;
         box-sizing: border-box;
         width: 100%;
-        min-height: 48px;
-        padding: 10px 12px;
+        min-height: 38px;
+        padding: 7px 10px;
         border-radius: var(--maliev-radius-xs);
         color: var(--maliev-muted);
         font-size: var(--maliev-font-base);
@@ -724,22 +736,23 @@
 
     .topbar-mobile-nav-link ::deep .mud-icon-root {
         display: inline-flex;
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         align-items: center;
         justify-content: center;
-        align-self: center;
-        flex: 0 0 24px;
+        justify-self: center;
+        flex: 0 0 22px;
         color: currentColor;
         line-height: 1;
     }
 
     .topbar-mobile-nav-link > span {
-        display: inline-flex;
-        min-height: 24px;
+        display: block;
         min-width: 0;
-        align-items: center;
         line-height: 1.1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .topbar-mobile-nav-link:hover,
@@ -759,20 +772,20 @@
     }
 
     .topbar-mobile-nav-group {
-        display: flex;
-        flex-direction: column;
+        display: grid;
         gap: 4px;
         margin-top: 0;
-        padding: 12px 0 10px;
+        padding: 8px 0;
         border-top: 1px solid var(--maliev-border);
     }
 
     .topbar-mobile-nav-group-title {
-        display: flex;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
         align-items: center;
-        gap: 8px;
-        min-height: 34px;
-        padding: 8px 12px 4px;
+        column-gap: 10px;
+        min-height: 28px;
+        padding: 4px 10px;
         color: var(--maliev-muted-2);
         font-size: var(--maliev-font-micro);
         font-weight: 800;
@@ -786,8 +799,16 @@
         height: 22px;
         align-items: center;
         justify-content: center;
-        flex: 0 0 auto;
+        justify-self: center;
+        flex: 0 0 22px;
         color: currentColor;
+    }
+
+    .topbar-mobile-nav-group-title > span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .topbar-spacer {
