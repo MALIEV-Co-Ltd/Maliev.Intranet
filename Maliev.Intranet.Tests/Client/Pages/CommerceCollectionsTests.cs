@@ -117,6 +117,21 @@ public sealed class CommerceCollectionsTests
     }
 
     [Fact]
+    public void CollectionsMarkup_UsesCompactPublishingSwitch()
+    {
+        var collections = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Collections.razor.css");
+
+        Assert.Contains("Class=\"commerce-collection-publish-switch\"", collections, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-publish-row ::deep .commerce-collection-publish-switch", styles, StringComparison.Ordinal);
+        Assert.Contains("justify-self: start;", styles, StringComparison.Ordinal);
+        Assert.Contains("width: fit-content;", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-publish-row ::deep .commerce-collection-publish-switch .mud-switch-span", styles, StringComparison.Ordinal);
+        Assert.Contains("padding: 0;", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-collection-publish-row ::deep .commerce-collection-publish-switch .mud-switch-base", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CollectionEditorState_OpensOnlyForCreateOrEdit()
     {
         var page = new global::Maliev.Intranet.Client.Pages.Commerce.Collections();

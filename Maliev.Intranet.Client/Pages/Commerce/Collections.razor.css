@@ -141,6 +141,21 @@
     padding: 0.75rem;
 }
 
+.commerce-collection-publish-row ::deep .commerce-collection-publish-switch {
+    align-items: center;
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
+}
+
+.commerce-collection-publish-row ::deep .commerce-collection-publish-switch .mud-switch-span {
+    padding: 0;
+}
+
+.commerce-collection-publish-row ::deep .commerce-collection-publish-switch .mud-switch-base {
+    padding: 5px;
+}
+
 .commerce-collection-url-group {
     display: grid;
     gap: 0.35rem;
