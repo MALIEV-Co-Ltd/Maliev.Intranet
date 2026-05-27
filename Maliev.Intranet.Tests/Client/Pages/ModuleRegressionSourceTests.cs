@@ -2022,6 +2022,21 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNew_MobilePartsDrawerBottomAlignsTotalPartsFooter()
+    {
+        var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css")
+            .ReplaceLineEndings("\n");
+        var partsList = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartsListPanel.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pn-parts-drawer ::deep .mud-drawer-content {\n        display: flex;\n        flex-direction: column;\n        height: 100%;", projectNew, StringComparison.Ordinal);
+        Assert.Contains(".pn-parts-drawer ::deep .plp-root {\n        width: min(270px, 100vw);", projectNew, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 auto;", ExtractCssBlock(projectNew, ".pn-parts-drawer ::deep .plp-root"), StringComparison.Ordinal);
+        Assert.Contains("min-height: 0;", ExtractCssBlock(partsList, ".plp-root"), StringComparison.Ordinal);
+        Assert.Contains("margin-top: auto;", ExtractCssBlock(partsList, ".plp-footer"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerNew_MobileTabsAndAiToggleWrapWithinViewport()
     {
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
