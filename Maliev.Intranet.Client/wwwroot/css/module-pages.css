@@ -449,13 +449,17 @@ select.mlv-form-select,
     box-shadow: var(--maliev-focus-ring);
 }
 
-@media (max-width: 1000px) {
+@media (min-width: 721px) and (max-width: 1000px) {
     .mlv-span-3,
     .mlv-span-4,
     .mlv-span-5,
-    .mlv-span-6,
+    .mlv-span-6 {
+        grid-column: span 6;
+    }
+
     .mlv-span-7,
-    .mlv-span-8 {
+    .mlv-span-8,
+    .mlv-span-12 {
         grid-column: span 12;
     }
 }
@@ -476,6 +480,16 @@ select.mlv-form-select,
 }
 
 @media (max-width: 720px) {
+    .mlv-span-3,
+    .mlv-span-4,
+    .mlv-span-5,
+    .mlv-span-6,
+    .mlv-span-7,
+    .mlv-span-8,
+    .mlv-span-12 {
+        grid-column: span 12;
+    }
+
     .mlv-toolbar {
         align-items: stretch;
         flex-direction: column;

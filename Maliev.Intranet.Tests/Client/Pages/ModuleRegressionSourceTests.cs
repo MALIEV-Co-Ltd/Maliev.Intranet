@@ -78,8 +78,10 @@ public class ModuleRegressionSourceTests
             Assert.Contains($".mlv-form-grid ::deep .{spanClass}", gridStyles, StringComparison.Ordinal);
         }
 
-        Assert.Contains("@media (max-width: 900px)", gridStyles, StringComparison.Ordinal);
-        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(gridStyles, "@media (max-width: 900px)"), StringComparison.Ordinal);
+        Assert.Contains("@media (min-width: 641px) and (max-width: 1024px)", gridStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(2, minmax(0, 1fr));", ExtractCssBlock(gridStyles, "@media (min-width: 641px) and (max-width: 1024px)"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 640px)", gridStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(gridStyles, "@media (max-width: 640px)"), StringComparison.Ordinal);
         Assert.Contains("min-width: 0;", fieldBlock, StringComparison.Ordinal);
         Assert.Contains("overflow-wrap: anywhere;", labelBlock, StringComparison.Ordinal);
         Assert.Contains("FormField Label=\"Address\" Class=\"mlv-span-6\"", supplierPage, StringComparison.Ordinal);
@@ -1088,6 +1090,18 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void SupplierCreateForm_UsesTabletWidthForIntakeAndStacksOnlyOnPhone()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor.css");
+        var normalized = styles.ReplaceLineEndings("\n");
+
+        Assert.Contains("grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);", ExtractCssBlock(styles, ".supplier-intake-grid"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 720px)", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("@media (max-width: 960px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".supplier-registry-search,\n    .supplier-file-row {\n        align-items: stretch;\n        flex-direction: column;", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CommerceCatalog_UsesDedicatedCollectionsManagementPage()
     {
         var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");
@@ -1523,6 +1537,18 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void HrProfile_TabletFormsUseTwoColumnFieldsBeforeMobileCollapse()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor.css");
+        var normalized = styles.ReplaceLineEndings("\n");
+
+        Assert.Contains("@media (min-width: 641px) and (max-width: 1100px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".profile-edit-grid,\n    .preference-form-grid {\n        grid-template-columns: repeat(2, minmax(0, 1fr));", normalized, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 640px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".profile-edit-grid,\n    .preference-form-grid,\n    .preference-toggle-grid,\n    .profile-preferences-intro {\n        grid-template-columns: 1fr;", normalized, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerNew_UsesTabbedWorkflowAndIntegratedCompanyLayout()
     {
         var page = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor");
@@ -1871,18 +1897,22 @@ public class ModuleRegressionSourceTests
         var toolbarBlock = ExtractCssBlock(styles, ".mlv-toolbar {");
         var segmentedBlock = ExtractCssBlock(styles, ".mlv-segmented {");
         var segmentedButtonBlock = ExtractCssBlock(styles, ".mlv-segmented button {");
+        var normalized = styles.ReplaceLineEndings("\n");
 
         Assert.Contains("flex-wrap: wrap;", toolbarBlock, StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", ExtractCssBlock(styles, ".mlv-toolbar-left,"), StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", segmentedBlock, StringComparison.Ordinal);
         Assert.Contains("overflow-x: auto;", segmentedBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 0 0 auto;", segmentedButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("@media (min-width: 721px) and (max-width: 1000px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".mlv-span-3,\n    .mlv-span-4,\n    .mlv-span-5,\n    .mlv-span-6 {\n        grid-column: span 6;", normalized, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 900px)", styles, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 100%;", styles, StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 720px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".mlv-span-3,\n    .mlv-span-4,\n    .mlv-span-5,\n    .mlv-span-6,\n    .mlv-span-7,\n    .mlv-span-8,\n    .mlv-span-12 {\n        grid-column: span 12;", normalized, StringComparison.Ordinal);
         Assert.Contains("max-width: 100%;", styles, StringComparison.Ordinal);
         Assert.Contains("overflow-x: auto;", styles, StringComparison.Ordinal);
-        Assert.Contains(".mlv-segmented {\n        flex-wrap: wrap;\n        overflow-x: visible;", styles.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains(".mlv-segmented {\n        flex-wrap: wrap;\n        overflow-x: visible;", normalized, StringComparison.Ordinal);
     }
 
     [Fact]
