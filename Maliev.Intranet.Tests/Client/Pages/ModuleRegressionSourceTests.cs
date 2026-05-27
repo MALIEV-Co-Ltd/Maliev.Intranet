@@ -689,6 +689,14 @@ public class ModuleRegressionSourceTests
         Assert.Contains("overflow: hidden;", detailStyles, StringComparison.Ordinal);
         Assert.Contains("white-space: nowrap;", detailStyles, StringComparison.Ordinal);
         Assert.Contains("50mm", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", ExtractCssBlock(detailStyles, ".material-label-panel {"), StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", ExtractCssBlock(detailStyles, ".material-print-label {"), StringComparison.Ordinal);
+        Assert.Contains("max-width: 100%;", ExtractCssBlock(detailStyles, ".material-print-label {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(72px, 104px) minmax(0, 1fr);", ExtractCssBlock(detailStyles, ".material-qr-label-body {"), StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", ExtractCssBlock(detailStyles, ".material-qr-shell {"), StringComparison.Ordinal);
+        Assert.Contains("aspect-ratio: 1;", ExtractCssBlock(detailStyles, ".material-qr-shell {"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 520px)", detailStyles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr);", detailStyles[detailStyles.IndexOf("@media (max-width: 520px)", StringComparison.Ordinal)..], StringComparison.Ordinal);
         Assert.Contains("material-audit-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-supplier-entry", detailStyles, StringComparison.Ordinal);
         Assert.Contains("material-color-picker", detail, StringComparison.Ordinal);
@@ -753,6 +761,27 @@ public class ModuleRegressionSourceTests
         Assert.Contains("search, sortBy, sortDesc, minPrice, maxPrice, supplierId, manufacturingProcess, color", materialClient, StringComparison.Ordinal);
         Assert.Contains("[FromQuery] string? search = null", materialsController, StringComparison.Ordinal);
         Assert.Contains("api/v1/materials/{Id}", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SharedSurfaces_UseViewportSafeCardsAndDialogs()
+    {
+        var panel = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PanelCard.razor.css");
+        var modal = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "ConfirmModal.razor.css");
+        var mudOverrides = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "mudblazor-overrides.css");
+
+        Assert.Contains("min-width: 0;", ExtractCssBlock(panel, ".mlv-panel-card {"), StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: anywhere;", ExtractCssBlock(panel, ".mlv-panel-card {"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 520px)", panel, StringComparison.Ordinal);
+        Assert.Contains("calc(100vw - 24px)", ExtractCssBlock(modal, ".mlv-modal {"), StringComparison.Ordinal);
+        Assert.Contains("max-height: calc(100dvh - 24px);", ExtractCssBlock(modal, ".mlv-modal {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-rows: auto minmax(0, 1fr) auto;", ExtractCssBlock(modal, ".mlv-modal {"), StringComparison.Ordinal);
+        Assert.Contains("overflow: auto;", ExtractCssBlock(modal, ".mlv-modal-body {"), StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: wrap;", ExtractCssBlock(modal, ".mlv-modal-actions {"), StringComparison.Ordinal);
+        Assert.Contains("max-width: calc(100vw - 24px);", ExtractCssBlock(mudOverrides, ".mud-dialog {"), StringComparison.Ordinal);
+        Assert.Contains("max-height: calc(100dvh - 24px);", ExtractCssBlock(mudOverrides, ".mud-dialog {"), StringComparison.Ordinal);
+        Assert.Contains("overflow: auto;", ExtractCssBlock(mudOverrides, ".mud-dialog .mud-dialog-content {"), StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: wrap;", ExtractCssBlock(mudOverrides, ".mud-dialog .mud-dialog-actions {"), StringComparison.Ordinal);
     }
 
     [Fact]

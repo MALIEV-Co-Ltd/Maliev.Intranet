@@ -449,6 +449,9 @@
    ──────────────────────────────────────────────────────────────── */
 
 .mud-dialog {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow: hidden;
     border-radius: var(--maliev-radius-md);
     background-color: var(--maliev-panel);
     box-shadow: var(--maliev-shadow-card);
@@ -461,10 +464,13 @@
 }
 
 .mud-dialog .mud-dialog-content {
+    min-width: 0;
+    overflow: auto;
     padding: 8px 16px;
 }
 
 .mud-dialog .mud-dialog-actions {
+    flex-wrap: wrap;
     padding: 8px 16px 12px 16px;
 }
 

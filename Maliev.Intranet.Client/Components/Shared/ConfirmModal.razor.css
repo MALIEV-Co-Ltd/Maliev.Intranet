@@ -4,12 +4,16 @@
     z-index: 2000;
     display: grid;
     place-items: center;
-    padding: 20px;
+    padding: min(20px, 4vw);
+    overflow: auto;
     background: rgba(8, 12, 20, 0.55);
 }
 
 .mlv-modal {
-    width: min(440px, 100%);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(440px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
     overflow: hidden;
     border-radius: 10px;
     background: var(--maliev-panel);
@@ -53,6 +57,9 @@
 }
 
 .mlv-modal-body {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
     padding: 18px;
     color: var(--maliev-ink-2);
     font-size: var(--maliev-font-base);
@@ -60,11 +67,22 @@
 
 .mlv-modal-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
     padding: 14px 18px;
     border-top: 1px solid var(--maliev-border);
     background: var(--maliev-panel-2);
+}
+
+@media (max-width: 520px) {
+    .mlv-modal-actions {
+        justify-content: stretch;
+    }
+
+    .mlv-modal-actions ::deep .mlv-button {
+        flex: 1 1 140px;
+    }
 }
 
 ::deep .danger {

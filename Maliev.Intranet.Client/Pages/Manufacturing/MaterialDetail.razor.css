@@ -184,6 +184,7 @@
 
 .material-label-panel {
     display: grid;
+    min-width: 0;
     gap: 12px;
 }
 
@@ -209,9 +210,9 @@
 
 .material-qr-label-body {
     display: grid;
-    grid-template-columns: 24mm minmax(0, 1fr);
+    grid-template-columns: minmax(72px, 104px) minmax(0, 1fr);
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
     overflow: hidden;
 }
@@ -219,11 +220,12 @@
 .material-qr-shell {
     display: grid;
     place-items: center;
-    width: 24mm;
-    height: 24mm;
-    padding: 2mm;
+    width: 100%;
+    aspect-ratio: 1;
+    min-width: 0;
+    height: auto;
+    padding: clamp(6px, 2vw, 10px);
     box-sizing: border-box;
-    flex: 0 0 24mm;
     border-radius: 4px;
     background: #fff;
     box-shadow: var(--maliev-shadow-ring);
@@ -287,9 +289,10 @@
 }
 
 .material-print-label {
-    width: min(100%, 50mm);
+    width: 100%;
+    max-width: 100%;
     min-height: 30mm;
-    padding: 8px;
+    padding: clamp(8px, 2.2vw, 12px);
     border: 1px solid var(--maliev-border);
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
@@ -648,6 +651,22 @@
     }
 }
 
+@media (max-width: 520px) {
+    .material-qr-label-body {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .material-qr-shell {
+        width: min(100%, 132px);
+    }
+
+    .material-label-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 @media print {
     body * {
         visibility: hidden;
@@ -663,10 +682,23 @@
         top: 0;
         left: 0;
         width: 50mm;
+        max-width: 50mm;
         min-height: 30mm;
+        padding: 8px;
         color: #111;
         background: #fff;
         box-shadow: none;
+    }
+
+    .material-qr-label-body {
+        grid-template-columns: 24mm minmax(0, 1fr);
+        gap: 2mm;
+    }
+
+    .material-qr-shell {
+        width: 24mm;
+        height: 24mm;
+        padding: 2mm;
     }
 
     .material-label-actions {
