@@ -1983,16 +1983,18 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
-    public void ProjectQuoteSummaryBar_MobileLayoutUsesTouchFriendlyColumns()
+    public void ProjectQuoteSummaryBar_MobileLayoutUsesComfortableTouchSpacing()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "QuoteSummaryBar.razor");
         var normalized = source.ReplaceLineEndings("\n");
 
         Assert.Contains("@@media (max-width: 600px)", source, StringComparison.Ordinal);
         Assert.Contains("flex-wrap: nowrap;", source, StringComparison.Ordinal);
-        Assert.Contains(".qsb-actions {\n            display: grid;\n            grid-template-columns: repeat(3, minmax(0, 1fr));", normalized, StringComparison.Ordinal);
-        Assert.Contains("height: 44px;", source, StringComparison.Ordinal);
-        Assert.Contains("@@media (max-width: 380px)", source, StringComparison.Ordinal);
+        Assert.Contains("gap: 14px;", source, StringComparison.Ordinal);
+        Assert.Contains(".qsb-zone-customer .customer-picker-trigger {\n            height: 52px;", normalized, StringComparison.Ordinal);
+        Assert.Contains(".qsb-lead-options {\n            display: grid;\n            grid-template-columns: 1fr;", normalized, StringComparison.Ordinal);
+        Assert.Contains(".qsb-actions {\n            display: grid;\n            grid-template-columns: repeat(2, minmax(0, 1fr));", normalized, StringComparison.Ordinal);
+        Assert.Contains("height: 50px;", source, StringComparison.Ordinal);
         Assert.Contains(".qsb-btn-checkout {\n            grid-column: 1 / -1;", normalized, StringComparison.Ordinal);
     }
 
