@@ -1485,10 +1485,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("gap: 6px;", ExtractCssBlock(compactNavStyles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains("width: min(96px, 100%);", ExtractCssBlock(styles, ".topbar-logo-button ::deep img"), StringComparison.Ordinal);
         Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-left"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
         Assert.Contains("width: 0;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
-        Assert.DoesNotContain("overflow: hidden;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
         Assert.DoesNotContain("max-width: 86px;", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
+        Assert.DoesNotContain("display: none !important;", ExtractCssBlock(compactNavStyles, ".topbar-right ::deep .topbar-theme-toggle"), StringComparison.Ordinal);
         Assert.Contains("@media (max-width: 420px)", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("flex-wrap: wrap;", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("flex: 1 1 100%;", styles, StringComparison.Ordinal);
@@ -1508,12 +1509,15 @@ public class ModuleRegressionSourceTests
         var mobileGlobalSearchBlock = ExtractCssBlock(mobileStyles, ".topbar-root ::deep .topbar-global-search");
 
         Assert.Contains("display: none;", mobileLeftBlock, StringComparison.Ordinal);
+        Assert.Contains("display: none;", mobileLogoBlock, StringComparison.Ordinal);
         Assert.Contains("width: 0;", mobileLogoBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", mobileLogoBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 auto;", mobileSearchBlock, StringComparison.Ordinal);
         Assert.Contains("min-width: 0;", mobileSearchBlock, StringComparison.Ordinal);
         Assert.Contains("justify-content: stretch;", mobileSearchBlock, StringComparison.Ordinal);
         Assert.Contains("width: 100%;", mobileGlobalSearchBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("flex-basis: 118px;", mobileSearchBlock, StringComparison.Ordinal);
+        Assert.Contains("display: inline-flex !important;", ExtractCssBlock(mobileStyles, ".topbar-right ::deep .topbar-theme-toggle"), StringComparison.Ordinal);
     }
 
     [Fact]

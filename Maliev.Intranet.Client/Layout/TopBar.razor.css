@@ -910,9 +910,11 @@
     }
 
     .topbar-logo-button {
+        display: none;
         width: 0;
         height: 0;
-        padding-inline: 0;
+        padding: 0;
+        overflow: hidden;
     }
 
     .topbar-search {
@@ -942,16 +944,9 @@
     .topbar-root ::deep .topbar-currency-autocomplete .mud-input {
         padding-left: 6px;
     }
-}
 
-@media (max-width: 520px) {
     .topbar-right ::deep .topbar-theme-toggle {
-        display: none !important;
-    }
-
-    .topbar-search {
-        flex: 1 1 auto;
-        min-width: 0;
+        display: inline-flex !important;
     }
 }
 
