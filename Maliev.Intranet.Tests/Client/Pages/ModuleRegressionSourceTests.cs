@@ -1864,6 +1864,97 @@ public class ModuleRegressionSourceTests
         Assert.Contains("operational density", designBrief, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void SharedModuleResponsiveStyles_ConstrainToolbarsSegmentedControlsAndTables()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
+        var toolbarBlock = ExtractCssBlock(styles, ".mlv-toolbar {");
+        var segmentedBlock = ExtractCssBlock(styles, ".mlv-segmented {");
+        var segmentedButtonBlock = ExtractCssBlock(styles, ".mlv-segmented button {");
+
+        Assert.Contains("flex-wrap: wrap;", toolbarBlock, StringComparison.Ordinal);
+        Assert.Contains("max-width: 100%;", ExtractCssBlock(styles, ".mlv-toolbar-left,"), StringComparison.Ordinal);
+        Assert.Contains("max-width: 100%;", segmentedBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", segmentedBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", segmentedButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 900px)", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 100%;", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 720px)", styles, StringComparison.Ordinal);
+        Assert.Contains("max-width: 100%;", styles, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", styles, StringComparison.Ordinal);
+        Assert.Contains(".mlv-segmented {\n        flex-wrap: wrap;\n        overflow-x: visible;", styles.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectQuoteSummaryBar_MobileLayoutCannotWrapIntoSecondColumn()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "QuoteSummaryBar.razor");
+
+        Assert.Contains("@@media (max-width: 600px)", source, StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: nowrap;", source, StringComparison.Ordinal);
+        Assert.Contains("flex: 0 0 auto;", source, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomerNew_MobileTabsAndAiToggleWrapWithinViewport()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
+
+        Assert.Contains("flex: 0 1 auto;", ExtractCssBlock(styles, ".ai-intake-toggle-meta"), StringComparison.Ordinal);
+        Assert.Contains("text-overflow: ellipsis;", ExtractCssBlock(styles, ".ai-intake-toggle-meta > span"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 600px)", styles, StringComparison.Ordinal);
+        Assert.Contains("flex-wrap: wrap;", styles, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: visible;", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 calc(50% - 0.25rem);", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CommerceListing_CompactsVariantAndMediaRowsBeforeLaptopWidth()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "CatalogListing.razor.css");
+
+        Assert.Contains("@media (max-width: 1500px)", styles, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: clip;", ExtractCssBlock(styles, ".commerce-listing-tabs ::deep .mud-tabs-panels,"), StringComparison.Ordinal);
+        Assert.Contains("margin: 0;", ExtractCssBlock(styles, ".commerce-listing-tabs ::deep .mud-grid {"), StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 0.9fr)", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1.5fr)", styles, StringComparison.Ordinal);
+        Assert.Contains(".commerce-variant-row > *,", styles, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProductionScheduleBoard_MobileControlsStackInsideCard()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Production", "ProductionScheduleBoard.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Production", "ProductionScheduleBoard.razor.css");
+
+        Assert.Contains("<div class=\"psb-toolbar\">", source, StringComparison.Ordinal);
+        Assert.Contains("<div class=\"psb-controls\">", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Class=\"psb-controls\"", source, StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(styles, ".psb-toolbar {"), StringComparison.Ordinal);
+        Assert.Contains("display: flex;", ExtractCssBlock(styles, ".psb-controls {"), StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 960px)", styles, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 100%;", styles, StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", styles, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 640px)", styles, StringComparison.Ordinal);
+        Assert.Contains(".production-schedule-board .psb-controls", styles, StringComparison.Ordinal);
+        Assert.Contains("display: grid !important;", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr);", styles, StringComparison.Ordinal);
+        Assert.Contains(".psb-controls ::deep .mud-tooltip-root", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr));", styles, StringComparison.Ordinal);
+        Assert.Contains(".psb-scale,", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MaterialDetail_StacksSidePanelBeforeTabletWidth()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor.css");
+
+        Assert.Contains("@media (max-width: 900px)", styles, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", ExtractCssBlock(styles, "@media (max-width: 900px)"), StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var startDirectories = new List<string>();

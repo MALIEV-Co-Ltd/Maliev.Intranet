@@ -10,14 +10,14 @@
          data-focused-machine-id="@ResolvedFocusMachineId"
          data-board-range-days="@VisibleDays.Count"
          data-board-zoom="@TimelineZoomPercent">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2" Class="psb-toolbar">
-        <MudStack Spacing="0" Class="psb-title">
+    <div class="psb-toolbar">
+        <div class="psb-title">
             <span>@Eyebrow</span>
             <strong>@Title</strong>
             <small>@RangeLabel</small>
-        </MudStack>
+        </div>
 
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="psb-controls">
+        <div class="psb-controls">
             <label class="psb-search">
                 <MudIcon Icon="@Icons.Material.Outlined.Search" Size="Size.Small" />
                 <input value="@_search" @oninput="OnSearchChanged" placeholder="Search machines..." aria-label="Search machines" />
@@ -71,8 +71,8 @@
                     </button>
                 </MudTooltip>
             }
-        </MudStack>
-    </MudStack>
+        </div>
+    </div>
 
     <div class="psb-legend" aria-label="Schedule legend">
         <span><i class="job"></i> Job</span>

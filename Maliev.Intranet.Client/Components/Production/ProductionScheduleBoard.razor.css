@@ -8,12 +8,17 @@
 }
 
 .psb-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
     flex-shrink: 0;
 }
 
 .psb-title {
+    display: grid;
+    gap: 0;
     min-width: min(280px, 100%);
 }
 
@@ -40,6 +45,9 @@
 }
 
 .psb-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     flex: 1 1 520px;
     justify-content: flex-end;
     flex-wrap: wrap;
@@ -666,11 +674,18 @@
 }
 
 @media (max-width: 960px) {
+    .psb-toolbar {
+        align-items: stretch !important;
+    }
+
     .psb-controls {
         justify-content: flex-start;
+        flex: 1 1 100%;
+        width: 100%;
     }
 
     .psb-search {
+        flex-basis: 100%;
         max-width: none;
     }
 
@@ -681,7 +696,7 @@
 
 @media (max-width: 640px) {
     .psb-toolbar {
-        align-items: stretch;
+        align-items: stretch !important;
     }
 
     .psb-controls,
@@ -692,8 +707,38 @@
         max-width: none;
     }
 
+    .production-schedule-board .psb-controls {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .psb-scale,
     .psb-zoom,
     .psb-icon-button {
         flex: 1 1 auto;
+    }
+
+    .psb-controls ::deep .mud-tooltip-root,
+    .psb-scale ::deep .mud-tooltip-root {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .psb-scale,
+    .psb-zoom {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .psb-scale {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .psb-scale button,
+    .psb-icon-button {
+        width: 100%;
     }
 }

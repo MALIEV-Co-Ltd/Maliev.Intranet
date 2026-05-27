@@ -25,6 +25,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 14px;
 }
@@ -35,19 +36,25 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+    max-width: 100%;
 }
 
 .mlv-segmented {
-    display: inline-flex;
+    display: flex;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
     gap: 2px;
     padding: 3px;
     border: 0;
     border-radius: var(--maliev-radius-sm);
     background: var(--maliev-panel);
     box-shadow: var(--maliev-shadow-ring);
+    scrollbar-width: thin;
 }
 
 .mlv-segmented button {
+    flex: 0 0 auto;
     min-height: 26px;
     padding: 0 10px;
     border: 0;
@@ -453,6 +460,21 @@ select.mlv-form-select,
     }
 }
 
+@media (max-width: 900px) {
+    .mlv-toolbar {
+        align-items: stretch;
+    }
+
+    .mlv-toolbar-left {
+        flex: 1 1 100%;
+    }
+
+    .mlv-toolbar-right {
+        flex: 1 1 auto;
+        justify-content: flex-start;
+    }
+}
+
 @media (max-width: 720px) {
     .mlv-toolbar {
         align-items: stretch;
@@ -462,6 +484,12 @@ select.mlv-form-select,
     .mlv-toolbar-left,
     .mlv-toolbar-right {
         flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .mlv-segmented {
+        flex-wrap: wrap;
+        overflow-x: visible;
     }
 
     .accounting-report-toolbar {
@@ -485,8 +513,10 @@ select.mlv-form-select,
 
     .mlv-table {
         display: block;
+        max-width: 100%;
         overflow-x: auto;
         white-space: nowrap;
+        scrollbar-width: thin;
     }
 
     .mlv-two-column-grid {

@@ -276,6 +276,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
+    flex: 0 1 auto;
+    min-width: 0;
     font-size: 0.85rem;
     white-space: nowrap;
 }
@@ -283,6 +285,9 @@
 .ai-intake-toggle-meta > span {
     display: inline-flex;
     align-items: center;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .ai-processing-spinner {
@@ -1661,6 +1666,27 @@
 
     .customer-create-side {
         position: static;
+    }
+}
+
+@media (max-width: 600px) {
+    .customer-create-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .customer-create-tabs button {
+        flex: 1 1 calc(50% - 0.25rem);
+    }
+
+    .ai-intake-toggle {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .ai-intake-toggle-meta {
+        white-space: normal;
     }
 }
 

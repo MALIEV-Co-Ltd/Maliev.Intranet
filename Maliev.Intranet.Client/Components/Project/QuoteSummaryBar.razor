@@ -720,13 +720,16 @@
         .qsb-root {
             flex-direction: column;
             align-items: stretch;
+            flex-wrap: nowrap;
             padding: 10px;
         }
         .qsb-zone-customer,
         .qsb-zone-lead,
         .qsb-zone-total {
+            flex: 0 0 auto;
             width: 100%;
             max-width: none;
+            min-width: 0;
             padding: 10px 0;
         }
         .qsb-zone-customer {
