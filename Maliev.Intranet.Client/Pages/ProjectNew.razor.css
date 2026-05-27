@@ -207,11 +207,18 @@
         width: min(270px, 100vw);
     }
     .pn-mobile-toolbar {
-        padding: 8px;
+        padding: 10px 12px;
+        gap: 10px;
         align-items: stretch;
     }
     .pn-parts-toggle--mobile {
         flex: 1 1 auto;
         justify-content: center;
+        min-height: 44px;
+    }
+    .pn-mode-icon-button {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
     }
 }

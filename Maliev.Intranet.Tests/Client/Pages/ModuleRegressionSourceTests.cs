@@ -1999,6 +1999,29 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNew_MobileConfiguratorUsesFingerFriendlyControls()
+    {
+        var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");
+        var mobileProjectNew = projectNew[projectNew.IndexOf("@media (max-width: 600px)", StringComparison.Ordinal)..]
+            .ReplaceLineEndings("\n");
+        var sidebar = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("padding: 10px 12px;", mobileProjectNew, StringComparison.Ordinal);
+        Assert.Contains("gap: 10px;", mobileProjectNew, StringComparison.Ordinal);
+        Assert.Contains(".pn-parts-toggle--mobile {\n        flex: 1 1 auto;\n        justify-content: center;\n        min-height: 44px;", mobileProjectNew, StringComparison.Ordinal);
+        Assert.Contains(".pn-mode-icon-button {\n        width: 44px;\n        height: 44px;", mobileProjectNew, StringComparison.Ordinal);
+
+        Assert.Contains("@@media (max-width: 640px)", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-grid {\n                    grid-template-columns: repeat(2, minmax(0, 1fr));", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card {\n                    min-height: 76px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-card,\n                .pcs-fin-card,\n                .pcs-choice-card {\n                    min-height: 56px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-qty-btn {\n                    width: 44px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-qty-input {\n                    height: 44px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-qty-presets {\n                    display: grid;\n                    grid-template-columns: repeat(3, minmax(0, 1fr));", sidebar, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerNew_MobileTabsAndAiToggleWrapWithinViewport()
     {
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
