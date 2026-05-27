@@ -486,7 +486,7 @@
             <PanelCard Title="Inventory label">
                 @if (_material is not null)
                 {
-                    <div class="material-label-panel material-print-label">
+                    <div id="@MaterialRecordLabelElementId" class="material-label-panel material-print-label">
                         <div class="material-label-heading">
                             <span>Material record</span>
                             <strong>@_material.Name</strong>
@@ -502,7 +502,7 @@
                             </div>
                         </div>
                         <div class="material-label-actions">
-                            <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@PrintLabelsAsync">Print label</SecondaryButton>
+                            <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@(_ => PrintLabelsAsync(MaterialRecordLabelElementId))">Print label</SecondaryButton>
                             <SecondaryButton Icon="@Icons.Material.Outlined.OpenInNew" Href="@MaterialRecordHref">Open material</SecondaryButton>
                         </div>
                     </div>
@@ -512,7 +512,7 @@
             @if (_createdItem is not null)
             {
                 <PanelCard Title="Latest item label">
-                    <div class="material-label-panel material-print-label">
+                    <div id="@LatestItemLabelElementId" class="material-label-panel material-print-label">
                         <div class="material-label-heading">
                             <span>Apply to raw stock</span>
                             <strong>@_createdItem.Location</strong>
@@ -532,7 +532,7 @@
                             <dt>Grade</dt><dd>@DisplayNullable(_createdItem.MaterialGrade)</dd>
                             <dt>Received</dt><dd>@_createdItem.ReceivedAt.LocalDateTime.ToString("dd MMM yyyy HH:mm")</dd>
                         </dl>
-                        <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@PrintLabelsAsync">Print label</SecondaryButton>
+                        <SecondaryButton Icon="@Icons.Material.Outlined.Print" OnClick="@(_ => PrintLabelsAsync(LatestItemLabelElementId))">Print label</SecondaryButton>
                     </div>
                 </PanelCard>
             }
@@ -766,6 +766,9 @@
     private string ReorderPointText => _material is null || _material.ReorderLevel <= 0
         ? "Not configured"
         : $"{_material.ReorderLevel:N0} {_material.Unit}";
+
+    private const string MaterialRecordLabelElementId = "material-record-label";
+    private const string LatestItemLabelElementId = "latest-material-item-label";
 
     private string InventoryTrackingShortCode => _material is null
         ? string.Empty
@@ -1214,9 +1217,9 @@
             _ => Icons.Material.Outlined.Tune
         };
 
-    private async Task PrintLabelsAsync(MouseEventArgs _)
+    private async Task PrintLabelsAsync(string labelElementId)
     {
-        await Js.InvokeVoidAsync("print");
+        await Js.InvokeVoidAsync("malievMaterialLabels.print", labelElementId);
     }
 
     private static string BuildQrSvg(string value)

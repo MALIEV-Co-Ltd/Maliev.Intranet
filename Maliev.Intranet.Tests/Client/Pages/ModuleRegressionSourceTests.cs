@@ -768,6 +768,54 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void MaterialDetail_PrintLabelUsesFiftyByThirtyMillimeterLandscapePage()
+    {
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor");
+        var detailStyles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialDetail.razor.css");
+        var printScript = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "material-labels.js");
+        var standaloneHost = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "index.html");
+        var bffHost = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+        var printIndex = detailStyles.IndexOf("@media print", StringComparison.Ordinal);
+
+        Assert.True(printIndex >= 0, "Expected MaterialDetail to define print-specific inventory label styles.");
+
+        var printStyles = detailStyles[printIndex..];
+        var labelBlock = ExtractCssBlock(printStyles, ".material-print-label {");
+        var qrBodyBlock = ExtractCssBlock(printStyles, ".material-qr-label-body {");
+        var qrShellBlock = ExtractCssBlock(printStyles, ".material-qr-shell {");
+        var actionsBlock = ExtractCssBlock(printStyles, ".material-label-actions {");
+
+        Assert.Contains("id=\"@MaterialRecordLabelElementId\"", detail, StringComparison.Ordinal);
+        Assert.Contains("id=\"@LatestItemLabelElementId\"", detail, StringComparison.Ordinal);
+        Assert.Contains("PrintLabelsAsync(MaterialRecordLabelElementId)", detail, StringComparison.Ordinal);
+        Assert.Contains("PrintLabelsAsync(LatestItemLabelElementId)", detail, StringComparison.Ordinal);
+        Assert.Contains("malievMaterialLabels.print", detail, StringComparison.Ordinal);
+        Assert.Contains("window.malievMaterialLabels", printScript, StringComparison.Ordinal);
+        Assert.Contains("@page", printScript, StringComparison.Ordinal);
+        Assert.Contains("size: 50mm 30mm;", printScript, StringComparison.Ordinal);
+        Assert.Contains("margin: 0;", printScript, StringComparison.Ordinal);
+        Assert.Contains("body * {", printScript, StringComparison.Ordinal);
+        Assert.Contains("visibility: hidden !important;", printScript, StringComparison.Ordinal);
+        Assert.Contains("material-print-label--printing", printScript, StringComparison.Ordinal);
+        Assert.Contains("afterprint", printScript, StringComparison.Ordinal);
+        Assert.Contains("<script src=\"js/material-labels.js\"></script>", standaloneHost, StringComparison.Ordinal);
+        Assert.Contains("<script src=\"js/material-labels.js\"></script>", bffHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("@page", printStyles, StringComparison.Ordinal);
+        Assert.Contains("width: 50mm;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("max-width: 50mm;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("height: 30mm;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: 0;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("box-sizing: border-box;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("padding: 2mm;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("break-after: page;", labelBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 18mm minmax(0, 1fr);", qrBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("width: 18mm;", qrShellBlock, StringComparison.Ordinal);
+        Assert.Contains("height: 18mm;", qrShellBlock, StringComparison.Ordinal);
+        Assert.Contains("display: none !important;", actionsBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SharedSurfaces_UseViewportSafeCardsAndDialogs()
     {
         var panel = ReadRepoFile("Maliev.Intranet.Client", "Components", "Shared", "PanelCard.razor.css");
