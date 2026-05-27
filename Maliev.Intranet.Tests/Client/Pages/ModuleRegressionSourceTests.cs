@@ -1983,14 +1983,17 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
-    public void ProjectQuoteSummaryBar_MobileLayoutCannotWrapIntoSecondColumn()
+    public void ProjectQuoteSummaryBar_MobileLayoutUsesTouchFriendlyColumns()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "QuoteSummaryBar.razor");
+        var normalized = source.ReplaceLineEndings("\n");
 
         Assert.Contains("@@media (max-width: 600px)", source, StringComparison.Ordinal);
         Assert.Contains("flex-wrap: nowrap;", source, StringComparison.Ordinal);
-        Assert.Contains("flex: 0 0 auto;", source, StringComparison.Ordinal);
-        Assert.Contains("min-width: 0;", source, StringComparison.Ordinal);
+        Assert.Contains(".qsb-actions {\n            display: grid;\n            grid-template-columns: repeat(3, minmax(0, 1fr));", normalized, StringComparison.Ordinal);
+        Assert.Contains("height: 44px;", source, StringComparison.Ordinal);
+        Assert.Contains("@@media (max-width: 380px)", source, StringComparison.Ordinal);
+        Assert.Contains(".qsb-btn-checkout {\n            grid-column: 1 / -1;", normalized, StringComparison.Ordinal);
     }
 
     [Fact]
