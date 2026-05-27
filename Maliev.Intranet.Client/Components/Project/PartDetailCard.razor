@@ -89,6 +89,24 @@
     </div>
 </div>
 
+@if (ShouldShowMobileStatusFloat)
+{
+    <div class="pdc-mobile-status-float" aria-live="polite">
+        @if (Part.QueuedUpload)
+        {
+            <PartQueueLoader Class="part-queue-loader--mobile-status" Label="@GetMobileStatusTitle()" />
+        }
+        else
+        {
+            <PartProcessingLoader Class="part-processing-loader--mobile-status" Label="@GetMobileStatusTitle()" />
+        }
+        <div class="pdc-mobile-status-copy">
+            <strong>@GetMobileStatusTitle()</strong>
+            <span>@GetMobileStatusMessage()</span>
+        </div>
+    </div>
+}
+
 <div class="pdc-container">
     @* ── Tab: DFM Checks ───────────────────────────────────────────────────────────── *@
     @if (_activeTab == 2)
@@ -225,7 +243,7 @@
             <DfmOverlayPanel @ref="_dfmPanel" @key="@Part.FileId"
                              DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
-                             Analyzing="@(_dfmIssues.Count == 0 && Part.ViewerUrl != null && Part.DfmReport == null && !Part.DfmAcknowledged && !string.IsNullOrEmpty(Part.ProcessCode))"
+                             Analyzing="@IsDfmAnalyzing"
                              TimedOut="@Part.DfmAnalysisTimedOut"
                              ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
                              AllClear="@ShouldShowAllClearOverlay()"
@@ -359,6 +377,42 @@
         if (Part.QueuedUpload) return "Part queued for upload";
         if (Part.Uploading) return "Uploading part";
         return "Processing part preview";
+    }
+
+    private bool IsDfmAnalyzing =>
+        _dfmIssues.Count == 0
+        && Part.ViewerUrl != null
+        && Part.DfmReport == null
+        && !Part.DfmAcknowledged
+        && !string.IsNullOrEmpty(Part.ProcessCode);
+
+    private bool ShouldShowMobileStatusFloat =>
+        Part.QueuedUpload
+        || Part.Uploading
+        || Part.AwaitingPreview
+        || IsDfmAnalyzing
+        || Part.PricingLoading;
+
+    private string GetMobileStatusTitle()
+    {
+        if (Part.QueuedUpload) return "Queued for upload";
+        if (Part.Uploading) return "Uploading...";
+        if (Part.AwaitingPreview) return "Processing geometry...";
+        if (IsDfmAnalyzing) return "Analyzing your model...";
+        if (Part.PricingLoading) return "Calculating pricing...";
+
+        return GetStatusLabel();
+    }
+
+    private string GetMobileStatusMessage()
+    {
+        if (Part.QueuedUpload) return "Waiting for the previous part upload to finish.";
+        if (Part.Uploading) return Part.StatusText;
+        if (Part.AwaitingPreview) return Part.StatusText;
+        if (IsDfmAnalyzing) return "Checking manufacturability for the selected process.";
+        if (Part.PricingLoading) return "Updating quote pricing and lead time.";
+
+        return Part.StatusText;
     }
 
     private static string FormatRelative(DateTimeOffset t)

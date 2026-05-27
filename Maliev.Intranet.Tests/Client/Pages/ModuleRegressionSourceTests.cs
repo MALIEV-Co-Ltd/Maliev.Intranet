@@ -2037,6 +2037,28 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNew_MobilePartStatusFloatsActiveProcessingState()
+    {
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor.css")
+            .ReplaceLineEndings("\n");
+        var mobileStyles = styles[styles.IndexOf("@media (max-width: 600px)", StringComparison.Ordinal)..];
+
+        Assert.Contains("class=\"pdc-mobile-status-float\"", detail, StringComparison.Ordinal);
+        Assert.Contains("ShouldShowMobileStatusFloat", detail, StringComparison.Ordinal);
+        Assert.Contains("Part.PricingLoading", detail, StringComparison.Ordinal);
+        Assert.Contains("IsDfmAnalyzing", detail, StringComparison.Ordinal);
+        Assert.Contains("Analyzing your model...", detail, StringComparison.Ordinal);
+        Assert.Contains("Calculating pricing...", detail, StringComparison.Ordinal);
+        Assert.Contains("position: fixed;", ExtractCssBlock(mobileStyles, ".pdc-mobile-status-float"), StringComparison.Ordinal);
+        Assert.Contains("top: calc(64px + env(safe-area-inset-top, 0px));", mobileStyles, StringComparison.Ordinal);
+        Assert.Contains("z-index: 1400;", ExtractCssBlock(mobileStyles, ".pdc-mobile-status-float"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(mobileStyles, ".pdc-upload-progress"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(mobileStyles, ".pdc-viewer-wrap ::deep .dfm-overlay-panel--analyzing"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerNew_MobileTabsAndAiToggleWrapWithinViewport()
     {
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerNew.razor.css");
