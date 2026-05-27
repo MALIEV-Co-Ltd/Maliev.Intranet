@@ -321,7 +321,7 @@ public class ModuleRegressionSourceTests
     public void CustomerList_RendersLoadingTableInsideResultsPanel()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
-        var panelBlock = ExtractRazorBlock(source, "<PanelCard>");
+        var panelBlock = ExtractRazorBlock(source, "<PanelCard Class=\"mlv-data-results-panel\"");
 
         Assert.Contains("@if (_loading)", panelBlock, StringComparison.Ordinal);
         Assert.Contains("<ProgressiveSkeleton Layout=\"table\"", panelBlock, StringComparison.Ordinal);
@@ -472,8 +472,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("pageSize={_pageSize}", list, StringComparison.Ordinal);
         Assert.Contains("purchasing-filter-toolbar", list, StringComparison.Ordinal);
         Assert.Contains("purchasing-filter-left", list, StringComparison.Ordinal);
-        Assert.Contains("Class=\"purchasing-page-body\"", list, StringComparison.Ordinal);
-        Assert.Contains("Class=\"purchasing-results-panel\"", list, StringComparison.Ordinal);
+        Assert.Contains("purchasing-page-body", list, StringComparison.Ordinal);
+        Assert.Contains("purchasing-results-panel", list, StringComparison.Ordinal);
         Assert.Contains("mlv-empty purchasing-results-empty", list, StringComparison.Ordinal);
         Assert.Contains("<span>Order ID</span>", list, StringComparison.Ordinal);
         Assert.Contains("Class=\"purchasing-search-box\"", list, StringComparison.Ordinal);
@@ -636,7 +636,8 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("@page \"/mfg/materials\"", list, StringComparison.Ordinal);
         Assert.Contains("@page \"/mfg/materials/{Id:guid}\"", detail, StringComparison.Ordinal);
-        Assert.Contains("<PageBody>", list, StringComparison.Ordinal);
+        Assert.Contains("<PageBody", list, StringComparison.Ordinal);
+        Assert.Contains("mlv-data-page-body", list, StringComparison.Ordinal);
         Assert.Contains("</PageBody>", list, StringComparison.Ordinal);
         Assert.Contains("<PageBody>", detail, StringComparison.Ordinal);
         Assert.Contains("</PageBody>", detail, StringComparison.Ordinal);
@@ -648,7 +649,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("MalievPermissions.Material.Update", detail, StringComparison.Ordinal);
         Assert.Contains("roles.platform.owner", detail, StringComparison.Ordinal);
         Assert.DoesNotContain("Aggregate stock; barcode lots pending", detail, StringComparison.Ordinal);
-        Assert.Contains("<PanelCard>", list, StringComparison.Ordinal);
+        Assert.Contains("<PanelCard", list, StringComparison.Ordinal);
+        Assert.Contains("mlv-data-results-panel", list, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Inventory control\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Receive material item\">", detail, StringComparison.Ordinal);
         Assert.Contains("<PanelCard Title=\"Profile\">", detail, StringComparison.Ordinal);
@@ -1102,6 +1104,47 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ListPages_UseFullHeightDataPanels()
+    {
+        var moduleStyles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
+        var dataBodyBlock = ExtractCssBlock(moduleStyles, ".mlv-data-page-body");
+        var resultsPanelBlock = ExtractCssBlock(moduleStyles, ".mlv-data-results-panel");
+        var emptyBlock = ExtractCssBlock(moduleStyles, ".mlv-data-results-panel .mlv-empty");
+
+        Assert.Contains("display: flex;", dataBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("flex-direction: column;", dataBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 auto;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("min-height: clamp(360px, 52dvh, 760px);", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("display: flex;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 auto;", emptyBlock, StringComparison.Ordinal);
+        Assert.Contains(".mlv-data-page-body > .mlv-pagination-footer", moduleStyles, StringComparison.Ordinal);
+
+        var listPages = new[]
+        {
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Projects.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "AdminPage.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Admin", "ChatbotInstructions.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Iam", "UserList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "EquipmentList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Manufacturing", "MaterialList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Contacts", "ContactRequestList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Delivery", "DeliveryNoteList.razor"),
+            ReadRepoFile("Maliev.Intranet.Client", "Pages", "Accounting", "InvoiceList.razor")
+        };
+
+        foreach (var page in listPages)
+        {
+            Assert.Contains("<PageBody", page, StringComparison.Ordinal);
+            Assert.Contains("mlv-data-page-body", page, StringComparison.Ordinal);
+            Assert.Contains("mlv-data-results-panel", page, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void CommerceCatalog_UsesDedicatedCollectionsManagementPage()
     {
         var catalog = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Commerce", "Catalog.razor");
@@ -1441,7 +1484,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("width: clamp(220px, 32vw, 420px);", ExtractCssBlock(styles, ".topbar-root ::deep .topbar-global-search"), StringComparison.Ordinal);
         Assert.Contains("gap: 6px;", ExtractCssBlock(compactNavStyles, ".topbar-right"), StringComparison.Ordinal);
         Assert.Contains("width: min(96px, 100%);", ExtractCssBlock(styles, ".topbar-logo-button ::deep img"), StringComparison.Ordinal);
-        Assert.Contains("width: clamp(92px, 17vw, 100px);", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", ExtractCssBlock(compactNavStyles, ".topbar-left"), StringComparison.Ordinal);
+        Assert.Contains("width: 0;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
         Assert.DoesNotContain("overflow: hidden;", ExtractCssBlock(compactNavStyles, ".topbar-logo-button"), StringComparison.Ordinal);
         Assert.DoesNotContain("max-width: 86px;", styles, StringComparison.Ordinal);
         Assert.Contains(".topbar-right ::deep .topbar-theme-toggle", styles, StringComparison.Ordinal);
@@ -1451,6 +1495,25 @@ public class ModuleRegressionSourceTests
         Assert.DoesNotContain(".topbar-search { display: none; }", styles, StringComparison.Ordinal);
         Assert.DoesNotContain("@media (max-width: 960px)", searchStyles, StringComparison.Ordinal);
         Assert.DoesNotContain("display: none", searchStyles, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TopBar_MobileBottomBarHidesLogoAndLetsSearchFillLeftSpace()
+    {
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var mobileStyles = styles[styles.IndexOf("@media (max-width: 720px)", StringComparison.Ordinal)..];
+        var mobileLeftBlock = ExtractCssBlock(mobileStyles, ".topbar-left");
+        var mobileLogoBlock = ExtractCssBlock(mobileStyles, ".topbar-logo-button");
+        var mobileSearchBlock = ExtractCssBlock(mobileStyles, ".topbar-search");
+        var mobileGlobalSearchBlock = ExtractCssBlock(mobileStyles, ".topbar-root ::deep .topbar-global-search");
+
+        Assert.Contains("display: none;", mobileLeftBlock, StringComparison.Ordinal);
+        Assert.Contains("width: 0;", mobileLogoBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 auto;", mobileSearchBlock, StringComparison.Ordinal);
+        Assert.Contains("min-width: 0;", mobileSearchBlock, StringComparison.Ordinal);
+        Assert.Contains("justify-content: stretch;", mobileSearchBlock, StringComparison.Ordinal);
+        Assert.Contains("width: 100%;", mobileGlobalSearchBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("flex-basis: 118px;", mobileSearchBlock, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1951,6 +2014,28 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-template-columns: minmax(0, 1.5fr)", styles, StringComparison.Ordinal);
         Assert.Contains(".commerce-variant-row > *,", styles, StringComparison.Ordinal);
         Assert.Contains("min-width: 0;", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PurchaseOrderCreate_GuidesMissingDependenciesAndPreservesReturnRoute()
+    {
+        var poList = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoList.razor");
+        var poNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "PoNew.razor");
+        var suppliers = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Purchasing", "SupplierList.razor");
+
+        Assert.Contains("BuildCreatePurchaseOrderHref()", poList, StringComparison.Ordinal);
+        Assert.Contains("returnUrl={Uri.EscapeDataString(\"/purchasing\")}", poList, StringComparison.Ordinal);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"returnUrl\")]", poNew, StringComparison.Ordinal);
+        Assert.Contains("MissingPurchaseOrderPrerequisites", poNew, StringComparison.Ordinal);
+        Assert.Contains("CreateSupplierHref", poNew, StringComparison.Ordinal);
+        Assert.Contains("CreateSourceOrderHref", poNew, StringComparison.Ordinal);
+        Assert.Contains("Create supplier first", poNew, StringComparison.Ordinal);
+        Assert.Contains("Create source order first", poNew, StringComparison.Ordinal);
+        Assert.Contains("Add an order item first", poNew, StringComparison.Ordinal);
+        Assert.Contains("return [];", poNew, StringComparison.Ordinal);
+        Assert.DoesNotContain("new LineOption(\"primary\", \"Order total\", 1)", poNew, StringComparison.Ordinal);
+        Assert.Contains("[SupplyParameterFromQuery(Name = \"returnUrl\")]", suppliers, StringComparison.Ordinal);
+        Assert.Contains("Navigation.NavigateTo(ReturnUrl", suppliers, StringComparison.Ordinal);
     }
 
     [Fact]

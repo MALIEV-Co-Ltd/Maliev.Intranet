@@ -17,7 +17,7 @@
         }
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         @if (_loading)
         {
             <ProgressiveSkeleton Layout="table" Rows="6" Columns="6" ShowFilters="false" Class="mb-3" Label="Loading invoices" />
@@ -42,7 +42,7 @@
 
         @if (_tab == "Invoices")
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 @if (_invoices.Count > 0)
                 {
                     <table class="mlv-table">
@@ -80,7 +80,7 @@
         }
         else if (_tab == "Journal Entries")
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 @if (_journalEntries.Count > 0)
                 {
                     <table class="mlv-table">

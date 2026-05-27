@@ -13,7 +13,7 @@
                 Subtitle="Configure Mali website persona and backend-injected skill prompts."
                 BackHref="/admin" />
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
             Website conversations use the <strong>website</strong> core profile for Mali / น้องมะลิ. Topic entries act as dynamic SKILLS that ChatbotService injects when customer intent matches.
         </MudAlert>
@@ -25,7 +25,7 @@
 
         <MudGrid Spacing="3">
             <MudItem xs="12" lg="7">
-                <PanelCard>
+                <PanelCard Class="mlv-data-results-panel">
                     <div class="mlv-toolbar chatbot-instruction-filter-toolbar">
                         <MudTextField @bind-Value="_topicFilter"
                                       Class="chatbot-filter-search"

@@ -20,6 +20,22 @@
             {
                 <ProgressiveSkeleton Layout="form" Rows="8" ShowFilters="false" Label="Loading purchasing references" />
             }
+            else if (MissingPurchaseOrderPrerequisites.Count > 0)
+            {
+                <div class="mlv-prerequisite-list" role="status" aria-label="Missing purchase order dependencies">
+                    @foreach (var prerequisite in MissingPurchaseOrderPrerequisites)
+                    {
+                        <div class="mlv-prerequisite-card">
+                            <MudIcon Icon="@prerequisite.Icon" Size="Size.Medium" />
+                            <div>
+                                <strong>@prerequisite.Title</strong>
+                                <span>@prerequisite.Description</span>
+                            </div>
+                            <SecondaryButton Icon="@prerequisite.ActionIcon" Href="@prerequisite.Href">@prerequisite.ActionLabel</SecondaryButton>
+                        </div>
+                    }
+                </div>
+            }
             else
             {
                 <EditForm Model="@_request" OnValidSubmit="SaveAsync">
@@ -69,6 +85,10 @@
                         </FormField>
                         <FormField Label="Order item">
                             <select class="mlv-form-input" @bind="_selectedSourceOrderItemId" disabled="@(!_lineOptions.Any())">
+                                @if (!_lineOptions.Any())
+                                {
+                                    <option value="">Select a source order first</option>
+                                }
                                 @foreach (var item in _lineOptions)
                                 {
                                     <option value="@item.SourceItemId">@item.Label</option>
@@ -93,6 +113,10 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "supplierId")] public Guid? SupplierId { get; set; }
+    [SupplyParameterFromQuery(Name = "sourceOrderId")] public string? SourceOrderId { get; set; }
+
     private CreatePurchaseOrderRequest _request = new()
     {
         CurrencyCode = "THB",
@@ -112,6 +136,57 @@
     private bool _saving;
     private string? _error;
 
+    private IReadOnlyList<PurchaseOrderPrerequisite> MissingPurchaseOrderPrerequisites
+    {
+        get
+        {
+            var prerequisites = new List<PurchaseOrderPrerequisite>();
+
+            if (_suppliers.Count == 0)
+            {
+                prerequisites.Add(new PurchaseOrderPrerequisite(
+                    Icons.Material.Outlined.Business,
+                    "Create supplier first",
+                    "Purchase orders need a supplier profile before employee can route procurement, contact the vendor, or receive stock.",
+                    "Create supplier",
+                    Icons.Material.Outlined.AddBusiness,
+                    CreateSupplierHref));
+            }
+
+            if (_orders.Count == 0)
+            {
+                prerequisites.Add(new PurchaseOrderPrerequisite(
+                    Icons.Material.Outlined.ReceiptLong,
+                    "Create source order first",
+                    "A purchase order must be tied to an order with at least one line item so the procurement item can be traced.",
+                    "Create source order",
+                    Icons.Material.Outlined.Add,
+                    CreateSourceOrderHref));
+            }
+
+            if (!string.IsNullOrWhiteSpace(_selectedSourceOrderId) && !_lineOptions.Any())
+            {
+                prerequisites.Add(new PurchaseOrderPrerequisite(
+                    Icons.Material.Outlined.FormatListBulleted,
+                    "Add an order item first",
+                    "The selected source order has no purchasable line item. Add the required item before creating the PO.",
+                    "Open source orders",
+                    Icons.Material.Outlined.OpenInNew,
+                    CreateSourceOrderHref));
+            }
+
+            return prerequisites;
+        }
+    }
+
+    private string CurrentPageHref => string.IsNullOrWhiteSpace(ReturnUrl)
+        ? "/purchasing/new"
+        : $"/purchasing/new?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    private string CreateSupplierHref => $"/purchasing/suppliers?create=true&returnUrl={Uri.EscapeDataString(CurrentPageHref)}";
+
+    private string CreateSourceOrderHref => $"/sales/projects/new?returnUrl={Uri.EscapeDataString(CurrentPageHref)}";
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -125,6 +200,12 @@
             _suppliers = (suppliersTask.Result?.Data ?? []).Where(supplier => supplier.Id != Guid.Empty).ToList();
             _orders = (ordersTask.Result?.Data ?? []).Where(order => !string.IsNullOrWhiteSpace(order.OrderNumber)).ToList();
             _currencies = (currenciesTask.Result ?? []).Where(currency => currency.IsActive || currency.Code == "THB").ToList();
+
+            ApplyQuerySelections();
+            if (!string.IsNullOrWhiteSpace(_selectedSourceOrderId))
+            {
+                await LoadSourceOrderAsync(_selectedSourceOrderId);
+            }
 
             ApplyDefaultCurrency();
         }
@@ -157,20 +238,7 @@
             return;
         }
 
-        try
-        {
-            var order = await Http.GetFromJsonAsync<OrderDetailDto>($"api/v1/orders/{Uri.EscapeDataString(_selectedSourceOrderId)}");
-            _lineOptions = BuildLineOptions(order);
-            var firstLine = _lineOptions.FirstOrDefault();
-            _selectedSourceOrderItemId = firstLine?.SourceItemId;
-            _line.SourceOrderItemId = _selectedSourceOrderItemId;
-            _line.Quantity = firstLine?.Quantity ?? 1;
-        }
-        catch (Exception ex)
-        {
-            _error = "Source order details could not be loaded.";
-            Console.WriteLine(ex.Message);
-        }
+        await LoadSourceOrderAsync(_selectedSourceOrderId);
     }
 
     private void OnCurrencyChanged(ChangeEventArgs args)
@@ -263,6 +331,39 @@
         _request.CurrencyServiceId = currency.Id;
     }
 
+    private void ApplyQuerySelections()
+    {
+        if (SupplierId is not null && _suppliers.Any(supplier => supplier.Id == SupplierId.Value))
+        {
+            _selectedSupplierId = SupplierId.Value;
+            _request.SupplierServiceId = SupplierId.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SourceOrderId) && _orders.Any(order => string.Equals(order.OrderNumber, SourceOrderId, StringComparison.OrdinalIgnoreCase)))
+        {
+            _selectedSourceOrderId = SourceOrderId;
+            _request.SourceOrderId = SourceOrderId;
+        }
+    }
+
+    private async Task LoadSourceOrderAsync(string sourceOrderId)
+    {
+        try
+        {
+            var order = await Http.GetFromJsonAsync<OrderDetailDto>($"api/v1/orders/{Uri.EscapeDataString(sourceOrderId)}");
+            _lineOptions = BuildLineOptions(order);
+            var firstLine = _lineOptions.FirstOrDefault();
+            _selectedSourceOrderItemId = firstLine?.SourceItemId;
+            _line.SourceOrderItemId = _selectedSourceOrderItemId;
+            _line.Quantity = firstLine?.Quantity ?? 1;
+        }
+        catch (Exception ex)
+        {
+            _error = "Source order details could not be loaded.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
     private static List<LineOption> BuildLineOptions(OrderDetailDto? order)
     {
         if (order?.Items is { Count: > 0 })
@@ -278,7 +379,7 @@
             }).ToList();
         }
 
-        return [new LineOption("primary", "Order total", 1)];
+        return [];
     }
 
     private static string OrderLabel(OrderSummaryDto order)
@@ -289,4 +390,6 @@
     }
 
     private sealed record LineOption(string SourceItemId, string Label, decimal Quantity);
+
+    private sealed record PurchaseOrderPrerequisite(string Icon, string Title, string Description, string ActionLabel, string ActionIcon, string Href);
 }

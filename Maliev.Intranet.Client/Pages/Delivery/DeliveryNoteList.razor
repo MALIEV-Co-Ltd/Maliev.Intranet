@@ -12,7 +12,7 @@
         <PrimaryButton Icon="@Icons.Material.Outlined.LocalShipping" Href="/finance/delivery-notes/new">New Delivery Note</PrimaryButton>
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         <StatBar Class="mb-4">
             <StatTile Label="Matching notes" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="Pending" Value="@_notes.Count(n => IsStatus(n, "Pending")).ToString("N0")" />
@@ -30,7 +30,7 @@
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard>
+        <PanelCard Class="mlv-data-results-panel">
             @if (_notes.Count > 0)
             {
                 <table class="mlv-table">

@@ -18,7 +18,7 @@
         </MudButton>
     </PageHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
             Starter draft listings for the 30g and 50g pneumatic injection molding machines are seeded by CommerceService. Use this page to review, complete, and publish product listings.
         </MudAlert>
@@ -32,7 +32,7 @@
 
         <MudGrid Spacing="3">
             <MudItem xs="12">
-                <PanelCard Class="mb-4">
+                <PanelCard Class="mb-4 mlv-data-results-panel">
                     <div class="catalog-product-toolbar mb-4">
                         <MudTextField @bind-Value="_query"
                                       Label="Search products"

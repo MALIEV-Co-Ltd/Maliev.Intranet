@@ -8,7 +8,7 @@
 <div class="mlv-module-shell">
     <ModuleHeader Title="Admin" Subtitle="Platform operations, service consoles, reference data, and notification configuration." />
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         @if (_loading)
         {
             <ProgressiveSkeleton Layout="table" Rows="5" Columns="5" ShowFilters="false" Class="mb-3" Label="Loading admin workspace" />
@@ -90,7 +90,7 @@
         }
         else if (_tab == "Notifications")
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 <div class="mlv-toolbar mb-3">
                     <div>
                         <div class="mlv-row-main">Notification templates</div>

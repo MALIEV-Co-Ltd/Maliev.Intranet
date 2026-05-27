@@ -11,7 +11,7 @@
         <PrimaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/iam/users/new">Create User</PrimaryButton>
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         @if (_loading)
         {
             <ProgressiveSkeleton Layout="table" Rows="6" Columns="5" ShowFilters="false" Class="mb-3" Label="Loading users" />
@@ -69,7 +69,7 @@
 
         @if (_tab == "Users")
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 @if (_users.Count > 0)
                 {
                     <table class="mlv-table">
@@ -109,7 +109,7 @@
         }
         else if (_tab == "Roles")
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 @if (_roles.Count > 0)
                 {
                     <div class="mlv-list">
@@ -139,7 +139,7 @@
         }
         else
         {
-            <PanelCard>
+            <PanelCard Class="mlv-data-results-panel">
                 @if (_permissions.Count > 0)
                 {
                     <table class="mlv-table">

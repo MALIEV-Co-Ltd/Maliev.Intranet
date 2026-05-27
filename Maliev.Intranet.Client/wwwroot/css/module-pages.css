@@ -111,6 +111,33 @@
     background: var(--maliev-panel-2);
 }
 
+.mlv-data-page-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.mlv-data-results-panel {
+    flex: 1 1 auto;
+    min-height: clamp(360px, 52dvh, 760px);
+    display: flex;
+    flex-direction: column;
+}
+
+.mlv-data-results-panel .mlv-table {
+    flex: 1 1 auto;
+    height: 100%;
+}
+
+.mlv-data-results-panel .mlv-empty {
+    flex: 1 1 auto;
+    min-height: 100%;
+    align-content: center;
+}
+
+.mlv-data-page-body > .mlv-pagination-footer {
+    flex: 0 0 auto;
+}
+
 .mlv-row-title {
     display: flex;
     align-items: center;
@@ -293,6 +320,38 @@
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);
     overflow-wrap: anywhere;
+}
+
+.mlv-prerequisite-list {
+    display: grid;
+    gap: 12px;
+}
+
+.mlv-prerequisite-card {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    box-shadow: var(--maliev-shadow-ring);
+}
+
+.mlv-prerequisite-card > div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.mlv-prerequisite-card strong {
+    color: var(--maliev-ink);
+    font-weight: 700;
+}
+
+.mlv-prerequisite-card span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
 }
 
 .accounting-report-panel {
@@ -504,6 +563,15 @@ select.mlv-form-select,
     .mlv-segmented {
         flex-wrap: wrap;
         overflow-x: visible;
+    }
+
+    .mlv-prerequisite-card {
+        grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .mlv-prerequisite-card .mlv-button {
+        grid-column: 1 / -1;
+        justify-self: stretch;
     }
 
     .accounting-report-toolbar {

@@ -905,18 +905,26 @@
     }
 
     .topbar-left {
+        display: none;
         gap: 4px;
     }
 
     .topbar-logo-button {
-        width: clamp(92px, 17vw, 100px);
+        width: 0;
+        height: 0;
         padding-inline: 0;
     }
 
     .topbar-search {
-        flex-basis: 118px;
-        min-width: 108px;
+        flex: 1 1 auto;
+        flex-basis: auto;
+        justify-content: stretch;
+        min-width: 0;
         max-width: none;
+    }
+
+    .topbar-root ::deep .topbar-global-search {
+        width: 100%;
     }
 
     .topbar-right ::deep .mud-button-root.mud-icon-button,
@@ -942,8 +950,8 @@
     }
 
     .topbar-search {
-        flex-basis: 104px;
-        min-width: 96px;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 }
 

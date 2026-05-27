@@ -13,7 +13,7 @@
         <SecondaryButton Icon="@Icons.Material.Outlined.Business" Href="@SupplierSetupHref">@SupplierActionLabel</SecondaryButton>
         @if (CanCreatePurchaseOrder)
         {
-            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">New PO</PrimaryButton>
+            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="@BuildCreatePurchaseOrderHref()">New PO</PrimaryButton>
         }
         else
         {
@@ -21,7 +21,7 @@
         }
     </ModuleHeader>
 
-    <PageBody Class="purchasing-page-body">
+    <PageBody Class="mlv-data-page-body purchasing-page-body">
         <StatBar Class="mb-4">
             <StatTile Label="Matching POs" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="Page spend" Value="@_orders.Sum(o => o.TotalAmount).ToString("N2")" />
@@ -74,7 +74,7 @@
             <ProgressiveSkeleton Layout="table" Rows="6" Columns="7" ShowFilters="false" Class="mb-3" Label="Loading purchase orders" />
         }
 
-        <PanelCard Class="purchasing-results-panel">
+        <PanelCard Class="purchasing-results-panel mlv-data-results-panel">
             @if (_orders.Count > 0)
             {
                 <table class="mlv-table">
@@ -126,7 +126,7 @@
                     <div class="mt-3">
                         @if (CanCreatePurchaseOrder)
                         {
-                            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="/purchasing/new">Create Purchase Order</PrimaryButton>
+                            <PrimaryButton Icon="@Icons.Material.Outlined.AddShoppingCart" Href="@BuildCreatePurchaseOrderHref()">Create Purchase Order</PrimaryButton>
                         }
                         else
                         {
@@ -193,7 +193,7 @@
 
     private string SupplierActionLabel => _supplierTotal > 0 ? "Supplier Profiles" : "Create supplier first";
 
-    private const string SupplierSetupHref = "/purchasing/suppliers?create=true";
+    private string SupplierSetupHref => $"/purchasing/suppliers?create=true&returnUrl={Uri.EscapeDataString("/purchasing")}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -357,6 +357,9 @@
     private static bool IsOpenStatus(string status) =>
         !string.Equals(status, "Delivered", StringComparison.OrdinalIgnoreCase) &&
         !string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildCreatePurchaseOrderHref() =>
+        $"/purchasing/new?returnUrl={Uri.EscapeDataString("/purchasing")}";
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
 

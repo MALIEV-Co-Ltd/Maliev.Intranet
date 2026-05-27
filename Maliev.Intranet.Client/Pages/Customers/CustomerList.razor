@@ -13,7 +13,7 @@
         <PrimaryButton Icon="@Icons.Material.Outlined.PersonAdd" Href="/customers/new">New Customer</PrimaryButton>
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         <div class="mlv-toolbar">
             <div class="mlv-toolbar-left">
                 <SearchBox Value="@_search" ValueChanged="OnSearchChanged" Placeholder="Search customers..." OnEnter="SearchAsync" />
@@ -35,7 +35,7 @@
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard>
+        <PanelCard Class="mlv-data-results-panel">
             @if (_loading)
             {
                 <ProgressiveSkeleton Layout="table" Rows="6" Columns="6" ShowFilters="false" Label="Loading customers" />

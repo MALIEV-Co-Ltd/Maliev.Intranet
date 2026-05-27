@@ -12,7 +12,7 @@
         <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="@ReloadAsync">Refresh</SecondaryButton>
     </ModuleHeader>
 
-    <PageBody>
+    <PageBody Class="mlv-data-page-body">
         <StatBar Class="mb-4">
             <StatTile Label="Matching requests" Value="@_meta.TotalItems.ToString("N0")" />
             <StatTile Label="New" Value="@_requests.Count(request => request.Status == ContactRequestStatus.New).ToString("N0")" />
@@ -54,7 +54,7 @@
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard>
+        <PanelCard Class="mlv-data-results-panel">
             @if (_requests.Count > 0)
             {
                 <table class="mlv-table">
