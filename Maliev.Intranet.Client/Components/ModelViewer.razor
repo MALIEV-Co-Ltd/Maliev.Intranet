@@ -92,6 +92,57 @@
         </div>
     }
 
+    @if (_renderMode == "realistic")
+    {
+        <div class="vp-realistic-panel" @onclick:stopPropagation>
+            <MudPaper Elevation="16" Class="pa-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2 d-block">Realistic Material</MudText>
+
+                <MudSelect T="string" @bind-Value="_materialType"
+                           Label="Material" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Class="mb-2">
+                    @foreach (var mat in _materialOptions)
+                    {
+                        <MudSelectItem Value="@mat.Key">@mat.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudTextField T="string" Label="Color" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Value="@_customColorHex" ValueChanged="OnColorHexChanged"
+                              Immediate="true" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Colorize" />
+                <input type="color" value="@_customColorHex"
+                       @oninput="OnColorPickerInput" class="vp-color-picker-input"
+                       style="width:100%;height:36px;border:none;cursor:pointer;margin-top:4px;" />
+                @if (_hasCustomColor)
+                {
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Secondary"
+                               OnClick="ResetColorAsync" Class="mt-1" FullWidth="true">
+                        Reset to preset
+                    </MudButton>
+                }
+            </MudPaper>
+        </div>
+    }
+
+    @* ── Sphere render mode toggle — bottom-left, outside toolbar ── *@
+    <div class="vp-sphere-toggle" @onclick:stopPropagation>
+        <MudTooltip Text="Realistic render" Placement="Placement.Right" Arrow="false">
+            <button type="button"
+                    class="@($"vp-sphere-btn {(_renderMode == "realistic" ? "vp-sphere-active" : "")}")"
+                    @onclick='@(() => SetRenderModeAsync("realistic"))'>
+                <img src="/images/sphere-realistic.png" alt="Realistic render mode" />
+            </button>
+        </MudTooltip>
+        <MudTooltip Text="CAD render" Placement="Placement.Right" Arrow="false">
+            <button type="button"
+                    class="@($"vp-sphere-btn {(_renderMode == "solid" ? "vp-sphere-active" : "")}")"
+                    @onclick='@(() => SetRenderModeAsync("solid"))'>
+                <img src="/images/sphere-cad.png" alt="CAD render mode" />
+            </button>
+        </MudTooltip>
+    </div>
+
     @* ── CAD Toolbar — bottom-center, floating ── *@
     <div class="vp-toolbar-shell">
         <MudPaper Elevation="8" Class="d-flex align-center pa-1 vp-toolbar-paper">
@@ -126,6 +177,12 @@
                 <button class="@($"vp-cube-btn {(_renderMode == "transparent" ? "vp-active" : "")}")"
                         @onclick='@(() => SetRenderModeAsync("transparent"))' type="button">
                     @GetModeIconSvg("transparent", _renderMode == "transparent")
+                </button>
+            </MudTooltip>
+            <MudTooltip Text="Realistic" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_renderMode == "realistic" ? "vp-active" : "")}")"
+                        @onclick='@(() => SetRenderModeAsync("realistic"))' type="button">
+                    @GetModeIconSvg("realistic", _renderMode == "realistic")
                 </button>
             </MudTooltip>
 
@@ -221,6 +278,9 @@
     private IJSObjectReference? _module;
     private DotNetObjectReference<ModelViewer>? _dotNetRef;
     private string _renderMode        = "solid";
+    private string _materialType      = "aluminum";
+    private string _customColorHex    = "#D0D0D0";
+    private bool   _hasCustomColor;
     private string _cameraPreset      = "iso";
     private string _cameraProjection  = "orthographic";
     private bool   _edgesEnabled;
@@ -233,6 +293,7 @@
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
     private string? _lastMeasurement;     // Display last measurement result in overlay
     private string? _lastViewerSettingsKey;
+    private string _previousMaterialType = "aluminum";
 
     // ── Section view ─────────────────────────────────────────────────────────
     private bool   _sectionEnabled;
@@ -267,6 +328,18 @@
         new("thickness", "Thickness Analysis", Icons.Material.Filled.Fullscreen),
     ];
 
+    private record MaterialOption(string Key, string Label);
+
+    private static readonly MaterialOption[] _materialOptions =
+    [
+        new("aluminum", "Aluminum"),
+        new("steel", "Steel"),
+        new("stainless-steel", "Stainless Steel"),
+        new("black-pom", "Black POM"),
+        new("white-pom", "White POM"),
+        new("blue-pom", "Blue POM"),
+    ];
+
     private bool ShouldShowGrid => _gridEnabled || _temporaryGridOwners.Count > 0;
 
     /// <inheritdoc />
@@ -288,6 +361,7 @@
             return;
 
         _renderMode = NormalizeRenderMode(settings.RenderMode);
+        _materialType = NormalizeMaterialType(settings.MaterialType);
         _cameraProjection = NormalizeProjection(settings.CameraProjection);
         _edgesEnabled = settings.EdgesEnabled && _renderMode != "wireframe";
         _gridEnabled = settings.GridEnabled;
@@ -303,6 +377,7 @@
     private PartViewerSettings CaptureViewerSettings() => new()
     {
         RenderMode = _renderMode,
+        MaterialType = _materialType,
         CameraProjection = _cameraProjection,
         EdgesEnabled = _edgesEnabled,
         GridEnabled = _gridEnabled,
@@ -325,6 +400,7 @@
         string.Join(
             "|",
             NormalizeRenderMode(settings.RenderMode),
+            NormalizeMaterialType(settings.MaterialType),
             NormalizeProjection(settings.CameraProjection),
             settings.EdgesEnabled,
             settings.GridEnabled,
@@ -339,7 +415,9 @@
             ? "wireframe"
             : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
                 ? "transparent"
-                : "solid";
+                : string.Equals(mode, "realistic", StringComparison.OrdinalIgnoreCase)
+                    ? "realistic"
+                    : "solid";
 
     private static string NormalizeProjection(string? mode) =>
         string.Equals(mode, "perspective", StringComparison.OrdinalIgnoreCase)
@@ -352,6 +430,18 @@
             : string.Equals(axis, "z", StringComparison.OrdinalIgnoreCase)
                 ? "z"
                 : "x";
+
+    private static string NormalizeMaterialType(string? materialType) =>
+        materialType switch
+        {
+            "aluminum" => "aluminum",
+            "steel" => "steel",
+            "stainless-steel" => "stainless-steel",
+            "black-pom" => "black-pom",
+            "white-pom" => "white-pom",
+            "blue-pom" => "blue-pom",
+            _ => "aluminum",
+        };
 
     [JSInvokable]
     public async Task OnLoadError(string errorMessage)
@@ -462,6 +552,17 @@
                 <polygon points="50,44 14,28 50,12 86,28" fill="rgba(var(--mud-palette-primary-rgb), 0.22)" stroke="none"/>
                 """,
 
+            "realistic" => $"""
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,44 14,28 50,12 86,28" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,86 14,70 14,28 50,44" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,44" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="70" cy="68" r="12" fill="rgba(var(--mud-palette-primary-rgb), 0.35)" stroke="rgba(var(--mud-palette-primary-rgb), 0.65)" stroke-width="2.5"/>
+                <path d="M64 68 L67.5 71.5 L75.5 63" fill="none" stroke="var(--mud-palette-white)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
             "edges" => $"""
                 <polygon points="50,44 14,28 50,12 86,28" fill="{solidTop}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
                 <polygon points="50,86 14,70 14,28 50,44" fill="{solidLeft}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
@@ -557,6 +658,8 @@
         {
             await _module.InvokeVoidAsync("enableSectionPanelDrag", _sectionPanelId);
         }
+
+        await PushMaterialTypeIfChangedAsync();
     }
 
     private string GetTurningAxisKey()
@@ -627,9 +730,58 @@
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
             if (target == "wireframe")
                 await _module.InvokeVoidAsync("toggleEdges", _canvasId, false);
+            if (target == "realistic")
+                await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
         }
 
         await NotifyViewerSettingsChangedAsync();
+    }
+
+    /// <summary>Changes the realistic material type and applies it immediately.</summary>
+    private async Task SetMaterialTypeAsync(string materialType)
+    {
+        _materialType = NormalizeMaterialType(materialType);
+        if (_module != null && _renderMode == "realistic")
+            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
+        await NotifyViewerSettingsChangedAsync();
+    }
+
+    /// <summary>Pushes a material-type change to the JS viewer when the MudSelect binding updates _materialType.</summary>
+    private async Task PushMaterialTypeIfChangedAsync()
+    {
+        if (_materialType == _previousMaterialType) return;
+        _previousMaterialType = _materialType;
+        _hasCustomColor = false;
+        if (_module != null && _renderMode == "realistic")
+            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
+        await NotifyViewerSettingsChangedAsync();
+    }
+
+    /// <summary>Handles real-time colour-picker input changes.</summary>
+    private async Task OnColorPickerInput(ChangeEventArgs e)
+    {
+        var hex = e.Value?.ToString() ?? "#808080";
+        _customColorHex = hex;
+        _hasCustomColor = true;
+        if (_module != null && _renderMode == "realistic")
+            await _module.InvokeVoidAsync("setMaterialColor", _canvasId, hex);
+    }
+
+    /// <summary>Handles hex text-field changes (debounced via Immediate).</summary>
+    private async Task OnColorHexChanged(string hex)
+    {
+        _customColorHex = hex ?? "#808080";
+        _hasCustomColor = true;
+        if (_module != null && _renderMode == "realistic" && hex?.Length >= 4 && hex.StartsWith('#'))
+            await _module.InvokeVoidAsync("setMaterialColor", _canvasId, hex);
+    }
+
+    /// <summary>Resets the albedo colour to the selected material preset.</summary>
+    private async Task ResetColorAsync()
+    {
+        _hasCustomColor = false;
+        if (_module != null && _renderMode == "realistic")
+            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
     }
 
     private async Task ResetCamera()
@@ -949,8 +1101,8 @@
         if (_module == null) return;
         try
         {
-            // When a body is selected, reset toolbar transparent mode to avoid conflicts
-            if (bodyIndex.HasValue && _renderMode == "transparent")
+            // When a body is selected, reset toolbar transparent/realistic mode to avoid conflicts
+            if (bodyIndex.HasValue && (_renderMode == "transparent" || _renderMode == "realistic"))
             {
                 _renderMode = "solid";
                 await _module.InvokeVoidAsync("setRenderMode", _canvasId, "solid");

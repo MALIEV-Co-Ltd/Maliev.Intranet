@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared.Dtos
 @attribute [RequirePermission(MalievPermissions.Commerce.ProductsRead)]
 @inject HttpClient Http
 @inject CurrencyService CurrencyService
@@ -331,8 +332,21 @@
                                                 <div class="commerce-bom-assembly-grid">
                                                     <MudTextField @bind-Value="item.AssemblyName" Label="Assembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                                     <MudTextField @bind-Value="item.SubassemblyName" Label="Subassembly" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.SupplierName" Label="Supplier" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                                    <MudTextField @bind-Value="item.SupplierUrl" Label="Part URL" HelperText="Supplier URL or part page" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudAutocomplete T="SupplierSummaryDto"
+                                                                     Label="Supplier"
+                                                                     Value="@GetBomSupplierValue(item)"
+                                                                     ValueChanged="@(s => SetBomSupplierValue(item, s))"
+                                                                     SearchFunc="SearchSuppliersAsync"
+                                                                     ToStringFunc="@(s => s?.Name ?? string.Empty)"
+                                                                     Variant="Variant.Outlined"
+                                                                     Margin="Margin.Dense"
+                                                                     MinCharacters="2"
+                                                                     DebounceInterval="300"
+                                                                     CoerceText="true"
+                                                                     Immediate="true"
+                                                                     ResetValueOnEmptyText="false" />
+                                                    <MudTextField @bind-Value="item.SupplierUrl" Label="Supplier URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                                    <MudTextField @bind-Value="item.DrawingUrl" Label="Drawing URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                                                 </div>
                                             </div>
                                             <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" OnClick="@(() => RemoveBomItem(item))" />
@@ -350,8 +364,34 @@
                                             </MudSelect>
                                             <MudNumericField T="int?" @bind-Value="item.LeadTimeDays" Label="Lead time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
                                             <MudNumericField T="int?" @bind-Value="item.SourcingTimeDays" Label="Sourcing time" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Min="0" />
-                                            <MudTextField @bind-Value="item.ImageUrl" Label="Image URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-                                            <MudTextField @bind-Value="item.DrawingUrl" Label="Drawing URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                            <div class="commerce-bom-upload-cell">
+                                                <span class="commerce-bom-upload-label">Part image</span>
+                                                @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
+                                                {
+                                                    <span class="commerce-bom-upload-set">Image linked</span>
+                                                }
+                                                <MudFileUpload T="IBrowserFile" FilesChanged="@(f => UploadBomImageAsync(item, f))" Accept=".jpg,.jpeg,.png,.webp" Disabled="@IsBomImageUploading(item)">
+                                                    <CustomContent Context="ctx">
+                                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Upload" OnClick="@ctx.OpenFilePickerAsync" Disabled="@IsBomImageUploading(item)">
+                                                            @(IsBomImageUploading(item) ? "Uploading…" : "Upload image")
+                                                        </MudButton>
+                                                    </CustomContent>
+                                                </MudFileUpload>
+                                            </div>
+                                            <div class="commerce-bom-upload-cell">
+                                                <span class="commerce-bom-upload-label">Drawing / document</span>
+                                                @if (!string.IsNullOrWhiteSpace(item.DrawingUrl))
+                                                {
+                                                    <span class="commerce-bom-upload-set">Document linked</span>
+                                                }
+                                                <MudFileUpload T="IBrowserFile" FilesChanged="@(f => UploadBomDrawingAsync(item, f))" Accept=".pdf,.jpg,.jpeg,.png,.webp" Disabled="@IsBomDrawingUploading(item)">
+                                                    <CustomContent Context="ctx">
+                                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Upload" OnClick="@ctx.OpenFilePickerAsync" Disabled="@IsBomDrawingUploading(item)">
+                                                            @(IsBomDrawingUploading(item) ? "Uploading…" : "Upload drawing")
+                                                        </MudButton>
+                                                    </CustomContent>
+                                                </MudFileUpload>
+                                            </div>
                                         </div>
 
                                         <div class="commerce-bom-card-footer">
@@ -389,6 +429,10 @@
                                         </div>
 
                                         <MudTextField @bind-Value="item.Notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" MaxLength="1000" Counter="1000" />
+
+                                        <div class="commerce-bom-item-actions">
+                                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveListingAsync" Disabled="@_saving">Save item</MudButton>
+                                        </div>
                                     </div>
                                 }
                             }
@@ -429,7 +473,11 @@
     private bool _mediaUploading;
     private CommerceProductMediaMutationRequest? _draggedMedia;
     private const long MaxCommerceMediaFileSize = 10 * 1024 * 1024;
+    private const long MaxBomDocumentFileSize = 20 * 1024 * 1024;
     private static readonly HashSet<string> AllowedCommerceMediaExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+    private static readonly HashSet<string> AllowedBomDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp", ".pdf" };
+    private readonly HashSet<CommerceProductBomItemMutationRequest> _bomImageUploadingItems = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<CommerceProductBomItemMutationRequest> _bomDrawingUploadingItems = new(ReferenceEqualityComparer.Instance);
 
     private int BomDrawingCount => _productForm.BomItems.Count(item => !string.IsNullOrWhiteSpace(item.DrawingUrl));
 
@@ -662,6 +710,146 @@
         {
             _mediaUploading = false;
         }
+    }
+
+    private bool IsBomImageUploading(CommerceProductBomItemMutationRequest item) => _bomImageUploadingItems.Contains(item);
+    private bool IsBomDrawingUploading(CommerceProductBomItemMutationRequest item) => _bomDrawingUploadingItems.Contains(item);
+
+    private async Task UploadBomImageAsync(CommerceProductBomItemMutationRequest item, IBrowserFile? file)
+    {
+        if (file is null) return;
+        if (file.Size is <= 0 or > MaxCommerceMediaFileSize || !AllowedCommerceMediaExtensions.Contains(Path.GetExtension(file.Name)))
+        {
+            Snackbar.Add("Select a JPG, PNG, or WEBP image up to 10 MB.", Severity.Warning);
+            return;
+        }
+
+        _bomImageUploadingItems.Add(item);
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(MaxCommerceMediaFileSize);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(GetCommerceMediaContentType(file));
+            content.Add(fileContent, "file", file.Name);
+
+            var handle = string.IsNullOrWhiteSpace(_productForm.Handle) ? "draft" : _productForm.Handle;
+            var response = await Http.PostAsync($"api/v1/commerce/products/media?handle={Uri.EscapeDataString(handle)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Image upload failed.", Severity.Warning);
+                return;
+            }
+
+            var uploads = await response.Content.ReadFromJsonAsync<List<BffUploadResponse>>() ?? [];
+            var upload = uploads.FirstOrDefault();
+            var url = FirstNonEmpty(upload?.FileReference, upload?.SignedUrl, upload?.StoragePath);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                item.ImageUrl = url;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Image upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _bomImageUploadingItems.Remove(item);
+        }
+    }
+
+    private async Task UploadBomDrawingAsync(CommerceProductBomItemMutationRequest item, IBrowserFile? file)
+    {
+        if (file is null) return;
+        if (file.Size is <= 0 or > MaxBomDocumentFileSize || !AllowedBomDocumentExtensions.Contains(Path.GetExtension(file.Name)))
+        {
+            Snackbar.Add("Select a PDF, JPG, PNG, or WEBP file up to 20 MB.", Severity.Warning);
+            return;
+        }
+
+        _bomDrawingUploadingItems.Add(item);
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(MaxBomDocumentFileSize);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(GetBomDocumentContentType(file));
+            content.Add(fileContent, "file", file.Name);
+
+            var handle = string.IsNullOrWhiteSpace(_productForm.Handle) ? "draft" : _productForm.Handle;
+            var response = await Http.PostAsync($"api/v1/commerce/products/documents?handle={Uri.EscapeDataString(handle)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Drawing upload failed.", Severity.Warning);
+                return;
+            }
+
+            var upload = await response.Content.ReadFromJsonAsync<BffUploadResponse>();
+            var url = FirstNonEmpty(upload?.FileReference, upload?.SignedUrl, upload?.StoragePath);
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                item.DrawingUrl = url;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Drawing upload failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _bomDrawingUploadingItems.Remove(item);
+        }
+    }
+
+    private static SupplierSummaryDto? GetBomSupplierValue(CommerceProductBomItemMutationRequest item)
+    {
+        return string.IsNullOrWhiteSpace(item.SupplierName)
+            ? null
+            : new SupplierSummaryDto { Name = item.SupplierName };
+    }
+
+    private static void SetBomSupplierValue(CommerceProductBomItemMutationRequest item, SupplierSummaryDto? supplier)
+    {
+        item.SupplierName = supplier?.Name;
+    }
+
+    private async Task<IEnumerable<SupplierSummaryDto>> SearchSuppliersAsync(string search, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(search) || search.Trim().Length < 2)
+        {
+            return [];
+        }
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PagedResponse<SupplierSummaryDto>>(
+                $"api/v1/suppliers?search={Uri.EscapeDataString(search.Trim())}&status=Active&pageSize=10", ct);
+            return response?.Data ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static string GetBomDocumentContentType(IBrowserFile file)
+    {
+        if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+            (file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+             file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)))
+        {
+            return file.ContentType;
+        }
+
+        return Path.GetExtension(file.Name).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
     }
 
     private void AddBomItem()
