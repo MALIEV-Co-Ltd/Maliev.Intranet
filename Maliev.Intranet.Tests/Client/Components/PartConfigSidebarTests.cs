@@ -184,8 +184,9 @@ public class PartConfigSidebarTests
         Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 76px;", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3) center / cover no-repeat;", source, StringComparison.Ordinal);
         Assert.Contains("display: block;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-copy {\n                padding: 6px 7px 7px;\n                text-align: left;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-copy {\n                width: 100%;\n                min-width: 0;\n                box-sizing: border-box;\n                padding: 6px 7px 7px;\n                text-align: left;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;\n                color: var(--maliev-text);\n                white-space: nowrap;\n                overflow: hidden;\n                text-overflow: ellipsis;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-description {\n                margin-top: 2px;", source, StringComparison.Ordinal);
         Assert.Contains("white-space: nowrap;", source, StringComparison.Ordinal);
         Assert.Contains("text-overflow: ellipsis;", source, StringComparison.Ordinal);
