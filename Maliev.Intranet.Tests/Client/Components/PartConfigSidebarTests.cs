@@ -167,6 +167,24 @@ public class PartConfigSidebarTests
     }
 
     [Fact]
+    public void ProcessCardStyles_UseLargerFullBleedImagesAndLeftAlignedCopy()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-process-card {\n                flex: 0 0 116px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 76px;", source, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-panel-3) center / cover no-repeat;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-copy {\n                padding: 6px 7px 7px;\n                text-align: left;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-description {\n                margin-top: 2px;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OnNotesChanged_WhenValueProvided_UpdatesPartNotes()
     {
         var sidebar = new PartConfigSidebar();

@@ -610,6 +610,21 @@ public partial class PartConfigSidebar : ComponentBase
     private bool IsProcess(string processCode) =>
         string.Equals(Part?.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase);
 
+    private static string GetProcessDescription(ProcessDto process)
+    {
+        if (!string.IsNullOrWhiteSpace(process.Description))
+            return process.Description.Trim();
+
+        return NormalizeOptionText(process.Code) switch
+        {
+            "cnc" or "cncmill" or "cncmilling" => "Precision subtractive machining",
+            "cncturn" or "cncturning" => "Lathe-cut round components",
+            "fdm" or "fdm3dprinting" => "Layered thermoplastic parts",
+            "sla" or "sladlp" or "dlp" => "Smooth resin prototypes",
+            _ => "Manufacturing process",
+        };
+    }
+
     private bool IsVisibleTolerance(CatalogToleranceDto tolerance)
     {
         if (!IsFdmProcess)

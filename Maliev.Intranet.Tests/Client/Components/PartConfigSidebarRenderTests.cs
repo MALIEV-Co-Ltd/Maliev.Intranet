@@ -49,4 +49,26 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.NotEmpty(cut.FindAll(".pcs-tolerance-group--iso .pcs-tol-card"));
         Assert.NotEmpty(cut.FindAll(".pcs-tolerance-group--it .pcs-tol-card"));
     }
+
+    [Fact]
+    public void ProcessCards_WhenDescriptionIsMissing_RenderCompactFallbackDescription()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, [new ProcessDto(Guid.NewGuid(), "CNC_MILL", "CNC Milling", null, 10)]));
+
+        var card = cut.Find(".pcs-process-card");
+
+        Assert.Equal("CNC Milling", card.QuerySelector(".pcs-process-name")?.TextContent.Trim());
+        Assert.Equal(
+            "Precision subtractive machining",
+            card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
+    }
 }
