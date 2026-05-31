@@ -4335,7 +4335,7 @@ const CUTTING_MAT_ANIMATION_MS = 240;
 const CUTTING_MAT_CAMERA_MIN_Z = 0.001;
 const CUTTING_MAT_MINOR_GRID_MM = 10;
 const CUTTING_MAT_MAJOR_GRID_MM = 100;
-const CUTTING_MAT_TITLE_FONT_MM = 5.6;
+const CUTTING_MAT_LOGO_FONT_MM = 7.0;
 const CUTTING_MAT_NUMBER_FONT_MM = 4.5;
 const cuttingMatAnimationStates = {};
 const cuttingMatCameraClipStates = {};
@@ -4348,7 +4348,7 @@ const cuttingMatCameraClipStates = {};
  *   - 16 mm margin band: grid lines stop at the border, numbers live in the margin
  *   - Rounded corners (8 mm radius) in both the visible top and slab geometry
  *   - Raw RGBA texture upload so the green surface, grid, and labels render immediately
- *   - Reference-style top-right cutting-mat title, away from the scale labels
+ *   - Top-right MALIEV wordmark, away from the scale labels
  *   - Manual convex fan triangulation (no CreatePolygon / earcut dependency)
  */
 export function showCuttingMat(canvasId) {
@@ -4436,18 +4436,18 @@ export function showCuttingMat(canvasId) {
     _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
         CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
 
-    // ── Margin title + number labels ──────────────────────────────────────────
-    const TITLE_LABEL_PX  = Math.round(px * CUTTING_MAT_TITLE_FONT_MM);
+    // ── Margin logo + number labels ───────────────────────────────────────────
+    const LOGO_LABEL_PX   = Math.round(px * CUTTING_MAT_LOGO_FONT_MM);
     const NUMBER_LABEL_PX = Math.round(px * CUTTING_MAT_NUMBER_FONT_MM);
     const LABEL_STEP      = 10 * px;
     const colCount        = Math.round((matW - 2 * MARGIN) / 10);
     const rowCount        = Math.round((matH - 2 * MARGIN) / 10);
     ctx.fillStyle         = 'rgba(255,255,255,0.88)';
-    ctx.font              = `bold ${TITLE_LABEL_PX}px Arial, sans-serif`;
+    ctx.font              = `900 ${LOGO_LABEL_PX}px Arial Black, Arial, sans-serif`;
 
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('CUTTING MAT 3022', TEX_W - MPX * 0.45, MPX * 0.5);
+    ctx.fillText('MALIEV', TEX_W - MPX * 0.45, MPX * 0.5);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

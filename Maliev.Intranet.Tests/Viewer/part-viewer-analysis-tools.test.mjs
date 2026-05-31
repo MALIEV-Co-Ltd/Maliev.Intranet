@@ -575,10 +575,12 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
 
     const drawCalls = createdCanvasContexts.at(-1)?.calls ?? [];
     const mirroredTextCalls = drawCalls.filter(call => call[0] === 'scale' && call[1] < 0);
-    const titleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
+    const legacyTitleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
+    const logoCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'MALIEV');
     const numberTextCalls = drawCalls.filter(call => call[0] === 'fillText' && /^[0-9]+$/.test(call[1]));
     assert.equal(mirroredTextCalls.length, 0);
-    assert.equal(titleCalls.length, 1);
+    assert.equal(legacyTitleCalls.length, 0);
+    assert.equal(logoCalls.length, 1);
     assert.ok(numberTextCalls.length > 0);
     const numericFontSizes = numberTextCalls
         .map(call => /bold\s+(\d+)px/.exec(call[4])?.[1])
