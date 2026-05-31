@@ -213,7 +213,8 @@ function loadViewerContext() {
                     this.position = {};
                     this.rotation = {};
                     this.metadata = {};
-                    this.dispose = () => {};
+                    this.disposed = false;
+                    this.dispose = () => { this.disposed = true; };
                     scene?.meshes?.push(this);
                 }
             },
@@ -517,6 +518,125 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     const titleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
     assert.equal(mirroredTextCalls.length, 0);
     assert.equal(titleCalls.length, 1);
+});
+
+test('cutting mat fades in from below and fades out before disposal', () => {
+    const context = loadViewerContext();
+    let now = 1000;
+    const renderTicks = [];
+    const removedTicks = [];
+    context.performance = { now: () => now };
+
+    const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
+    shadowCatcher.isVisible = true;
+    context.scene = {
+        meshes: [shadowCatcher],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+        onBeforeRenderObservable: {
+            add(callback) {
+                renderTicks.push(callback);
+                return callback;
+            },
+            remove(callback) {
+                removedTicks.push(callback);
+            },
+        },
+    };
+
+    const start = vm.runInContext(`
+        (() => {
+            scenes.viewer = scene;
+            sceneBoundingBoxes.viewer = {
+                min: { x: -30, y: -12, z: 0 },
+                max: { x: 30, y: 12, z: 36 }
+            };
+            showCuttingMat('viewer');
+            const top = scene.getMeshByName('__cutting_mat__');
+            const slab = scene.getMeshByName('__cutting_mat_slab__');
+            return {
+            topZ: top.position.z,
+            slabZ: slab.position.z,
+            topAlpha: top.material.alpha,
+            slabAlpha: slab.material.alpha,
+            shadowVisible: scene.getMeshByName('__shadow_catcher__').isVisible
+            };
+        })();
+    `, context);
+
+    assert.ok(start.topZ < 0);
+    assert.ok(start.slabZ < 0);
+    assert.equal(start.topAlpha, 0);
+    assert.equal(start.slabAlpha, 0);
+    assert.equal(start.shadowVisible, false);
+    assert.equal(renderTicks.length, 1);
+
+    now += 120;
+    renderTicks.at(-1)();
+    const duringShow = vm.runInContext(`
+        (() => {
+            const top = scene.getMeshByName('__cutting_mat__');
+            return { topZ: top.position.z, topAlpha: top.material.alpha };
+        })();
+    `, context);
+
+    assert.ok(duringShow.topZ < 0);
+    assert.ok(duringShow.topAlpha > 0 && duringShow.topAlpha < 1);
+
+    now += 500;
+    renderTicks.at(-1)();
+    const shown = vm.runInContext(`
+        (() => {
+            const top = scene.getMeshByName('__cutting_mat__');
+            return { topZ: top.position.z, topAlpha: top.material.alpha };
+        })();
+    `, context);
+
+    assert.equal(shown.topZ, 0);
+    assert.equal(shown.topAlpha, 1);
+    assert.equal(removedTicks.length, 1);
+
+    const hideStart = vm.runInContext(`
+        (() => {
+            hideCuttingMat('viewer');
+            const top = scene.getMeshByName('__cutting_mat__');
+            return { topExists: !!top, topZ: top.position.z, topAlpha: top.material.alpha };
+        })();
+    `, context);
+
+    assert.equal(hideStart.topExists, true);
+    assert.equal(hideStart.topZ, 0);
+    assert.equal(hideStart.topAlpha, 1);
+    assert.equal(renderTicks.length, 2);
+
+    now += 120;
+    renderTicks.at(-1)();
+    const duringHide = vm.runInContext(`
+        (() => {
+            const top = scene.getMeshByName('__cutting_mat__');
+            return { topExists: !!top, topZ: top.position.z, topAlpha: top.material.alpha };
+        })();
+    `, context);
+
+    assert.equal(duringHide.topExists, true);
+    assert.ok(duringHide.topZ < 0);
+    assert.ok(duringHide.topAlpha > 0 && duringHide.topAlpha < 1);
+
+    now += 500;
+    renderTicks.at(-1)();
+    const hidden = vm.runInContext(`
+        (() => ({
+            topExists: !!scene.getMeshByName('__cutting_mat__'),
+            slabExists: !!scene.getMeshByName('__cutting_mat_slab__'),
+            shadowVisible: scene.getMeshByName('__shadow_catcher__').isVisible
+        }))();
+    `, context);
+
+    assert.equal(hidden.topExists, false);
+    assert.equal(hidden.slabExists, false);
+    assert.equal(hidden.shadowVisible, true);
+    assert.equal(removedTicks.length, 2);
 });
 
 test('section hatch generation uses model meshes and excludes section ghost meshes', () => {

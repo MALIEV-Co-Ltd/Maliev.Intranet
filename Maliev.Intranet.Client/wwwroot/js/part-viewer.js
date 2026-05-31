@@ -1658,6 +1658,9 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
 
 // ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
 
+const CUTTING_MAT_ANIMATION_MS = 240;
+const cuttingMatAnimationStates = {};
+
 /**
  * Renders a realistic cutting-mat floor at model base (Z=0).
  *
@@ -1673,6 +1676,7 @@ export function showCuttingMat(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
+    _cancelCuttingMatAnimation(canvasId);
     ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
         const m = scene.getMeshByName(n);
         if (m) m.dispose(false, true);
@@ -1690,6 +1694,7 @@ export function showCuttingMat(canvasId) {
     const THICK  = 3;    // mm slab thickness
     const matW   = Math.ceil(Math.max(300, modelW + PAD * 2) / 10) * 10;
     const matH   = Math.ceil(Math.max(220, modelH + PAD * 2) / 10) * 10;
+    const slideOffset = _cuttingMatSlideOffset(bb);
 
     // ── Texture ───────────────────────────────────────────────────────────────
     const TEX_W = 2048;
@@ -1789,9 +1794,11 @@ export function showCuttingMat(canvasId) {
     topMat.ambientColor          = new BABYLON.Color3(0.18, 0.42, 0.26);
     topMat.specularColor         = new BABYLON.Color3(0.02, 0.05, 0.03);
     topMat.backFaceCulling       = false;
-    topMat.transparencyMode      = BABYLON.Material?.MATERIAL_ALPHATEST ?? 4;
+    topMat.transparencyMode      = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
     topMat.alphaCutOff           = 0.5;
+    topMat.alpha                 = 0;
     topMesh.material = topMat;
+    topMesh.metadata = { ...(topMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
     disableSectionClippingForMesh(topMesh);
 
     const slabMesh = _createRoundedMatSlabMesh(scene, outline, THICK);
@@ -1801,7 +1808,10 @@ export function showCuttingMat(canvasId) {
     slabMat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
     slabMat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
     slabMat.backFaceCulling = false;
+    slabMat.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+    slabMat.alpha = 0;
     slabMesh.material = slabMat;
+    slabMesh.metadata = { ...(slabMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
     disableSectionClippingForMesh(slabMesh);
 
     // ── Hide the shadow catcher ───────────────────────────────────────────────
@@ -1811,6 +1821,85 @@ export function showCuttingMat(canvasId) {
     // so shadows render correctly directly on the mat surface without the catcher.
     const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
     if (shadowCatcher) shadowCatcher.isVisible = false;
+
+    _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
+        fromZ: -slideOffset,
+        toZ: 0,
+        fromAlpha: 0,
+        toAlpha: 1,
+    });
+}
+
+function _cuttingMatSlideOffset(bb) {
+    const modelHeight = Math.max(0, (bb?.max?.z ?? 0) - (bb?.min?.z ?? 0));
+    return Math.max(12, Math.min(40, modelHeight * 0.35 || 18));
+}
+
+function _cuttingMatNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
+
+function _easeCuttingMat(t) {
+    return t * t * (3 - 2 * t);
+}
+
+function _applyCuttingMatAnimation(meshes, materials, z, alpha) {
+    meshes.forEach(mesh => {
+        if (mesh?.position) mesh.position.z = z;
+    });
+    materials.forEach(material => {
+        if (material) material.alpha = alpha;
+    });
+}
+
+function _cancelCuttingMatAnimation(canvasId) {
+    const state = cuttingMatAnimationStates[canvasId];
+    if (!state) return;
+    if (state.observer && state.scene?.onBeforeRenderObservable?.remove) {
+        state.scene.onBeforeRenderObservable.remove(state.observer);
+    }
+    delete cuttingMatAnimationStates[canvasId];
+}
+
+function _animateCuttingMat(canvasId, scene, meshes, materials, options) {
+    const durationMs = CUTTING_MAT_ANIMATION_MS;
+    const startedAt = _cuttingMatNow();
+
+    const apply = eased => {
+        const z = options.fromZ + (options.toZ - options.fromZ) * eased;
+        const alpha = options.fromAlpha + (options.toAlpha - options.fromAlpha) * eased;
+        _applyCuttingMatAnimation(meshes, materials, z, alpha);
+    };
+
+    apply(0);
+
+    if (!scene.onBeforeRenderObservable?.add) {
+        apply(1);
+        options.onComplete?.();
+        return;
+    }
+
+    const state = { scene, observer: null };
+    const tick = () => {
+        const elapsed = Math.max(0, _cuttingMatNow() - startedAt);
+        const t = Math.min(1, elapsed / durationMs);
+        apply(_easeCuttingMat(t));
+
+        if (t >= 1) {
+            if (state.observer && scene.onBeforeRenderObservable?.remove) {
+                scene.onBeforeRenderObservable.remove(state.observer);
+            }
+            if (cuttingMatAnimationStates[canvasId] === state) {
+                delete cuttingMatAnimationStates[canvasId];
+            }
+            options.onComplete?.();
+        }
+    };
+
+    state.observer = scene.onBeforeRenderObservable.add(tick);
+    cuttingMatAnimationStates[canvasId] = state;
 }
 
 function _createCuttingMatTexture(scene, rawCanvas, width, height) {
@@ -1980,15 +2069,34 @@ function _cuttingMatGridLines(ctx, w, h, step, color, lineWidth, offsetX = 0, of
 export function hideCuttingMat(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
-    ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
-        const m = scene.getMeshByName(n);
-        if (m) m.dispose(false, true);
-    });
-    // Restore the shadow catcher that was hidden when the mat was shown
-    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
-    if (shadowCatcher) shadowCatcher.isVisible = true;
-}
 
+    _cancelCuttingMatAnimation(canvasId);
+    const meshes = ['__cutting_mat__', '__cutting_mat_slab__']
+        .map(n => scene.getMeshByName(n))
+        .filter(Boolean);
+    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
+
+    if (meshes.length === 0) {
+        if (shadowCatcher) shadowCatcher.isVisible = true;
+        return;
+    }
+
+    const materials = meshes.map(mesh => mesh.material).filter(Boolean);
+    const slideOffset = Math.max(...meshes.map(mesh => mesh.metadata?.malievCuttingMatSlideOffset ?? 18));
+    const fromZ = meshes[0]?.position?.z ?? 0;
+    const fromAlpha = materials[0]?.alpha ?? 1;
+
+    _animateCuttingMat(canvasId, scene, meshes, materials, {
+        fromZ,
+        toZ: -slideOffset,
+        fromAlpha,
+        toAlpha: 0,
+        onComplete: () => {
+            meshes.forEach(mesh => mesh.dispose(false, true));
+            if (shadowCatcher) shadowCatcher.isVisible = true;
+        },
+    });
+}
 
 // ── initialize ────────────────────────────────────────────────────────────────
 
