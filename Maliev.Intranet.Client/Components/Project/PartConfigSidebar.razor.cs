@@ -164,7 +164,7 @@ public partial class PartConfigSidebar : ComponentBase
         ["anodizedred"] = "finish-painted-red-part-surface.png",
         ["anodizedblue"] = "finish-painted-blue-part-surface.png",
         ["anodizedgold"] = "brass-c360-part-material.png",
-        ["anodizedgreen"] = "finish-painted-green-part-surface.png",
+        ["anodizedgreen"] = "finish-anodized-green-part-surface.png",
         ["anodizedpurple"] = "finish-painted-blue-part-surface.png",
         ["powder"] = "finish-painted-part-surface.png",
         ["powdercoat"] = "finish-painted-part-surface.png",

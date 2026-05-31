@@ -236,6 +236,20 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void AnodizedGreenColorImage_UsesDedicatedAnodizedRepresentation()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor.cs")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("[\"anodizedgreen\"] = \"finish-anodized-green-part-surface.png\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[\"anodizedgreen\"] = \"finish-painted-green-part-surface.png\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProcessCardStyles_RenderActiveBorderAndCheckAboveImageInDarkMode()
     {
         var source = ReadRepoFile(
