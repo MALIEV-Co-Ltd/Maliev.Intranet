@@ -180,7 +180,10 @@ function loadViewerContext() {
             width: options.width,
             height: options.height,
             depth: options.depth,
-            dispose: () => {},
+            disposed: false,
+            dispose() {
+                this.disposed = true;
+            },
         };
         scene?.meshes?.push(mesh);
         return mesh;
@@ -534,6 +537,107 @@ test('showGrid uses a low-contrast grid floor in light mode', () => {
     assert.ok(result.minorUnitVisibility <= 0.35);
     assert.ok(result.lineColor.r >= 0.72);
     assert.ok(result.mainColor.r >= 0.93);
+});
+
+test('grid floor fades in and fades out before disposal', () => {
+    const context = loadViewerContext();
+    let now = 1000;
+    const renderTicks = [];
+    const removedTicks = [];
+    context.performance = { now: () => now };
+    context.scene = {
+        meshes: [],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+        onBeforeRenderObservable: {
+            add(callback) {
+                renderTicks.push(callback);
+                return callback;
+            },
+            remove(callback) {
+                removedTicks.push(callback);
+            },
+        },
+    };
+
+    const start = vm.runInContext(`
+        (() => {
+            scenes.viewer = scene;
+            darkModes.viewer = false;
+            sceneBoundingBoxes.viewer = {
+                min: { x: -25, y: -10, z: 0 },
+                max: { x: 25, y: 10, z: 30 }
+            };
+            showGrid('viewer');
+            const grid = scene.getMeshByName('__grid__');
+            return {
+                exists: !!grid,
+                opacity: grid.material.opacity,
+                targetOpacity: grid.metadata.malievGridTargetOpacity
+            };
+        })();
+    `, context);
+
+    assert.equal(start.exists, true);
+    assert.equal(start.opacity, 0);
+    assert.ok(start.targetOpacity > 0);
+    assert.equal(renderTicks.length, 1);
+
+    now += 120;
+    renderTicks.at(-1)();
+    const duringShow = vm.runInContext(`
+        (() => {
+            const grid = scene.getMeshByName('__grid__');
+            return { opacity: grid.material.opacity, targetOpacity: grid.metadata.malievGridTargetOpacity };
+        })();
+    `, context);
+
+    assert.ok(duringShow.opacity > 0 && duringShow.opacity < duringShow.targetOpacity);
+
+    now += 500;
+    renderTicks.at(-1)();
+    const shown = vm.runInContext(`
+        (() => {
+            const grid = scene.getMeshByName('__grid__');
+            return { exists: !!grid, opacity: grid.material.opacity, targetOpacity: grid.metadata.malievGridTargetOpacity };
+        })();
+    `, context);
+
+    assert.equal(shown.exists, true);
+    assert.equal(shown.opacity, shown.targetOpacity);
+    assert.equal(removedTicks.length, 1);
+
+    const hideStart = vm.runInContext(`
+        (() => {
+            hideGrid('viewer');
+            const grid = scene.getMeshByName('__grid__');
+            return { exists: !!grid, opacity: grid.material.opacity };
+        })();
+    `, context);
+
+    assert.equal(hideStart.exists, true);
+    assert.equal(hideStart.opacity, shown.targetOpacity);
+    assert.equal(renderTicks.length, 2);
+
+    now += 120;
+    renderTicks.at(-1)();
+    const duringHide = vm.runInContext(`
+        (() => {
+            const grid = scene.getMeshByName('__grid__');
+            return { exists: !!grid, opacity: grid.material.opacity };
+        })();
+    `, context);
+
+    assert.equal(duringHide.exists, true);
+    assert.ok(duringHide.opacity > 0 && duringHide.opacity < shown.targetOpacity);
+
+    now += 500;
+    renderTicks.at(-1)();
+    const hidden = vm.runInContext("!!scene.getMeshByName('__grid__')", context);
+
+    assert.equal(hidden, false);
+    assert.equal(removedTicks.length, 2);
 });
 
 test('cutting mat creates an RGBA-textured rounded floor at the model base', () => {

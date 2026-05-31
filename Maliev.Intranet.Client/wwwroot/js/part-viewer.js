@@ -4261,8 +4261,90 @@ function clearBoundingBox(canvasId) {
 
 // ── showGrid / hideGrid ───────────────────────────────────────────────────────
 
+const GRID_FADE_ANIMATION_MS = 240;
+const gridAnimationStates = {};
+
 function getGridThemeConfig(canvasId) {
     return isDarkMode(canvasId) ? CONFIG.GRID.dark : CONFIG.GRID.light;
+}
+
+function _gridNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
+
+function _easeGridFade(t) {
+    return t * t * (3 - 2 * t);
+}
+
+function _getGridOpacity(material) {
+    if (!material) return 0;
+    if (typeof material.opacity === 'number') return material.opacity;
+    if (typeof material.alpha === 'number') return material.alpha;
+    return 1;
+}
+
+function _setGridOpacity(material, opacity) {
+    if (!material) return;
+    if ('opacity' in material) {
+        material.opacity = opacity;
+    } else {
+        material.alpha = opacity;
+    }
+}
+
+function _cancelGridAnimation(canvasId) {
+    const state = gridAnimationStates[canvasId];
+    if (!state) return;
+    if (state.observer && state.scene?.onBeforeRenderObservable?.remove) {
+        state.scene.onBeforeRenderObservable.remove(state.observer);
+    }
+    delete gridAnimationStates[canvasId];
+}
+
+function _animateGridOpacity(canvasId, scene, grid, fromOpacity, toOpacity, onComplete) {
+    const material = grid?.material;
+    if (!grid || !material) {
+        onComplete?.();
+        return;
+    }
+
+    _cancelGridAnimation(canvasId);
+
+    const apply = eased => {
+        const opacity = fromOpacity + (toOpacity - fromOpacity) * eased;
+        _setGridOpacity(material, opacity);
+    };
+
+    apply(0);
+
+    if (!scene.onBeforeRenderObservable?.add) {
+        apply(1);
+        onComplete?.();
+        return;
+    }
+
+    const startedAt = _gridNow();
+    const state = { scene, observer: null };
+    const tick = () => {
+        const elapsed = Math.max(0, _gridNow() - startedAt);
+        const t = Math.min(1, elapsed / GRID_FADE_ANIMATION_MS);
+        apply(_easeGridFade(t));
+
+        if (t >= 1) {
+            if (state.observer && scene.onBeforeRenderObservable?.remove) {
+                scene.onBeforeRenderObservable.remove(state.observer);
+            }
+            if (gridAnimationStates[canvasId] === state) {
+                delete gridAnimationStates[canvasId];
+            }
+            onComplete?.();
+        }
+    };
+
+    state.observer = scene.onBeforeRenderObservable.add(tick);
+    gridAnimationStates[canvasId] = state;
 }
 
 /**
@@ -4275,9 +4357,12 @@ export function showGrid(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    // Remove any existing grid first
     const existing = scene.getMeshByName('__grid__');
-    if (existing) existing.dispose();
+    if (existing) {
+        const targetOpacity = existing.metadata?.malievGridTargetOpacity ?? _getGridOpacity(existing.material);
+        _animateGridOpacity(canvasId, scene, existing, _getGridOpacity(existing.material), targetOpacity);
+        return;
+    }
 
     const bb = sceneBoundingBoxes[canvasId];
     if (!bb) return;
@@ -4307,6 +4392,7 @@ export function showGrid(canvasId) {
         mat.lineColor   = toColor3(gridTheme.lineColor);
         mat.opacity     = gridTheme.opacity;
         ground.material = mat;
+        ground.metadata = { ...(ground.metadata ?? {}), malievGridTargetOpacity: gridTheme.opacity };
         disableSectionClippingForMesh(ground);
     } else {
         // GridMaterial CDN not yet loaded — use a plain transparent material as fallback
@@ -4315,8 +4401,13 @@ export function showGrid(canvasId) {
         mat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
         mat.backFaceCulling = false;
         ground.material = mat;
+        ground.metadata = { ...(ground.metadata ?? {}), malievGridTargetOpacity: 0.15 };
         disableSectionClippingForMesh(ground);
     }
+
+    const targetOpacity = ground.metadata.malievGridTargetOpacity;
+    _setGridOpacity(ground.material, 0);
+    _animateGridOpacity(canvasId, scene, ground, 0, targetOpacity);
 }
 
 /**
@@ -4326,7 +4417,12 @@ export function hideGrid(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
     const grid = scene.getMeshByName('__grid__');
-    if (grid) grid.dispose();
+    if (!grid) return;
+
+    const fromOpacity = _getGridOpacity(grid.material);
+    _animateGridOpacity(canvasId, scene, grid, fromOpacity, 0, () => {
+        grid.dispose();
+    });
 }
 
 // ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
