@@ -246,6 +246,26 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ConfiguratorOptionImages_RaiseHoveredCardAboveSiblingCards()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-mat-card:hover,\n            .pcs-mat-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-fin-card:hover,\n            .pcs-fin-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-choice-card:hover,\n            .pcs-choice-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-color-choice:hover,\n            .pcs-color-choice:focus-within", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 90;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-option-image-frame:hover,\n            .pcs-option-image-frame:focus-within {\n                z-index: 100;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 110;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("isolation: isolate;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OptionImageStyles_UseConsistentBoundedPreviewSize()
     {
         var source = ReadRepoFile(

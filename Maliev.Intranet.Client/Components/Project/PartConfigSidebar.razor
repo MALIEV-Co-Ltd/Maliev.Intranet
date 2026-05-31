@@ -918,6 +918,17 @@
                 background: var(--maliev-panel-3);
             }
 
+            .pcs-mat-card:hover,
+            .pcs-mat-card:focus-within,
+            .pcs-fin-card:hover,
+            .pcs-fin-card:focus-within,
+            .pcs-choice-card:hover,
+            .pcs-choice-card:focus-within,
+            .pcs-color-choice:hover,
+            .pcs-color-choice:focus-within {
+                z-index: 90;
+            }
+
             .pcs-mat-card--active,
             .pcs-fin-card--active {
                 border-color: var(--mud-palette-primary);
@@ -943,7 +954,6 @@
                 overflow: visible;
                 background: #fff;
                 color: var(--mud-palette-primary);
-                isolation: isolate;
             }
 
             .pcs-option-image-frame--small {
@@ -976,7 +986,7 @@
                 position: absolute;
                 left: calc(100% + 10px);
                 top: 50%;
-                z-index: 50;
+                z-index: 110;
                 width: min(220px, 64vw);
                 aspect-ratio: 1 / 1;
                 padding: 6px;
@@ -988,6 +998,11 @@
                 pointer-events: none;
                 transform: translateY(-50%) translateX(-4px) scale(0.98);
                 transition: opacity 0.12s ease, transform 0.12s ease;
+            }
+
+            .pcs-option-image-frame:hover,
+            .pcs-option-image-frame:focus-within {
+                z-index: 100;
             }
 
             .pcs-option-image-frame:hover .pcs-image-preview-popout,
@@ -1260,6 +1275,7 @@
                 font-weight: 600;
                 cursor: pointer;
                 text-align: left;
+                position: relative;
             }
 
             .pcs-color-choice > .mud-icon-root {
