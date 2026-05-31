@@ -259,9 +259,9 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(".pcs-fin-card:hover,\n            .pcs-fin-card:focus-within,", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-choice-card:hover,\n            .pcs-choice-card:focus-within,", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-color-choice:hover,\n            .pcs-color-choice:focus-within", source, StringComparison.Ordinal);
-        Assert.Contains("z-index: 90;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-option-image-frame:hover,\n            .pcs-option-image-frame:focus-within {\n                z-index: 100;", source, StringComparison.Ordinal);
-        Assert.Contains("z-index: 110;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 320;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-option-image-frame:hover,\n            .pcs-option-image-frame:focus-within {\n                z-index: 330;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 340;", source, StringComparison.Ordinal);
         Assert.DoesNotContain("isolation: isolate;", source, StringComparison.Ordinal);
     }
 
@@ -283,6 +283,29 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
         Assert.Contains("overflow: visible;\n                z-index: 220;", source, StringComparison.Ordinal);
         Assert.Contains("pointer-events: auto;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfiguratorOptionImages_RaiseHoveredPreviewAboveAllOptionListsAndItems()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-cards,\n            .pcs-feature-toggle-grid,\n            .pcs-option-row,\n            .pcs-tol-grid,\n            .pcs-color-choice-grid", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-cards:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-feature-toggle-grid:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-option-row:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-color-choice-grid:has(.pcs-option-image-frame:hover)", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-fin-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-choice-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-color-choice:has(.pcs-option-image-frame:hover)", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 260;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 320;", source, StringComparison.Ordinal);
     }
 
     [Fact]
