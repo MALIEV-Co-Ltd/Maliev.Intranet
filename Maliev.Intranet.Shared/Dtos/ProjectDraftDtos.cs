@@ -282,8 +282,11 @@ public sealed class DraftPartState
 /// </summary>
 public sealed class PartViewerSettings
 {
-    /// <summary>The active render mode: solid, wireframe, or transparent.</summary>
+    /// <summary>The active render mode: solid, wireframe, transparent, or realistic.</summary>
     public string RenderMode { get; set; } = "solid";
+
+    /// <summary>The material type key for realistic rendering (e.g. aluminum, steel, black-pom).</summary>
+    public string MaterialType { get; set; } = "aluminum";
 
     /// <summary>The active camera projection: perspective or orthographic.</summary>
     public string CameraProjection { get; set; } = "orthographic";
@@ -313,6 +316,7 @@ public sealed class PartViewerSettings
     public PartViewerSettings Clone() => new()
     {
         RenderMode = RenderMode,
+        MaterialType = MaterialType,
         CameraProjection = CameraProjection,
         EdgesEnabled = EdgesEnabled,
         GridEnabled = GridEnabled,

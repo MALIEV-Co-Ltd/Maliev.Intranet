@@ -95,7 +95,47 @@ class Ray {
     }
 }
 
-function createElement() {
+const createdCanvasContexts = [];
+
+function createCanvasContext() {
+    const calls = [];
+    const context = {
+        calls,
+        beginPath: () => calls.push(['beginPath']),
+        moveTo: (x, y) => calls.push(['moveTo', x, y]),
+        lineTo: (x, y) => calls.push(['lineTo', x, y]),
+        arcTo: (x1, y1, x2, y2, r) => calls.push(['arcTo', x1, y1, x2, y2, r]),
+        closePath: () => calls.push(['closePath']),
+        clip: () => calls.push(['clip']),
+        fill: (...args) => calls.push(['fill', ...args]),
+        stroke: () => calls.push(['stroke']),
+        strokeRect: (x, y, w, h) => calls.push(['strokeRect', x, y, w, h]),
+        fillText: (text, x, y) => calls.push(['fillText', text, x, y]),
+        save: () => calls.push(['save']),
+        restore: () => calls.push(['restore']),
+        translate: (x, y) => calls.push(['translate', x, y]),
+        scale: (x, y) => calls.push(['scale', x, y]),
+        getImageData: (x, y, width, height) => ({
+            data: new Uint8Array(width * height * 4),
+            width,
+            height,
+        }),
+    };
+    createdCanvasContexts.push(context);
+    return context;
+}
+
+function createElement(tagName = '') {
+    if (String(tagName).toLowerCase() === 'canvas') {
+        const context = createCanvasContext();
+        return {
+            width: 0,
+            height: 0,
+            getContext: () => context,
+            _context: context,
+        };
+    }
+
     return {
         className: '',
         innerHTML: '',
@@ -107,6 +147,28 @@ function createElement() {
 }
 
 function loadViewerContext() {
+    const rawTextureCalls = [];
+    const dynamicTextureCalls = [];
+
+    function createMesh(name, options = {}, scene = null) {
+        const mesh = {
+            name,
+            material: null,
+            metadata: {},
+            isPickable: true,
+            isVisible: true,
+            receiveShadows: false,
+            position: {},
+            rotation: {},
+            width: options.width,
+            height: options.height,
+            depth: options.depth,
+            dispose: () => {},
+        };
+        scene?.meshes?.push(mesh);
+        return mesh;
+    }
+
     const context = {
         console,
         document: {
@@ -114,9 +176,16 @@ function loadViewerContext() {
             createElement,
             getElementById: () => null,
         },
+        Path2D: class Path2D {
+            constructor(path) {
+                this.path = path;
+            }
+        },
         requestAnimationFrame: (callback) => callback(),
         window: {},
         globalThis: {},
+        rawTextureCalls,
+        dynamicTextureCalls,
         BABYLON: {
             Axis: {
                 X: new Vector3(1, 0, 0),
@@ -135,12 +204,47 @@ function loadViewerContext() {
                 RotationX: () => ({}),
             },
             Mesh: class Mesh {
-                constructor(name) {
+                constructor(name, scene) {
                     this.name = name;
                     this.material = null;
                     this.isPickable = true;
+                    this.isVisible = true;
+                    this.receiveShadows = false;
+                    this.position = {};
+                    this.rotation = {};
                     this.metadata = {};
                     this.dispose = () => {};
+                    scene?.meshes?.push(this);
+                }
+            },
+            MaterialPluginBase: class MaterialPluginBase {
+                constructor() {
+                    this._isEnabled = false;
+                }
+
+                set isEnabled(value) {
+                    this._isEnabled = value;
+                }
+
+                get isEnabled() {
+                    return this._isEnabled;
+                }
+            },
+            Material: {
+                MATERIAL_ALPHATEST: 4,
+            },
+            Constants: {
+                TEXTUREFORMAT_RGBA: 5,
+                TEXTURETYPE_UNSIGNED_BYTE: 0,
+                TEXTURE_TRILINEAR_SAMPLINGMODE: 3,
+            },
+            DynamicTexture: class DynamicTexture {
+                constructor(name, options) {
+                    this.name = name;
+                    this.options = options;
+                    this.hasAlpha = false;
+                    this.update = () => {};
+                    dynamicTextureCalls.push({ name, options });
                 }
             },
             Plane: class Plane {
@@ -152,6 +256,8 @@ function loadViewerContext() {
                 }
             },
             MeshBuilder: {
+                CreateGround: (name, options, scene) => createMesh(name, options, scene),
+                CreateBox: (name, options, scene) => createMesh(name, options, scene),
                 CreateLines: (name, options) => ({
                     name,
                     points: options.points,
@@ -203,6 +309,22 @@ function loadViewerContext() {
                 ImportMeshAsync: async () => ({ meshes: [] }),
             },
             Ray,
+            RawTexture: {
+                CreateRGBATexture: (data, width, height, scene, generateMipMaps, invertY, samplingMode) => {
+                    const texture = {
+                        data,
+                        width,
+                        height,
+                        scene,
+                        generateMipMaps,
+                        invertY,
+                        samplingMode,
+                        hasAlpha: false,
+                    };
+                    rawTextureCalls.push(texture);
+                    return texture;
+                },
+            },
             StandardMaterial: class StandardMaterial {
                 constructor(name) {
                     this.name = name;
@@ -344,6 +466,57 @@ test('model mesh registry marks only real model geometry pickable for analysis',
     assert.deepEqual(result.filter(m => m.model).map(m => m.name), ['model']);
     assert.equal(result.find(m => m.name === 'model').pickable, true);
     assert.equal(result.find(m => m.name === '__section_ghost_1').pickable, false);
+});
+
+test('cutting mat creates an RGBA-textured rounded floor at the model base', () => {
+    createdCanvasContexts.length = 0;
+    const context = loadViewerContext();
+    const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
+    shadowCatcher.isVisible = true;
+    context.scene = {
+        meshes: [shadowCatcher],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -30, y: -12, z: 0 },
+            max: { x: 30, y: 12, z: 36 }
+        };
+        showCuttingMat('viewer');
+        const top = scene.getMeshByName('__cutting_mat__');
+        const slab = scene.getMeshByName('__cutting_mat_slab__');
+        ({
+            rawTextureCount: rawTextureCalls.length,
+            dynamicTextureCount: dynamicTextureCalls.length,
+            rawTextureWidth: rawTextureCalls[0]?.width,
+            rawTextureDataLength: rawTextureCalls[0]?.data?.length,
+            topHasAlphaTexture: top?.material?.diffuseTexture?.hasAlpha === true,
+            firstOutlineUv: top?.vertexData?.uvs?.slice(2, 4),
+            topVertexCount: (top?.vertexData?.positions?.length ?? 0) / 3,
+            slabVertexCount: (slab?.vertexData?.positions?.length ?? 0) / 3,
+            shadowVisible: scene.getMeshByName('__shadow_catcher__')?.isVisible
+        });
+    `, context);
+
+    assert.equal(result.rawTextureCount, 1);
+    assert.equal(result.dynamicTextureCount, 0);
+    assert.equal(result.rawTextureWidth, 2048);
+    assert.ok(result.rawTextureDataLength > 2048 * 256 * 4);
+    assert.equal(result.topHasAlphaTexture, true);
+    assert.equal(result.firstOutlineUv[0], 0);
+    assert.ok(result.topVertexCount > 12);
+    assert.ok(result.slabVertexCount > 24);
+    assert.equal(result.shadowVisible, false);
+
+    const drawCalls = createdCanvasContexts.at(-1)?.calls ?? [];
+    const mirroredTextCalls = drawCalls.filter(call => call[0] === 'scale' && call[1] < 0);
+    const titleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
+    assert.equal(mirroredTextCalls.length, 0);
+    assert.equal(titleCalls.length, 1);
 });
 
 test('section hatch generation uses model meshes and excludes section ghost meshes', () => {

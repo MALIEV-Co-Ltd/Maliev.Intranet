@@ -492,7 +492,7 @@ function computeSceneBounds(scene) {
     let minX = Infinity, minY = Infinity, minZ = Infinity;
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
     scene.meshes.forEach(m => {
-        if (m.name === '__grid__' || m.name === '__shadow_catcher__' || m.name.startsWith('__axis')) return;
+        if (m.name === '__grid__' || m.name === '__shadow_catcher__' || m.name.startsWith('__axis') || m.name.startsWith('__cutting_mat')) return;
         m.computeWorldMatrix(true);
         const bi = m.getBoundingInfo();
         const lo = bi.boundingBox.minimumWorld, hi = bi.boundingBox.maximumWorld;
@@ -607,6 +607,7 @@ function isSystemMeshForTurningAxis(mesh, canvasId) {
     if (!mesh || !mesh.name) return true;
     if (mesh.name === '__grid__' || mesh.name === '__shadow_catcher__') return true;
     if (mesh.name.startsWith('__axis') || mesh.name.startsWith('bbox_')) return true;
+    if (mesh.name.startsWith('__cutting_mat')) return true;
     if (mesh.name.startsWith('__flipped_overlay__') || mesh.name.startsWith('measure_')) return true;
 
     const directOverlayMap = overlayMeshes?.[canvasId];
@@ -1655,6 +1656,340 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
     }
 }
 
+// ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
+
+/**
+ * Renders a realistic cutting-mat floor at model base (Z=0).
+ *
+ * Design:
+ *   - Brighter green (#2e7d52 surface, lit with emissive baseline)
+ *   - 16 mm margin band: grid lines stop at the border, numbers live in the margin
+ *   - Rounded corners (8 mm radius) in both the visible top and slab geometry
+ *   - Raw RGBA texture upload so the green surface, grid, and labels render immediately
+ *   - Reference-style top-right cutting-mat title, away from the scale labels
+ *   - Manual convex fan triangulation (no CreatePolygon / earcut dependency)
+ */
+export function showCuttingMat(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
+        const m = scene.getMeshByName(n);
+        if (m) m.dispose(false, true);
+    });
+
+    const bb = sceneBoundingBoxes[canvasId];
+    if (!bb) return;
+
+    const modelW = bb.max.x - bb.min.x;
+    const modelH = bb.max.y - bb.min.y;
+
+    const PAD    = 60;   // mm clearance around model
+    const MARGIN = 16;   // mm margin band (numbers + title live here, outside grid)
+    const CORNER = 8;    // mm corner fillet radius
+    const THICK  = 3;    // mm slab thickness
+    const matW   = Math.ceil(Math.max(300, modelW + PAD * 2) / 10) * 10;
+    const matH   = Math.ceil(Math.max(220, modelH + PAD * 2) / 10) * 10;
+
+    // ── Texture ───────────────────────────────────────────────────────────────
+    const TEX_W = 2048;
+    const TEX_H = Math.max(256, Math.round(TEX_W * matH / matW));
+    const px    = TEX_W / matW;   // pixels per mm
+    const MPX   = MARGIN * px;    // margin in pixels
+    const CPX   = CORNER * px;    // corner radius in pixels
+
+    // Pre-create a standard HTML canvas — BabylonJS DynamicTexture's internal
+    // canvas suppresses ctx.fillRect in some build configurations, producing a
+    // blue/blank mat surface.  Drawing to a plain canvas always works.
+    // Drawing to canvas first keeps text/grid crisp before the raw RGBA upload.
+    const rawCanvas = document.createElement('canvas');
+    rawCanvas.width  = TEX_W;
+    rawCanvas.height = TEX_H;
+    const ctx = rawCanvas.getContext('2d');
+
+    // Helper: build a rounded-rect path on ctx
+    const _rrPath = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y,     x + w, y + r,   r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x,     y + h, x,     y + h - r, r);
+        ctx.lineTo(x,     y + r);
+        ctx.arcTo(x,     y,     x + r,   y,       r);
+        ctx.closePath();
+    };
+
+    // ── Background with rounded corners ───────────────────────────────────────
+    _rrPath(0, 0, TEX_W, TEX_H, CPX);
+    ctx.fillStyle = '#2d7a4f';
+    ctx.fill();
+    // Clip all subsequent drawing to the rounded rectangle
+    _rrPath(0, 0, TEX_W, TEX_H, CPX);
+    ctx.clip();
+
+    // ── Outer mat border ──────────────────────────────────────────────────────
+    const borderW = Math.max(3, px * 1.6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth   = borderW;
+    _rrPath(borderW / 2, borderW / 2, TEX_W - borderW, TEX_H - borderW, Math.max(0, CPX - borderW / 2));
+    ctx.stroke();
+
+    // ── Inner grid-area border ────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.60)';
+    ctx.lineWidth   = Math.max(2, px * 1.0);
+    ctx.strokeRect(MPX, MPX, TEX_W - 2 * MPX, TEX_H - 2 * MPX);
+
+    // ── Grid lines (symmetric — no mirroring needed) ──────────────────────────
+    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
+        5  * px, 'rgba(255,255,255,0.28)', Math.max(0.8, px * 0.40), MPX, MPX);
+    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
+        10 * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
+
+    // ── Margin title + number labels ──────────────────────────────────────────
+    const LABEL_PX   = Math.round(px * 7.5);
+    const LABEL_STEP = 10 * px;
+    const colCount   = Math.round((matW - 2 * MARGIN) / 10);
+    const rowCount   = Math.round((matH - 2 * MARGIN) / 10);
+    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
+    ctx.font         = `bold ${LABEL_PX}px Arial, sans-serif`;
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CUTTING MAT 3022', TEX_W - MPX * 0.45, MPX * 0.5);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Bottom edge labels (column axis), matching the physical mat reference.
+    for (let i = 0; i <= colCount; i++) {
+        const cx = MPX + i * LABEL_STEP;
+        ctx.fillText(String(i), cx, TEX_H - MPX * 0.5);
+    }
+
+    // Left edge labels (row axis). The top/right margins stay clear for the title.
+    for (let j = 0; j <= rowCount; j++) {
+        const cy = MPX + j * LABEL_STEP;
+        ctx.fillText(String(j), MPX * 0.5, cy);
+    }
+
+    // ── Upload texture from raw RGBA pixels ───────────────────────────────────
+    const tex = _createCuttingMatTexture(scene, rawCanvas, TEX_W, TEX_H);
+
+    // ── Rounded top surface and slab body ─────────────────────────────────────
+    const outline = _roundedRectPoints(matW, matH, CORNER, 8);
+    const topMesh = _createRoundedMatTopMesh(scene, outline, matW, matH);
+
+    const topMat = new BABYLON.StandardMaterial('__cutting_mat_mat__', scene);
+    topMat.diffuseTexture        = tex;
+    topMat.diffuseColor          = new BABYLON.Color3(1, 1, 1);
+    topMat.emissiveColor         = new BABYLON.Color3(0.04, 0.12, 0.06);
+    topMat.ambientColor          = new BABYLON.Color3(0.18, 0.42, 0.26);
+    topMat.specularColor         = new BABYLON.Color3(0.02, 0.05, 0.03);
+    topMat.backFaceCulling       = false;
+    topMat.transparencyMode      = BABYLON.Material?.MATERIAL_ALPHATEST ?? 4;
+    topMat.alphaCutOff           = 0.5;
+    topMesh.material = topMat;
+    disableSectionClippingForMesh(topMesh);
+
+    const slabMesh = _createRoundedMatSlabMesh(scene, outline, THICK);
+
+    const slabMat = new BABYLON.StandardMaterial('__cutting_mat_slab_mat__', scene);
+    slabMat.diffuseColor  = new BABYLON.Color3(0.12, 0.40, 0.24);
+    slabMat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
+    slabMat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
+    slabMat.backFaceCulling = false;
+    slabMesh.material = slabMat;
+    disableSectionClippingForMesh(slabMesh);
+
+    // ── Hide the shadow catcher ───────────────────────────────────────────────
+    // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
+    // surface.  Leaving it visible causes z-fighting that makes the model shadow
+    // appear shifted / "ghosted" on the mat.  The mat already has receiveShadows=true
+    // so shadows render correctly directly on the mat surface without the catcher.
+    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
+    if (shadowCatcher) shadowCatcher.isVisible = false;
+}
+
+function _createCuttingMatTexture(scene, rawCanvas, width, height) {
+    const ctx = rawCanvas.getContext('2d');
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+
+    if (BABYLON.RawTexture?.CreateRGBATexture) {
+        const samplingMode = BABYLON.Constants?.TEXTURE_TRILINEAR_SAMPLINGMODE
+            ?? BABYLON.Texture?.TRILINEAR_SAMPLINGMODE
+            ?? 3;
+        const tex = BABYLON.RawTexture.CreateRGBATexture(
+            pixels,
+            width,
+            height,
+            scene,
+            true,
+            false,
+            samplingMode);
+        tex.hasAlpha = true;
+        if (BABYLON.Texture?.CLAMP_ADDRESSMODE !== undefined) {
+            tex.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+            tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        }
+        return tex;
+    }
+
+    const tex = new BABYLON.DynamicTexture('__cutting_mat_tex__', { width, height }, scene, false);
+    tex.hasAlpha = true;
+    const texCtx = tex.getContext?.();
+    if (texCtx?.putImageData) {
+        texCtx.putImageData(ctx.getImageData(0, 0, width, height), 0, 0);
+    } else if (texCtx?.drawImage) {
+        texCtx.drawImage(rawCanvas, 0, 0);
+    }
+    tex.update(false);
+    return tex;
+}
+
+function _roundedRectPoints(width, height, radius, segments) {
+    const hw = width / 2;
+    const hh = height / 2;
+    const r = Math.min(radius, hw, hh);
+    const arcs = [
+        { cx:  hw - r, cy:  hh - r, start: 0, end: Math.PI / 2 },
+        { cx: -hw + r, cy:  hh - r, start: Math.PI / 2, end: Math.PI },
+        { cx: -hw + r, cy: -hh + r, start: Math.PI, end: Math.PI * 1.5 },
+        { cx:  hw - r, cy: -hh + r, start: Math.PI * 1.5, end: Math.PI * 2 },
+    ];
+    const pts = [];
+    arcs.forEach(arc => {
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const a = arc.start + (arc.end - arc.start) * t;
+            pts.push({
+                x: arc.cx + Math.cos(a) * r,
+                y: arc.cy + Math.sin(a) * r,
+            });
+        }
+    });
+    return pts;
+}
+
+function _cuttingMatUv(x, y, width, height) {
+    return {
+        u: 1 - ((x + width / 2) / width),
+        v: 1 - ((y + height / 2) / height),
+    };
+}
+
+function _createRoundedMatTopMesh(scene, outline, width, height) {
+    const mesh = new BABYLON.Mesh('__cutting_mat__', scene);
+    const positions = [0, 0, 0];
+    const indices = [];
+    const normals = [0, 0, 1];
+    const uvs = [0.5, 0.5];
+
+    outline.forEach(p => {
+        positions.push(p.x, p.y, 0);
+        normals.push(0, 0, 1);
+        const uv = _cuttingMatUv(p.x, p.y, width, height);
+        uvs.push(uv.u, uv.v);
+    });
+
+    for (let i = 1; i <= outline.length; i++) {
+        const next = i === outline.length ? 1 : i + 1;
+        indices.push(0, i, next);
+    }
+
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.normals = normals;
+    vertexData.uvs = uvs;
+    vertexData.applyToMesh(mesh);
+
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    return markAnalysisHelperMesh(mesh);
+}
+
+function _createRoundedMatSlabMesh(scene, outline, thickness) {
+    const mesh = new BABYLON.Mesh('__cutting_mat_slab__', scene);
+    const positions = [];
+    const indices = [];
+    const topZ = -0.08;
+    const bottomZ = -thickness;
+
+    outline.forEach(p => positions.push(p.x, p.y, topZ));
+    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
+
+    const n = outline.length;
+    for (let i = 0; i < n; i++) {
+        const next = (i + 1) % n;
+        indices.push(i, next, next + n, i, next + n, i + n);
+    }
+
+    const bottomCenterIndex = positions.length / 3;
+    positions.push(0, 0, bottomZ);
+    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
+    for (let i = 0; i < n; i++) {
+        const current = bottomCenterIndex + 1 + i;
+        const next = bottomCenterIndex + 1 + ((i + 1) % n);
+        indices.push(bottomCenterIndex, next, current);
+    }
+
+    const normals = [];
+    if (BABYLON.VertexData.ComputeNormals) {
+        BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    }
+
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    if (normals.length > 0) vertexData.normals = normals;
+    vertexData.applyToMesh(mesh);
+
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    return markAnalysisHelperMesh(mesh);
+}
+
+/**
+ * Draws a uniform grid pass (horizontal + vertical) clipped to an inset rectangle.
+ * offsetX/Y shift the grid origin so lines start at the grid-area edge.
+ */
+function _cuttingMatGridLines(ctx, w, h, step, color, lineWidth, offsetX = 0, offsetY = 0) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = lineWidth;
+    ctx.beginPath();
+    for (let x = 0; x <= w + 0.5; x += step) {
+        ctx.moveTo(x + offsetX, offsetY);
+        ctx.lineTo(x + offsetX, offsetY + h);
+    }
+    for (let y = 0; y <= h + 0.5; y += step) {
+        ctx.moveTo(offsetX,     y + offsetY);
+        ctx.lineTo(offsetX + w, y + offsetY);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
+/**
+ * Removes the cutting-mat meshes (top plane + slab body) from the scene,
+ * disposing materials and texture resources together to avoid memory leaks.
+ */
+export function hideCuttingMat(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
+        const m = scene.getMeshByName(n);
+        if (m) m.dispose(false, true);
+    });
+    // Restore the shadow catcher that was hidden when the mat was shown
+    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
+    if (shadowCatcher) shadowCatcher.isVisible = true;
+}
+
+
 // ── initialize ────────────────────────────────────────────────────────────────
 
 /**
@@ -2015,7 +2350,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     console.warn('[BabylonViewer] Shadow generator not found for canvas:', canvasId);
                 }
                 _scene.meshes.forEach(m => {
-                    if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis')) {
+                    if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis') && !m.name.startsWith('__cutting_mat')) {
                         if (m.material) origMats[m.uniqueId] = m.material;
                         if (shadowGen) {
                             shadowGen.addShadowCaster(m);
@@ -2759,6 +3094,7 @@ function isAnalysisHelperMesh(mesh) {
     return !!mesh?.metadata?.malievAnalysisHelper
         || name === '__grid__'
         || name === '__shadow_catcher__'
+        || name.startsWith('__cutting_mat')
         || name === '__root__'
         || name.startsWith('__axis')
         || name.startsWith('bbox_')

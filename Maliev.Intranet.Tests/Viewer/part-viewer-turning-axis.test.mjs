@@ -88,6 +88,19 @@ function loadViewerContext() {
             VertexBuffer: {
                 PositionKind: 'position',
             },
+            MaterialPluginBase: class MaterialPluginBase {
+                constructor() {
+                    this._isEnabled = false;
+                }
+
+                set isEnabled(value) {
+                    this._isEnabled = value;
+                }
+
+                get isEnabled() {
+                    return this._isEnabled;
+                }
+            },
         },
     };
     context.globalThis = context;

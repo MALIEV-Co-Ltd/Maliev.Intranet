@@ -223,6 +223,12 @@
                     @GetModeIconSvg("grid", _gridEnabled)
                 </button>
             </MudTooltip>
+            <MudTooltip Text="Cutting Mat" Placement="Placement.Top" Arrow="false">
+                <button class="@($"vp-cube-btn {(_cuttingMatEnabled ? "vp-active" : "")}")"
+                        @onclick="ToggleCuttingMatAsync" type="button">
+                    @GetModeIconSvg("cuttingmat", _cuttingMatEnabled)
+                </button>
+            </MudTooltip>
 
             <div class="vp-divider" />
 
@@ -286,6 +292,7 @@
     private bool   _edgesEnabled;
     private bool   _bboxEnabled;
     private bool   _gridEnabled;
+    private bool   _cuttingMatEnabled;
     private readonly HashSet<string> _temporaryGridOwners = new(StringComparer.Ordinal);
     private bool? _lastAppliedGridVisible;
     private string? _lastViewerUrl;
@@ -583,6 +590,20 @@
                 <path d="M16 72H84M24 60H76M32 48H68M40 36H60" stroke="{backC}" stroke-width="1.5" stroke-linecap="round"/>
                 """,
 
+            "cuttingmat" => $"""
+                <rect x="9" y="22" width="82" height="56" rx="2"
+                      fill="{(isActive ? "rgba(27,110,60,0.90)" : "rgba(27,94,56,0.72)")}"
+                      stroke="{edgeC}" stroke-width="1.5"/>
+                <line x1="9"  y1="38" x2="91" y2="38" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <line x1="9"  y1="50" x2="91" y2="50" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <line x1="9"  y1="62" x2="91" y2="62" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <line x1="29" y1="22" x2="29" y2="78" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <line x1="50" y1="22" x2="50" y2="78" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <line x1="71" y1="22" x2="71" y2="78" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+                <rect x="9"  y="75" width="82" height="5" rx="0"
+                      fill="rgba(8,52,22,0.85)" stroke="none"/>
+                """,
+
             "ortho" => $"""
                 <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -642,6 +663,8 @@
                     settings);
                 _lastAppliedGridVisible = _gridEnabled;
                 await ApplyGridVisibilityAsync(notifySettingsChanged: false);
+                if (_cuttingMatEnabled)
+                    await ApplyCuttingMatAsync(enabled: true);
                 await ApplyTurningAxisAsync();
             }
             catch (Exception ex)
@@ -859,7 +882,39 @@
     private async Task ToggleGridAsync()
     {
         _gridEnabled = !_gridEnabled;
+        // Cutting mat and grid are mutually exclusive floor modes.
+        if (_gridEnabled && _cuttingMatEnabled)
+            await ApplyCuttingMatAsync(enabled: false);
         await ApplyGridVisibilityAsync(notifySettingsChanged: true);
+    }
+
+    private async Task ToggleCuttingMatAsync()
+    {
+        _cuttingMatEnabled = !_cuttingMatEnabled;
+        // Cutting mat and grid are mutually exclusive floor modes.
+        if (_cuttingMatEnabled && _gridEnabled)
+        {
+            _gridEnabled = false;
+            await ApplyGridVisibilityAsync(notifySettingsChanged: true);
+        }
+        await ApplyCuttingMatAsync(enabled: _cuttingMatEnabled);
+    }
+
+    private async Task ApplyCuttingMatAsync(bool enabled)
+    {
+        _cuttingMatEnabled = enabled;
+        if (_module is null) return;
+        try
+        {
+            await _module.InvokeVoidAsync(
+                enabled ? "showCuttingMat" : "hideCuttingMat",
+                _canvasId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling cutting mat visibility");
+            _cuttingMatEnabled = !enabled;
+        }
     }
 
     private void CloseAnalysisPanels()
