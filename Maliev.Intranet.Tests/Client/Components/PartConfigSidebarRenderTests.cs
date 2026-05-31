@@ -157,11 +157,82 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.NotEmpty(cut.FindAll(".pcs-option-image"));
         Assert.NotEmpty(cut.FindAll(".pcs-option-image-fallback"));
-        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/white-pom-material-image.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-pom-material-image.png']"));
-        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-anodized-clear-material-image.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-anodized-blue-material-image.png']"));
-        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-material-image.png']"));
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/white-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-anodized-clear-part-surface.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-painted-blue-part-surface.png']"));
+        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.png']"));
+    }
+
+    [Fact]
+    public void ConfiguratorOptionImages_UsePartBasedRepresentationsForAllOptionGroups()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var toleranceId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            FinishId = finishId,
+            ToleranceId = toleranceId,
+            RoughnessCode = "RA_3_2",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "Aluminum 6061-T6", "AL6061", "Metal", null, "Most common CNC aluminum alloy.", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Bead blasted", "BEAD_BLAST", 1.6m, 12m, "Uniform satin texture", 10),
+            ],
+            AvailableTolerances =
+            [
+                new CatalogToleranceDto(toleranceId, "Medium (ISO 2768-m)", "ISO2768_M", "ISO 2768", "m", "+-0.1mm", 0m, 20),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "deburr_edges",
+                    "Deburr all edges",
+                    "boolean",
+                    null,
+                    null,
+                    null,
+                    "Break sharp edges before shipment.",
+                    false,
+                    20),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/aluminum-6061-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-bead-blast-part-surface.png']"));
+        Assert.NotNull(cut.Find(".pcs-roughness-card img[src='/images/materials/roughness-ra-3-2-part-surface.png']"));
+        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-tapped-holes-part.png']"));
+        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-thread-inserts-part.png']"));
+        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.png']"));
+        Assert.NotNull(cut.Find("[data-config-section='inspection'] img[src='/images/materials/inspection-standard-part-check.png']"));
+    }
+
+    [Fact]
+    public void MaterialCardStyles_UseLargeImageColumn()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("grid-template-columns: minmax(86px, 34%) minmax(0, 1fr) 18px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-swatch {\n                width: 100%;\n                min-height: 76px;\n                height: 100%;", source, StringComparison.Ordinal);
+        Assert.Contains("aspect-ratio: 4 / 3;", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -215,5 +286,22 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             Assert.False(card.HasAttribute("disabled"));
             Assert.Equal("false", card.GetAttribute("aria-disabled"));
         });
+    }
+
+    private static string ReadRepoFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
 }

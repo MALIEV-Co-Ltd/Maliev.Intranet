@@ -87,110 +87,123 @@ public partial class PartConfigSidebar : ComponentBase
 
     private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["al6061"] = "aluminum-material-image.png",
-        ["al7075"] = "aluminum-material-image.png",
-        ["aluminum"] = "aluminum-material-image.png",
-        ["aluminium"] = "aluminum-material-image.png",
-        ["ss304"] = "stainless-steel-material-image.png",
-        ["ss316"] = "stainless-steel-material-image.png",
-        ["stainless"] = "stainless-steel-material-image.png",
-        ["stainlesssteel"] = "stainless-steel-material-image.png",
-        ["steelmild"] = "steel-material-image.png",
-        ["mildsteel"] = "steel-material-image.png",
-        ["steel"] = "steel-material-image.png",
-        ["brass"] = "brass-material-image.png",
-        ["delrin"] = "white-pom-material-image.png",
-        ["pom"] = "white-pom-material-image.png",
-        ["pomc"] = "white-pom-material-image.png",
-        ["acetal"] = "white-pom-material-image.png",
-        ["pla"] = "blue-plastic-material-image.png",
-        ["petg"] = "clear-petg-material-image.png",
-        ["abs"] = "abs-black-material-image.png",
-        ["nylon"] = "nylon-black-material-image.png",
-        ["tough2000"] = "tough-resin-material-image.png",
-        ["toughresin"] = "tough-resin-material-image.png",
-        ["clear"] = "clear-plastic-material-image.png",
-        ["hightemp"] = "high-temp-resin-material-image.png",
-        ["pa12"] = "pa12-natural-material-image.png",
-        ["peek"] = "peek-natural-material-image.png",
-        ["metal"] = "raw-metal-material-image.png",
-        ["plastic"] = "natural-plastic-material-image.png",
+        ["al6061"] = "aluminum-6061-part-material.png",
+        ["aluminum6061t6"] = "aluminum-6061-part-material.png",
+        ["al6061t6"] = "aluminum-6061-part-material.png",
+        ["al7075"] = "aluminum-7075-part-material.png",
+        ["aluminum7075t6"] = "aluminum-7075-part-material.png",
+        ["al7075t6"] = "aluminum-7075-part-material.png",
+        ["aluminum"] = "aluminum-6061-part-material.png",
+        ["aluminium"] = "aluminum-6061-part-material.png",
+        ["ss304"] = "stainless-304-part-material.png",
+        ["stainlesssteel304"] = "stainless-304-part-material.png",
+        ["ss316"] = "stainless-316-part-material.png",
+        ["stainlesssteel316l"] = "stainless-316-part-material.png",
+        ["stainless"] = "stainless-304-part-material.png",
+        ["stainlesssteel"] = "stainless-304-part-material.png",
+        ["steelmild"] = "raw-metal-part-material.png",
+        ["mildsteel"] = "raw-metal-part-material.png",
+        ["steel"] = "raw-metal-part-material.png",
+        ["brass"] = "brass-c360-part-material.png",
+        ["brassc360"] = "brass-c360-part-material.png",
+        ["copper"] = "copper-c110-part-material.png",
+        ["copperc110"] = "copper-c110-part-material.png",
+        ["titanium"] = "titanium-ti64-part-material.png",
+        ["titaniumti6al4v"] = "titanium-ti64-part-material.png",
+        ["ti6al4v"] = "titanium-ti64-part-material.png",
+        ["delrin"] = "white-plastic-part-material.png",
+        ["pom"] = "white-plastic-part-material.png",
+        ["pomc"] = "white-plastic-part-material.png",
+        ["acetal"] = "white-plastic-part-material.png",
+        ["pla"] = "blue-plastic-part-material.png",
+        ["petg"] = "clear-plastic-part-material.png",
+        ["abs"] = "black-plastic-part-material.png",
+        ["nylon"] = "black-plastic-part-material.png",
+        ["tough2000"] = "white-plastic-part-material.png",
+        ["toughresin"] = "white-plastic-part-material.png",
+        ["clear"] = "clear-plastic-part-material.png",
+        ["hightemp"] = "white-plastic-part-material.png",
+        ["pa12"] = "natural-plastic-part-material.png",
+        ["peek"] = "peek-natural-part-material.png",
+        ["metal"] = "raw-metal-part-material.png",
+        ["plastic"] = "natural-plastic-part-material.png",
     };
 
     private static readonly Dictionary<string, string> ColorImages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["black"] = "black-pom-material-image.png",
-        ["matteblack"] = "black-pom-material-image.png",
-        ["ral9005"] = "black-pom-material-image.png",
-        ["white"] = "white-pom-material-image.png",
-        ["naturalwhite"] = "white-pom-material-image.png",
-        ["ral9010"] = "white-pom-material-image.png",
-        ["blue"] = "blue-pom-material-image.png",
-        ["red"] = "red-plastic-material-image.png",
-        ["yellow"] = "yellow-plastic-material-image.png",
-        ["green"] = "green-plastic-material-image.png",
-        ["gray"] = "gray-plastic-material-image.png",
-        ["grey"] = "gray-plastic-material-image.png",
-        ["natural"] = "natural-plastic-material-image.png",
-        ["clear"] = "clear-plastic-material-image.png",
-        ["transparent"] = "clear-plastic-material-image.png",
-        ["raw"] = "raw-metal-material-image.png",
-        ["silver"] = "raw-metal-material-image.png",
-        ["peeknatural"] = "peek-natural-material-image.png",
+        ["black"] = "black-plastic-part-material.png",
+        ["matteblack"] = "black-plastic-part-material.png",
+        ["ral9005"] = "black-plastic-part-material.png",
+        ["white"] = "white-plastic-part-material.png",
+        ["naturalwhite"] = "white-plastic-part-material.png",
+        ["ral9010"] = "white-plastic-part-material.png",
+        ["blue"] = "blue-plastic-part-material.png",
+        ["red"] = "red-plastic-part-material.png",
+        ["yellow"] = "yellow-plastic-part-material.png",
+        ["green"] = "green-plastic-part-material.png",
+        ["gray"] = "raw-metal-part-material.png",
+        ["grey"] = "raw-metal-part-material.png",
+        ["natural"] = "natural-plastic-part-material.png",
+        ["clear"] = "clear-plastic-part-material.png",
+        ["transparent"] = "clear-plastic-part-material.png",
+        ["raw"] = "raw-metal-part-material.png",
+        ["silver"] = "raw-metal-part-material.png",
+        ["peeknatural"] = "peek-natural-part-material.png",
     };
 
     private static readonly Dictionary<string, string> FinishImages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["machined"] = "finish-machined-material-image.png",
-        ["asmachined"] = "finish-machined-material-image.png",
-        ["beadblast"] = "finish-bead-blast-material-image.png",
-        ["anodizedclear"] = "finish-anodized-clear-material-image.png",
-        ["anodizeclear"] = "finish-anodized-clear-material-image.png",
-        ["anodizedblack"] = "finish-anodized-black-material-image.png",
-        ["anodizeblack"] = "finish-anodized-black-material-image.png",
-        ["anodizedred"] = "finish-anodized-red-material-image.png",
-        ["anodizedblue"] = "finish-anodized-blue-material-image.png",
-        ["anodizedgold"] = "finish-anodized-gold-material-image.png",
-        ["anodizedgreen"] = "finish-anodized-green-material-image.png",
-        ["anodizedpurple"] = "finish-anodized-purple-material-image.png",
-        ["powder"] = "finish-powder-material-image.png",
-        ["powdercoat"] = "finish-powder-material-image.png",
-        ["painted"] = "finish-painted-material-image.png",
-        ["paint"] = "finish-painted-material-image.png",
-        ["asprinted"] = "finish-as-printed-material-image.png",
-        ["sanded"] = "finish-sanded-material-image.png",
-        ["uvcured"] = "finish-uv-cured-material-image.png",
-        ["natural"] = "finish-natural-material-image.png",
-        ["turned"] = "finish-turned-material-image.png",
-        ["raw"] = "finish-raw-material-image.png",
+        ["machined"] = "finish-as-machined-part-surface.png",
+        ["asmachined"] = "finish-as-machined-part-surface.png",
+        ["beadblast"] = "finish-bead-blast-part-surface.png",
+        ["beadblasted"] = "finish-bead-blast-part-surface.png",
+        ["anodizedclear"] = "finish-anodized-clear-part-surface.png",
+        ["anodizeclear"] = "finish-anodized-clear-part-surface.png",
+        ["anodizedblack"] = "finish-anodized-black-part-surface.png",
+        ["anodizeblack"] = "finish-anodized-black-part-surface.png",
+        ["anodizedred"] = "finish-painted-red-part-surface.png",
+        ["anodizedblue"] = "finish-painted-blue-part-surface.png",
+        ["anodizedgold"] = "brass-c360-part-material.png",
+        ["anodizedgreen"] = "finish-painted-green-part-surface.png",
+        ["anodizedpurple"] = "finish-painted-blue-part-surface.png",
+        ["powder"] = "finish-painted-part-surface.png",
+        ["powdercoat"] = "finish-painted-part-surface.png",
+        ["painted"] = "finish-painted-part-surface.png",
+        ["paint"] = "finish-painted-part-surface.png",
+        ["asprinted"] = "natural-plastic-part-material.png",
+        ["sanded"] = "finish-bead-blast-part-surface.png",
+        ["uvcured"] = "finish-painted-part-surface.png",
+        ["natural"] = "finish-as-machined-part-surface.png",
+        ["turned"] = "finish-as-machined-part-surface.png",
+        ["raw"] = "raw-metal-part-material.png",
     };
 
     private static readonly Dictionary<string, string> AnodizeColorImages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["clear"] = "finish-anodized-clear-material-image.png",
-        ["black"] = "finish-anodized-black-material-image.png",
-        ["red"] = "finish-anodized-red-material-image.png",
-        ["blue"] = "finish-anodized-blue-material-image.png",
-        ["gold"] = "finish-anodized-gold-material-image.png",
-        ["green"] = "finish-anodized-green-material-image.png",
-        ["purple"] = "finish-anodized-purple-material-image.png",
+        ["clear"] = "finish-anodized-clear-part-surface.png",
+        ["black"] = "finish-anodized-black-part-surface.png",
+        ["red"] = "finish-painted-red-part-surface.png",
+        ["blue"] = "finish-painted-blue-part-surface.png",
+        ["gold"] = "brass-c360-part-material.png",
+        ["green"] = "finish-painted-green-part-surface.png",
+        ["purple"] = "finish-painted-blue-part-surface.png",
     };
 
     private static readonly Dictionary<string, string> PaintColorImages = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["black"] = "finish-painted-black-material-image.png",
-        ["white"] = "finish-painted-white-material-image.png",
-        ["signalred"] = "finish-painted-signal-red-material-image.png",
-        ["trafficblue"] = "finish-painted-traffic-blue-material-image.png",
-        ["resedagreen"] = "finish-painted-reseda-green-material-image.png",
-        ["lightgray"] = "finish-painted-light-gray-material-image.png",
-        ["lightgrey"] = "finish-painted-light-gray-material-image.png",
-        ["ral9005"] = "finish-painted-black-material-image.png",
-        ["ral9010"] = "finish-painted-white-material-image.png",
-        ["ral3001"] = "finish-painted-signal-red-material-image.png",
-        ["ral5017"] = "finish-painted-traffic-blue-material-image.png",
-        ["ral6011"] = "finish-painted-reseda-green-material-image.png",
-        ["ral7035"] = "finish-painted-light-gray-material-image.png",
+        ["black"] = "finish-painted-black-part-surface.png",
+        ["white"] = "finish-painted-white-part-surface.png",
+        ["signalred"] = "finish-painted-red-part-surface.png",
+        ["trafficblue"] = "finish-painted-blue-part-surface.png",
+        ["resedagreen"] = "finish-painted-green-part-surface.png",
+        ["lightgray"] = "finish-painted-light-gray-part-surface.png",
+        ["lightgrey"] = "finish-painted-light-gray-part-surface.png",
+        ["ral9005"] = "finish-painted-black-part-surface.png",
+        ["ral9010"] = "finish-painted-white-part-surface.png",
+        ["ral3001"] = "finish-painted-red-part-surface.png",
+        ["ral5017"] = "finish-painted-blue-part-surface.png",
+        ["ral6011"] = "finish-painted-green-part-surface.png",
+        ["ral7035"] = "finish-painted-light-gray-part-surface.png",
     };
 
     private static readonly HashSet<string> HiddenCustomerOptionKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -1211,11 +1224,11 @@ public partial class PartConfigSidebar : ComponentBase
                 return MaterialImageBasePath + image;
         }
 
-        return MaterialImageBasePath + "raw-metal-material-image.png";
+        return MaterialImageBasePath + "raw-metal-part-material.png";
     }
 
     private static string GetMaterialColorImageUrl(string color) =>
-        MaterialImageBasePath + GetMappedImage(ColorImages, color, "natural-plastic-material-image.png");
+        MaterialImageBasePath + GetMappedImage(ColorImages, color, "natural-plastic-part-material.png");
 
     private static string GetSurfaceFinishImageUrl(CatalogSurfaceFinishDto finish)
     {
@@ -1227,22 +1240,22 @@ public partial class PartConfigSidebar : ComponentBase
 
             if (token.Contains("anod", StringComparison.Ordinal)
                 && token.Contains("typeiii", StringComparison.Ordinal))
-                return MaterialImageBasePath + "finish-anodized-black-material-image.png";
+                return MaterialImageBasePath + "finish-anodized-black-part-surface.png";
 
             if (token.Contains("anod", StringComparison.Ordinal))
-                return MaterialImageBasePath + "finish-anodized-clear-material-image.png";
+                return MaterialImageBasePath + "finish-anodized-clear-part-surface.png";
         }
 
-        return MaterialImageBasePath + "finish-machined-material-image.png";
+        return MaterialImageBasePath + "finish-as-machined-part-surface.png";
     }
 
     private static string GetBooleanOptionImageUrl(ProcessConfigOptionDto option)
     {
         var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
         if (normalized.Contains("deburr", StringComparison.Ordinal))
-            return MaterialImageBasePath + "deburr-edges-material-image.png";
+            return MaterialImageBasePath + "deburr-edges-part-detail.png";
 
-        return MaterialImageBasePath + "finish-machined-material-image.png";
+        return MaterialImageBasePath + "finish-as-machined-part-surface.png";
     }
 
     private static string GetPaintColorImageUrl(PaintColorOption paint)
@@ -1253,16 +1266,16 @@ public partial class PartConfigSidebar : ComponentBase
                 return MaterialImageBasePath + image;
         }
 
-        return MaterialImageBasePath + "finish-painted-material-image.png";
+        return MaterialImageBasePath + "finish-painted-part-surface.png";
     }
 
     private static string GetCustomPaintImageUrl() =>
-        MaterialImageBasePath + "finish-painted-material-image.png";
+        MaterialImageBasePath + "finish-painted-part-surface.png";
 
     private static string GetColorChoiceImageUrl(ProcessConfigOptionDto option, string value)
     {
         if (IsAnodizeColorOption(option))
-            return MaterialImageBasePath + GetMappedImage(AnodizeColorImages, value, "finish-anodized-clear-material-image.png");
+            return MaterialImageBasePath + GetMappedImage(AnodizeColorImages, value, "finish-anodized-clear-part-surface.png");
 
         if (PaintColorImages.TryGetValue(NormalizeOptionText(value), out var paintImage))
             return MaterialImageBasePath + paintImage;
@@ -1278,8 +1291,8 @@ public partial class PartConfigSidebar : ComponentBase
         {
             return MaterialImageBasePath + (valueText.Contains("no", StringComparison.Ordinal)
                 || valueText.Contains("none", StringComparison.Ordinal)
-                    ? "no-deburr-material-image.png"
-                    : "deburr-edges-material-image.png");
+                    ? "no-deburr-part-detail.png"
+                    : "deburr-edges-part-detail.png");
         }
 
         if (optionText.Contains("finish", StringComparison.Ordinal)
@@ -1292,8 +1305,32 @@ public partial class PartConfigSidebar : ComponentBase
             }
         }
 
-        return MaterialImageBasePath + "finish-machined-material-image.png";
+        return MaterialImageBasePath + "finish-as-machined-part-surface.png";
     }
+
+    private static string GetRoughnessImageUrl(string code) =>
+        MaterialImageBasePath + (NormalizeOptionText(code) switch
+        {
+            var normalized when normalized.Contains("ra04", StringComparison.Ordinal) => "roughness-ra-0-4-part-surface.png",
+            var normalized when normalized.Contains("ra08", StringComparison.Ordinal) => "roughness-ra-0-8-part-surface.png",
+            var normalized when normalized.Contains("ra16", StringComparison.Ordinal) => "roughness-ra-1-6-part-surface.png",
+            _ => "roughness-ra-3-2-part-surface.png",
+        });
+
+    private static string GetFeatureImageUrl(string featureKey) =>
+        MaterialImageBasePath + (NormalizeOptionText(featureKey) switch
+        {
+            var normalized when normalized.Contains("insert", StringComparison.Ordinal) => "feature-thread-inserts-part.png",
+            _ => "feature-tapped-holes-part.png",
+        });
+
+    private static string GetInspectionImageUrl(InspectionLevel level) =>
+        MaterialImageBasePath + (level switch
+        {
+            InspectionLevel.FullCmm => "inspection-cmm-part-check.png",
+            InspectionLevel.Dimensional => "inspection-dimensional-part-check.png",
+            _ => "inspection-standard-part-check.png",
+        });
 
     private static string GetMappedImage(
         IReadOnlyDictionary<string, string> images,

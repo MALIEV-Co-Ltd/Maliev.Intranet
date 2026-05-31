@@ -252,11 +252,18 @@
                         @foreach (var roughness in RoughnessOptions)
                         {
                             var active = string.Equals(Part!.RoughnessCode, roughness.Code, StringComparison.OrdinalIgnoreCase);
-                            <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "")"
+                            <button class="pcs-choice-card pcs-roughness-card @(active ? "pcs-choice-card--active" : "")"
                                     @onclick="@(() => OnRoughnessChanged(roughness.Code))">
-                                <div class="pcs-choice-swatch pcs-choice-swatch--metal">
-                                    <MudIcon Icon="@Icons.Material.Outlined.Grain" Size="Size.Small" />
-                                </div>
+                                <span class="pcs-choice-swatch pcs-option-image-frame">
+                                    <img class="pcs-option-image"
+                                         src="@GetRoughnessImageUrl(roughness.Code)"
+                                         alt=""
+                                         loading="lazy"
+                                         onerror="@OptionImageFallbackScript" />
+                                    <span class="pcs-option-image-fallback" hidden>
+                                        <MudIcon Icon="@Icons.Material.Outlined.Grain" Size="Size.Small" />
+                                    </span>
+                                </span>
                                 <div class="pcs-choice-info">
                                     <div class="pcs-choice-name">@roughness.Name</div>
                                     <div class="pcs-choice-sub">@roughness.Description</div>
@@ -284,9 +291,16 @@
                             disabled="@(!HasSelectedProcess)"
                             aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
-                        <div class="pcs-choice-swatch">
-                            <MudIcon Icon="@Icons.Material.Outlined.Construction" Size="Size.Small" />
-                        </div>
+                        <span class="pcs-choice-swatch pcs-option-image-frame">
+                            <img class="pcs-option-image"
+                                 src='@GetFeatureImageUrl("tapped_holes")'
+                                 alt=""
+                                 loading="lazy"
+                                 onerror="@OptionImageFallbackScript" />
+                            <span class="pcs-option-image-fallback" hidden>
+                                <MudIcon Icon="@Icons.Material.Outlined.Construction" Size="Size.Small" />
+                            </span>
+                        </span>
                         <div class="pcs-choice-info">
                             <div class="pcs-choice-name">Tapped holes</div>
                             <div class="pcs-choice-sub">Internal threads cut into the part.</div>
@@ -302,9 +316,16 @@
                             disabled="@(!HasSelectedProcess)"
                             aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
-                        <div class="pcs-choice-swatch">
-                            <MudIcon Icon="@Icons.Material.Outlined.Hardware" Size="Size.Small" />
-                        </div>
+                        <span class="pcs-choice-swatch pcs-option-image-frame">
+                            <img class="pcs-option-image"
+                                 src='@GetFeatureImageUrl("thread_inserts")'
+                                 alt=""
+                                 loading="lazy"
+                                 onerror="@OptionImageFallbackScript" />
+                            <span class="pcs-option-image-fallback" hidden>
+                                <MudIcon Icon="@Icons.Material.Outlined.Hardware" Size="Size.Small" />
+                            </span>
+                        </span>
                         <div class="pcs-choice-info">
                             <div class="pcs-choice-name">Thread inserts</div>
                             <div class="pcs-choice-sub">Installed threaded hardware such as Helicoil or heat-set inserts.</div>
@@ -539,9 +560,16 @@
                                 disabled="@(!HasSelectedProcess)"
                                 aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                                 @onclick="@(() => OnInspectionChanged(inspection.Level))">
-                            <div class="pcs-choice-swatch">
-                                <MudIcon Icon="@inspection.Icon" Size="Size.Small" />
-                            </div>
+                            <span class="pcs-choice-swatch pcs-option-image-frame">
+                                <img class="pcs-option-image"
+                                     src="@GetInspectionImageUrl(inspection.Level)"
+                                     alt=""
+                                     loading="lazy"
+                                     onerror="@OptionImageFallbackScript" />
+                                <span class="pcs-option-image-fallback" hidden>
+                                    <MudIcon Icon="@inspection.Icon" Size="Size.Small" />
+                                </span>
+                            </span>
                             <div class="pcs-choice-info">
                                 <div class="pcs-choice-name">@inspection.Name</div>
                                 <div class="pcs-choice-sub">@inspection.Description</div>
@@ -944,6 +972,14 @@
                 position: relative;
             }
 
+            .pcs-mat-card {
+                display: grid;
+                grid-template-columns: minmax(86px, 34%) minmax(0, 1fr) 18px;
+                align-items: stretch;
+                min-height: 92px;
+                padding: 7px 8px;
+            }
+
             .pcs-mat-card:hover,
             .pcs-fin-card:hover {
                 background: var(--maliev-panel-3);
@@ -964,13 +1000,15 @@
             }
 
             .pcs-mat-swatch {
-                width: 52px;
-                height: 52px;
+                width: 100%;
+                min-height: 76px;
+                height: 100%;
+                aspect-ratio: 4 / 3;
             }
 
             .pcs-fin-swatch {
-                width: 22px;
-                height: 22px;
+                width: 46px;
+                height: 40px;
                 border-radius: 3px;
             }
 
@@ -1037,6 +1075,8 @@
             .pcs-card-check {
                 color: var(--mud-palette-primary);
                 flex-shrink: 0;
+                align-self: center;
+                justify-self: end;
             }
 
             /* ── Tolerance Grid ─────────────────────────────────────────────────── */
