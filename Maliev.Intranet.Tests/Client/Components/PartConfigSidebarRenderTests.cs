@@ -242,6 +242,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(".pcs-option-image-frame:hover .pcs-image-preview-popout", sidebarSource, StringComparison.Ordinal);
         Assert.Contains(".pcs-option-image-frame:focus-within .pcs-image-preview-popout", sidebarSource, StringComparison.Ordinal);
         Assert.Contains("width: min(220px, 64vw);", sidebarSource, StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;", sidebarSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -256,8 +257,43 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("grid-template-columns: 66px minmax(0, 1fr) 18px;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-mat-swatch,\n            .pcs-fin-swatch,\n            .pcs-choice-swatch,\n            .pcs-color-chip {\n                width: 58px;\n                height: 58px;", source, StringComparison.Ordinal);
-        Assert.Contains("overflow: hidden;", source, StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;", source, StringComparison.Ordinal);
         Assert.Contains("object-fit: contain;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SurfaceFinishCards_ReservePriceAndCheckmarkColumns()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-fin-card {\n                grid-template-columns: 66px minmax(0, 1fr) max-content 18px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-fin-price {\n                grid-column: 3;", source, StringComparison.Ordinal);
+        Assert.Contains("white-space: nowrap;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-fin-card .pcs-card-check {\n                grid-column: 4;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThreadInsertFeatureImage_IsDistinctFromGenericSteelInsertImage()
+    {
+        var threadInsertPath = FindRepoFile(
+            "Maliev.Intranet.Client",
+            "wwwroot",
+            "images",
+            "materials",
+            "feature-thread-inserts-part.png");
+        var genericInsertPath = FindRepoFile(
+            "Maliev.Intranet.Client",
+            "wwwroot",
+            "images",
+            "materials",
+            "feature-steel-inserts-part.png");
+
+        Assert.NotEqual(File.ReadAllBytes(genericInsertPath), File.ReadAllBytes(threadInsertPath));
     }
 
     [Fact]

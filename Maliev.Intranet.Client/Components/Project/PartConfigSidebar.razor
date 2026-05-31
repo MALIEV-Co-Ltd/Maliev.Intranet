@@ -909,6 +909,10 @@
                 padding: 8px 10px;
             }
 
+            .pcs-fin-card {
+                grid-template-columns: 66px minmax(0, 1fr) max-content 18px;
+            }
+
             .pcs-mat-card:hover,
             .pcs-fin-card:hover {
                 background: var(--maliev-panel-3);
@@ -936,7 +940,7 @@
                 position: relative;
                 display: grid;
                 place-items: center;
-                overflow: hidden;
+                overflow: visible;
                 background: #fff;
                 color: var(--mud-palette-primary);
                 isolation: isolate;
@@ -1021,10 +1025,18 @@
             }
 
             .pcs-fin-price {
+                grid-column: 3;
+                justify-self: end;
                 font-size: 10.5px;
                 color: var(--maliev-muted);
                 font-family: 'JetBrains Mono', monospace;
                 flex-shrink: 0;
+                text-align: right;
+                white-space: nowrap;
+            }
+
+            .pcs-fin-card .pcs-card-check {
+                grid-column: 4;
             }
 
             .pcs-card-check {
