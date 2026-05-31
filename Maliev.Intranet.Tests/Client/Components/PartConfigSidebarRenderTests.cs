@@ -163,4 +163,57 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-anodized-blue-material-image.png']"));
         Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-material-image.png']"));
     }
+
+    [Fact]
+    public void PartFeaturesAndInspection_WhenProcessIsNotSelected_RenderDisabled()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.All(cut.FindAll(".pcs-feature-card"), card =>
+        {
+            Assert.True(card.HasAttribute("disabled"));
+            Assert.Equal("true", card.GetAttribute("aria-disabled"));
+        });
+
+        Assert.All(cut.FindAll("[data-config-section='inspection'] .pcs-choice-card"), card =>
+        {
+            Assert.True(card.HasAttribute("disabled"));
+            Assert.Equal("true", card.GetAttribute("aria-disabled"));
+        });
+    }
+
+    [Fact]
+    public void PartFeaturesAndInspection_WhenProcessIsSelected_RenderEnabled()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.All(cut.FindAll(".pcs-feature-card"), card =>
+        {
+            Assert.False(card.HasAttribute("disabled"));
+            Assert.Equal("false", card.GetAttribute("aria-disabled"));
+        });
+
+        Assert.All(cut.FindAll("[data-config-section='inspection'] .pcs-choice-card"), card =>
+        {
+            Assert.False(card.HasAttribute("disabled"));
+            Assert.Equal("false", card.GetAttribute("aria-disabled"));
+        });
+    }
 }

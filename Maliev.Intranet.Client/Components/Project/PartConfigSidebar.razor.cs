@@ -308,6 +308,12 @@ public partial class PartConfigSidebar : ComponentBase
     private CatalogToleranceDto? SelectedTolerance =>
         Part?.AvailableTolerances.FirstOrDefault(t => t.Id == Part.ToleranceId);
 
+    private bool HasSelectedProcess =>
+        !string.IsNullOrWhiteSpace(Part?.ProcessCode);
+
+    private static string GetDisabledAriaValue(bool disabled) =>
+        disabled ? "true" : "false";
+
     private IEnumerable<CatalogToleranceDto> VisibleTolerances =>
         Part?.AvailableTolerances.Where(IsVisibleTolerance) ?? [];
 
@@ -693,7 +699,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnThreadedHolesChanged(bool value)
     {
-        if (Part == null) return;
+        if (Part == null || !HasSelectedProcess) return;
         Part.HasThreadedHoles = value;
         if (!value)
         {
@@ -706,7 +712,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnInsertsChanged(bool value)
     {
-        if (Part == null) return;
+        if (Part == null || !HasSelectedProcess) return;
         Part.HasInserts = value;
         if (!value)
         {
@@ -748,7 +754,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnInspectionChanged(InspectionLevel level)
     {
-        if (Part == null) return;
+        if (Part == null || !HasSelectedProcess) return;
         Part.InspectionLevel = level;
         await OnPartChanged.InvokeAsync(Part);
     }

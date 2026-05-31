@@ -1,5 +1,6 @@
 using System.Reflection;
 using Maliev.Intranet.Client.Components.Project;
+using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Tests.Client.Components;
@@ -206,6 +207,54 @@ public class PartConfigSidebarTests
         await InvokePrivateTask(sidebar, "OnNotesChanged", "Deburr all outside edges.");
 
         Assert.Equal("Deburr all outside edges.", part.PartNotes);
+    }
+
+    [Fact]
+    public async Task OnThreadedHolesChanged_WhenProcessIsNotSelected_DoesNotUpdatePart()
+    {
+        var sidebar = new PartConfigSidebar();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "unconfigured.stl",
+        };
+        SetPartParameter(sidebar, part);
+
+        await InvokePrivateTask(sidebar, "OnThreadedHolesChanged", true);
+
+        Assert.False(part.HasThreadedHoles);
+    }
+
+    [Fact]
+    public async Task OnInsertsChanged_WhenProcessIsNotSelected_DoesNotUpdatePart()
+    {
+        var sidebar = new PartConfigSidebar();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "unconfigured.stl",
+        };
+        SetPartParameter(sidebar, part);
+
+        await InvokePrivateTask(sidebar, "OnInsertsChanged", true);
+
+        Assert.False(part.HasInserts);
+    }
+
+    [Fact]
+    public async Task OnInspectionChanged_WhenProcessIsNotSelected_DoesNotUpdatePart()
+    {
+        var sidebar = new PartConfigSidebar();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "unconfigured.stl",
+        };
+        SetPartParameter(sidebar, part);
+
+        await InvokePrivateTask(sidebar, "OnInspectionChanged", InspectionLevel.FullCmm);
+
+        Assert.Equal(InspectionLevel.Standard, part.InspectionLevel);
     }
 
     private static async Task InvokeOnParametersSetAsync(PartConfigSidebar sidebar)

@@ -280,7 +280,9 @@
                     <span class="pcs-section-count">2 options</span>
                 </div>
                 <div class="pcs-feature-toggle-grid">
-                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasThreadedHoles ? "pcs-choice-card--active" : "")"
+                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasThreadedHoles ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
+                            disabled="@(!HasSelectedProcess)"
+                            aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
                         <div class="pcs-choice-swatch">
                             <MudIcon Icon="@Icons.Material.Outlined.Construction" Size="Size.Small" />
@@ -296,7 +298,9 @@
                             </div>
                         }
                     </button>
-                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasInserts ? "pcs-choice-card--active" : "")"
+                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasInserts ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
+                            disabled="@(!HasSelectedProcess)"
+                            aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
                         <div class="pcs-choice-swatch">
                             <MudIcon Icon="@Icons.Material.Outlined.Hardware" Size="Size.Small" />
@@ -522,7 +526,7 @@
             }
 
             @* ── Quality ─────────────────────────────────────────────────────── *@
-            <section class="pcs-section">
+            <section class="pcs-section" data-config-section="inspection">
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Inspection</span>
                     <span class="pcs-section-count">@InspectionOptions.Count options</span>
@@ -531,7 +535,9 @@
                     @foreach (var inspection in InspectionOptions)
                     {
                         var active = Part!.InspectionLevel == inspection.Level;
-                        <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "")"
+                        <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
+                                disabled="@(!HasSelectedProcess)"
+                                aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                                 @onclick="@(() => OnInspectionChanged(inspection.Level))">
                             <div class="pcs-choice-swatch">
                                 <MudIcon Icon="@inspection.Icon" Size="Size.Small" />
@@ -1288,6 +1294,17 @@
             .pcs-choice-card--active {
                 border-color: var(--mud-palette-primary);
                 background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+            }
+
+            .pcs-choice-card--disabled,
+            .pcs-choice-card:disabled {
+                cursor: not-allowed;
+                opacity: 0.55;
+            }
+
+            .pcs-choice-card--disabled:hover,
+            .pcs-choice-card:disabled:hover {
+                background: var(--maliev-panel);
             }
 
             .pcs-choice-swatch {
