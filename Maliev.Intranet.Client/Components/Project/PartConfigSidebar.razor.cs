@@ -617,11 +617,11 @@ public partial class PartConfigSidebar : ComponentBase
 
         return NormalizeOptionText(process.Code) switch
         {
-            "cnc" or "cncmill" or "cncmilling" => "Precision subtractive machining",
-            "cncturn" or "cncturning" => "Lathe-cut round components",
-            "fdm" or "fdm3dprinting" => "Layered thermoplastic parts",
-            "sla" or "sladlp" or "dlp" => "Smooth resin prototypes",
-            _ => "Manufacturing process",
+            "cnc" or "cncmill" or "cncmilling" => "Milled parts",
+            "cncturn" or "cncturning" => "Turned parts",
+            "fdm" or "fdm3dprinting" => "FDM print",
+            "sla" or "sladlp" or "dlp" => "Resin print",
+            _ => "Process",
         };
     }
 

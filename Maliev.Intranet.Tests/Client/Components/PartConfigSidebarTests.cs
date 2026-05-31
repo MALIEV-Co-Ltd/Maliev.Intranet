@@ -167,7 +167,7 @@ public class PartConfigSidebarTests
     }
 
     [Fact]
-    public void ProcessCardStyles_UseLargerFullBleedImagesAndLeftAlignedCopy()
+    public void ProcessCardStyles_UseFlushFullBleedImagesAndCompactLeftAlignedCopy()
     {
         var source = ReadRepoFile(
                 "Maliev.Intranet.Client",
@@ -176,12 +176,19 @@ public class PartConfigSidebarTests
                 "PartConfigSidebar.razor")
             .ReplaceLineEndings("\n");
 
+        Assert.Contains(".pcs-process-row {\n                display: flex;\n                flex-flow: row nowrap;\n                gap: 7px;\n                overflow-x: auto;\n                padding: 0 0 6px;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-card {\n                flex: 0 0 116px;", source, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: inset 0 0 0 1px var(--maliev-border);", source, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: inset 0 0 0 2px var(--mud-palette-primary);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("border-width: 2px;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 76px;", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3) center / cover no-repeat;", source, StringComparison.Ordinal);
+        Assert.Contains("display: block;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-copy {\n                padding: 6px 7px 7px;\n                text-align: left;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-description {\n                margin-top: 2px;", source, StringComparison.Ordinal);
+        Assert.Contains("white-space: nowrap;", source, StringComparison.Ordinal);
+        Assert.Contains("text-overflow: ellipsis;", source, StringComparison.Ordinal);
     }
 
     [Fact]

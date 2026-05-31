@@ -68,7 +68,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("CNC Milling", card.QuerySelector(".pcs-process-name")?.TextContent.Trim());
         Assert.Equal(
-            "Precision subtractive machining",
+            "Milled parts",
             card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
     }
 }

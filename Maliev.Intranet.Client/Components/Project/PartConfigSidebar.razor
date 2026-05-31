@@ -750,7 +750,7 @@
                 flex-flow: row nowrap;
                 gap: 7px;
                 overflow-x: auto;
-                padding: 2px 0 6px;
+                padding: 0 0 6px;
                 scrollbar-width: thin;
                 scrollbar-color: var(--maliev-border) transparent;
             }
@@ -758,7 +758,7 @@
             .pcs-process-card {
                 flex: 0 0 116px;
                 width: 116px;
-                border: 1px solid var(--maliev-border);
+                border: 0;
                 background: var(--maliev-panel);
                 border-radius: 7px;
                 cursor: pointer;
@@ -772,18 +772,18 @@
                 overflow: hidden;
                 padding: 0;
                 text-align: left;
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
             }
 
             .pcs-process-card:hover {
                 background: var(--maliev-panel-3);
-                border-color: var(--maliev-border);
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
             }
 
             .pcs-process-card--active {
-                border-color: var(--mud-palette-primary);
-                border-width: 2px;
                 color: var(--mud-palette-primary);
                 font-weight: 600;
+                box-shadow: inset 0 0 0 2px var(--mud-palette-primary);
             }
 
             .pcs-process-photo {
@@ -791,6 +791,7 @@
                 height: 76px;
                 flex-shrink: 0;
                 background: var(--maliev-panel-3) center / cover no-repeat;
+                display: block;
             }
 
             .pcs-process-check {
@@ -833,9 +834,8 @@
                 font-size: var(--mud-typography-caption-size);
                 font-weight: 400;
                 line-height: 1.2;
-                display: -webkit-box;
-                -webkit-box-orient: vertical;
-                -webkit-line-clamp: 2;
+                white-space: nowrap;
+                text-overflow: ellipsis;
                 overflow: hidden;
             }
 
@@ -1456,14 +1456,14 @@
 
                 .pcs-process-row {
                     gap: 10px;
-                    padding-bottom: 8px;
+                    padding: 0 0 8px;
                 }
 
                 .pcs-process-card {
                     flex: 0 0 100px;
                     width: 100px;
                     border-radius: 7px;
-                    font-size: 12px;
+                    font-size: var(--mud-typography-caption-size);
                 }
 
                 .pcs-process-photo {
