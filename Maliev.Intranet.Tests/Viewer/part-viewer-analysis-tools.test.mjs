@@ -738,7 +738,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(removedTicks.length, 3);
 });
 
-test('cutting mat uses PBR materials when realistic render mode is active', () => {
+test('cutting mat keeps stable textured materials when realistic render mode is active', () => {
     const context = loadViewerContext();
     const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
     context.scene = {
@@ -763,19 +763,17 @@ test('cutting mat uses PBR materials when realistic render mode is active', () =
         ({
             topIsPbr: top.material instanceof BABYLON.PBRMaterial,
             slabIsPbr: slab.material instanceof BABYLON.PBRMaterial,
-            topHasAlbedoTexture: !!top.material.albedoTexture,
-            topMetallic: top.material.metallic,
-            topRoughness: top.material.roughness,
-            slabRoughness: slab.material.roughness
+            topHasDiffuseTexture: !!top.material.diffuseTexture,
+            topReceivesShadows: top.receiveShadows,
+            slabReceivesShadows: slab.receiveShadows
         });
     `, context);
 
-    assert.equal(result.topIsPbr, true);
-    assert.equal(result.slabIsPbr, true);
-    assert.equal(result.topHasAlbedoTexture, true);
-    assert.equal(result.topMetallic, 0);
-    assert.ok(result.topRoughness > 0.5);
-    assert.ok(result.slabRoughness > 0.5);
+    assert.equal(result.topIsPbr, false);
+    assert.equal(result.slabIsPbr, false);
+    assert.equal(result.topHasDiffuseTexture, true);
+    assert.equal(result.topReceivesShadows, true);
+    assert.equal(result.slabReceivesShadows, true);
 });
 
 test('section hatch generation uses model meshes and excludes section ghost meshes', () => {

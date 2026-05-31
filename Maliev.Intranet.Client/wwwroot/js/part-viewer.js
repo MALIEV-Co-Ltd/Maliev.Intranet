@@ -4550,27 +4550,7 @@ function _setCuttingMatMaterialsOpaque(materials) {
     });
 }
 
-function _isCuttingMatRealisticMode(canvasId) {
-    return currentRenderModes[canvasId] === 'realistic' && typeof BABYLON.PBRMaterial !== 'undefined';
-}
-
 function _createCuttingMatTopMaterial(scene, canvasId, texture, alpha = 1) {
-    if (_isCuttingMatRealisticMode(canvasId)) {
-        getOrCreateEnvironmentTexture(scene, canvasId);
-        const mat = new BABYLON.PBRMaterial('__cutting_mat_mat_realistic__', scene);
-        mat.albedoTexture = texture;
-        mat.albedoColor = new BABYLON.Color3(1, 1, 1);
-        mat.metallic = 0;
-        mat.roughness = 0.72;
-        mat.emissiveColor = new BABYLON.Color3(0.005, 0.018, 0.010);
-        mat.backFaceCulling = false;
-        mat.useAlphaFromAlbedoTexture = false;
-        mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
-        mat.needDepthPrePass = false;
-        mat.alpha = alpha;
-        return mat;
-    }
-
     const mat = new BABYLON.StandardMaterial('__cutting_mat_mat__', scene);
     mat.diffuseTexture = texture;
     mat.useAlphaFromDiffuseTexture = false;
@@ -4586,20 +4566,6 @@ function _createCuttingMatTopMaterial(scene, canvasId, texture, alpha = 1) {
 }
 
 function _createCuttingMatSlabMaterial(scene, canvasId, alpha = 1) {
-    if (_isCuttingMatRealisticMode(canvasId)) {
-        getOrCreateEnvironmentTexture(scene, canvasId);
-        const mat = new BABYLON.PBRMaterial('__cutting_mat_slab_mat_realistic__', scene);
-        mat.albedoColor = new BABYLON.Color3(0.12, 0.40, 0.24);
-        mat.metallic = 0;
-        mat.roughness = 0.82;
-        mat.emissiveColor = new BABYLON.Color3(0.004, 0.014, 0.008);
-        mat.backFaceCulling = false;
-        mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
-        mat.needDepthPrePass = false;
-        mat.alpha = alpha;
-        return mat;
-    }
-
     const mat = new BABYLON.StandardMaterial('__cutting_mat_slab_mat__', scene);
     mat.diffuseColor = new BABYLON.Color3(0.12, 0.40, 0.24);
     mat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
@@ -4616,7 +4582,7 @@ function _syncCuttingMatRenderMode(canvasId) {
 
     const top = _sceneMeshByName(scene, '__cutting_mat__');
     const slab = _sceneMeshByName(scene, '__cutting_mat_slab__');
-    const wantPbr = _isCuttingMatRealisticMode(canvasId);
+    const wantPbr = false;
 
     if (top?.material && (!!(top.material instanceof BABYLON.PBRMaterial) !== wantPbr)) {
         const oldMat = top.material;

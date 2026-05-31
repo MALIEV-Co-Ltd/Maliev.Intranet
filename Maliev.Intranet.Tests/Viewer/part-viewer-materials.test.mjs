@@ -148,7 +148,7 @@ test('solid CAD render mode prepares PBR environment lighting on first material 
     assert.equal(result.toneMappingEnabled, true);
 });
 
-test('realistic render mode upgrades a visible cutting mat to PBR materials', () => {
+test('realistic render mode preserves stable cutting mat texture materials', () => {
     const context = loadViewerContext();
     const matTexture = { name: 'cutting-mat-texture' };
     const model = {
@@ -194,14 +194,14 @@ test('realistic render mode upgrades a visible cutting mat to PBR materials', ()
         ({
             topIsPbr: scene.meshes[1].material instanceof BABYLON.PBRMaterial,
             slabIsPbr: scene.meshes[2].material instanceof BABYLON.PBRMaterial,
-            actualTexturePreserved: scene.meshes[1].material.albedoTexture?.name === 'cutting-mat-texture',
+            actualTexturePreserved: scene.meshes[1].material.diffuseTexture?.name === 'cutting-mat-texture',
             topReceivesShadows: scene.meshes[1].receiveShadows,
             slabReceivesShadows: scene.meshes[2].receiveShadows
         });
     `, context);
 
-    assert.equal(result.topIsPbr, true);
-    assert.equal(result.slabIsPbr, true);
+    assert.equal(result.topIsPbr, false);
+    assert.equal(result.slabIsPbr, false);
     assert.equal(result.actualTexturePreserved, true);
     assert.equal(result.topReceivesShadows, true);
     assert.equal(result.slabReceivesShadows, true);
