@@ -82,6 +82,116 @@ public partial class PartConfigSidebar : ComponentBase
     private const string PaintColorHexKey = "paint_color_hex";
     private const string PaintColorReferenceKey = "paint_color_reference";
     private const string MaterialColorKey = "material_color";
+    private const string MaterialImageBasePath = "/images/materials/";
+    private const string OptionImageFallbackScript = "this.hidden=true;this.nextElementSibling.hidden=false;";
+
+    private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["al6061"] = "aluminum-material-image.png",
+        ["al7075"] = "aluminum-material-image.png",
+        ["aluminum"] = "aluminum-material-image.png",
+        ["aluminium"] = "aluminum-material-image.png",
+        ["ss304"] = "stainless-steel-material-image.png",
+        ["ss316"] = "stainless-steel-material-image.png",
+        ["stainless"] = "stainless-steel-material-image.png",
+        ["stainlesssteel"] = "stainless-steel-material-image.png",
+        ["steelmild"] = "steel-material-image.png",
+        ["mildsteel"] = "steel-material-image.png",
+        ["steel"] = "steel-material-image.png",
+        ["brass"] = "brass-material-image.png",
+        ["delrin"] = "white-pom-material-image.png",
+        ["pom"] = "white-pom-material-image.png",
+        ["pomc"] = "white-pom-material-image.png",
+        ["acetal"] = "white-pom-material-image.png",
+        ["pla"] = "blue-plastic-material-image.png",
+        ["petg"] = "clear-petg-material-image.png",
+        ["abs"] = "abs-black-material-image.png",
+        ["nylon"] = "nylon-black-material-image.png",
+        ["tough2000"] = "tough-resin-material-image.png",
+        ["toughresin"] = "tough-resin-material-image.png",
+        ["clear"] = "clear-plastic-material-image.png",
+        ["hightemp"] = "high-temp-resin-material-image.png",
+        ["pa12"] = "pa12-natural-material-image.png",
+        ["peek"] = "peek-natural-material-image.png",
+        ["metal"] = "raw-metal-material-image.png",
+        ["plastic"] = "natural-plastic-material-image.png",
+    };
+
+    private static readonly Dictionary<string, string> ColorImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["black"] = "black-pom-material-image.png",
+        ["matteblack"] = "black-pom-material-image.png",
+        ["ral9005"] = "black-pom-material-image.png",
+        ["white"] = "white-pom-material-image.png",
+        ["naturalwhite"] = "white-pom-material-image.png",
+        ["ral9010"] = "white-pom-material-image.png",
+        ["blue"] = "blue-pom-material-image.png",
+        ["red"] = "red-plastic-material-image.png",
+        ["yellow"] = "yellow-plastic-material-image.png",
+        ["green"] = "green-plastic-material-image.png",
+        ["gray"] = "gray-plastic-material-image.png",
+        ["grey"] = "gray-plastic-material-image.png",
+        ["natural"] = "natural-plastic-material-image.png",
+        ["clear"] = "clear-plastic-material-image.png",
+        ["transparent"] = "clear-plastic-material-image.png",
+        ["raw"] = "raw-metal-material-image.png",
+        ["silver"] = "raw-metal-material-image.png",
+        ["peeknatural"] = "peek-natural-material-image.png",
+    };
+
+    private static readonly Dictionary<string, string> FinishImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["machined"] = "finish-machined-material-image.png",
+        ["asmachined"] = "finish-machined-material-image.png",
+        ["beadblast"] = "finish-bead-blast-material-image.png",
+        ["anodizedclear"] = "finish-anodized-clear-material-image.png",
+        ["anodizeclear"] = "finish-anodized-clear-material-image.png",
+        ["anodizedblack"] = "finish-anodized-black-material-image.png",
+        ["anodizeblack"] = "finish-anodized-black-material-image.png",
+        ["anodizedred"] = "finish-anodized-red-material-image.png",
+        ["anodizedblue"] = "finish-anodized-blue-material-image.png",
+        ["anodizedgold"] = "finish-anodized-gold-material-image.png",
+        ["anodizedgreen"] = "finish-anodized-green-material-image.png",
+        ["anodizedpurple"] = "finish-anodized-purple-material-image.png",
+        ["powder"] = "finish-powder-material-image.png",
+        ["powdercoat"] = "finish-powder-material-image.png",
+        ["painted"] = "finish-painted-material-image.png",
+        ["paint"] = "finish-painted-material-image.png",
+        ["asprinted"] = "finish-as-printed-material-image.png",
+        ["sanded"] = "finish-sanded-material-image.png",
+        ["uvcured"] = "finish-uv-cured-material-image.png",
+        ["natural"] = "finish-natural-material-image.png",
+        ["turned"] = "finish-turned-material-image.png",
+        ["raw"] = "finish-raw-material-image.png",
+    };
+
+    private static readonly Dictionary<string, string> AnodizeColorImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["clear"] = "finish-anodized-clear-material-image.png",
+        ["black"] = "finish-anodized-black-material-image.png",
+        ["red"] = "finish-anodized-red-material-image.png",
+        ["blue"] = "finish-anodized-blue-material-image.png",
+        ["gold"] = "finish-anodized-gold-material-image.png",
+        ["green"] = "finish-anodized-green-material-image.png",
+        ["purple"] = "finish-anodized-purple-material-image.png",
+    };
+
+    private static readonly Dictionary<string, string> PaintColorImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["black"] = "finish-painted-black-material-image.png",
+        ["white"] = "finish-painted-white-material-image.png",
+        ["signalred"] = "finish-painted-signal-red-material-image.png",
+        ["trafficblue"] = "finish-painted-traffic-blue-material-image.png",
+        ["resedagreen"] = "finish-painted-reseda-green-material-image.png",
+        ["lightgray"] = "finish-painted-light-gray-material-image.png",
+        ["lightgrey"] = "finish-painted-light-gray-material-image.png",
+        ["ral9005"] = "finish-painted-black-material-image.png",
+        ["ral9010"] = "finish-painted-white-material-image.png",
+        ["ral3001"] = "finish-painted-signal-red-material-image.png",
+        ["ral5017"] = "finish-painted-traffic-blue-material-image.png",
+        ["ral6011"] = "finish-painted-reseda-green-material-image.png",
+        ["ral7035"] = "finish-painted-light-gray-material-image.png",
+    };
 
     private static readonly HashSet<string> HiddenCustomerOptionKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -148,10 +258,19 @@ public partial class PartConfigSidebar : ComponentBase
 
     private static readonly IReadOnlyList<string> PomMaterialColors =
     [
-        "Natural",
         "Black",
         "White",
         "Blue",
+    ];
+
+    private static readonly IReadOnlyList<string> PeekMaterialColors =
+    [
+        "PEEK Natural",
+    ];
+
+    private static readonly IReadOnlyList<string> MetalRawColor =
+    [
+        "Raw",
     ];
 
     private static readonly IReadOnlyList<string> DefaultAnodizeColors =
@@ -201,7 +320,18 @@ public partial class PartConfigSidebar : ComponentBase
         (Part?.AvailableProcessOptions ?? []).Any(IsPaintSpecificColorOption);
 
     private bool RequiresDedicatedMaterialColorSelection =>
-        SelectedMaterial != null && IsPomMaterial(SelectedMaterial);
+        SelectedMaterial != null
+        && (IsPomMaterial(SelectedMaterial) || IsPeekMaterial(SelectedMaterial) || IsMetalMaterial(SelectedMaterial));
+
+    private IReadOnlyList<string> MaterialColorOptions =>
+        SelectedMaterial switch
+        {
+            null => [],
+            var m when IsPomMaterial(m) => PomMaterialColors,
+            var m when IsPeekMaterial(m) => PeekMaterialColors,
+            var m when IsMetalMaterial(m) => MetalRawColor,
+            _ => [],
+        };
 
     private bool IsFdmProcess =>
         IsProcess("FDM") || IsProcess("FDM_3D_PRINTING");
@@ -360,14 +490,30 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.MaterialCode = m?.Code;
         Part.MaterialId = m?.Id;
-        if (m == null || !IsPomMaterial(m))
+        if (m == null)
         {
             Part.ProcessOptionValues.Remove(MaterialColorKey);
         }
-        else if (!Part.ProcessOptionValues.TryGetValue(MaterialColorKey, out var color)
-            || string.IsNullOrWhiteSpace(color))
+        else if (IsPomMaterial(m))
         {
-            Part.ProcessOptionValues[MaterialColorKey] = PomMaterialColors[0];
+            if (!Part.ProcessOptionValues.TryGetValue(MaterialColorKey, out var color)
+                || string.IsNullOrWhiteSpace(color)
+                || !PomMaterialColors.Contains(color, StringComparer.OrdinalIgnoreCase))
+            {
+                Part.ProcessOptionValues[MaterialColorKey] = PomMaterialColors[0];
+            }
+        }
+        else if (IsPeekMaterial(m))
+        {
+            Part.ProcessOptionValues[MaterialColorKey] = PeekMaterialColors[0];
+        }
+        else if (IsMetalMaterial(m))
+        {
+            Part.ProcessOptionValues[MaterialColorKey] = MetalRawColor[0];
+        }
+        else
+        {
+            Part.ProcessOptionValues.Remove(MaterialColorKey);
         }
 
         await OnPartChanged.InvokeAsync(Part);
@@ -610,19 +756,48 @@ public partial class PartConfigSidebar : ComponentBase
     private bool IsProcess(string processCode) =>
         string.Equals(Part?.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase);
 
+    private static string GetProcessCardName(ProcessDto process)
+    {
+        return NormalizeOptionText(process.Code) switch
+        {
+            "cnc" or "cncmill" or "cncmilling" => "CNC Milling",
+            "cncturn" or "cncturning" => "CNC Turning",
+            "fdm" or "fdm3dprinting" => "FDM",
+            "sla" or "sladlp" or "dlp" => "SLA / DLP",
+            "sls" => "SLS",
+            "mjf" => "MJF",
+            "mj" or "materialjetting" => "Material Jet",
+            "bj" or "binderjetting" => "Binder Jet",
+            "dmls" => "DMLS",
+            _ => CompactProcessCardText(process.Name, process.Code),
+        };
+    }
+
     private static string GetProcessDescription(ProcessDto process)
     {
-        if (!string.IsNullOrWhiteSpace(process.Description))
-            return process.Description.Trim();
-
         return NormalizeOptionText(process.Code) switch
         {
             "cnc" or "cncmill" or "cncmilling" => "Milled parts",
             "cncturn" or "cncturning" => "Turned parts",
-            "fdm" or "fdm3dprinting" => "FDM print",
+            "fdm" or "fdm3dprinting" => "3D print",
             "sla" or "sladlp" or "dlp" => "Resin print",
+            "sls" => "Nylon powder",
+            "mjf" => "Powder fusion",
+            "mj" or "materialjetting" => "Fine detail",
+            "bj" or "binderjetting" => "Binder jet",
+            "dmls" => "Metal print",
             _ => "Process",
         };
+    }
+
+    private static string CompactProcessCardText(string? preferred, string fallback)
+    {
+        var value = string.IsNullOrWhiteSpace(preferred) ? fallback : preferred.Trim();
+        var parenthesisIndex = value.IndexOf(" (", StringComparison.Ordinal);
+        if (parenthesisIndex > 0)
+            value = value[..parenthesisIndex];
+
+        return value.Length <= 16 ? value : $"{value[..15]}...";
     }
 
     private bool IsVisibleTolerance(CatalogToleranceDto tolerance)
@@ -825,6 +1000,26 @@ public partial class PartConfigSidebar : ComponentBase
             || normalized.Contains("acetal", StringComparison.Ordinal);
     }
 
+    private static bool IsPeekMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description}");
+        return normalized.Contains("peek", StringComparison.Ordinal);
+    }
+
+    private static bool IsMetalMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description} {material.Category}");
+        return normalized.Contains("metal", StringComparison.Ordinal)
+            || normalized.Contains("aluminium", StringComparison.Ordinal)
+            || normalized.Contains("aluminum", StringComparison.Ordinal)
+            || normalized.Contains("steel", StringComparison.Ordinal)
+            || normalized.Contains("brass", StringComparison.Ordinal)
+            || normalized.Contains("copper", StringComparison.Ordinal)
+            || normalized.Contains("bronze", StringComparison.Ordinal)
+            || normalized.Contains("titanium", StringComparison.Ordinal)
+            || normalized.Contains("stainless", StringComparison.Ordinal);
+    }
+
     private static IReadOnlyList<CatalogSurfaceFinishDto> GetVisibleFinishes(IReadOnlyList<CatalogSurfaceFinishDto> finishes) =>
         finishes
             .OrderBy(f => f.SortOrder)
@@ -1002,6 +1197,125 @@ public partial class PartConfigSidebar : ComponentBase
             .Replace("-", " ", StringComparison.Ordinal)
             .Trim();
 
+    private static string GetMaterialImageUrl(CatalogMaterialDto material)
+    {
+        foreach (var token in GetImageLookupTokens(material.Code, material.Name, material.Category, material.Description))
+        {
+            if (MaterialImages.TryGetValue(token, out var image))
+                return MaterialImageBasePath + image;
+        }
+
+        return MaterialImageBasePath + "raw-metal-material-image.png";
+    }
+
+    private static string GetMaterialColorImageUrl(string color) =>
+        MaterialImageBasePath + GetMappedImage(ColorImages, color, "natural-plastic-material-image.png");
+
+    private static string GetSurfaceFinishImageUrl(CatalogSurfaceFinishDto finish)
+    {
+        var displayKey = GetSurfaceFinishDisplayKey(finish);
+        foreach (var token in GetImageLookupTokens(displayKey, finish.Code, finish.Name, finish.Description))
+        {
+            if (FinishImages.TryGetValue(token, out var image))
+                return MaterialImageBasePath + image;
+
+            if (token.Contains("anod", StringComparison.Ordinal)
+                && token.Contains("typeiii", StringComparison.Ordinal))
+                return MaterialImageBasePath + "finish-anodized-black-material-image.png";
+
+            if (token.Contains("anod", StringComparison.Ordinal))
+                return MaterialImageBasePath + "finish-anodized-clear-material-image.png";
+        }
+
+        return MaterialImageBasePath + "finish-machined-material-image.png";
+    }
+
+    private static string GetBooleanOptionImageUrl(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        if (normalized.Contains("deburr", StringComparison.Ordinal))
+            return MaterialImageBasePath + "deburr-edges-material-image.png";
+
+        return MaterialImageBasePath + "finish-machined-material-image.png";
+    }
+
+    private static string GetPaintColorImageUrl(PaintColorOption paint)
+    {
+        foreach (var token in GetImageLookupTokens(paint.Name, paint.Reference))
+        {
+            if (PaintColorImages.TryGetValue(token, out var image))
+                return MaterialImageBasePath + image;
+        }
+
+        return MaterialImageBasePath + "finish-painted-material-image.png";
+    }
+
+    private static string GetCustomPaintImageUrl() =>
+        MaterialImageBasePath + "finish-painted-material-image.png";
+
+    private static string GetColorChoiceImageUrl(ProcessConfigOptionDto option, string value)
+    {
+        if (IsAnodizeColorOption(option))
+            return MaterialImageBasePath + GetMappedImage(AnodizeColorImages, value, "finish-anodized-clear-material-image.png");
+
+        if (PaintColorImages.TryGetValue(NormalizeOptionText(value), out var paintImage))
+            return MaterialImageBasePath + paintImage;
+
+        return GetMaterialColorImageUrl(value);
+    }
+
+    private static string GetCardChoiceOptionImageUrl(ProcessConfigOptionDto option, string value)
+    {
+        var optionText = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        var valueText = NormalizeOptionText(value);
+        if (optionText.Contains("deburr", StringComparison.Ordinal))
+        {
+            return MaterialImageBasePath + (valueText.Contains("no", StringComparison.Ordinal)
+                || valueText.Contains("none", StringComparison.Ordinal)
+                    ? "no-deburr-material-image.png"
+                    : "deburr-edges-material-image.png");
+        }
+
+        if (optionText.Contains("finish", StringComparison.Ordinal)
+            || optionText.Contains("surface", StringComparison.Ordinal))
+        {
+            foreach (var token in GetImageLookupTokens(value, option.Label, option.ConfigKey))
+            {
+                if (FinishImages.TryGetValue(token, out var image))
+                    return MaterialImageBasePath + image;
+            }
+        }
+
+        return MaterialImageBasePath + "finish-machined-material-image.png";
+    }
+
+    private static string GetMappedImage(
+        IReadOnlyDictionary<string, string> images,
+        string value,
+        string fallback)
+    {
+        foreach (var token in GetImageLookupTokens(value))
+        {
+            if (images.TryGetValue(token, out var image))
+                return image;
+        }
+
+        return fallback;
+    }
+
+    private static IEnumerable<string> GetImageLookupTokens(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+
+            var normalized = NormalizeOptionText(value);
+            if (!string.IsNullOrEmpty(normalized))
+                yield return normalized;
+        }
+    }
+
     private static string GetOptionIcon(string key)
     {
         if (key.Contains("anod", StringComparison.OrdinalIgnoreCase))
@@ -1042,12 +1356,15 @@ public partial class PartConfigSidebar : ComponentBase
             "orange" => "#e47c2f",
             "gold" => "#d4a72c",
             "purple" => "#7c4dff",
+            "peek natural" => "#B3AA9E",
+            "raw" => "#c4c6ca",
             _ when normalized.Contains("black", StringComparison.Ordinal) => "#111111",
             _ when normalized.Contains("white", StringComparison.Ordinal) => "#f7f7f2",
             _ when normalized.Contains("blue", StringComparison.Ordinal) => "#2f6fd6",
             _ when normalized.Contains("red", StringComparison.Ordinal) => "#c8333a",
             _ when normalized.Contains("green", StringComparison.Ordinal) => "#2f8f5b",
             _ when normalized.Contains("gold", StringComparison.Ordinal) => "#d4a72c",
+            _ when normalized.Contains("peek", StringComparison.Ordinal) => "#B3AA9E",
             _ => "linear-gradient(135deg, #d8dce4, #a8aeb8)",
         };
     }

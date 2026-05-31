@@ -71,4 +71,96 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             "Milled parts",
             card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
     }
+
+    [Fact]
+    public void ProcessCards_WhenCatalogTextIsLong_RenderCompactCardText()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "FDM",
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(
+                p => p.Processes,
+                [
+                    new ProcessDto(
+                        Guid.NewGuid(),
+                        "FDM",
+                        "3D Printing (FDM)",
+                        "Fused Deposition Modeling - thermoplastic filament",
+                        20),
+                ]));
+
+        var card = cut.Find(".pcs-process-card");
+
+        Assert.Equal("FDM", card.QuerySelector(".pcs-process-name")?.TextContent.Trim());
+        Assert.Equal(
+            "3D print",
+            card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
+    }
+
+    [Fact]
+    public void SelectableConfiguratorItems_RenderImagePreviewsWithFallbacks()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            FinishId = finishId,
+            FinishCode = "ANODIZE_CLEAR",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "POM-C", "POM-C", "Plastic", null, "Acetal engineering plastic", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Anodized clear", "ANODIZE_CLEAR", 1.6m, 12m, "Clear Type II anodize", 10),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "anodize_color",
+                    "Anodize color",
+                    "dropdown",
+                    "Black",
+                    "[\"Black\",\"Blue\"]",
+                    null,
+                    null,
+                    false,
+                    10),
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "deburr_edges",
+                    "Deburr edges",
+                    "boolean",
+                    null,
+                    null,
+                    null,
+                    "Break sharp edges before shipment.",
+                    false,
+                    20),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotEmpty(cut.FindAll(".pcs-option-image"));
+        Assert.NotEmpty(cut.FindAll(".pcs-option-image-fallback"));
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/white-pom-material-image.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-pom-material-image.png']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-anodized-clear-material-image.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-anodized-blue-material-image.png']"));
+        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-material-image.png']"));
+    }
 }
