@@ -74,6 +74,26 @@ public class WorkspaceEmailDomainEnforcementMiddlewareTests
         Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
     }
 
+    [Fact]
+    public async Task InvokeAsync_AuthenticatedServiceAccountWithoutEmail_Continues()
+    {
+        var nextCalled = false;
+        var middleware = new WorkspaceEmailDomainEnforcementMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            NullLogger<WorkspaceEmailDomainEnforcementMiddleware>.Instance);
+        var httpContext = CreateServiceAccountContext("/api/v1/seed/customers");
+        AddAuthenticationService(httpContext);
+
+        await middleware.InvokeAsync(httpContext);
+
+        Assert.True(nextCalled);
+        Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+    }
+
     private static DefaultHttpContext CreateContext(string path, string email)
     {
         var identity = new ClaimsIdentity(
@@ -82,6 +102,25 @@ public class WorkspaceEmailDomainEnforcementMiddlewareTests
                 new Claim(ClaimTypes.Email, email)
             ],
             CookieAuthenticationDefaults.AuthenticationScheme);
+
+        var context = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(identity)
+        };
+        context.Request.Path = path;
+        return context;
+    }
+
+    private static DefaultHttpContext CreateServiceAccountContext(string path)
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim("sub", "system:service:intranetbff"),
+                new Claim("service_name", "IntranetBff"),
+                new Claim("user_type", "service"),
+                new Claim("role", "service-account")
+            ],
+            "Bearer");
 
         var context = new DefaultHttpContext
         {

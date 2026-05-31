@@ -19,6 +19,7 @@ internal sealed class WorkspaceEmailDomainEnforcementMiddleware
     {
         if (context.User.Identity?.IsAuthenticated != true ||
             IsAuthenticationPath(context.Request.Path) ||
+            IsServiceAccount(context.User) ||
             WorkspaceEmailDomainPolicy.IsAllowedEmployee(context.User))
         {
             await _next(context);
@@ -49,6 +50,15 @@ internal sealed class WorkspaceEmailDomainEnforcementMiddleware
             path.StartsWithSegments("/signin-google", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments("/api/v1/auth/login", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments("/api/v1/auth/logout", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsServiceAccount(System.Security.Claims.ClaimsPrincipal principal)
+    {
+        var userType = principal.FindFirst("user_type")?.Value;
+        var role = principal.FindFirst("role")?.Value;
+
+        return string.Equals(userType, "service", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "service-account", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ShouldRedirectToLogin(PathString path)
