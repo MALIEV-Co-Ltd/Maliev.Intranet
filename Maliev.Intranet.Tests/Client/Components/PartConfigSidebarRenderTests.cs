@@ -266,6 +266,26 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ConfiguratorOptionImages_RaiseHoveredPreviewAboveSidebarAncestorsAndFooter()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-root:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-root:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-section:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-section:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
+        Assert.Contains("overflow: visible;\n                z-index: 220;", source, StringComparison.Ordinal);
+        Assert.Contains("pointer-events: auto;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OptionImageStyles_UseConsistentBoundedPreviewSize()
     {
         var source = ReadRepoFile(
