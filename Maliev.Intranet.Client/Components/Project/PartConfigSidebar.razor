@@ -888,7 +888,17 @@
             .pcs-process-card--active {
                 color: var(--mud-palette-primary);
                 font-weight: 600;
-                box-shadow: inset 0 0 0 2px var(--mud-palette-primary);
+                box-shadow: inset 0 0 0 1px var(--mud-palette-primary);
+            }
+
+            .pcs-process-card--active::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border: 2px solid var(--mud-palette-primary);
+                border-radius: inherit;
+                pointer-events: none;
+                z-index: 3;
             }
 
             .pcs-process-photo {
@@ -909,13 +919,14 @@
                 background: var(--mud-palette-primary);
                 display: grid;
                 place-items: center;
-                color: #fff;
+                color: var(--mud-palette-primary-contrast-text);
                 font-size: 10px;
                 line-height: 1;
-                z-index: 1;
+                z-index: 4;
             }
 
             .pcs-process-check .mud-icon-root {
+                color: currentColor;
                 font-size: 10px !important;
                 width: 10px !important;
                 height: 10px !important;

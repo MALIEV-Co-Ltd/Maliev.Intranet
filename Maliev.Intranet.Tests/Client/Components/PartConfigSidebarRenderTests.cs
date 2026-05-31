@@ -236,6 +236,26 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProcessCardStyles_RenderActiveBorderAndCheckAboveImageInDarkMode()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-process-card--active::after", source, StringComparison.Ordinal);
+        Assert.Contains("border: 2px solid var(--mud-palette-primary);", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card--active::after {\n                content: \"\";", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 3;", source, StringComparison.Ordinal);
+        Assert.Contains("color: var(--mud-palette-primary-contrast-text);", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-check {\n                position: absolute;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 4;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-check .mud-icon-root {\n                color: currentColor;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PartFeaturesAndInspection_WhenProcessIsNotSelected_RenderDisabled()
     {
         var part = new PartViewModel
