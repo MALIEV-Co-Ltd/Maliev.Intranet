@@ -134,42 +134,193 @@ const CONFIG = {
         alpha: 1.0,       // Fully opaque
     },
 
+    /** Realistic PBR material presets matching real-world manufactured materials.
+     *  Albedo, metallic, and roughness values are tuned to approximate the
+     *  appearance of each material under neutral studio lighting. */
+    MATERIAL_REALISTIC: {
+        'aluminum': {
+            albedoColor: { r: 0.82, g: 0.82, b: 0.80 },
+            metallic: 0.95,
+            roughness: 0.22,
+        },
+        'steel': {
+            albedoColor: { r: 0.42, g: 0.42, b: 0.40 },
+            metallic: 0.95,
+            roughness: 0.45,
+        },
+        'stainless-steel': {
+            albedoColor: { r: 0.62, g: 0.62, b: 0.60 },
+            metallic: 0.95,
+            roughness: 0.12,
+        },
+        'black-pom': {
+            albedoColor: { r: 0.06, g: 0.06, b: 0.06 },
+            metallic: 0.0,
+            roughness: 0.30,
+        },
+        'white-pom': {
+            albedoColor: { r: 0.96, g: 0.95, b: 0.94 },  // raised: real white POM ≈ 95-97% reflectance
+            metallic: 0.0,
+            roughness: 0.32,
+        },
+        'blue-pom': {
+            albedoColor: { r: 0.08, g: 0.28, b: 0.62 },
+            metallic: 0.0,
+            roughness: 0.34,
+        },
+        'brass': {
+            albedoColor: { r: 0.85, g: 0.70, b: 0.30 },
+            metallic: 0.95,
+            roughness: 0.28,
+        },
+        'copper': {
+            albedoColor: { r: 0.84, g: 0.42, b: 0.30 },
+            metallic: 0.95,
+            roughness: 0.30,
+        },
+        'bronze': {
+            albedoColor: { r: 0.67, g: 0.45, b: 0.22 },
+            metallic: 0.92,
+            roughness: 0.35,
+        },
+        'titanium': {
+            albedoColor: { r: 0.55, g: 0.53, b: 0.50 },
+            metallic: 0.85,
+            roughness: 0.18,
+        },
+        'pla': {
+            albedoColor: { r: 0.85, g: 0.85, b: 0.80 },
+            metallic: 0.0,
+            roughness: 0.34,
+        },
+        'abs': {
+            albedoColor: { r: 0.80, g: 0.80, b: 0.78 },
+            metallic: 0.0,
+            roughness: 0.42,
+        },
+        'petg': {
+            albedoColor: { r: 0.88, g: 0.87, b: 0.84 },
+            metallic: 0.0,
+            roughness: 0.40,
+        },
+        'nylon': {
+            albedoColor: { r: 0.92, g: 0.90, b: 0.86 },
+            metallic: 0.0,
+            roughness: 0.52,
+        },
+        'peek': {
+            albedoColor: { r: 0.70, g: 0.67, b: 0.62 },
+            metallic: 0.0,
+            roughness: 0.48,
+        },
+        'carbon-fiber': {
+            albedoColor: { r: 0.12, g: 0.12, b: 0.13 },
+            metallic: 0.0,
+            roughness: 0.72,
+        },
+        'petg-clear': {
+            // Translucent/frosted plastic — like light through a napkin, not clear glass.
+            // alpha < 1 enables ALPHABLEND so the mesh is semi-opaque.
+            albedoColor: { r: 0.97, g: 0.97, b: 0.96 },
+            metallic: 0.0,
+            roughness: 0.10,
+            alpha: 0.78,
+        },
+        'resin': {
+            albedoColor: { r: 0.78, g: 0.78, b: 0.78 },
+            metallic: 0.0,
+            roughness: 0.22,
+        },
+    },
+
+    /** Realistic mode rendering settings */
+    REALISTIC: {
+        environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
+        contrast: 1.15,
+        exposure: 1.1,
+        /** Edge angle threshold in degrees for normal smoothing. Edges sharper
+         *  than this stay hard; gentler creases get blended. 0 = no smoothing,
+         *  180 = fully smooth all edges. Raised from 30 to 55 to handle low-poly
+         *  CAD tesselation where facet angles routinely exceed 30 degrees. */
+        smoothAngleDeg: 55,
+    },
+
     // =========================================================================
     // LIGHTING SETTINGS
     // =========================================================================
 
-    /** Ambient light (hemispheric) - provides base illumination */
-    LIGHTING_AMBIENT: {
-        intensityDark: 0.20,
-        intensityLight: 0.30,
-        specular: { r: 0.05, g: 0.05, b: 0.05 },
-        groundColorDark: { r: 0.08, g: 0.08, b: 0.12 },
-        groundColorLight: { r: 0.50, g: 0.55, b: 0.60 },
-        direction: { x: -0.70, y: -1.00, z: -0.80 },
+    /**
+     * Studio lighting — light mode (clean white product photography).
+     * Warm key from upper-left, cool-blue fill from right, pure-white rim from behind.
+     */
+    STUDIO_LIGHT: {
+        key: {
+            direction:     { x: -0.50, y: -1.10, z: -0.80 },
+            diffuse:       { r: 1.00, g: 0.98, b: 0.95 },
+            intensity:     1.35,
+            shadowMapSize: 2048,
+            shadowDarkness: 0.20,
+        },
+        fill: {
+            direction:  { x: 0.85, y: -0.40, z: -0.20 },
+            diffuse:    { r: 0.85, g: 0.92, b: 1.00 },
+            intensity:  0.78,
+        },
+        rim: {
+            direction:  { x: 0.10, y: 0.70, z: -0.40 },
+            diffuse:    { r: 1.00, g: 0.99, b: 0.97 },
+            intensity:  0.24,
+        },
+        ambient: {
+            direction:   { x: 0, y: 1, z: 0 },
+            diffuse:     { r: 0.88, g: 0.92, b: 0.98 },
+            groundColor: { r: 0.82, g: 0.84, b: 0.88 },
+            specular:    { r: 0.06, g: 0.06, b: 0.07 },
+            intensity:   0.42,
+        },
+        exposure: 1.02,
     },
 
-    /** Key light (directional) - main light source with shadows */
-    LIGHTING_KEY: {
-        intensityDark: 0.80,
-        intensityLight: 1.50,
-        direction: { x: -0.70, y: -1.00, z: -0.80 },
-        shadowMapSize: 2048,
-        shadowDarknessDark: 0.30,
-        shadowDarknessLight: 0.60,
+    /**
+     * Studio lighting — dark mode (dramatic product dark studio).
+     * Warm-gold key from upper-right, cool-blue rim from left, near-black ambient.
+     */
+    STUDIO_DARK: {
+        key: {
+            direction:     { x: 0.65, y: -1.10, z: -0.60 },
+            diffuse:       { r: 1.00, g: 0.84, b: 0.65 },
+            intensity:     2.60,
+            shadowMapSize: 2048,
+            shadowDarkness: 0.18,
+        },
+        rim: {
+            direction:  { x: -0.80, y: -0.30, z: 0.55 },
+            diffuse:    { r: 0.38, g: 0.55, b: 1.00 },
+            intensity:  1.05,
+        },
+        back: {
+            direction:  { x: 0.10, y: 0.90, z: 0.80 },
+            diffuse:    { r: 0.32, g: 0.44, b: 0.88 },
+            intensity:  0.24,
+        },
+        ambient: {
+            direction:   { x: 0, y: 1, z: 0 },
+            diffuse:     { r: 0.10, g: 0.12, b: 0.18 },
+            groundColor: { r: 0.02, g: 0.02, b: 0.04 },
+            specular:    { r: 0.02, g: 0.02, b: 0.02 },
+            intensity:   0.10,
+        },
+        exposure: 0.92,
     },
 
-    /** Fill light (directional) - fills shadows with soft light */
-    LIGHTING_FILL: {
-        intensityDark: 0.30,
-        intensityLight: 0.50,
-        direction: { x: 0.80, y: -0.40, z: -0.30 },
-    },
-
-    /** Back light (directional) - provides rim lighting from behind */
-    LIGHTING_BACK: {
-        intensityDark: 0.40,
-        intensityLight: 0.65,
-        direction: { x: 0.00, y: 1.00, z: -0.50 },
+    /**
+     * Maps CNC Ra roughness codes to absolute PBR roughness values.
+     * Takes priority over finishCode offset when provided.
+     */
+    CNC_ROUGHNESS_MAP: {
+        RA_3_2: 0.52,
+        RA_1_6: 0.34,
+        RA_0_8: 0.18,
     },
 
     // =========================================================================
@@ -205,9 +356,9 @@ const CONFIG = {
 
     /** Grid configuration */
     GRID: {
-        majorUnitFrequency: 10,      // Major line every 10mm
-        minorUnitVisibility: 0.25,   // Minor line visibility
-        gridRatio: 10,               // 10mm grid lines
+        majorUnitFrequency: 10,      // Major line every 10 cells (gridRatio=10mm, so major every 100mm)
+        minorUnitVisibility: 0.55,   // Minor line visibility — raised for readable 10mm grid
+        gridRatio: 10,               // 10mm grid cells (minor lines every 10mm)
         mainColor: { r: 0.85, g: 0.85, b: 0.85 },
         lineColor: { r: 0.55, g: 0.55, b: 0.55 },
         opacity: 0.70,
@@ -294,6 +445,32 @@ const CONFIG = {
     /** Minimum auto-rotation speed threshold (below this, rotation stops) */
     AUTO_ROTATION_MIN_THRESHOLD: 0.00001,
 };
+
+// ── Realistic-mode per-canvas state ────────────────────────────────────────────
+
+/** Per-canvas currently selected material type key (e.g. 'aluminum', 'steel') */
+const materialTypes = {};
+
+/** Per-canvas environment texture for PBR reflections */
+const environmentTextures = {};
+
+/** Per-canvas realistic PBR material cache (Map<materialType, PBRMaterial>) */
+const realisticMaterialCache = {};
+
+/** Per-canvas original vertex normals saved before smoothing (Map<uniqueId, Float32Array>) */
+const originalNormalData = {};
+
+/** Per-canvas custom albedo color override for realistic mode (null = use preset) */
+const customAlbedoColors = {};
+
+/** Per-canvas finish modifiers for roughness/metallic adjustments */
+const perCanvasFinishModifiers = {};
+
+/** Per-canvas DefaultRenderingPipeline for post-processing */
+const perCanvasPipelines = {};
+
+/** Per-canvas current render mode for transition detection */
+const currentRenderModes = {};
 
 function isViewerDebugEnabled() {
     try {
@@ -509,7 +686,7 @@ function toWorldPoint(point) {
 
 function normalizeViewerSettings(viewerSettings) {
     const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
-    const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent'
+    const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent' || settings.renderMode === 'realistic'
         ? settings.renderMode
         : 'solid';
     const cameraMode = settings.cameraProjection === 'perspective'
@@ -518,6 +695,9 @@ function normalizeViewerSettings(viewerSettings) {
     const sectionAxis = settings.sectionAxis === 'y' || settings.sectionAxis === 'z'
         ? settings.sectionAxis
         : 'x';
+    const materialType = CONFIG.MATERIAL_REALISTIC[settings.materialType]
+        ? settings.materialType
+        : 'aluminum';
 
     return {
         renderMode,
@@ -529,6 +709,7 @@ function normalizeViewerSettings(viewerSettings) {
         sectionAxis,
         sectionOffsetMm: Number.isFinite(Number(settings.sectionOffsetMm)) ? Number(settings.sectionOffsetMm) : 0,
         sectionInverted: !!settings.sectionInverted,
+        materialType,
     };
 }
 
@@ -1656,515 +1837,6 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
     }
 }
 
-// ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
-
-const CUTTING_MAT_ANIMATION_MS = 240;
-const CUTTING_MAT_CAMERA_MIN_Z = 0.003;
-const CUTTING_MAT_MINOR_GRID_MM = 10;
-const CUTTING_MAT_MAJOR_GRID_MM = 100;
-const cuttingMatAnimationStates = {};
-const cuttingMatCameraClipStates = {};
-
-/**
- * Renders a realistic cutting-mat floor at model base (Z=0).
- *
- * Design:
- *   - Brighter green (#2e7d52 surface, lit with emissive baseline)
- *   - 16 mm margin band: grid lines stop at the border, numbers live in the margin
- *   - Rounded corners (8 mm radius) in both the visible top and slab geometry
- *   - Raw RGBA texture upload so the green surface, grid, and labels render immediately
- *   - Reference-style top-right cutting-mat title, away from the scale labels
- *   - Manual convex fan triangulation (no CreatePolygon / earcut dependency)
- */
-export function showCuttingMat(canvasId) {
-    const scene = scenes[canvasId];
-    if (!scene) return;
-
-    _cancelCuttingMatAnimation(canvasId);
-    ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
-        const m = scene.getMeshByName(n);
-        if (m) m.dispose(false, true);
-    });
-
-    const bb = sceneBoundingBoxes[canvasId];
-    if (!bb) return;
-    _relaxCuttingMatCameraClipping(canvasId, scene);
-
-    const modelW = bb.max.x - bb.min.x;
-    const modelH = bb.max.y - bb.min.y;
-
-    const PAD    = 60;   // mm clearance around model
-    const MARGIN = 16;   // mm margin band (numbers + title live here, outside grid)
-    const CORNER = 8;    // mm corner fillet radius
-    const THICK  = 3;    // mm slab thickness
-    const matW   = Math.ceil(Math.max(300, modelW + PAD * 2) / 10) * 10;
-    const matH   = Math.ceil(Math.max(220, modelH + PAD * 2) / 10) * 10;
-    const slideOffset = _cuttingMatSlideOffset(bb);
-
-    // ── Texture ───────────────────────────────────────────────────────────────
-    const TEX_W = 2048;
-    const TEX_H = Math.max(256, Math.round(TEX_W * matH / matW));
-    const px    = TEX_W / matW;   // pixels per mm
-    const MPX   = MARGIN * px;    // margin in pixels
-    const CPX   = CORNER * px;    // corner radius in pixels
-
-    // Pre-create a standard HTML canvas — BabylonJS DynamicTexture's internal
-    // canvas suppresses ctx.fillRect in some build configurations, producing a
-    // blue/blank mat surface.  Drawing to a plain canvas always works.
-    // Drawing to canvas first keeps text/grid crisp before the raw RGBA upload.
-    const rawCanvas = document.createElement('canvas');
-    rawCanvas.width  = TEX_W;
-    rawCanvas.height = TEX_H;
-    const ctx = rawCanvas.getContext('2d');
-
-    // Helper: build a rounded-rect path on ctx
-    const _rrPath = (x, y, w, h, r) => {
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.arcTo(x + w, y,     x + w, y + r,   r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-        ctx.lineTo(x + r, y + h);
-        ctx.arcTo(x,     y + h, x,     y + h - r, r);
-        ctx.lineTo(x,     y + r);
-        ctx.arcTo(x,     y,     x + r,   y,       r);
-        ctx.closePath();
-    };
-
-    // ── Background with rounded corners ───────────────────────────────────────
-    _rrPath(0, 0, TEX_W, TEX_H, CPX);
-    ctx.fillStyle = '#2d7a4f';
-    ctx.fill();
-    // Clip all subsequent drawing to the rounded rectangle
-    _rrPath(0, 0, TEX_W, TEX_H, CPX);
-    ctx.clip();
-
-    // ── Outer mat border ──────────────────────────────────────────────────────
-    const borderW = Math.max(3, px * 1.6);
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth   = borderW;
-    _rrPath(borderW / 2, borderW / 2, TEX_W - borderW, TEX_H - borderW, Math.max(0, CPX - borderW / 2));
-    ctx.stroke();
-
-    // ── Inner grid-area border ────────────────────────────────────────────────
-    ctx.strokeStyle = 'rgba(255,255,255,0.60)';
-    ctx.lineWidth   = Math.max(2, px * 1.0);
-    ctx.strokeRect(MPX, MPX, TEX_W - 2 * MPX, TEX_H - 2 * MPX);
-
-    // ── Grid lines (symmetric — no mirroring needed) ──────────────────────────
-    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
-        CUTTING_MAT_MINOR_GRID_MM * px, 'rgba(255,255,255,0.28)', Math.max(0.8, px * 0.40), MPX, MPX);
-    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
-        CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
-
-    // ── Margin title + number labels ──────────────────────────────────────────
-    const LABEL_PX   = Math.round(px * 7.5);
-    const LABEL_STEP = 10 * px;
-    const colCount   = Math.round((matW - 2 * MARGIN) / 10);
-    const rowCount   = Math.round((matH - 2 * MARGIN) / 10);
-    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
-    ctx.font         = `bold ${LABEL_PX}px Arial, sans-serif`;
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('CUTTING MAT 3022', TEX_W - MPX * 0.45, MPX * 0.5);
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Bottom edge labels (column axis), matching the physical mat reference.
-    for (let i = 0; i <= colCount; i++) {
-        const cx = MPX + i * LABEL_STEP;
-        ctx.fillText(String(i), cx, TEX_H - MPX * 0.5);
-    }
-
-    // Left edge labels (row axis). The top/right margins stay clear for the title.
-    for (let j = 0; j <= rowCount; j++) {
-        const cy = MPX + j * LABEL_STEP;
-        ctx.fillText(String(j), MPX * 0.5, cy);
-    }
-
-    // ── Upload texture from raw RGBA pixels ───────────────────────────────────
-    const tex = _createCuttingMatTexture(scene, rawCanvas, TEX_W, TEX_H);
-
-    // ── Rounded top surface and slab body ─────────────────────────────────────
-    const outline = _roundedRectPoints(matW, matH, CORNER, 8);
-    const topMesh = _createRoundedMatTopMesh(scene, outline, matW, matH);
-
-    const topMat = new BABYLON.StandardMaterial('__cutting_mat_mat__', scene);
-    topMat.diffuseTexture        = tex;
-    topMat.useAlphaFromDiffuseTexture = false;
-    topMat.diffuseColor          = new BABYLON.Color3(1, 1, 1);
-    topMat.emissiveColor         = new BABYLON.Color3(0.04, 0.12, 0.06);
-    topMat.ambientColor          = new BABYLON.Color3(0.18, 0.42, 0.26);
-    topMat.specularColor         = new BABYLON.Color3(0.02, 0.05, 0.03);
-    topMat.backFaceCulling       = false;
-    topMat.transparencyMode      = _cuttingMatAlphaBlendMode();
-    topMat.alphaCutOff           = 0.5;
-    topMat.alpha                 = 0;
-    topMesh.material = topMat;
-    topMesh.metadata = { ...(topMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
-    disableSectionClippingForMesh(topMesh);
-
-    const slabMesh = _createRoundedMatSlabMesh(scene, outline, THICK);
-
-    const slabMat = new BABYLON.StandardMaterial('__cutting_mat_slab_mat__', scene);
-    slabMat.diffuseColor  = new BABYLON.Color3(0.12, 0.40, 0.24);
-    slabMat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
-    slabMat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
-    slabMat.backFaceCulling = false;
-    slabMat.transparencyMode = _cuttingMatAlphaBlendMode();
-    slabMat.alpha = 0;
-    slabMesh.material = slabMat;
-    slabMesh.metadata = { ...(slabMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
-    disableSectionClippingForMesh(slabMesh);
-
-    // ── Hide the shadow catcher ───────────────────────────────────────────────
-    // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
-    // surface.  Leaving it visible causes z-fighting that makes the model shadow
-    // appear shifted / "ghosted" on the mat.  The mat already has receiveShadows=true
-    // so shadows render correctly directly on the mat surface without the catcher.
-    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
-    if (shadowCatcher) shadowCatcher.isVisible = false;
-
-    _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
-        fromZ: -slideOffset,
-        toZ: 0,
-        fromAlpha: 0,
-        toAlpha: 1,
-        onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),
-    });
-}
-
-function _cuttingMatSlideOffset(bb) {
-    const modelHeight = Math.max(0, (bb?.max?.z ?? 0) - (bb?.min?.z ?? 0));
-    return Math.max(12, Math.min(40, modelHeight * 0.35 || 18));
-}
-
-function _cuttingMatNow() {
-    return typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : Date.now();
-}
-
-function _easeCuttingMat(t) {
-    return t * t * (3 - 2 * t);
-}
-
-function _applyCuttingMatAnimation(meshes, materials, z, alpha) {
-    meshes.forEach(mesh => {
-        if (mesh?.position) mesh.position.z = z;
-    });
-    materials.forEach(material => {
-        if (material) material.alpha = alpha;
-    });
-}
-
-function _cuttingMatAlphaBlendMode() {
-    return BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
-}
-
-function _cuttingMatOpaqueMode() {
-    return BABYLON.Material?.MATERIAL_OPAQUE ?? 0;
-}
-
-function _setCuttingMatMaterialsForFade(materials) {
-    materials.forEach(material => {
-        if (!material) return;
-        material.transparencyMode = _cuttingMatAlphaBlendMode();
-        material.needDepthPrePass = false;
-    });
-}
-
-function _setCuttingMatMaterialsOpaque(materials) {
-    materials.forEach(material => {
-        if (!material) return;
-        material.alpha = 1;
-        material.transparencyMode = _cuttingMatOpaqueMode();
-        material.needDepthPrePass = false;
-    });
-}
-
-function _cuttingMatCamera(canvasId, scene) {
-    return mainCameras[canvasId] ?? scene?.activeCamera ?? null;
-}
-
-function _relaxCuttingMatCameraClipping(canvasId, scene) {
-    const camera = _cuttingMatCamera(canvasId, scene);
-    if (!camera || typeof camera.minZ !== 'number') return;
-
-    const state = cuttingMatCameraClipStates[canvasId];
-    if (state?.camera && state.camera !== camera) {
-        _restoreCuttingMatCameraClipping(canvasId);
-    }
-
-    if (!cuttingMatCameraClipStates[canvasId]) {
-        cuttingMatCameraClipStates[canvasId] = { camera, minZ: camera.minZ };
-    }
-
-    camera.minZ = Math.min(camera.minZ, CUTTING_MAT_CAMERA_MIN_Z);
-}
-
-function _restoreCuttingMatCameraClipping(canvasId) {
-    const state = cuttingMatCameraClipStates[canvasId];
-    if (!state) return;
-
-    if (state.camera && typeof state.camera.minZ === 'number'
-        && state.camera.minZ <= CUTTING_MAT_CAMERA_MIN_Z + 0.000001) {
-        state.camera.minZ = state.minZ;
-    }
-
-    delete cuttingMatCameraClipStates[canvasId];
-}
-
-function _cancelCuttingMatAnimation(canvasId) {
-    const state = cuttingMatAnimationStates[canvasId];
-    if (!state) return;
-    if (state.observer && state.scene?.onBeforeRenderObservable?.remove) {
-        state.scene.onBeforeRenderObservable.remove(state.observer);
-    }
-    delete cuttingMatAnimationStates[canvasId];
-}
-
-function _animateCuttingMat(canvasId, scene, meshes, materials, options) {
-    const durationMs = CUTTING_MAT_ANIMATION_MS;
-    const startedAt = _cuttingMatNow();
-
-    const apply = eased => {
-        const z = options.fromZ + (options.toZ - options.fromZ) * eased;
-        const alpha = options.fromAlpha + (options.toAlpha - options.fromAlpha) * eased;
-        _applyCuttingMatAnimation(meshes, materials, z, alpha);
-    };
-
-    apply(0);
-
-    if (!scene.onBeforeRenderObservable?.add) {
-        apply(1);
-        options.onComplete?.();
-        return;
-    }
-
-    const state = { scene, observer: null };
-    const tick = () => {
-        const elapsed = Math.max(0, _cuttingMatNow() - startedAt);
-        const t = Math.min(1, elapsed / durationMs);
-        apply(_easeCuttingMat(t));
-
-        if (t >= 1) {
-            if (state.observer && scene.onBeforeRenderObservable?.remove) {
-                scene.onBeforeRenderObservable.remove(state.observer);
-            }
-            if (cuttingMatAnimationStates[canvasId] === state) {
-                delete cuttingMatAnimationStates[canvasId];
-            }
-            options.onComplete?.();
-        }
-    };
-
-    state.observer = scene.onBeforeRenderObservable.add(tick);
-    cuttingMatAnimationStates[canvasId] = state;
-}
-
-function _createCuttingMatTexture(scene, rawCanvas, width, height) {
-    const ctx = rawCanvas.getContext('2d');
-    const pixels = ctx.getImageData(0, 0, width, height).data;
-
-    if (BABYLON.RawTexture?.CreateRGBATexture) {
-        const samplingMode = BABYLON.Constants?.TEXTURE_TRILINEAR_SAMPLINGMODE
-            ?? BABYLON.Texture?.TRILINEAR_SAMPLINGMODE
-            ?? 3;
-        const tex = BABYLON.RawTexture.CreateRGBATexture(
-            pixels,
-            width,
-            height,
-            scene,
-            true,
-            false,
-            samplingMode);
-        tex.hasAlpha = false;
-        if (BABYLON.Texture?.CLAMP_ADDRESSMODE !== undefined) {
-            tex.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
-            tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-        }
-        return tex;
-    }
-
-    const tex = new BABYLON.DynamicTexture('__cutting_mat_tex__', { width, height }, scene, false);
-    tex.hasAlpha = false;
-    const texCtx = tex.getContext?.();
-    if (texCtx?.putImageData) {
-        texCtx.putImageData(ctx.getImageData(0, 0, width, height), 0, 0);
-    } else if (texCtx?.drawImage) {
-        texCtx.drawImage(rawCanvas, 0, 0);
-    }
-    tex.update(false);
-    return tex;
-}
-
-function _roundedRectPoints(width, height, radius, segments) {
-    const hw = width / 2;
-    const hh = height / 2;
-    const r = Math.min(radius, hw, hh);
-    const arcs = [
-        { cx:  hw - r, cy:  hh - r, start: 0, end: Math.PI / 2 },
-        { cx: -hw + r, cy:  hh - r, start: Math.PI / 2, end: Math.PI },
-        { cx: -hw + r, cy: -hh + r, start: Math.PI, end: Math.PI * 1.5 },
-        { cx:  hw - r, cy: -hh + r, start: Math.PI * 1.5, end: Math.PI * 2 },
-    ];
-    const pts = [];
-    arcs.forEach(arc => {
-        for (let i = 0; i <= segments; i++) {
-            const t = i / segments;
-            const a = arc.start + (arc.end - arc.start) * t;
-            pts.push({
-                x: arc.cx + Math.cos(a) * r,
-                y: arc.cy + Math.sin(a) * r,
-            });
-        }
-    });
-    return pts;
-}
-
-function _cuttingMatUv(x, y, width, height) {
-    return {
-        u: 1 - ((x + width / 2) / width),
-        v: 1 - ((y + height / 2) / height),
-    };
-}
-
-function _createRoundedMatTopMesh(scene, outline, width, height) {
-    const mesh = new BABYLON.Mesh('__cutting_mat__', scene);
-    const positions = [0, 0, 0];
-    const indices = [];
-    const normals = [0, 0, 1];
-    const uvs = [0.5, 0.5];
-
-    outline.forEach(p => {
-        positions.push(p.x, p.y, 0);
-        normals.push(0, 0, 1);
-        const uv = _cuttingMatUv(p.x, p.y, width, height);
-        uvs.push(uv.u, uv.v);
-    });
-
-    for (let i = 1; i <= outline.length; i++) {
-        const next = i === outline.length ? 1 : i + 1;
-        indices.push(0, i, next);
-    }
-
-    const vertexData = new BABYLON.VertexData();
-    vertexData.positions = positions;
-    vertexData.indices = indices;
-    vertexData.normals = normals;
-    vertexData.uvs = uvs;
-    vertexData.applyToMesh(mesh);
-
-    mesh.isPickable = false;
-    mesh.receiveShadows = true;
-    return markAnalysisHelperMesh(mesh);
-}
-
-function _createRoundedMatSlabMesh(scene, outline, thickness) {
-    const mesh = new BABYLON.Mesh('__cutting_mat_slab__', scene);
-    const positions = [];
-    const indices = [];
-    const topZ = -0.08;
-    const bottomZ = -thickness;
-
-    outline.forEach(p => positions.push(p.x, p.y, topZ));
-    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
-
-    const n = outline.length;
-    for (let i = 0; i < n; i++) {
-        const next = (i + 1) % n;
-        indices.push(i, next, next + n, i, next + n, i + n);
-    }
-
-    const bottomCenterIndex = positions.length / 3;
-    positions.push(0, 0, bottomZ);
-    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
-    for (let i = 0; i < n; i++) {
-        const current = bottomCenterIndex + 1 + i;
-        const next = bottomCenterIndex + 1 + ((i + 1) % n);
-        indices.push(bottomCenterIndex, next, current);
-    }
-
-    const normals = [];
-    if (BABYLON.VertexData.ComputeNormals) {
-        BABYLON.VertexData.ComputeNormals(positions, indices, normals);
-    }
-
-    const vertexData = new BABYLON.VertexData();
-    vertexData.positions = positions;
-    vertexData.indices = indices;
-    if (normals.length > 0) vertexData.normals = normals;
-    vertexData.applyToMesh(mesh);
-
-    mesh.isPickable = false;
-    mesh.receiveShadows = true;
-    return markAnalysisHelperMesh(mesh);
-}
-
-/**
- * Draws a uniform grid pass (horizontal + vertical) clipped to an inset rectangle.
- * offsetX/Y shift the grid origin so lines start at the grid-area edge.
- */
-function _cuttingMatGridLines(ctx, w, h, step, color, lineWidth, offsetX = 0, offsetY = 0) {
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = lineWidth;
-    ctx.beginPath();
-    for (let x = 0; x <= w + 0.5; x += step) {
-        ctx.moveTo(x + offsetX, offsetY);
-        ctx.lineTo(x + offsetX, offsetY + h);
-    }
-    for (let y = 0; y <= h + 0.5; y += step) {
-        ctx.moveTo(offsetX,     y + offsetY);
-        ctx.lineTo(offsetX + w, y + offsetY);
-    }
-    ctx.stroke();
-    ctx.restore();
-}
-
-/**
- * Removes the cutting-mat meshes (top plane + slab body) from the scene,
- * disposing materials and texture resources together to avoid memory leaks.
- */
-export function hideCuttingMat(canvasId) {
-    const scene = scenes[canvasId];
-    if (!scene) return;
-
-    _cancelCuttingMatAnimation(canvasId);
-    const meshes = ['__cutting_mat__', '__cutting_mat_slab__']
-        .map(n => scene.getMeshByName(n))
-        .filter(Boolean);
-    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
-
-    if (meshes.length === 0) {
-        if (shadowCatcher) shadowCatcher.isVisible = true;
-        _restoreCuttingMatCameraClipping(canvasId);
-        return;
-    }
-
-    const materials = meshes.map(mesh => mesh.material).filter(Boolean);
-    const slideOffset = Math.max(...meshes.map(mesh => mesh.metadata?.malievCuttingMatSlideOffset ?? 18));
-    const fromZ = meshes[0]?.position?.z ?? 0;
-    const fromAlpha = materials[0]?.alpha ?? 1;
-    _setCuttingMatMaterialsForFade(materials);
-
-    _animateCuttingMat(canvasId, scene, meshes, materials, {
-        fromZ,
-        toZ: -slideOffset,
-        fromAlpha,
-        toAlpha: 0,
-        onComplete: () => {
-            meshes.forEach(mesh => mesh.dispose(false, true));
-            if (shadowCatcher) shadowCatcher.isVisible = true;
-            _restoreCuttingMatCameraClipping(canvasId);
-        },
-    });
-}
-
 // ── initialize ────────────────────────────────────────────────────────────────
 
 /**
@@ -2212,6 +1884,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const engine = new BABYLON.Engine(canvas, true, {
             premultipliedAlpha: false,
             alpha: true,
+            stencil: true,
             disableUniformBuffers: true,
         });
         const scene  = new BABYLON.Scene(engine);
@@ -2287,34 +1960,50 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // ── Re-affirm transparent background (append:true keeps existing scene) ──
                 _scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
-                // ── Remove placeholder lights, add proper Z-up lighting ──
+                // ── Remove placeholder lights, add studio lighting ──
                 _scene.lights.forEach(l => l.dispose());
+                const _lc = isDark ? CONFIG.STUDIO_DARK : CONFIG.STUDIO_LIGHT;
 
-                // ── Ambient (HemisphericLight — no shadows) ──
-                const hemi = new BABYLON.HemisphericLight('hemi', toVector3(CONFIG.LIGHTING_AMBIENT.direction), _scene);
-                hemi.intensity   = isDark ? CONFIG.LIGHTING_AMBIENT.intensityDark : CONFIG.LIGHTING_AMBIENT.intensityLight;
-                hemi.specular    = toColor3(CONFIG.LIGHTING_AMBIENT.specular);
-                hemi.groundColor = isDark ? toColor3(CONFIG.LIGHTING_AMBIENT.groundColorDark)
-                                          : toColor3(CONFIG.LIGHTING_AMBIENT.groundColorLight);
+                // Ambient hemisphere
+                const _amb = _lc.ambient;
+                const hemi = new BABYLON.HemisphericLight('hemi', toVector3(_amb.direction), _scene);
+                hemi.intensity   = _amb.intensity;
+                hemi.diffuse     = toColor3(_amb.diffuse);
+                hemi.groundColor = toColor3(_amb.groundColor);
+                hemi.specular    = toColor3(_amb.specular);
 
-                // ── Key Light (shadows) — front-right-above ──
-                const key = new BABYLON.DirectionalLight('key', toVector3(CONFIG.LIGHTING_KEY.direction), _scene);
-                key.intensity = isDark ? CONFIG.LIGHTING_KEY.intensityDark : CONFIG.LIGHTING_KEY.intensityLight;
+                // Key light — casts shadows; kept as named local so key.position below stays valid
+                const key = new BABYLON.DirectionalLight('key', toVector3(_lc.key.direction), _scene);
+                key.intensity = _lc.key.intensity;
+                key.diffuse   = toColor3(_lc.key.diffuse);
+                key.specular  = toColor3(_lc.key.diffuse);
 
-                const shadowGenerator = new BABYLON.ShadowGenerator(CONFIG.LIGHTING_KEY.shadowMapSize, key);
+                const shadowGenerator = new BABYLON.ShadowGenerator(_lc.key.shadowMapSize, key);
                 shadowGenerator.usePercentageCloserFiltering = true;
                 shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
-                shadowGenerator.setDarkness(isDark ? CONFIG.LIGHTING_KEY.shadowDarknessDark : CONFIG.LIGHTING_KEY.shadowDarknessLight);
-                shadowGenerator.transparencyShadow = true;  // Enable shadows for transparent/xray-mode meshes
+                shadowGenerator.setDarkness(_lc.key.shadowDarkness);
+                shadowGenerator.transparencyShadow = true;
                 shadowGenerators[canvasId] = shadowGenerator;
 
-                // ── Fill Light (no shadows) — left-front-above ──
-                const fill = new BABYLON.DirectionalLight('fill', toVector3(CONFIG.LIGHTING_FILL.direction), _scene);
-                fill.intensity = isDark ? CONFIG.LIGHTING_FILL.intensityDark : CONFIG.LIGHTING_FILL.intensityLight;
-
-                // ── Back Light (no shadows) — behind-above ──
-                const back = new BABYLON.DirectionalLight('back', toVector3(CONFIG.LIGHTING_BACK.direction), _scene);
-                back.intensity = isDark ? CONFIG.LIGHTING_BACK.intensityDark : CONFIG.LIGHTING_BACK.intensityLight;
+                // Fill / rim lights (no shadows)
+                if (_lc.fill) {
+                    const fill = new BABYLON.DirectionalLight('fill', toVector3(_lc.fill.direction), _scene);
+                    fill.intensity = _lc.fill.intensity;
+                    fill.diffuse   = toColor3(_lc.fill.diffuse);
+                    fill.specular  = new BABYLON.Color3(0.05, 0.05, 0.06);
+                }
+                if (_lc.rim) {
+                    const rim = new BABYLON.DirectionalLight('rim', toVector3(_lc.rim.direction), _scene);
+                    rim.intensity = _lc.rim.intensity;
+                    rim.diffuse   = toColor3(_lc.rim.diffuse);
+                    rim.specular  = toColor3(_lc.rim.diffuse);
+                }
+                if (_lc.back) {
+                    const back2 = new BABYLON.DirectionalLight('back', toVector3(_lc.back.direction), _scene);
+                    back2.intensity = _lc.back.intensity;
+                    back2.diffuse   = toColor3(_lc.back.diffuse);
+                    back2.specular  = new BABYLON.Color3(0.02, 0.02, 0.04);
+                }
 
                 // ── Find real model root nodes (TransformNodes or Meshes at scene root) ──
                 // Operating on scene.rootNodes guarantees local-space == world-space
@@ -2552,6 +2241,14 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 });
                 tagModelMeshesForAnalysis(canvasId, _scene);
 
+                // ── Store material type and apply realistic mode on initial load ──
+                materialTypes[canvasId] = viewerSettings.materialType || 'aluminum';
+                currentRenderModes[canvasId] = viewerSettings.renderMode;
+                if (viewerSettings.renderMode === 'realistic') {
+                    applyRealisticMaterial(canvasId, materialTypes[canvasId]);
+                    applySmoothNormals(canvasId);
+                }
+
                 // Position directional light to correctly cast shadows from the top, front-left
                 const dist = Math.max(
                     finalBb.max.x - finalBb.min.x,
@@ -2574,9 +2271,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 }
 
                 // ── Post Processing ──
-                // Engine is already created with hardware MSAA (new BABYLON.Engine(canvas, true)).
-                // FXAA is intentionally omitted: it blurs wireframes. SSAO is omitted because it
-                // conflicts with the multi-camera setup used for the axis gizmo viewport.
+                // Image processing is configured via scene.imageProcessingConfiguration
+                // (tonemapping, contrast, exposure) inside getOrCreateEnvironmentTexture()
+                // when realistic mode is entered. Hardware MSAA is enabled on engine creation.
+                // Full DefaultRenderingPipeline is intentionally avoided: it adds shader
+                // complexity that conflicts with analysis-tool overlays and the axis gizmo.
 
                 // ── Auto-rotation: idle spin with hover slow-down and click stop ──
                 animStates[canvasId]       = 'idle';
@@ -3131,6 +2830,514 @@ function updateAxisLabels(canvasId, scene, axesCam) {
     });
 }
 
+// ── Studio environment map for realistic PBR reflections ─────────────────────
+
+/**
+ * Creates a simple studio-lighting cube texture for PBR environment reflections.
+ * Without an environment map metallic PBR materials render flat/dark, so this
+ * generates a lightweight procedural cubemap: bright top (softbox), mid-gray
+ * sides, dark bottom.  The texture is cached per scene.
+ * @param {BABYLON.Scene} scene
+ * @param {string} canvasId
+ */
+function getOrCreateEnvironmentTexture(scene, canvasId) {
+    if (environmentTextures[canvasId]) return environmentTextures[canvasId];
+
+    const size = 256;
+
+    /**
+     * Generates a graduated studio-lighting cube face as a raw RGBA Uint8Array.
+     * Identical visual output to the old canvas-gradient approach but fully
+     * synchronous — no Image.onload latency — so PBR materials are lit correctly
+     * on the very first rendered frame after file upload.
+     *
+     * @param {number} r - red 0-255
+     * @param {number} g - green 0-255
+     * @param {number} b - blue 0-255
+     * @param {'top'|'bottom'|'side'} kind - gradient direction
+     * @returns {Uint8Array} RGBA pixels, size×size×4 bytes
+     */
+    function rawFace(r, g, b, kind) {
+        const pixels = new Uint8Array(size * size * 4);
+        const cx = size / 2, cy = size / 2;
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                let fr, fg, fb;
+
+                if (kind === 'top') {
+                    // Radial gradient: inner r=size*0.1, outer r=size*0.72
+                    // stop 0 → bright, stop 0.45 → base, stop 1 → dark
+                    const innerR = size * 0.1, outerR = size * 0.72;
+                    const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                    const t = Math.min(1, Math.max(0, (dist - innerR) / (outerR - innerR)));
+                    if (t <= 0.45) {
+                        const u = t / 0.45;
+                        fr = Math.min(255, r + 30) * (1 - u) + r * u;
+                        fg = Math.min(255, g + 30) * (1 - u) + g * u;
+                        fb = Math.min(255, b + 22) * (1 - u) + b * u;
+                    } else {
+                        const u = (t - 0.45) / 0.55;
+                        fr = r * (1 - u) + Math.max(0, r - 55) * u;
+                        fg = g * (1 - u) + Math.max(0, g - 55) * u;
+                        fb = b * (1 - u) + Math.max(0, b - 48) * u;
+                    }
+                } else if (kind === 'bottom') {
+                    // Flat base with radial shadow overlay (centre 5% alpha → edge 55% alpha)
+                    const innerR = size * 0.05, outerR = size * 0.8;
+                    const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                    const t = Math.min(1, Math.max(0, (dist - innerR) / (outerR - innerR)));
+                    const shadow = 0.05 + t * 0.50;
+                    fr = r * (1 - shadow);
+                    fg = g * (1 - shadow);
+                    fb = b * (1 - shadow);
+                } else {
+                    // Side — linear vertical gradient (top bright, bottom dark)
+                    const t = y / (size - 1);
+                    if (t <= 0.55) {
+                        const u = t / 0.55;
+                        fr = r - 18 * u;
+                        fg = g - 18 * u;
+                        fb = b - 18 * u;
+                    } else {
+                        const u = (t - 0.55) / 0.45;
+                        fr = (r - 18) - 17 * u;
+                        fg = (g - 18) - 17 * u;
+                        fb = (b - 18) - 17 * u;
+                    }
+                }
+
+                const idx = (y * size + x) * 4;
+                pixels[idx]     = Math.round(Math.max(0, Math.min(255, fr)));
+                pixels[idx + 1] = Math.round(Math.max(0, Math.min(255, fg)));
+                pixels[idx + 2] = Math.round(Math.max(0, Math.min(255, fb)));
+                pixels[idx + 3] = 255;
+            }
+        }
+        return pixels;
+    }
+
+    // Studio lighting: bright softbox above, dark floor, neutral grey walls.
+    // Face order for BabylonJS CubeTexture: [+X, -X, +Y, -Y, +Z, -Z]
+    const sidePosX = rawFace(165, 165, 170, 'side');   // +X
+    const sideNegX = rawFace(165, 165, 170, 'side');   // -X
+    const top      = rawFace(238, 238, 232, 'top');     // +Y — overhead softbox
+    const bottom   = rawFace(42,  42,  45,  'bottom'); // -Y — dark floor
+    const sidePosZ = rawFace(165, 165, 170, 'side');   // +Z
+    const sideNegZ = rawFace(155, 155, 160, 'side');   // -Z — slightly darker back wall
+
+    // RawCubeTexture receives typed arrays directly — zero async I/O, zero Image.onload
+    // latency. The old CubeTexture.CreateFromImages approach loaded PNG data-URLs through
+    // the browser Image pipeline asynchronously, so PBR metallic materials (metallic≥0.9)
+    // rendered black on first load because the environment map wasn't ready yet.
+    const cube = new BABYLON.RawCubeTexture(
+        scene,
+        [sidePosX, sideNegX, top, bottom, sidePosZ, sideNegZ],
+        size,
+        BABYLON.Constants.TEXTUREFORMAT_RGBA,
+        BABYLON.Constants.TEXTURETYPE_UNSIGNED_BYTE,
+        true,   // generateMipMaps — needed for smooth specular highlights
+        false,  // invertY
+        BABYLON.Constants.TEXTURE_TRILINEAR_SAMPLINGMODE
+    );
+
+    scene.environmentTexture = cube;
+    scene.environmentIntensity = CONFIG.REALISTIC.environmentIntensity;
+
+    // Image processing for realistic rendering.
+    // Standard tone mapping (linear + gamma) is used instead of ACES because
+    // ACES was designed for HDR cinematic content and compresses mid-range
+    // palette colours (e.g. white POM at 0.95 reads as grey under ACES).
+    scene.imageProcessingConfiguration.contrast = CONFIG.REALISTIC.contrast;
+    scene.imageProcessingConfiguration.exposure = CONFIG.REALISTIC.exposure;
+    scene.imageProcessingConfiguration.toneMappingEnabled = true;
+    scene.imageProcessingConfiguration.toneMappingType =
+        BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
+
+    environmentTextures[canvasId] = cube;
+    return cube;
+}
+
+// ── FDM layer-line MaterialPlugin ─────────────────────────────────────────────
+// Simulates FDM printing layer lines as a world-space Y-periodic surface darkening.
+// UV-independent: works on any GLB regardless of UV quality.
+// Applied only to FDM plastic presets in realistic mode.
+
+const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
+
+class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
+    constructor(material, layerHeightMm) {
+        super(material, 'FdmLayer', 200, { FDMLAYER: false });
+        this._layerHeightMm = layerHeightMm || 0.2;
+        // Activate immediately — markAllSubMeshesAsMiscDirty forces shader recompile
+        this.isEnabled = true;
+    }
+
+    getClassName() { return 'FdmLayerPlugin'; }
+
+    prepareDefines(defines) {
+        defines.FDMLAYER = this._isEnabled;
+    }
+
+    getUniforms() {
+        // Declare the uniform via the UBO path; BabylonJS injects it into the shader automatically
+        return { ubo: [{ name: 'fdmLayerH', size: 1, type: 'float' }] };
+    }
+
+    bindForSubMesh(uniformBuffer) {
+        if (this._isEnabled) uniformBuffer.updateFloat('fdmLayerH', this._layerHeightMm);
+    }
+
+    getCustomCode(shaderType) {
+        if (shaderType !== 'fragment') return null;
+        return {
+            // Inject after all PBR lighting is resolved, before the final gl_FragColor write.
+            // 'color' is the vec4 final fragment colour available at this injection point.
+            // 'vPositionW' is the world-space position (in mm after model scaling).
+            CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+                #ifdef FDMLAYER
+                {
+                    // Periodic groove at each layer boundary (Y = vertical / stacking axis)
+                    float _lPhase = vPositionW.y / max(fdmLayerH, 0.001);
+                    float _ridge  = sin(_lPhase * 6.28318) * 0.5 + 0.5; // 1 = layer centre, 0 = boundary
+                    // Narrow dark groove at boundaries; transparent preset skips (alpha already < 1)
+                    float _groove = smoothstep(0.70, 1.0, 1.0 - _ridge) * 0.18;
+                    color.rgb *= (1.0 - _groove);
+                }
+                #endif
+            `,
+        };
+    }
+}
+
+// ── Realistic material ─────────────────────────────────────────────────────────
+
+/**
+ * Returns (or lazily creates) a PBRMaterial for the given material type.
+ * Each material type is cached per canvas so it is shared across all meshes.
+ * @param {BABYLON.Scene} scene
+ * @param {string} canvasId
+ * @param {string} materialType - key in CONFIG.MATERIAL_REALISTIC
+ * @returns {BABYLON.PBRMaterial}
+ */
+function getRealisticMaterial(scene, canvasId, materialType) {
+    if (!realisticMaterialCache[canvasId]) realisticMaterialCache[canvasId] = {};
+    const cache = realisticMaterialCache[canvasId];
+
+    if (cache[materialType]) return cache[materialType];
+
+    const preset = CONFIG.MATERIAL_REALISTIC[materialType]
+                || CONFIG.MATERIAL_REALISTIC['aluminum'];
+
+    const custom = customAlbedoColors[canvasId];
+
+    const pbr = new BABYLON.PBRMaterial(`__realistic_${materialType}__`, scene);
+    pbr.albedoColor = custom ? toColor3(custom) : toColor3(preset.albedoColor);
+    pbr.metallic     = preset.metallic;
+    pbr.roughness    = preset.roughness;
+
+    // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
+    if (preset.alpha != null && preset.alpha < 1.0) {
+        pbr.alpha            = preset.alpha;
+        pbr.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
+        pbr.needDepthPrePass = true;
+    }
+
+    // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
+    if (FDM_LAYER_PRESET_KEYS.has(materialType)) {
+        new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
+    }
+
+    cache[materialType] = pbr;
+    return pbr;
+}
+
+/**
+ * Applies the selected realistic material to all model meshes in the scene.
+ * Multi-body assemblies receive the same shared configurator-colour material
+ * so all bodies look uniform in realistic mode.  Original per-body materials
+ * are never mutated — they are restored intact on switch back to solid.
+ */
+function applyRealisticMaterial(canvasId, materialType) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    // Ensure an environment texture exists for metallic reflections.
+    getOrCreateEnvironmentTexture(scene, canvasId);
+
+    const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+
+    scene.meshes.forEach(mesh => {
+        if (isSystemMesh(mesh)) return;
+
+        mesh.material = getRealisticMaterial(scene, canvasId, materialType);
+        if (mesh.material instanceof BABYLON.PBRMaterial) {
+            const preset = CONFIG.MATERIAL_REALISTIC[materialType]
+                        || CONFIG.MATERIAL_REALISTIC['aluminum'];
+            mesh.material.metallic  = clamp(preset.metallic + finishMod.metallicOffset, 0, 1);
+            mesh.material.roughness = finishMod.absoluteRoughness != null
+                ? finishMod.absoluteRoughness
+                : clamp(preset.roughness + finishMod.roughnessOffset, 0, 1);
+        }
+    });
+}
+
+/**
+ * Sets the material type for realistic rendering mode and applies it immediately.
+ * Callable from Blazor via JS interop.
+ * @param {string} canvasId
+ * @param {string} materialType - key in CONFIG.MATERIAL_REALISTIC
+ */
+export function setMaterialType(canvasId, materialType) {
+    if (!CONFIG.MATERIAL_REALISTIC[materialType]) {
+        console.warn(`[BabylonViewer] Unknown material type: ${materialType}, falling back to aluminum`);
+        materialType = 'aluminum';
+    }
+    console.log(`[BabylonViewer] setMaterialType canvas=${canvasId} type=${materialType}`);
+
+    // Clear custom color override so the preset albedo is restored
+    delete customAlbedoColors[canvasId];
+
+    // Reset albedo on all cached materials back to their respective presets
+    const cache = realisticMaterialCache[canvasId];
+    if (cache) {
+        Object.entries(cache).forEach(([key, mat]) => {
+            const preset = CONFIG.MATERIAL_REALISTIC[key];
+            if (preset) {
+                mat.albedoColor.set(preset.albedoColor.r, preset.albedoColor.g, preset.albedoColor.b);
+            }
+        });
+    }
+
+    materialTypes[canvasId] = materialType;
+    applyRealisticMaterial(canvasId, materialType);
+}
+
+/**
+ * Overrides the albedo colour of all realistic materials on the fly.
+ * Callable from Blazor on every colour-picker change for real-time feedback.
+ * @param {string} canvasId
+ * @param {string} hexColor - e.g. "#ff8800"
+ */
+export function setMaterialColor(canvasId, hexColor) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+    const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+    const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return;
+
+    customAlbedoColors[canvasId] = { r, g, b };
+
+    // Update albedo in-place on all cached realistic materials
+    const cache = realisticMaterialCache[canvasId];
+    if (cache) {
+        Object.values(cache).forEach(mat => {
+            mat.albedoColor.set(r, g, b);
+        });
+    }
+}
+
+/**
+ * Maps a configurator material key to a realistic PBR preset and applies it along
+ * with an optional custom colour, surface finish, and Ra roughness. Called from Blazor
+ * when the user selects a material, colour, finish, or roughness in the PartConfigSidebar.
+ * @param {string} canvasId
+ * @param {string} materialKey - sanitised key matching a CONFIG.MATERIAL_REALISTIC entry
+ * @param {string|null} colorHex - optional hex colour override (e.g. "#2f6fd6")
+ * @param {string} finishCode - optional surface finish code (e.g. "anodized", "")
+ * @param {string|null} roughnessCode - optional Ra roughness code (e.g. "RA_3_2", "RA_1_6", "RA_0_8")
+ */
+export function configureMaterialFromConfigurator(canvasId, materialKey, colorHex, finishCode = '', roughnessCode = null) {
+    if (!CONFIG.MATERIAL_REALISTIC[materialKey]) {
+        console.warn(`[BabylonViewer] Unknown configurator material: ${materialKey}, falling back to aluminum`);
+        materialKey = 'aluminum';
+    }
+
+    // Reset custom colour if none provided, otherwise store it
+    if (colorHex && /^#[0-9a-fA-F]{6}$/.test(colorHex)) {
+        const r = parseInt(colorHex.slice(1, 3), 16) / 255;
+        const g = parseInt(colorHex.slice(3, 5), 16) / 255;
+        const b = parseInt(colorHex.slice(5, 7), 16) / 255;
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+            customAlbedoColors[canvasId] = { r, g, b };
+        }
+    } else {
+        delete customAlbedoColors[canvasId];
+    }
+
+    // Determine roughness/metallic modifiers from finish type
+    const finishModifiers = getFinishModifiers(finishCode);
+    // Ra roughness code overrides the finish-derived roughness with an absolute value
+    const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
+
+    // Reset albedo on all cached materials back to their respective presets
+    const cache = realisticMaterialCache[canvasId];
+    if (cache) {
+        Object.entries(cache).forEach(([key, mat]) => {
+            const preset = CONFIG.MATERIAL_REALISTIC[key];
+            if (preset) {
+                mat.albedoColor.set(preset.albedoColor.r, preset.albedoColor.g, preset.albedoColor.b);
+                // Ra roughness takes absolute priority; finish offset applies otherwise
+                mat.roughness = raRoughness !== null
+                    ? raRoughness
+                    : clamp(preset.roughness + finishModifiers.roughnessOffset, 0, 1);
+                mat.metallic = clamp(preset.metallic + finishModifiers.metallicOffset, 0, 1);
+            }
+        });
+    }
+
+    // Re-apply custom colour if present (overrides the preset albedo)
+    const custom = customAlbedoColors[canvasId];
+    if (custom && cache) {
+        Object.values(cache).forEach(mat => {
+            mat.albedoColor.set(custom.r, custom.g, custom.b);
+        });
+    }
+
+    materialTypes[canvasId] = materialKey;
+
+    // Store finish modifiers + resolved roughness so setRenderMode can re-apply them
+    perCanvasFinishModifiers[canvasId] = {
+        ...finishModifiers,
+        absoluteRoughness: raRoughness,  // null = use offset, non-null = absolute override
+    };
+
+    // Invalidate the cached material so getRealisticMaterial creates a fresh
+    // instance with the new colour/finish — regardless of current render mode.
+    // This ensures the new colour is used when the user later switches to
+    // realistic mode. BabylonJS ignores mesh.material = sameReference, so a
+    // stale cached instance would silently skip the update.
+    if (realisticMaterialCache[canvasId]) {
+        const old = realisticMaterialCache[canvasId][materialKey];
+        delete realisticMaterialCache[canvasId][materialKey];
+        try { old?.dispose(); } catch (_) {}
+    }
+
+    // Only apply immediately if we are already in realistic mode.
+    if (currentRenderModes[canvasId] === 'realistic') {
+        applyRealisticMaterial(canvasId, materialKey);
+    }
+}
+
+/**
+ * Returns roughness and metallic offsets for a given surface finish code.
+ * These are added to the material preset's base values.
+ */
+function getFinishModifiers(finishCode) {
+    const lower = (finishCode || '').toLowerCase();
+    if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05 };  // shinier, more metallic
+    if (lower.includes('polish')) return { roughnessOffset: -0.20, metallicOffset: 0.0 };   // very smooth
+    if (lower.includes('bead'))   return { roughnessOffset: 0.38, metallicOffset: -0.10 };  // heavily rough, fully matte
+    if (lower.includes('blast'))  return { roughnessOffset: 0.28, metallicOffset: -0.05 };   // roughened, matte
+    if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10 };    // less metallic
+    if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0 };   // slightly smoother
+    return { roughnessOffset: 0.0, metallicOffset: 0.0 };
+}
+
+/** Clamps a value between min and max. */
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+// ── Smooth normals for realistic edge softening ───────────────────────────────
+
+/**
+ * Recomputes per-vertex normals with angle-based smoothing to visually soften
+ * faceted CAD edges — approximating a 0.2 mm fillet without tessellating geometry.
+ * Original hard normals are saved so they can be restored on mode switch.
+ * @param {string} canvasId
+ */
+function applySmoothNormals(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const thresholdRad = (CONFIG.REALISTIC.smoothAngleDeg * Math.PI) / 180;
+    const cosThreshold = Math.cos(thresholdRad);
+
+    if (!originalNormalData[canvasId]) originalNormalData[canvasId] = new Map();
+    const saved = originalNormalData[canvasId];
+
+    scene.meshes.forEach(mesh => {
+        if (isSystemMesh(mesh)) return;
+        if (saved.has(mesh.uniqueId)) return;  // already smoothed
+
+        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+        const indices   = mesh.getIndices();
+        const origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        if (!positions || !indices || !origNorms) return;
+
+        // Save original (hard) normals for restoration
+        saved.set(mesh.uniqueId, new Float32Array(origNorms));
+
+        const vertCount = positions.length / 3;
+        const faceNormals = [];
+        const smoothNormals = new Float32Array(vertCount * 3);
+
+        // Pass 1 — compute face normals
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i] * 3, i1 = indices[i + 1] * 3, i2 = indices[i + 2] * 3;
+            const ax = positions[i1] - positions[i0], ay = positions[i1 + 1] - positions[i0 + 1], az = positions[i1 + 2] - positions[i0 + 2];
+            const bx = positions[i2] - positions[i0], by = positions[i2 + 1] - positions[i0 + 1], bz = positions[i2 + 2] - positions[i0 + 2];
+            const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+            const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+            faceNormals.push(len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len } : { x: 0, y: 0, z: 1 });
+        }
+
+        // Pass 2 — accumulate face normals per vertex (angle-weighted)
+        const faceAdj = new Array(vertCount);
+        for (let v = 0; v < vertCount; v++) faceAdj[v] = [];
+
+        for (let f = 0; f < faceNormals.length; f++) {
+            const fn = faceNormals[f];
+            const v0 = indices[f * 3], v1 = indices[f * 3 + 1], v2 = indices[f * 3 + 2];
+            if (v0 < vertCount) faceAdj[v0].push({ nx: fn.x, ny: fn.y, nz: fn.z });
+            if (v1 < vertCount) faceAdj[v1].push({ nx: fn.x, ny: fn.y, nz: fn.z });
+            if (v2 < vertCount) faceAdj[v2].push({ nx: fn.x, ny: fn.y, nz: fn.z });
+        }
+
+        // Pass 3 — average normals, discarding faces beyond angle threshold
+        for (let v = 0; v < vertCount; v++) {
+            const faces = faceAdj[v];
+            if (faces.length === 0) { smoothNormals[v * 3 + 2] = 1; continue; }
+
+            let sx = 0, sy = 0, sz = 0;
+            const ref = faces[0]; // use first face normal as reference
+            for (let j = 0; j < faces.length; j++) {
+                const f = faces[j];
+                const dot = ref.nx * f.nx + ref.ny * f.ny + ref.nz * f.nz;
+                if (dot >= cosThreshold) { sx += f.nx; sy += f.ny; sz += f.nz; }
+            }
+            const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
+            if (slen > 1e-10) { sx /= slen; sy /= slen; sz /= slen; }
+            smoothNormals[v * 3]     = slen > 1e-10 ? sx : 0;
+            smoothNormals[v * 3 + 1] = slen > 1e-10 ? sy : 0;
+            smoothNormals[v * 3 + 2] = slen > 1e-10 ? sz : 1;
+        }
+
+        mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, smoothNormals);
+    });
+}
+
+/**
+ * Restores the original per-vertex normals saved before smoothing.
+ * @param {string} canvasId
+ */
+function restoreOriginalNormals(canvasId) {
+    const scene = scenes[canvasId];
+    const saved = originalNormalData[canvasId];
+    if (!scene || !saved) return;
+
+    scene.meshes.forEach(mesh => {
+        const orig = saved.get(mesh.uniqueId);
+        if (!orig) return;
+        mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, orig);
+    });
+
+    delete originalNormalData[canvasId];
+}
+
 // ── CAD material ──────────────────────────────────────────────────────────────
 
 /**
@@ -3269,10 +3476,10 @@ function isAnalysisHelperMesh(mesh) {
     return !!mesh?.metadata?.malievAnalysisHelper
         || name === '__grid__'
         || name === '__shadow_catcher__'
-        || name.startsWith('__cutting_mat')
         || name === '__root__'
         || name.startsWith('__axis')
         || name.startsWith('bbox_')
+        || name.startsWith('__cutting_mat')
         || name.startsWith('__section_ghost')
         || name.startsWith('__section_edges_')
         || name.startsWith('__section_hatch_')
@@ -3508,12 +3715,106 @@ function animateMaterialAlpha(material, fromAlpha, toAlpha, scene, duration = CO
     });
 }
 
+// ── applyStudioLighting ───────────────────────────────────────────────────────
+
+/**
+ * Re-applies studio lighting for the given dark/light mode without re-loading the model.
+ * Called when the user toggles the app theme after a model is already loaded.
+ * @param {string} canvasId
+ * @param {boolean} isDark
+ */
+export function applyStudioLighting(canvasId, isDark) {
+    const scene = scenes[canvasId];
+    if (!scene || modelLoadState[canvasId] !== 'loaded') return;
+
+    darkModes[canvasId] = !!isDark;
+
+    // Dispose old shadow generator before disposing lights (prevents orphaned references)
+    const oldShadowGen = shadowGenerators[canvasId];
+    if (oldShadowGen) {
+        try { oldShadowGen.dispose(); } catch (_) {}
+        delete shadowGenerators[canvasId];
+    }
+
+    // Dispose all existing scene lights
+    scene.lights.slice().forEach(l => { try { l.dispose(); } catch (_) {} });
+
+    const _lc = isDark ? CONFIG.STUDIO_DARK : CONFIG.STUDIO_LIGHT;
+
+    // Ambient hemisphere
+    const _amb = _lc.ambient;
+    const hemi = new BABYLON.HemisphericLight('hemi', toVector3(_amb.direction), scene);
+    hemi.intensity   = _amb.intensity;
+    hemi.diffuse     = toColor3(_amb.diffuse);
+    hemi.groundColor = toColor3(_amb.groundColor);
+    hemi.specular    = toColor3(_amb.specular);
+
+    // Key light with shadows
+    const key = new BABYLON.DirectionalLight('key', toVector3(_lc.key.direction), scene);
+    key.intensity = _lc.key.intensity;
+    key.diffuse   = toColor3(_lc.key.diffuse);
+    key.specular  = toColor3(_lc.key.diffuse);
+
+    const shadowGen = new BABYLON.ShadowGenerator(_lc.key.shadowMapSize, key);
+    shadowGen.usePercentageCloserFiltering = true;
+    shadowGen.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
+    shadowGen.setDarkness(_lc.key.shadowDarkness);
+    shadowGen.transparencyShadow = true;
+    shadowGenerators[canvasId] = shadowGen;
+
+    // Fill / rim / back lights
+    if (_lc.fill) {
+        const fill = new BABYLON.DirectionalLight('fill', toVector3(_lc.fill.direction), scene);
+        fill.intensity = _lc.fill.intensity;
+        fill.diffuse   = toColor3(_lc.fill.diffuse);
+        fill.specular  = new BABYLON.Color3(0.05, 0.05, 0.06);
+    }
+    if (_lc.rim) {
+        const rim = new BABYLON.DirectionalLight('rim', toVector3(_lc.rim.direction), scene);
+        rim.intensity = _lc.rim.intensity;
+        rim.diffuse   = toColor3(_lc.rim.diffuse);
+        rim.specular  = toColor3(_lc.rim.diffuse);
+    }
+    if (_lc.back) {
+        const back2 = new BABYLON.DirectionalLight('back', toVector3(_lc.back.direction), scene);
+        back2.intensity = _lc.back.intensity;
+        back2.diffuse   = toColor3(_lc.back.diffuse);
+        back2.specular  = new BABYLON.Color3(0.02, 0.02, 0.04);
+    }
+
+    // Re-position key light relative to model bounds (same logic as initialize)
+    const bb = sceneBoundingBoxes[canvasId];
+    const mc = meshCenters[canvasId];
+    if (bb && mc) {
+        const dist = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
+        key.position = new BABYLON.Vector3(mc.x - dist, mc.y - dist, bb.max.z + dist);
+    }
+
+    // Re-register all model meshes as shadow casters / receivers
+    scene.meshes.forEach(m => {
+        if (m.name?.startsWith('__cutting_mat')) {
+            m.receiveShadows = true;
+            return;
+        }
+        if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis')) {
+            shadowGen.addShadowCaster(m);
+            m.receiveShadows = true;
+        }
+    });
+}
+
 // ── setRenderMode ─────────────────────────────────────────────────────────────
 
 export function setRenderMode(canvasId, mode) {
     const scene = scenes[canvasId];
     if (!scene) return;
     const origMats = originalMaterials[canvasId] ?? {};
+    const prevMode = currentRenderModes[canvasId] || 'solid';
+
+    // Ensure the IBL environment texture exists before assigning PBR materials.
+    // Solid CAD mode also uses PBR material, so it needs the same environment
+    // lighting that realistic mode creates; otherwise the first upload render is too dark.
+    if (mode === 'realistic' || mode === 'solid') getOrCreateEnvironmentTexture(scene, canvasId);
 
     scene.meshes.forEach(mesh => {
         // Skip system meshes: ground grid, axis gizmo parts, bounding box lines
@@ -3546,6 +3847,21 @@ export function setRenderMode(canvasId, mode) {
             mesh.material = tm;
             safeDisableEdges(mesh);
 
+        } else if (mode === 'realistic') {
+            const matType = materialTypes[canvasId] || 'aluminum';
+            const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+            // All bodies (single or multi) share the same configurator-colour realistic material.
+            // Original per-body materials are never mutated — solid mode restores them intact.
+            mesh.material = getRealisticMaterial(scene, canvasId, matType);
+            if (mesh.material instanceof BABYLON.PBRMaterial) {
+                const preset = CONFIG.MATERIAL_REALISTIC[matType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
+                mesh.material.metallic  = clamp(preset.metallic + finishMod.metallicOffset, 0, 1);
+                mesh.material.roughness = finishMod.absoluteRoughness != null
+                    ? finishMod.absoluteRoughness
+                    : clamp(preset.roughness + finishMod.roughnessOffset, 0, 1);
+            }
+            safeDisableEdges(mesh);
+
         } else {
             // Solid — restore the immutable baseline captured at load time.
             // Prefer defaultSolidMaterials (never overwritten by mode switches),
@@ -3567,6 +3883,15 @@ export function setRenderMode(canvasId, mode) {
     if (mode !== 'wireframe' && edgesEnabled[canvasId]) {
         toggleEdges(canvasId, true);
     }
+
+    // Smooth normals transition — apply on enter, restore on leave
+    if (mode === 'realistic' && prevMode !== 'realistic') {
+        applySmoothNormals(canvasId);
+    } else if (mode !== 'realistic' && prevMode === 'realistic') {
+        restoreOriginalNormals(canvasId);
+    }
+    currentRenderModes[canvasId] = mode;
+    _syncCuttingMatRenderMode(canvasId);
 }
 
 // ── setCameraPreset ───────────────────────────────────────────────────────────
@@ -3991,6 +4316,617 @@ export function hideGrid(canvasId) {
     if (grid) grid.dispose();
 }
 
+// ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
+
+const CUTTING_MAT_ANIMATION_MS = 240;
+const CUTTING_MAT_CAMERA_MIN_Z = 0.001;
+const CUTTING_MAT_MINOR_GRID_MM = 10;
+const CUTTING_MAT_MAJOR_GRID_MM = 100;
+const cuttingMatAnimationStates = {};
+const cuttingMatCameraClipStates = {};
+
+/**
+ * Renders a realistic cutting-mat floor at model base (Z=0).
+ *
+ * Design:
+ *   - Brighter green (#2e7d52 surface, lit with emissive baseline)
+ *   - 16 mm margin band: grid lines stop at the border, numbers live in the margin
+ *   - Rounded corners (8 mm radius) in both the visible top and slab geometry
+ *   - Raw RGBA texture upload so the green surface, grid, and labels render immediately
+ *   - Reference-style top-right cutting-mat title, away from the scale labels
+ *   - Manual convex fan triangulation (no CreatePolygon / earcut dependency)
+ */
+export function showCuttingMat(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    _cancelCuttingMatAnimation(canvasId);
+    ['__cutting_mat__', '__cutting_mat_slab__'].forEach(n => {
+        const m = scene.getMeshByName(n);
+        if (m) m.dispose(false, true);
+    });
+
+    const bb = sceneBoundingBoxes[canvasId];
+    if (!bb) {
+        _restoreCuttingMatCameraClipping(canvasId);
+        return;
+    }
+    _relaxCuttingMatCameraClipping(canvasId, scene, true);
+
+    const modelW = bb.max.x - bb.min.x;
+    const modelH = bb.max.y - bb.min.y;
+
+    const PAD    = 60;   // mm clearance around model
+    const MARGIN = 16;   // mm margin band (numbers + title live here, outside grid)
+    const CORNER = 8;    // mm corner fillet radius
+    const THICK  = 3;    // mm slab thickness
+    const matW   = Math.ceil(Math.max(300, modelW + PAD * 2) / 10) * 10;
+    const matH   = Math.ceil(Math.max(220, modelH + PAD * 2) / 10) * 10;
+    const slideOffset = _cuttingMatSlideOffset(bb);
+
+    // ── Texture ───────────────────────────────────────────────────────────────
+    const TEX_W = 2048;
+    const TEX_H = Math.max(256, Math.round(TEX_W * matH / matW));
+    const px    = TEX_W / matW;   // pixels per mm
+    const MPX   = MARGIN * px;    // margin in pixels
+    const CPX   = CORNER * px;    // corner radius in pixels
+
+    // Pre-create a standard HTML canvas — BabylonJS DynamicTexture's internal
+    // canvas suppresses ctx.fillRect in some build configurations, producing a
+    // blue/blank mat surface.  Drawing to a plain canvas always works.
+    // Drawing to canvas first keeps text/grid crisp before the raw RGBA upload.
+    const rawCanvas = document.createElement('canvas');
+    rawCanvas.width  = TEX_W;
+    rawCanvas.height = TEX_H;
+    const ctx = rawCanvas.getContext('2d');
+
+    // Helper: build a rounded-rect path on ctx
+    const _rrPath = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y,     x + w, y + r,   r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x,     y + h, x,     y + h - r, r);
+        ctx.lineTo(x,     y + r);
+        ctx.arcTo(x,     y,     x + r,   y,       r);
+        ctx.closePath();
+    };
+
+    // ── Background with rounded corners ───────────────────────────────────────
+    _rrPath(0, 0, TEX_W, TEX_H, CPX);
+    ctx.fillStyle = '#2d7a4f';
+    ctx.fill();
+    // Clip all subsequent drawing to the rounded rectangle
+    _rrPath(0, 0, TEX_W, TEX_H, CPX);
+    ctx.clip();
+
+    // ── Outer mat border ──────────────────────────────────────────────────────
+    const borderW = Math.max(3, px * 1.6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth   = borderW;
+    _rrPath(borderW / 2, borderW / 2, TEX_W - borderW, TEX_H - borderW, Math.max(0, CPX - borderW / 2));
+    ctx.stroke();
+
+    // ── Inner grid-area border ────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.60)';
+    ctx.lineWidth   = Math.max(2, px * 1.0);
+    ctx.strokeRect(MPX, MPX, TEX_W - 2 * MPX, TEX_H - 2 * MPX);
+
+    // ── Grid lines (symmetric — no mirroring needed) ──────────────────────────
+    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
+        CUTTING_MAT_MINOR_GRID_MM * px, 'rgba(255,255,255,0.28)', Math.max(0.8, px * 0.40), MPX, MPX);
+    _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
+        CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
+
+    // ── Margin title + number labels ──────────────────────────────────────────
+    const LABEL_PX   = Math.round(px * 7.5);
+    const LABEL_STEP = 10 * px;
+    const colCount   = Math.round((matW - 2 * MARGIN) / 10);
+    const rowCount   = Math.round((matH - 2 * MARGIN) / 10);
+    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
+    ctx.font         = `bold ${LABEL_PX}px Arial, sans-serif`;
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CUTTING MAT 3022', TEX_W - MPX * 0.45, MPX * 0.5);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Bottom edge labels (column axis), matching the physical mat reference.
+    for (let i = 0; i <= colCount; i++) {
+        const cx = MPX + i * LABEL_STEP;
+        ctx.fillText(String(i), cx, TEX_H - MPX * 0.5);
+    }
+
+    // Left edge labels (row axis). The top/right margins stay clear for the title.
+    for (let j = 0; j <= rowCount; j++) {
+        const cy = MPX + j * LABEL_STEP;
+        ctx.fillText(String(j), MPX * 0.5, cy);
+    }
+
+    // ── Upload texture from raw RGBA pixels ───────────────────────────────────
+    const tex = _createCuttingMatTexture(scene, rawCanvas, TEX_W, TEX_H);
+
+    // ── Rounded top surface and slab body ─────────────────────────────────────
+    const outline = _roundedRectPoints(matW, matH, CORNER, 8);
+    const topMesh = _createRoundedMatTopMesh(scene, outline, matW, matH);
+
+    const topMat = _createCuttingMatTopMaterial(scene, canvasId, tex, 0);
+    topMesh.material = topMat;
+    topMesh.metadata = { ...(topMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
+    disableSectionClippingForMesh(topMesh);
+
+    const slabMesh = _createRoundedMatSlabMesh(scene, outline, THICK);
+
+    const slabMat = _createCuttingMatSlabMaterial(scene, canvasId, 0);
+    slabMesh.material = slabMat;
+    slabMesh.metadata = { ...(slabMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
+    disableSectionClippingForMesh(slabMesh);
+
+    // ── Hide the shadow catcher ───────────────────────────────────────────────
+    // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
+    // surface.  Leaving it visible causes z-fighting that makes the model shadow
+    // appear shifted / "ghosted" on the mat.  The mat already has receiveShadows=true
+    // so shadows render correctly directly on the mat surface without the catcher.
+    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
+    if (shadowCatcher) shadowCatcher.isVisible = false;
+
+    _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
+        fromZ: -slideOffset,
+        toZ: 0,
+        fromAlpha: 0,
+        toAlpha: 1,
+        onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),
+    });
+}
+
+function _cuttingMatSlideOffset(bb) {
+    const modelHeight = Math.max(0, (bb?.max?.z ?? 0) - (bb?.min?.z ?? 0));
+    return Math.max(12, Math.min(40, modelHeight * 0.35 || 18));
+}
+
+function _cuttingMatNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
+
+function _easeCuttingMat(t) {
+    return t * t * (3 - 2 * t);
+}
+
+function _applyCuttingMatAnimation(meshes, materials, z, alpha) {
+    meshes.forEach(mesh => {
+        if (mesh?.position) mesh.position.z = z;
+    });
+    materials.forEach(material => {
+        if (material) material.alpha = alpha;
+    });
+}
+
+function _cuttingMatAlphaBlendMode() {
+    return BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+}
+
+function _cuttingMatOpaqueMode() {
+    return BABYLON.Material?.MATERIAL_OPAQUE ?? 0;
+}
+
+function _setCuttingMatMaterialsForFade(materials) {
+    materials.forEach(material => {
+        if (!material) return;
+        material.transparencyMode = _cuttingMatAlphaBlendMode();
+        material.needDepthPrePass = false;
+    });
+}
+
+function _setCuttingMatMaterialsOpaque(materials) {
+    materials.forEach(material => {
+        if (!material) return;
+        material.alpha = 1;
+        material.transparencyMode = _cuttingMatOpaqueMode();
+        material.needDepthPrePass = false;
+    });
+}
+
+function _isCuttingMatRealisticMode(canvasId) {
+    return currentRenderModes[canvasId] === 'realistic' && typeof BABYLON.PBRMaterial !== 'undefined';
+}
+
+function _createCuttingMatTopMaterial(scene, canvasId, texture, alpha = 1) {
+    if (_isCuttingMatRealisticMode(canvasId)) {
+        getOrCreateEnvironmentTexture(scene, canvasId);
+        const mat = new BABYLON.PBRMaterial('__cutting_mat_mat_realistic__', scene);
+        mat.albedoTexture = texture;
+        mat.albedoColor = new BABYLON.Color3(1, 1, 1);
+        mat.metallic = 0;
+        mat.roughness = 0.72;
+        mat.emissiveColor = new BABYLON.Color3(0.005, 0.018, 0.010);
+        mat.backFaceCulling = false;
+        mat.useAlphaFromAlbedoTexture = false;
+        mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
+        mat.needDepthPrePass = false;
+        mat.alpha = alpha;
+        return mat;
+    }
+
+    const mat = new BABYLON.StandardMaterial('__cutting_mat_mat__', scene);
+    mat.diffuseTexture = texture;
+    mat.useAlphaFromDiffuseTexture = false;
+    mat.diffuseColor = new BABYLON.Color3(1, 1, 1);
+    mat.emissiveColor = new BABYLON.Color3(0.04, 0.12, 0.06);
+    mat.ambientColor = new BABYLON.Color3(0.18, 0.42, 0.26);
+    mat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
+    mat.backFaceCulling = false;
+    mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
+    mat.alphaCutOff = 0.5;
+    mat.alpha = alpha;
+    return mat;
+}
+
+function _createCuttingMatSlabMaterial(scene, canvasId, alpha = 1) {
+    if (_isCuttingMatRealisticMode(canvasId)) {
+        getOrCreateEnvironmentTexture(scene, canvasId);
+        const mat = new BABYLON.PBRMaterial('__cutting_mat_slab_mat_realistic__', scene);
+        mat.albedoColor = new BABYLON.Color3(0.12, 0.40, 0.24);
+        mat.metallic = 0;
+        mat.roughness = 0.82;
+        mat.emissiveColor = new BABYLON.Color3(0.004, 0.014, 0.008);
+        mat.backFaceCulling = false;
+        mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
+        mat.needDepthPrePass = false;
+        mat.alpha = alpha;
+        return mat;
+    }
+
+    const mat = new BABYLON.StandardMaterial('__cutting_mat_slab_mat__', scene);
+    mat.diffuseColor = new BABYLON.Color3(0.12, 0.40, 0.24);
+    mat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
+    mat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
+    mat.backFaceCulling = false;
+    mat.transparencyMode = alpha < 1 ? _cuttingMatAlphaBlendMode() : _cuttingMatOpaqueMode();
+    mat.alpha = alpha;
+    return mat;
+}
+
+function _syncCuttingMatRenderMode(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const top = _sceneMeshByName(scene, '__cutting_mat__');
+    const slab = _sceneMeshByName(scene, '__cutting_mat_slab__');
+    const wantPbr = _isCuttingMatRealisticMode(canvasId);
+
+    if (top?.material && (!!(top.material instanceof BABYLON.PBRMaterial) !== wantPbr)) {
+        const oldMat = top.material;
+        const texture = oldMat.albedoTexture ?? oldMat.diffuseTexture ?? null;
+        top.material = _createCuttingMatTopMaterial(scene, canvasId, texture, oldMat.alpha ?? 1);
+        try { oldMat.dispose?.(false, false); } catch (_) {}
+    }
+
+    if (slab?.material && (!!(slab.material instanceof BABYLON.PBRMaterial) !== wantPbr)) {
+        const oldMat = slab.material;
+        slab.material = _createCuttingMatSlabMaterial(scene, canvasId, oldMat.alpha ?? 1);
+        try { oldMat.dispose?.(false, false); } catch (_) {}
+    }
+
+    [top, slab].forEach(mesh => {
+        if (!mesh) return;
+        mesh.receiveShadows = true;
+        disableSectionClippingForMesh(mesh);
+    });
+}
+
+function _sceneMeshByName(scene, name) {
+    return scene?.getMeshByName?.(name) ?? scene?.meshes?.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+}
+
+function _cuttingMatCamera(canvasId, scene) {
+    return mainCameras[canvasId] ?? scene?.activeCamera ?? null;
+}
+
+function _enforceCuttingMatCameraClipping(canvasId, scene) {
+    const state = cuttingMatCameraClipStates[canvasId];
+    const camera = _cuttingMatCamera(canvasId, scene);
+    if (!state || !camera || typeof camera.minZ !== 'number') return;
+    camera.minZ = CUTTING_MAT_CAMERA_MIN_Z;
+}
+
+function _hasCuttingMatMesh(scene) {
+    return !!(_sceneMeshByName(scene, '__cutting_mat__') || _sceneMeshByName(scene, '__cutting_mat_slab__'));
+}
+
+function _relaxCuttingMatCameraClipping(canvasId, scene, force = false) {
+    const camera = _cuttingMatCamera(canvasId, scene);
+    if (!camera || typeof camera.minZ !== 'number') return;
+
+    const state = cuttingMatCameraClipStates[canvasId];
+    if (!force && !state && !_hasCuttingMatMesh(scene)) return;
+    if (state?.camera && state.camera !== camera) {
+        _restoreCuttingMatCameraClipping(canvasId);
+    }
+
+    if (!cuttingMatCameraClipStates[canvasId]) {
+        cuttingMatCameraClipStates[canvasId] = { camera, minZ: camera.minZ, scene, observer: null };
+    }
+
+    const activeState = cuttingMatCameraClipStates[canvasId];
+    if (!activeState.observer && scene?.onBeforeRenderObservable?.add) {
+        activeState.observer = scene.onBeforeRenderObservable.add(() => {
+            _enforceCuttingMatCameraClipping(canvasId, scene);
+        });
+    }
+
+    _enforceCuttingMatCameraClipping(canvasId, scene);
+}
+
+function _restoreCuttingMatCameraClipping(canvasId) {
+    const state = cuttingMatCameraClipStates[canvasId];
+    if (!state) return;
+
+    if (state.observer && state.scene?.onBeforeRenderObservable?.remove) {
+        state.scene.onBeforeRenderObservable.remove(state.observer);
+    }
+
+    if (state.camera && typeof state.camera.minZ === 'number'
+        && state.camera.minZ <= CUTTING_MAT_CAMERA_MIN_Z + 0.000001) {
+        state.camera.minZ = state.minZ;
+    }
+
+    delete cuttingMatCameraClipStates[canvasId];
+}
+
+function _cancelCuttingMatAnimation(canvasId) {
+    const state = cuttingMatAnimationStates[canvasId];
+    if (!state) return;
+    if (state.observer && state.scene?.onBeforeRenderObservable?.remove) {
+        state.scene.onBeforeRenderObservable.remove(state.observer);
+    }
+    delete cuttingMatAnimationStates[canvasId];
+}
+
+function _animateCuttingMat(canvasId, scene, meshes, materials, options) {
+    const durationMs = CUTTING_MAT_ANIMATION_MS;
+    const startedAt = _cuttingMatNow();
+
+    const apply = eased => {
+        const z = options.fromZ + (options.toZ - options.fromZ) * eased;
+        const alpha = options.fromAlpha + (options.toAlpha - options.fromAlpha) * eased;
+        _applyCuttingMatAnimation(meshes, materials, z, alpha);
+    };
+
+    apply(0);
+
+    if (!scene.onBeforeRenderObservable?.add) {
+        apply(1);
+        options.onComplete?.();
+        return;
+    }
+
+    const state = { scene, observer: null };
+    const tick = () => {
+        const elapsed = Math.max(0, _cuttingMatNow() - startedAt);
+        const t = Math.min(1, elapsed / durationMs);
+        apply(_easeCuttingMat(t));
+
+        if (t >= 1) {
+            if (state.observer && scene.onBeforeRenderObservable?.remove) {
+                scene.onBeforeRenderObservable.remove(state.observer);
+            }
+            if (cuttingMatAnimationStates[canvasId] === state) {
+                delete cuttingMatAnimationStates[canvasId];
+            }
+            options.onComplete?.();
+        }
+    };
+
+    state.observer = scene.onBeforeRenderObservable.add(tick);
+    cuttingMatAnimationStates[canvasId] = state;
+}
+
+function _createCuttingMatTexture(scene, rawCanvas, width, height) {
+    const ctx = rawCanvas.getContext('2d');
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+
+    if (BABYLON.RawTexture?.CreateRGBATexture) {
+        const samplingMode = BABYLON.Constants?.TEXTURE_TRILINEAR_SAMPLINGMODE
+            ?? BABYLON.Texture?.TRILINEAR_SAMPLINGMODE
+            ?? 3;
+        const tex = BABYLON.RawTexture.CreateRGBATexture(
+            pixels,
+            width,
+            height,
+            scene,
+            true,
+            false,
+            samplingMode);
+        tex.hasAlpha = false;
+        if (BABYLON.Texture?.CLAMP_ADDRESSMODE !== undefined) {
+            tex.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+            tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        }
+        return tex;
+    }
+
+    const tex = new BABYLON.DynamicTexture('__cutting_mat_tex__', { width, height }, scene, false);
+    tex.hasAlpha = false;
+    const texCtx = tex.getContext?.();
+    if (texCtx?.putImageData) {
+        texCtx.putImageData(ctx.getImageData(0, 0, width, height), 0, 0);
+    } else if (texCtx?.drawImage) {
+        texCtx.drawImage(rawCanvas, 0, 0);
+    }
+    tex.update(false);
+    return tex;
+}
+
+function _roundedRectPoints(width, height, radius, segments) {
+    const hw = width / 2;
+    const hh = height / 2;
+    const r = Math.min(radius, hw, hh);
+    const arcs = [
+        { cx:  hw - r, cy:  hh - r, start: 0, end: Math.PI / 2 },
+        { cx: -hw + r, cy:  hh - r, start: Math.PI / 2, end: Math.PI },
+        { cx: -hw + r, cy: -hh + r, start: Math.PI, end: Math.PI * 1.5 },
+        { cx:  hw - r, cy: -hh + r, start: Math.PI * 1.5, end: Math.PI * 2 },
+    ];
+    const pts = [];
+    arcs.forEach(arc => {
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const a = arc.start + (arc.end - arc.start) * t;
+            pts.push({
+                x: arc.cx + Math.cos(a) * r,
+                y: arc.cy + Math.sin(a) * r,
+            });
+        }
+    });
+    return pts;
+}
+
+function _cuttingMatUv(x, y, width, height) {
+    return {
+        u: 1 - ((x + width / 2) / width),
+        v: 1 - ((y + height / 2) / height),
+    };
+}
+
+function _createRoundedMatTopMesh(scene, outline, width, height) {
+    const mesh = new BABYLON.Mesh('__cutting_mat__', scene);
+    const positions = [0, 0, 0];
+    const indices = [];
+    const normals = [0, 0, 1];
+    const uvs = [0.5, 0.5];
+
+    outline.forEach(p => {
+        positions.push(p.x, p.y, 0);
+        normals.push(0, 0, 1);
+        const uv = _cuttingMatUv(p.x, p.y, width, height);
+        uvs.push(uv.u, uv.v);
+    });
+
+    for (let i = 1; i <= outline.length; i++) {
+        const next = i === outline.length ? 1 : i + 1;
+        indices.push(0, i, next);
+    }
+
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.normals = normals;
+    vertexData.uvs = uvs;
+    vertexData.applyToMesh(mesh);
+
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    return markAnalysisHelperMesh(mesh);
+}
+
+function _createRoundedMatSlabMesh(scene, outline, thickness) {
+    const mesh = new BABYLON.Mesh('__cutting_mat_slab__', scene);
+    const positions = [];
+    const indices = [];
+    const topZ = -0.08;
+    const bottomZ = -thickness;
+
+    outline.forEach(p => positions.push(p.x, p.y, topZ));
+    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
+
+    const n = outline.length;
+    for (let i = 0; i < n; i++) {
+        const next = (i + 1) % n;
+        indices.push(i, next, next + n, i, next + n, i + n);
+    }
+
+    const bottomCenterIndex = positions.length / 3;
+    positions.push(0, 0, bottomZ);
+    outline.forEach(p => positions.push(p.x, p.y, bottomZ));
+    for (let i = 0; i < n; i++) {
+        const current = bottomCenterIndex + 1 + i;
+        const next = bottomCenterIndex + 1 + ((i + 1) % n);
+        indices.push(bottomCenterIndex, next, current);
+    }
+
+    const normals = [];
+    if (BABYLON.VertexData.ComputeNormals) {
+        BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    }
+
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    if (normals.length > 0) vertexData.normals = normals;
+    vertexData.applyToMesh(mesh);
+
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    return markAnalysisHelperMesh(mesh);
+}
+
+/**
+ * Draws a uniform grid pass (horizontal + vertical) clipped to an inset rectangle.
+ * offsetX/Y shift the grid origin so lines start at the grid-area edge.
+ */
+function _cuttingMatGridLines(ctx, w, h, step, color, lineWidth, offsetX = 0, offsetY = 0) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = lineWidth;
+    ctx.beginPath();
+    for (let x = 0; x <= w + 0.5; x += step) {
+        ctx.moveTo(x + offsetX, offsetY);
+        ctx.lineTo(x + offsetX, offsetY + h);
+    }
+    for (let y = 0; y <= h + 0.5; y += step) {
+        ctx.moveTo(offsetX,     y + offsetY);
+        ctx.lineTo(offsetX + w, y + offsetY);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
+/**
+ * Removes the cutting-mat meshes (top plane + slab body) from the scene,
+ * disposing materials and texture resources together to avoid memory leaks.
+ */
+export function hideCuttingMat(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    _cancelCuttingMatAnimation(canvasId);
+    const meshes = ['__cutting_mat__', '__cutting_mat_slab__']
+        .map(n => scene.getMeshByName(n))
+        .filter(Boolean);
+    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
+
+    if (meshes.length === 0) {
+        if (shadowCatcher) shadowCatcher.isVisible = true;
+        _restoreCuttingMatCameraClipping(canvasId);
+        return;
+    }
+
+    const materials = meshes.map(mesh => mesh.material).filter(Boolean);
+    const slideOffset = Math.max(...meshes.map(mesh => mesh.metadata?.malievCuttingMatSlideOffset ?? 18));
+    const fromZ = meshes[0]?.position?.z ?? 0;
+    const fromAlpha = materials[0]?.alpha ?? 1;
+    _setCuttingMatMaterialsForFade(materials);
+
+    _animateCuttingMat(canvasId, scene, meshes, materials, {
+        fromZ,
+        toZ: -slideOffset,
+        fromAlpha,
+        toAlpha: 0,
+        onComplete: () => {
+            meshes.forEach(mesh => mesh.dispose(false, true));
+            if (shadowCatcher) shadowCatcher.isVisible = true;
+            _restoreCuttingMatCameraClipping(canvasId);
+        },
+    });
+}
+
 // ── setCameraProjection ───────────────────────────────────────────────────────
 
 /**
@@ -4017,6 +4953,7 @@ export function setCameraProjection(canvasId, mode) {
         cam.orthoTop    =  half;
         cam.orthoBottom = -half;
         cam.minZ        = Math.max(meshRadius * CONFIG.CAMERA_NEAR_PLANE, 0.01);
+        _relaxCuttingMatCameraClipping(canvasId, scenes[canvasId]);
 
         // Keep ortho bounds in sync when the user zooms — but do NOT move camera!
         // Accumulate zoom factor and compute ortho bounds from it, then reset cam.radius.
@@ -4043,6 +4980,7 @@ export function setCameraProjection(canvasId, mode) {
                 _orthoGuard = true;
                 cam.radius = initialRadius;
                 cam.minZ    = Math.max(meshRadius * CONFIG.CAMERA_NEAR_PLANE, 0.01);
+                _relaxCuttingMatCameraClipping(canvasId, scenes[canvasId]);
                 _orthoGuard = false;
             });
         }
@@ -4053,6 +4991,7 @@ export function setCameraProjection(canvasId, mode) {
                 if (cameraProjection[canvasId] === 'orthographic') return;
                 if (panStates[canvasId]?.active) return;  // Skip during pan to prevent stutter
                 cam.minZ = 0.1;
+                _relaxCuttingMatCameraClipping(canvasId, scenes[canvasId]);
             });
         }
     } else {
@@ -4063,6 +5002,7 @@ export function setCameraProjection(canvasId, mode) {
         }
         cam.mode = BABYLON.Camera.PERSPECTIVE_CAMERA;
         cam.minZ  = 0.01;
+        _relaxCuttingMatCameraClipping(canvasId, scenes[canvasId]);
     }
 
     // Re-apply edges at the width suitable for the new projection mode.
@@ -4154,17 +5094,18 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
         const isMultiBody = overlayKey === 'GENERAL__multi_body';
         meshes.forEach(mesh => {
             const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_mat`, scene);
-            mat.metallic        = 0;
-            mat.roughness       = 0.8;
-            mat.backFaceCulling = false;
+            mat.metallic  = 0;
+            mat.roughness = 0.8;
             if (isMultiBody) {
                 // Multi-body overlay: honour per-body vertex colours baked into the GLB.
+                mat.backFaceCulling = false; // both faces needed for vertex-colored body mesh
                 mat.useVertexColors = true;
                 mat.albedoColor     = new BABYLON.Color3(1, 1, 1); // multiply with vertex colour
                 mat.alpha           = 0.85;
                 mat.emissiveColor   = new BABYLON.Color3(0, 0, 0);
                 mat.zOffset         = 0; // bodies sit on the model surface — no depth bias needed
             } else {
+                mat.backFaceCulling = true; // hide back faces to reduce noisy internal geometry
                 // Process-specific DFM issue: look up per-category style, fall back to red.
                 mat.useVertexColors = false;
                 const categorySuffix = overlayKey.includes('__')
@@ -5057,6 +5998,20 @@ export function dispose(canvasId) {
     }
 
     disposeSectionVisuals(canvasId, scenes[canvasId]);
+
+    // Clean up realistic material cache
+    if (realisticMaterialCache[canvasId]) {
+        Object.values(realisticMaterialCache[canvasId]).forEach(mat => {
+            try { mat.dispose(); } catch (_) {}
+        });
+        delete realisticMaterialCache[canvasId];
+    }
+    delete materialTypes[canvasId];
+    delete environmentTextures[canvasId];
+    delete originalNormalData[canvasId];
+    delete currentRenderModes[canvasId];
+    delete customAlbedoColors[canvasId];
+    delete perCanvasFinishModifiers[canvasId];
 
     scenes[canvasId]?.dispose();
     engine?.dispose();
@@ -6248,5 +7203,11 @@ window.babylonViewer = {
     enableThicknessAnalysis,
     disableThicknessAnalysis,
     enableBodyPicking,
-    clearBodySelection
+    clearBodySelection,
+    setMaterialType,
+    setMaterialColor,
+    configureMaterialFromConfigurator,
+    applyStudioLighting,
+    showGrid,
+    hideGrid
 };

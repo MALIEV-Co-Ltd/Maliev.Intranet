@@ -199,6 +199,9 @@ function loadViewerContext() {
                     this.b = b;
                 }
             },
+            ImageProcessingConfiguration: {
+                TONEMAPPING_STANDARD: 1,
+            },
             Matrix: {
                 Identity: () => ({}),
                 RotationX: () => ({}),
@@ -327,6 +330,11 @@ function loadViewerContext() {
                     rawTextureCalls.push(texture);
                     return texture;
                 },
+            },
+            RawCubeTexture: class RawCubeTexture {
+                constructor(scene) {
+                    this.scene = scene;
+                }
             },
             StandardMaterial: class StandardMaterial {
                 constructor(name) {
@@ -589,9 +597,9 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.ok(start.slabZ < 0);
     assert.equal(start.topAlpha, 0);
     assert.equal(start.slabAlpha, 0);
-    assert.equal(start.cameraMinZ, 0.003);
+    assert.equal(start.cameraMinZ, 0.001);
     assert.equal(start.shadowVisible, false);
-    assert.equal(renderTicks.length, 1);
+    assert.equal(renderTicks.length, 2);
 
     now += 120;
     renderTicks.at(-1)();
@@ -622,8 +630,12 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(shown.topZ, 0);
     assert.equal(shown.topAlpha, 1);
     assert.equal(shown.topTransparencyMode, 0);
-    assert.equal(shown.cameraMinZ, 0.003);
+    assert.equal(shown.cameraMinZ, 0.001);
     assert.equal(removedTicks.length, 1);
+
+    context.scene.activeCamera.minZ = 0.1;
+    renderTicks[0]();
+    assert.equal(context.scene.activeCamera.minZ, 0.001);
 
     const hideStart = vm.runInContext(`
         (() => {
@@ -636,7 +648,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(hideStart.topExists, true);
     assert.equal(hideStart.topZ, 0);
     assert.equal(hideStart.topAlpha, 1);
-    assert.equal(renderTicks.length, 2);
+    assert.equal(renderTicks.length, 3);
 
     now += 120;
     renderTicks.at(-1)();
@@ -666,7 +678,47 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(hidden.slabExists, false);
     assert.equal(hidden.cameraMinZ, 0.1);
     assert.equal(hidden.shadowVisible, true);
-    assert.equal(removedTicks.length, 2);
+    assert.equal(removedTicks.length, 3);
+});
+
+test('cutting mat uses PBR materials when realistic render mode is active', () => {
+    const context = loadViewerContext();
+    const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
+    context.scene = {
+        meshes: [shadowCatcher],
+        materials: [],
+        imageProcessingConfiguration: {},
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        currentRenderModes.viewer = 'realistic';
+        sceneBoundingBoxes.viewer = {
+            min: { x: -30, y: -12, z: 0 },
+            max: { x: 30, y: 12, z: 36 }
+        };
+        showCuttingMat('viewer');
+        const top = scene.getMeshByName('__cutting_mat__');
+        const slab = scene.getMeshByName('__cutting_mat_slab__');
+        ({
+            topIsPbr: top.material instanceof BABYLON.PBRMaterial,
+            slabIsPbr: slab.material instanceof BABYLON.PBRMaterial,
+            topHasAlbedoTexture: !!top.material.albedoTexture,
+            topMetallic: top.material.metallic,
+            topRoughness: top.material.roughness,
+            slabRoughness: slab.material.roughness
+        });
+    `, context);
+
+    assert.equal(result.topIsPbr, true);
+    assert.equal(result.slabIsPbr, true);
+    assert.equal(result.topHasAlbedoTexture, true);
+    assert.equal(result.topMetallic, 0);
+    assert.ok(result.topRoughness > 0.5);
+    assert.ok(result.slabRoughness > 0.5);
 });
 
 test('section hatch generation uses model meshes and excludes section ghost meshes', () => {
