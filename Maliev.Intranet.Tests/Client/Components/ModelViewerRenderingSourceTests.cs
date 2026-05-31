@@ -28,6 +28,41 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("roughness: 0.34", aluminumBlock, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RealisticNormals_UseAdaptiveToleranceAndAreaWeightedAveraging()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("normalPositionToleranceMin", source, StringComparison.Ordinal);
+        Assert.Contains("normalPositionToleranceRatio", source, StringComparison.Ordinal);
+        Assert.Contains("function getSmoothNormalPositionTolerance", source, StringComparison.Ordinal);
+        Assert.Contains("const positionTolerance = getSmoothNormalPositionTolerance(positions);", source, StringComparison.Ordinal);
+        Assert.Contains("weight: area", source, StringComparison.Ordinal);
+        Assert.Contains("sx += f.x * weight", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticEnvironment_UsesHigherResolutionFilteredStudioCube()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("environmentTextureSize: 512", source, StringComparison.Ordinal);
+        Assert.Contains("const size = CONFIG.REALISTIC.environmentTextureSize || 512;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("const size = 256;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticPbrMaterials_EnableSpecularFilteringForSmoothMetalReflections()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function configureRealisticPbrQuality(pbr)", source, StringComparison.Ordinal);
+        Assert.Contains("pbr.enableSpecularAntiAliasing = true;", source, StringComparison.Ordinal);
+        Assert.Contains("pbr.realTimeFiltering = true;", source, StringComparison.Ordinal);
+        Assert.Contains("pbr.realTimeFilteringQuality = BABYLON.Constants.TEXTURE_FILTERING_QUALITY_HIGH;", source, StringComparison.Ordinal);
+        Assert.Contains("configureRealisticPbrQuality(pbr);", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

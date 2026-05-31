@@ -238,12 +238,15 @@ const CONFIG = {
         environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
         contrast: 1.15,
         exposure: 1.1,
+        environmentTextureSize: 512,
         /** Edge angle threshold in degrees for normal smoothing. Edges sharper
          *  than this stay hard; gentler creases get blended. 0 = no smoothing,
-         *  180 = fully smooth all edges. Raised from 30 to 55 to handle low-poly
-         *  CAD tesselation where facet angles routinely exceed 30 degrees. */
-        smoothAngleDeg: 55,
+         *  180 = fully smooth all edges. Raised from 55 to 75 to handle coarse
+         *  STL/CAD tesselation while preserving true 90-degree edges. */
+        smoothAngleDeg: 75,
         normalPositionTolerance: 0.001,
+        normalPositionToleranceMin: 0.01,
+        normalPositionToleranceRatio: 0.00005,
     },
 
     // =========================================================================
@@ -2909,7 +2912,7 @@ function updateAxisLabels(canvasId, scene, axesCam) {
 function getOrCreateEnvironmentTexture(scene, canvasId) {
     if (environmentTextures[canvasId]) return environmentTextures[canvasId];
 
-    const size = 256;
+    const size = CONFIG.REALISTIC.environmentTextureSize || 512;
 
     /**
      * Generates a graduated studio-lighting cube face as a raw RGBA Uint8Array.
@@ -3077,6 +3080,14 @@ class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
 
 // ── Realistic material ─────────────────────────────────────────────────────────
 
+function configureRealisticPbrQuality(pbr) {
+    if (!pbr) return;
+
+    pbr.enableSpecularAntiAliasing = true;
+    pbr.realTimeFiltering = true;
+    pbr.realTimeFilteringQuality = BABYLON.Constants.TEXTURE_FILTERING_QUALITY_HIGH;
+}
+
 /**
  * Returns (or lazily creates) a PBRMaterial for the given material type.
  * Each material type is cached per canvas so it is shared across all meshes.
@@ -3100,6 +3111,7 @@ function getRealisticMaterial(scene, canvasId, materialType) {
     pbr.albedoColor = custom ? toColor3(custom) : toColor3(preset.albedoColor);
     pbr.metallic     = preset.metallic;
     pbr.roughness    = preset.roughness;
+    configureRealisticPbrQuality(pbr);
 
     // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
     if (preset.alpha != null && preset.alpha < 1.0) {
@@ -3307,8 +3319,27 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function getSmoothNormalPositionKey(positions, offset) {
-    const tolerance = CONFIG.REALISTIC.normalPositionTolerance || 0.001;
+function getSmoothNormalPositionTolerance(positions) {
+    const minTolerance = CONFIG.REALISTIC.normalPositionToleranceMin
+        || CONFIG.REALISTIC.normalPositionTolerance
+        || 0.001;
+    const ratio = CONFIG.REALISTIC.normalPositionToleranceRatio || 0;
+    if (!positions || positions.length < 6 || ratio <= 0) return minTolerance;
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+        minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
+    }
+
+    const dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+    const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return Math.max(minTolerance, diagonal * ratio);
+}
+
+function getSmoothNormalPositionKey(positions, offset, tolerance = CONFIG.REALISTIC.normalPositionTolerance || 0.001) {
     const qx = Math.round(positions[offset] / tolerance);
     const qy = Math.round(positions[offset + 1] / tolerance);
     const qz = Math.round(positions[offset + 2] / tolerance);
@@ -3366,6 +3397,7 @@ function applySmoothNormals(canvasId) {
         const faceNormals = [];
         const positionFaceMap = new Map();
         const smoothNormals = new Float32Array(vertCount * 3);
+        const positionTolerance = getSmoothNormalPositionTolerance(positions);
 
         // Pass 1 — compute face normals
         for (let i = 0; i < indices.length; i += 3) {
@@ -3375,12 +3407,13 @@ function applySmoothNormals(canvasId) {
             const bx = positions[i2] - positions[i0], by = positions[i2 + 1] - positions[i0 + 1], bz = positions[i2 + 2] - positions[i0 + 2];
             const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
             const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-            const fn = len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len } : { x: 0, y: 0, z: 1 };
+            const area = len * 0.5;
+            const fn = len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len, weight: area } : { x: 0, y: 0, z: 1, weight: 1 };
             faceNormals.push(fn);
 
             [v0, v1, v2].forEach(v => {
                 if (v >= vertCount) return;
-                const key = getSmoothNormalPositionKey(positions, v * 3);
+                const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
                 const faces = positionFaceMap.get(key) || [];
                 faces.push(fn);
                 positionFaceMap.set(key, faces);
@@ -3391,7 +3424,7 @@ function applySmoothNormals(canvasId) {
         // CAD/STL imports commonly duplicate vertices per triangle, so index-only
         // adjacency leaves round surfaces faceted and causes jagged PBR reflections.
         for (let v = 0; v < vertCount; v++) {
-            const key = getSmoothNormalPositionKey(positions, v * 3);
+            const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
             const faces = positionFaceMap.get(key) || [];
             if (faces.length === 0) { smoothNormals[v * 3 + 2] = 1; continue; }
 
@@ -3400,7 +3433,12 @@ function applySmoothNormals(canvasId) {
             for (let j = 0; j < faces.length; j++) {
                 const f = faces[j];
                 const dot = refNormal.x * f.x + refNormal.y * f.y + refNormal.z * f.z;
-                if (dot >= cosThreshold) { sx += f.x; sy += f.y; sz += f.z; }
+                if (dot >= cosThreshold) {
+                    const weight = f.weight || 1;
+                    sx += f.x * weight;
+                    sy += f.y * weight;
+                    sz += f.z * weight;
+                }
             }
             const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
             if (slen > 1e-10) { sx /= slen; sy /= slen; sz /= slen; }
