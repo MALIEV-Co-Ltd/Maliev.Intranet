@@ -4335,8 +4335,11 @@ const CUTTING_MAT_ANIMATION_MS = 240;
 const CUTTING_MAT_CAMERA_MIN_Z = 0.001;
 const CUTTING_MAT_MINOR_GRID_MM = 10;
 const CUTTING_MAT_MAJOR_GRID_MM = 100;
-const CUTTING_MAT_LOGO_FONT_MM = 7.0;
 const CUTTING_MAT_NUMBER_FONT_MM = 4.5;
+const MALIEV_LOGO_VIEWBOX = { width: 449.33078, height: 103.18751 };
+const MALIEV_LOGO_GROUP_TRANSLATE = { x: 178.09872, y: -25.13541 };
+// Source: wwwroot/images/logo.svg. Keep this path in sync with the asset.
+const MALIEV_LOGO_PATH = 'M 246.47181,25.13541 220.60482,96.206993 194.73651,25.13541 H 112.1492 v 103.1875 h 82.12005 l -7.5983,-20.90209 H 135.43254 V 86.783323 l 43.73483,-10e-4 -7.02072,-19.31352 h -36.71411 v -21.69583 l 42.02139,10e-4 30.04555,82.548947 h 26.17523 L 271.23205,25.13541 Z M 83.045039,128.32291 H 106.32837 V 25.13541 H 83.045039 Z m -126.51,-41.538527 11.54854,-30.12334 11.54985,30.12228 z m 85.235,-61.648973 h -24.87084 v 91.01666 l -36.7284,-91.01666 h -24.17312 l -36.72973,91.01666 V 25.13541 h -24.341659 l -24.34167,42.212423 -24.34167,-42.212423 h -24.34167 v 103.1875 h 24.34167 V 76.729163 l 17.03996,30.691657 h 14.60474 l 17.03864,-30.691657 v 51.593747 h 45.682159 l 8.01502,-20.90209 h 38.92153 l 8.0139697,20.90209 H 76.959619 v -20.90209 h -35.18958 z';
 const cuttingMatAnimationStates = {};
 const cuttingMatCameraClipStates = {};
 
@@ -4437,17 +4440,12 @@ export function showCuttingMat(canvasId) {
         CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
 
     // ── Margin logo + number labels ───────────────────────────────────────────
-    const LOGO_LABEL_PX   = Math.round(px * CUTTING_MAT_LOGO_FONT_MM);
     const NUMBER_LABEL_PX = Math.round(px * CUTTING_MAT_NUMBER_FONT_MM);
     const LABEL_STEP      = 10 * px;
     const colCount        = Math.round((matW - 2 * MARGIN) / 10);
     const rowCount        = Math.round((matH - 2 * MARGIN) / 10);
     ctx.fillStyle         = 'rgba(255,255,255,0.88)';
-    ctx.font              = `900 ${LOGO_LABEL_PX}px Arial Black, Arial, sans-serif`;
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('MALIEV', TEX_W - MPX * 0.45, MPX * 0.5);
+    _drawCuttingMatLogo(ctx, TEX_W - MPX * 0.45, MPX * 0.5, MPX * 0.44);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -4499,6 +4497,29 @@ export function showCuttingMat(canvasId) {
         toAlpha: 1,
         onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),
     });
+}
+
+function _drawCuttingMatLogo(ctx, rightX, centerY, logoHeight) {
+    if (typeof Path2D === 'undefined') {
+        ctx.font = `900 ${Math.round(logoHeight)}px Arial Black, Arial, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('MALIEV', rightX, centerY);
+        return;
+    }
+
+    const scale = logoHeight / MALIEV_LOGO_VIEWBOX.height;
+    const logoWidth = MALIEV_LOGO_VIEWBOX.width * scale;
+    const leftX = rightX - logoWidth;
+    const topY = centerY - logoHeight / 2;
+    const path = new Path2D(MALIEV_LOGO_PATH);
+
+    ctx.save();
+    ctx.translate(leftX, topY);
+    ctx.scale(scale, scale);
+    ctx.translate(MALIEV_LOGO_GROUP_TRANSLATE.x, MALIEV_LOGO_GROUP_TRANSLATE.y);
+    ctx.fill(path);
+    ctx.restore();
 }
 
 function _cuttingMatSlideOffset(bb) {

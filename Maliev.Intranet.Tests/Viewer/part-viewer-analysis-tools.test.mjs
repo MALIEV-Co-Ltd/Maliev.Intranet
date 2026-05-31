@@ -97,6 +97,15 @@ class Ray {
 
 const createdCanvasContexts = [];
 
+function readLogoSvgPath() {
+    const svg = fs.readFileSync('Maliev.Intranet.Client/wwwroot/images/logo.svg', 'utf8');
+    return /<path[\s\S]*?\sd="([^"]+)"/.exec(svg)?.[1] ?? '';
+}
+
+function normalizeSvgPath(path) {
+    return path.replace(/\s+/g, ' ').trim();
+}
+
 function createCanvasContext() {
     const calls = [];
     let font = '';
@@ -576,11 +585,15 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     const drawCalls = createdCanvasContexts.at(-1)?.calls ?? [];
     const mirroredTextCalls = drawCalls.filter(call => call[0] === 'scale' && call[1] < 0);
     const legacyTitleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
-    const logoCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'MALIEV');
+    const plainLogoTextCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'MALIEV');
+    const svgLogoCalls = drawCalls.filter(call => call[0] === 'fill' && call[1]?.path?.includes('246.47181'));
+    const logoSvgPath = readLogoSvgPath();
     const numberTextCalls = drawCalls.filter(call => call[0] === 'fillText' && /^[0-9]+$/.test(call[1]));
     assert.equal(mirroredTextCalls.length, 0);
     assert.equal(legacyTitleCalls.length, 0);
-    assert.equal(logoCalls.length, 1);
+    assert.equal(plainLogoTextCalls.length, 0);
+    assert.equal(svgLogoCalls.length, 1);
+    assert.equal(normalizeSvgPath(svgLogoCalls[0][1].path), normalizeSvgPath(logoSvgPath));
     assert.ok(numberTextCalls.length > 0);
     const numericFontSizes = numberTextCalls
         .map(call => /bold\s+(\d+)px/.exec(call[4])?.[1])
