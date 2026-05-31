@@ -1659,7 +1659,11 @@ function applyPreset(cam, presetName, smooth = false, canvasId = null) {
 // ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
 
 const CUTTING_MAT_ANIMATION_MS = 240;
+const CUTTING_MAT_CAMERA_MIN_Z = 0.003;
+const CUTTING_MAT_MINOR_GRID_MM = 10;
+const CUTTING_MAT_MAJOR_GRID_MM = 100;
 const cuttingMatAnimationStates = {};
+const cuttingMatCameraClipStates = {};
 
 /**
  * Renders a realistic cutting-mat floor at model base (Z=0).
@@ -1684,6 +1688,7 @@ export function showCuttingMat(canvasId) {
 
     const bb = sceneBoundingBoxes[canvasId];
     if (!bb) return;
+    _relaxCuttingMatCameraClipping(canvasId, scene);
 
     const modelW = bb.max.x - bb.min.x;
     const modelH = bb.max.y - bb.min.y;
@@ -1749,9 +1754,9 @@ export function showCuttingMat(canvasId) {
 
     // ── Grid lines (symmetric — no mirroring needed) ──────────────────────────
     _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
-        5  * px, 'rgba(255,255,255,0.28)', Math.max(0.8, px * 0.40), MPX, MPX);
+        CUTTING_MAT_MINOR_GRID_MM * px, 'rgba(255,255,255,0.28)', Math.max(0.8, px * 0.40), MPX, MPX);
     _cuttingMatGridLines(ctx, TEX_W - 2 * MPX, TEX_H - 2 * MPX,
-        10 * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
+        CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
 
     // ── Margin title + number labels ──────────────────────────────────────────
     const LABEL_PX   = Math.round(px * 7.5);
@@ -1789,12 +1794,13 @@ export function showCuttingMat(canvasId) {
 
     const topMat = new BABYLON.StandardMaterial('__cutting_mat_mat__', scene);
     topMat.diffuseTexture        = tex;
+    topMat.useAlphaFromDiffuseTexture = false;
     topMat.diffuseColor          = new BABYLON.Color3(1, 1, 1);
     topMat.emissiveColor         = new BABYLON.Color3(0.04, 0.12, 0.06);
     topMat.ambientColor          = new BABYLON.Color3(0.18, 0.42, 0.26);
     topMat.specularColor         = new BABYLON.Color3(0.02, 0.05, 0.03);
     topMat.backFaceCulling       = false;
-    topMat.transparencyMode      = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+    topMat.transparencyMode      = _cuttingMatAlphaBlendMode();
     topMat.alphaCutOff           = 0.5;
     topMat.alpha                 = 0;
     topMesh.material = topMat;
@@ -1808,7 +1814,7 @@ export function showCuttingMat(canvasId) {
     slabMat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.08);
     slabMat.specularColor = new BABYLON.Color3(0.02, 0.05, 0.03);
     slabMat.backFaceCulling = false;
-    slabMat.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+    slabMat.transparencyMode = _cuttingMatAlphaBlendMode();
     slabMat.alpha = 0;
     slabMesh.material = slabMat;
     slabMesh.metadata = { ...(slabMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
@@ -1827,6 +1833,7 @@ export function showCuttingMat(canvasId) {
         toZ: 0,
         fromAlpha: 0,
         toAlpha: 1,
+        onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),
     });
 }
 
@@ -1852,6 +1859,63 @@ function _applyCuttingMatAnimation(meshes, materials, z, alpha) {
     materials.forEach(material => {
         if (material) material.alpha = alpha;
     });
+}
+
+function _cuttingMatAlphaBlendMode() {
+    return BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+}
+
+function _cuttingMatOpaqueMode() {
+    return BABYLON.Material?.MATERIAL_OPAQUE ?? 0;
+}
+
+function _setCuttingMatMaterialsForFade(materials) {
+    materials.forEach(material => {
+        if (!material) return;
+        material.transparencyMode = _cuttingMatAlphaBlendMode();
+        material.needDepthPrePass = false;
+    });
+}
+
+function _setCuttingMatMaterialsOpaque(materials) {
+    materials.forEach(material => {
+        if (!material) return;
+        material.alpha = 1;
+        material.transparencyMode = _cuttingMatOpaqueMode();
+        material.needDepthPrePass = false;
+    });
+}
+
+function _cuttingMatCamera(canvasId, scene) {
+    return mainCameras[canvasId] ?? scene?.activeCamera ?? null;
+}
+
+function _relaxCuttingMatCameraClipping(canvasId, scene) {
+    const camera = _cuttingMatCamera(canvasId, scene);
+    if (!camera || typeof camera.minZ !== 'number') return;
+
+    const state = cuttingMatCameraClipStates[canvasId];
+    if (state?.camera && state.camera !== camera) {
+        _restoreCuttingMatCameraClipping(canvasId);
+    }
+
+    if (!cuttingMatCameraClipStates[canvasId]) {
+        cuttingMatCameraClipStates[canvasId] = { camera, minZ: camera.minZ };
+    }
+
+    camera.minZ = Math.min(camera.minZ, CUTTING_MAT_CAMERA_MIN_Z);
+}
+
+function _restoreCuttingMatCameraClipping(canvasId) {
+    const state = cuttingMatCameraClipStates[canvasId];
+    if (!state) return;
+
+    if (state.camera && typeof state.camera.minZ === 'number'
+        && state.camera.minZ <= CUTTING_MAT_CAMERA_MIN_Z + 0.000001) {
+        state.camera.minZ = state.minZ;
+    }
+
+    delete cuttingMatCameraClipStates[canvasId];
 }
 
 function _cancelCuttingMatAnimation(canvasId) {
@@ -1918,7 +1982,7 @@ function _createCuttingMatTexture(scene, rawCanvas, width, height) {
             true,
             false,
             samplingMode);
-        tex.hasAlpha = true;
+        tex.hasAlpha = false;
         if (BABYLON.Texture?.CLAMP_ADDRESSMODE !== undefined) {
             tex.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
             tex.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
@@ -1927,7 +1991,7 @@ function _createCuttingMatTexture(scene, rawCanvas, width, height) {
     }
 
     const tex = new BABYLON.DynamicTexture('__cutting_mat_tex__', { width, height }, scene, false);
-    tex.hasAlpha = true;
+    tex.hasAlpha = false;
     const texCtx = tex.getContext?.();
     if (texCtx?.putImageData) {
         texCtx.putImageData(ctx.getImageData(0, 0, width, height), 0, 0);
@@ -2078,6 +2142,7 @@ export function hideCuttingMat(canvasId) {
 
     if (meshes.length === 0) {
         if (shadowCatcher) shadowCatcher.isVisible = true;
+        _restoreCuttingMatCameraClipping(canvasId);
         return;
     }
 
@@ -2085,6 +2150,7 @@ export function hideCuttingMat(canvasId) {
     const slideOffset = Math.max(...meshes.map(mesh => mesh.metadata?.malievCuttingMatSlideOffset ?? 18));
     const fromZ = meshes[0]?.position?.z ?? 0;
     const fromAlpha = materials[0]?.alpha ?? 1;
+    _setCuttingMatMaterialsForFade(materials);
 
     _animateCuttingMat(canvasId, scene, meshes, materials, {
         fromZ,
@@ -2094,6 +2160,7 @@ export function hideCuttingMat(canvasId) {
         onComplete: () => {
             meshes.forEach(mesh => mesh.dispose(false, true));
             if (shadowCatcher) shadowCatcher.isVisible = true;
+            _restoreCuttingMatCameraClipping(canvasId);
         },
     });
 }

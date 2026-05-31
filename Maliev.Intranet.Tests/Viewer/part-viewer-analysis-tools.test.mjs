@@ -232,6 +232,8 @@ function loadViewerContext() {
                 }
             },
             Material: {
+                MATERIAL_OPAQUE: 0,
+                MATERIAL_ALPHABLEND: 2,
                 MATERIAL_ALPHATEST: 4,
             },
             Constants: {
@@ -495,7 +497,8 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
             dynamicTextureCount: dynamicTextureCalls.length,
             rawTextureWidth: rawTextureCalls[0]?.width,
             rawTextureDataLength: rawTextureCalls[0]?.data?.length,
-            topHasAlphaTexture: top?.material?.diffuseTexture?.hasAlpha === true,
+            topTextureHasAlpha: top?.material?.diffuseTexture?.hasAlpha === true,
+            topTransparencyMode: top?.material?.transparencyMode,
             firstOutlineUv: top?.vertexData?.uvs?.slice(2, 4),
             topVertexCount: (top?.vertexData?.positions?.length ?? 0) / 3,
             slabVertexCount: (slab?.vertexData?.positions?.length ?? 0) / 3,
@@ -507,7 +510,8 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.equal(result.dynamicTextureCount, 0);
     assert.equal(result.rawTextureWidth, 2048);
     assert.ok(result.rawTextureDataLength > 2048 * 256 * 4);
-    assert.equal(result.topHasAlphaTexture, true);
+    assert.equal(result.topTextureHasAlpha, false);
+    assert.equal(result.topTransparencyMode, 0);
     assert.equal(result.firstOutlineUv[0], 0);
     assert.ok(result.topVertexCount > 12);
     assert.ok(result.slabVertexCount > 24);
@@ -518,6 +522,19 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     const titleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
     assert.equal(mirroredTextCalls.length, 0);
     assert.equal(titleCalls.length, 1);
+
+    const gridBorderIndex = drawCalls.findIndex(call => call[0] === 'strokeRect');
+    assert.notEqual(gridBorderIndex, -1);
+    const gridCalls = drawCalls.slice(gridBorderIndex + 1);
+    const firstGridStrokeIndex = gridCalls.findIndex(call => call[0] === 'stroke');
+    const secondGridStrokeIndex = gridCalls.findIndex((call, index) => index > firstGridStrokeIndex && call[0] === 'stroke');
+    assert.notEqual(firstGridStrokeIndex, -1);
+    assert.notEqual(secondGridStrokeIndex, -1);
+
+    const minorGridLineCount = gridCalls.slice(0, firstGridStrokeIndex).filter(call => call[0] === 'moveTo').length;
+    const majorGridLineCount = gridCalls.slice(firstGridStrokeIndex + 1, secondGridStrokeIndex).filter(call => call[0] === 'moveTo').length;
+    assert.equal(minorGridLineCount, 46);
+    assert.equal(majorGridLineCount, 5);
 });
 
 test('cutting mat fades in from below and fades out before disposal', () => {
@@ -529,8 +546,10 @@ test('cutting mat fades in from below and fades out before disposal', () => {
 
     const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
     shadowCatcher.isVisible = true;
+    const camera = { minZ: 0.1 };
     context.scene = {
         meshes: [shadowCatcher],
+        activeCamera: camera,
         getMeshByName(name) {
             return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
         },
@@ -560,6 +579,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
             slabZ: slab.position.z,
             topAlpha: top.material.alpha,
             slabAlpha: slab.material.alpha,
+            cameraMinZ: scene.activeCamera.minZ,
             shadowVisible: scene.getMeshByName('__shadow_catcher__').isVisible
             };
         })();
@@ -569,6 +589,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.ok(start.slabZ < 0);
     assert.equal(start.topAlpha, 0);
     assert.equal(start.slabAlpha, 0);
+    assert.equal(start.cameraMinZ, 0.003);
     assert.equal(start.shadowVisible, false);
     assert.equal(renderTicks.length, 1);
 
@@ -589,12 +610,19 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     const shown = vm.runInContext(`
         (() => {
             const top = scene.getMeshByName('__cutting_mat__');
-            return { topZ: top.position.z, topAlpha: top.material.alpha };
+            return {
+                topZ: top.position.z,
+                topAlpha: top.material.alpha,
+                topTransparencyMode: top.material.transparencyMode,
+                cameraMinZ: scene.activeCamera.minZ
+            };
         })();
     `, context);
 
     assert.equal(shown.topZ, 0);
     assert.equal(shown.topAlpha, 1);
+    assert.equal(shown.topTransparencyMode, 0);
+    assert.equal(shown.cameraMinZ, 0.003);
     assert.equal(removedTicks.length, 1);
 
     const hideStart = vm.runInContext(`
@@ -629,12 +657,14 @@ test('cutting mat fades in from below and fades out before disposal', () => {
         (() => ({
             topExists: !!scene.getMeshByName('__cutting_mat__'),
             slabExists: !!scene.getMeshByName('__cutting_mat_slab__'),
+            cameraMinZ: scene.activeCamera.minZ,
             shadowVisible: scene.getMeshByName('__shadow_catcher__').isVisible
         }))();
     `, context);
 
     assert.equal(hidden.topExists, false);
     assert.equal(hidden.slabExists, false);
+    assert.equal(hidden.cameraMinZ, 0.1);
     assert.equal(hidden.shadowVisible, true);
     assert.equal(removedTicks.length, 2);
 });
