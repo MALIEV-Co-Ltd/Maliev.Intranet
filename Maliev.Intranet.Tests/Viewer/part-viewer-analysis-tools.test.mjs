@@ -210,6 +210,12 @@ function loadViewerContext() {
             ImageProcessingConfiguration: {
                 TONEMAPPING_STANDARD: 1,
             },
+            GridMaterial: class GridMaterial {
+                constructor(name) {
+                    this.name = name;
+                    this.backFaceCulling = true;
+                }
+            },
             Matrix: {
                 Identity: () => ({}),
                 RotationX: () => ({}),
@@ -485,6 +491,40 @@ test('model mesh registry marks only real model geometry pickable for analysis',
     assert.deepEqual(result.filter(m => m.model).map(m => m.name), ['model']);
     assert.equal(result.find(m => m.name === 'model').pickable, true);
     assert.equal(result.find(m => m.name === '__section_ghost_1').pickable, false);
+});
+
+test('showGrid uses a low-contrast grid floor in light mode', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        meshes: [],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        darkModes.viewer = false;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -25, y: -10, z: 0 },
+            max: { x: 25, y: 10, z: 30 }
+        };
+        showGrid('viewer');
+        const grid = scene.getMeshByName('__grid__');
+        ({
+            gridOpacity: grid.material.opacity,
+            minorUnitVisibility: grid.material.minorUnitVisibility,
+            lineColor: grid.material.lineColor,
+            mainColor: grid.material.mainColor,
+            receivesShadows: grid.receiveShadows
+        });
+    `, context);
+
+    assert.equal(result.receivesShadows, true);
+    assert.ok(result.gridOpacity <= 0.45);
+    assert.ok(result.minorUnitVisibility <= 0.35);
+    assert.ok(result.lineColor.r >= 0.72);
+    assert.ok(result.mainColor.r >= 0.93);
 });
 
 test('cutting mat creates an RGBA-textured rounded floor at the model base', () => {

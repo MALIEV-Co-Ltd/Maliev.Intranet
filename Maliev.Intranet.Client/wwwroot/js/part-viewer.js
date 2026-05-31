@@ -357,11 +357,19 @@ const CONFIG = {
     /** Grid configuration */
     GRID: {
         majorUnitFrequency: 10,      // Major line every 10 cells (gridRatio=10mm, so major every 100mm)
-        minorUnitVisibility: 0.55,   // Minor line visibility — raised for readable 10mm grid
         gridRatio: 10,               // 10mm grid cells (minor lines every 10mm)
-        mainColor: { r: 0.85, g: 0.85, b: 0.85 },
-        lineColor: { r: 0.55, g: 0.55, b: 0.55 },
-        opacity: 0.70,
+        light: {
+            minorUnitVisibility: 0.30,
+            mainColor: { r: 0.96, g: 0.97, b: 0.98 },
+            lineColor: { r: 0.78, g: 0.81, b: 0.86 },
+            opacity: 0.38,
+        },
+        dark: {
+            minorUnitVisibility: 0.55,   // Raised for readable 10mm grid on dark backgrounds
+            mainColor: { r: 0.85, g: 0.85, b: 0.85 },
+            lineColor: { r: 0.55, g: 0.55, b: 0.55 },
+            opacity: 0.70,
+        },
     },
 
     // =========================================================================
@@ -4253,6 +4261,10 @@ function clearBoundingBox(canvasId) {
 
 // ── showGrid / hideGrid ───────────────────────────────────────────────────────
 
+function getGridThemeConfig(canvasId) {
+    return isDarkMode(canvasId) ? CONFIG.GRID.dark : CONFIG.GRID.light;
+}
+
 /**
  * Shows a grid floor at the model's base (Z=0 after centering) to visualise
  * the print bed / machine table. Uses a 10mm-spaced GridMaterial.
@@ -4286,13 +4298,14 @@ export function showGrid(canvasId) {
 
     if (typeof BABYLON.GridMaterial !== 'undefined') {
         const mat = new BABYLON.GridMaterial('__grid_mat__', scene);
+        const gridTheme = getGridThemeConfig(canvasId);
         mat.majorUnitFrequency = CONFIG.GRID.majorUnitFrequency;
-        mat.minorUnitVisibility = CONFIG.GRID.minorUnitVisibility;
+        mat.minorUnitVisibility = gridTheme.minorUnitVisibility;
         mat.gridRatio = CONFIG.GRID.gridRatio;
         mat.backFaceCulling = false;
-        mat.mainColor   = toColor3(CONFIG.GRID.mainColor);
-        mat.lineColor   = toColor3(CONFIG.GRID.lineColor);
-        mat.opacity     = CONFIG.GRID.opacity;
+        mat.mainColor   = toColor3(gridTheme.mainColor);
+        mat.lineColor   = toColor3(gridTheme.lineColor);
+        mat.opacity     = gridTheme.opacity;
         ground.material = mat;
         disableSectionClippingForMesh(ground);
     } else {
