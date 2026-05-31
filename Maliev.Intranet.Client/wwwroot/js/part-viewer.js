@@ -3033,36 +3033,41 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
 
 const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
 
-class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
-    constructor(material, layerHeightMm) {
-        super(material, 'FdmLayer', 200, { FDMLAYER: false });
-        this._layerHeightMm = layerHeightMm || 0.2;
-        // Activate immediately — markAllSubMeshesAsMiscDirty forces shader recompile
-        this.isEnabled = true;
-    }
+let FdmLayerPluginClass = null;
 
-    getClassName() { return 'FdmLayerPlugin'; }
+function getFdmLayerPluginClass() {
+    if (FdmLayerPluginClass) return FdmLayerPluginClass;
 
-    prepareDefines(defines) {
-        defines.FDMLAYER = this._isEnabled;
-    }
+    FdmLayerPluginClass = class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
+        constructor(material, layerHeightMm) {
+            super(material, 'FdmLayer', 200, { FDMLAYER: false });
+            this._layerHeightMm = layerHeightMm || 0.2;
+            // Activate immediately — markAllSubMeshesAsMiscDirty forces shader recompile
+            this.isEnabled = true;
+        }
 
-    getUniforms() {
-        // Declare the uniform via the UBO path; BabylonJS injects it into the shader automatically
-        return { ubo: [{ name: 'fdmLayerH', size: 1, type: 'float' }] };
-    }
+        getClassName() { return 'FdmLayerPlugin'; }
 
-    bindForSubMesh(uniformBuffer) {
-        if (this._isEnabled) uniformBuffer.updateFloat('fdmLayerH', this._layerHeightMm);
-    }
+        prepareDefines(defines) {
+            defines.FDMLAYER = this._isEnabled;
+        }
 
-    getCustomCode(shaderType) {
-        if (shaderType !== 'fragment') return null;
-        return {
-            // Inject after all PBR lighting is resolved, before the final gl_FragColor write.
-            // 'color' is the vec4 final fragment colour available at this injection point.
-            // 'vPositionW' is the world-space position (in mm after model scaling).
-            CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+        getUniforms() {
+            // Declare the uniform via the UBO path; BabylonJS injects it into the shader automatically
+            return { ubo: [{ name: 'fdmLayerH', size: 1, type: 'float' }] };
+        }
+
+        bindForSubMesh(uniformBuffer) {
+            if (this._isEnabled) uniformBuffer.updateFloat('fdmLayerH', this._layerHeightMm);
+        }
+
+        getCustomCode(shaderType) {
+            if (shaderType !== 'fragment') return null;
+            return {
+                // Inject after all PBR lighting is resolved, before the final gl_FragColor write.
+                // 'color' is the vec4 final fragment colour available at this injection point.
+                // 'vPositionW' is the world-space position (in mm after model scaling).
+                CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef FDMLAYER
                 {
                     // Periodic groove at each layer boundary (Y = vertical / stacking axis)
@@ -3074,8 +3079,11 @@ class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
                 }
                 #endif
             `,
-        };
-    }
+            };
+        }
+    };
+
+    return FdmLayerPluginClass;
 }
 
 // ── Realistic material ─────────────────────────────────────────────────────────
@@ -3122,6 +3130,7 @@ function getRealisticMaterial(scene, canvasId, materialType) {
 
     // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
     if (FDM_LAYER_PRESET_KEYS.has(materialType)) {
+        const FdmLayerPlugin = getFdmLayerPluginClass();
         new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
     }
 

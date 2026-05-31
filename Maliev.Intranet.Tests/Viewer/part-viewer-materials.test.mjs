@@ -148,6 +148,26 @@ test('solid CAD render mode prepares PBR environment lighting on first material 
     assert.equal(result.toneMappingEnabled, true);
 });
 
+test('viewer module imports before Babylon globals are loaded', async () => {
+    const previousWindow = globalThis.window;
+    delete globalThis.BABYLON;
+    globalThis.window = {};
+
+    try {
+        const viewerPath = new URL(
+            `../../Maliev.Intranet.Client/wwwroot/js/part-viewer.js?import-before-babylon=${Date.now()}`,
+            import.meta.url);
+
+        await import(viewerPath.href);
+    } finally {
+        if (previousWindow === undefined) {
+            delete globalThis.window;
+        } else {
+            globalThis.window = previousWindow;
+        }
+    }
+});
+
 test('studio lighting keeps shadows soft enough for dark studio mode', () => {
     const context = loadViewerContext();
 
