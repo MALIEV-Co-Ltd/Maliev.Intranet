@@ -83,7 +83,6 @@ public partial class PartConfigSidebar : ComponentBase
     private const string PaintColorReferenceKey = "paint_color_reference";
     private const string MaterialColorKey = "material_color";
     private const string MaterialImageBasePath = "/images/materials/";
-    private const string OptionImageFallbackScript = "this.hidden=true;this.nextElementSibling.hidden=false;";
 
     private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
     {

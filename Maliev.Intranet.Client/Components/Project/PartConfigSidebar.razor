@@ -79,16 +79,9 @@
                     var active = SelectedMaterial?.Id == mat.Id;
                     <button class="pcs-mat-card @(active ? "pcs-mat-card--active" : "")"
                             @onclick="@(() => OnMaterialChanged(mat))">
-                        <span class="pcs-mat-swatch pcs-option-image-frame">
-                            <img class="pcs-option-image"
-                                 src="@GetMaterialImageUrl(mat)"
-                                 alt=""
-                                 loading="lazy"
-                                 onerror="@OptionImageFallbackScript" />
-                            <span class="pcs-option-image-fallback" hidden>
-                                <MudIcon Icon="@Icons.Material.Outlined.Category" Size="Size.Small" />
-                            </span>
-                        </span>
+                        <OptionImageFrame Class="pcs-mat-swatch"
+                                          ImageUrl="@GetMaterialImageUrl(mat)"
+                                          FallbackIcon="@Icons.Material.Outlined.Category" />
                         <div class="pcs-mat-info">
                             <div class="pcs-mat-name">@mat.Name</div>
                             @if (!string.IsNullOrEmpty(mat.Description))
@@ -123,16 +116,9 @@
                         var active = string.Equals(currentColor, color, StringComparison.OrdinalIgnoreCase);
                         <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
                                 @onclick="@(() => OnMaterialColorChanged(color))">
-                            <span class="pcs-color-chip pcs-option-image-frame pcs-option-image-frame--small">
-                                <img class="pcs-option-image"
-                                     src="@GetMaterialColorImageUrl(color)"
-                                     alt=""
-                                     loading="lazy"
-                                     onerror="@OptionImageFallbackScript" />
-                                <span class="pcs-option-image-fallback" hidden>
-                                    <MudIcon Icon="@Icons.Material.Outlined.Palette" Size="Size.Small" />
-                                </span>
-                            </span>
+                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                              ImageUrl="@GetMaterialColorImageUrl(color)"
+                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
                             <span>@color</span>
                             @if (active)
                             {
@@ -159,16 +145,9 @@
                     var active = IsSelectedFinishGroup(fin);
                     <button class="pcs-fin-card @(active ? "pcs-fin-card--active" : "")"
                             @onclick="@(() => OnFinishChanged(fin))">
-                        <span class="pcs-fin-swatch pcs-option-image-frame">
-                            <img class="pcs-option-image"
-                                 src="@GetSurfaceFinishImageUrl(fin)"
-                                 alt=""
-                                 loading="lazy"
-                                 onerror="@OptionImageFallbackScript" />
-                            <span class="pcs-option-image-fallback" hidden>
-                                <MudIcon Icon="@Icons.Material.Outlined.AutoFixHigh" Size="Size.Small" />
-                            </span>
-                        </span>
+                        <OptionImageFrame Class="pcs-fin-swatch"
+                                          ImageUrl="@GetSurfaceFinishImageUrl(fin)"
+                                          FallbackIcon="@Icons.Material.Outlined.AutoFixHigh" />
                         <div class="pcs-fin-info">
                             <div class="pcs-fin-name">@GetSurfaceFinishDisplayName(fin)</div>
                             @if (!string.IsNullOrEmpty(fin.Description))
@@ -254,16 +233,9 @@
                             var active = string.Equals(Part!.RoughnessCode, roughness.Code, StringComparison.OrdinalIgnoreCase);
                             <button class="pcs-choice-card pcs-roughness-card @(active ? "pcs-choice-card--active" : "")"
                                     @onclick="@(() => OnRoughnessChanged(roughness.Code))">
-                                <span class="pcs-choice-swatch pcs-option-image-frame">
-                                    <img class="pcs-option-image"
-                                         src="@GetRoughnessImageUrl(roughness.Code)"
-                                         alt=""
-                                         loading="lazy"
-                                         onerror="@OptionImageFallbackScript" />
-                                    <span class="pcs-option-image-fallback" hidden>
-                                        <MudIcon Icon="@Icons.Material.Outlined.Grain" Size="Size.Small" />
-                                    </span>
-                                </span>
+                                <OptionImageFrame Class="pcs-choice-swatch"
+                                                  ImageUrl="@GetRoughnessImageUrl(roughness.Code)"
+                                                  FallbackIcon="@Icons.Material.Outlined.Grain" />
                                 <div class="pcs-choice-info">
                                     <div class="pcs-choice-name">@roughness.Name</div>
                                     <div class="pcs-choice-sub">@roughness.Description</div>
@@ -291,16 +263,9 @@
                             disabled="@(!HasSelectedProcess)"
                             aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
-                        <span class="pcs-choice-swatch pcs-option-image-frame">
-                            <img class="pcs-option-image"
-                                 src='@GetFeatureImageUrl("tapped_holes")'
-                                 alt=""
-                                 loading="lazy"
-                                 onerror="@OptionImageFallbackScript" />
-                            <span class="pcs-option-image-fallback" hidden>
-                                <MudIcon Icon="@Icons.Material.Outlined.Construction" Size="Size.Small" />
-                            </span>
-                        </span>
+                        <OptionImageFrame Class="pcs-choice-swatch"
+                                          ImageUrl='@GetFeatureImageUrl("tapped_holes")'
+                                          FallbackIcon="@Icons.Material.Outlined.Construction" />
                         <div class="pcs-choice-info">
                             <div class="pcs-choice-name">Tapped holes</div>
                             <div class="pcs-choice-sub">Internal threads cut into the part.</div>
@@ -316,16 +281,9 @@
                             disabled="@(!HasSelectedProcess)"
                             aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                             @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
-                        <span class="pcs-choice-swatch pcs-option-image-frame">
-                            <img class="pcs-option-image"
-                                 src='@GetFeatureImageUrl("thread_inserts")'
-                                 alt=""
-                                 loading="lazy"
-                                 onerror="@OptionImageFallbackScript" />
-                            <span class="pcs-option-image-fallback" hidden>
-                                <MudIcon Icon="@Icons.Material.Outlined.Hardware" Size="Size.Small" />
-                            </span>
-                        </span>
+                        <OptionImageFrame Class="pcs-choice-swatch"
+                                          ImageUrl='@GetFeatureImageUrl("thread_inserts")'
+                                          FallbackIcon="@Icons.Material.Outlined.Hardware" />
                         <div class="pcs-choice-info">
                             <div class="pcs-choice-name">Thread inserts</div>
                             <div class="pcs-choice-sub">Installed threaded hardware such as Helicoil or heat-set inserts.</div>
@@ -369,16 +327,9 @@
                                     var enabled = GetProcessOptionBool(opt.ConfigKey);
                                     <button class="pcs-choice-card @(enabled ? "pcs-choice-card--active" : "")"
                                             @onclick="@(() => OnProcessOptionBoolChanged(opt.ConfigKey, !enabled))">
-                                        <span class="pcs-choice-swatch pcs-option-image-frame">
-                                            <img class="pcs-option-image"
-                                                 src="@GetBooleanOptionImageUrl(opt)"
-                                                 alt=""
-                                                 loading="lazy"
-                                                 onerror="@OptionImageFallbackScript" />
-                                            <span class="pcs-option-image-fallback" hidden>
-                                                <MudIcon Icon="@GetBooleanOptionIcon(opt)" Size="Size.Small" />
-                                            </span>
-                                        </span>
+                                        <OptionImageFrame Class="pcs-choice-swatch"
+                                                          ImageUrl="@GetBooleanOptionImageUrl(opt)"
+                                                          FallbackIcon="@GetBooleanOptionIcon(opt)" />
                                         <div class="pcs-choice-info">
                                             <div class="pcs-choice-name">@opt.Label</div>
                                             @if (!string.IsNullOrWhiteSpace(opt.HelpText))
@@ -406,16 +357,9 @@
                                             var active = IsPaintColorSelected(paint, paintHex, paintReference);
                                             <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
                                                     @onclick="@(() => OnStandardPaintColorChanged(opt.ConfigKey, paint))">
-                                                <span class="pcs-color-chip pcs-option-image-frame pcs-option-image-frame--small">
-                                                    <img class="pcs-option-image"
-                                                         src="@GetPaintColorImageUrl(paint)"
-                                                         alt=""
-                                                         loading="lazy"
-                                                         onerror="@OptionImageFallbackScript" />
-                                                    <span class="pcs-option-image-fallback" hidden>
-                                                        <MudIcon Icon="@Icons.Material.Outlined.Palette" Size="Size.Small" />
-                                                    </span>
-                                                </span>
+                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                                  ImageUrl="@GetPaintColorImageUrl(paint)"
+                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
                                                 <span>@paint.Name</span>
                                                 @if (active)
                                                 {
@@ -425,16 +369,9 @@
                                         }
                                         <button class="pcs-color-choice @(customPaintSelected ? "pcs-color-choice--active" : "")"
                                                 @onclick="@(() => OnCustomPaintColorSelected(opt.ConfigKey))">
-                                            <span class="pcs-color-chip pcs-option-image-frame pcs-option-image-frame--small">
-                                                <img class="pcs-option-image"
-                                                     src="@GetCustomPaintImageUrl()"
-                                                     alt=""
-                                                     loading="lazy"
-                                                     onerror="@OptionImageFallbackScript" />
-                                                <span class="pcs-option-image-fallback" hidden>
-                                                    <MudIcon Icon="@Icons.Material.Outlined.Palette" Size="Size.Small" />
-                                                </span>
-                                            </span>
+                                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                              ImageUrl="@GetCustomPaintImageUrl()"
+                                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
                                             <span>Custom</span>
                                             @if (customPaintSelected)
                                             {
@@ -474,16 +411,9 @@
                                             var active = string.Equals(currentValue, o, StringComparison.OrdinalIgnoreCase);
                                             <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
                                                     @onclick="@(() => OnProcessOptionValueChanged(opt.ConfigKey, o))">
-                                                <span class="pcs-color-chip pcs-option-image-frame pcs-option-image-frame--small">
-                                                    <img class="pcs-option-image"
-                                                         src="@GetColorChoiceImageUrl(opt, o)"
-                                                         alt=""
-                                                         loading="lazy"
-                                                         onerror="@OptionImageFallbackScript" />
-                                                    <span class="pcs-option-image-fallback" hidden>
-                                                        <MudIcon Icon="@Icons.Material.Outlined.Palette" Size="Size.Small" />
-                                                    </span>
-                                                </span>
+                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                                  ImageUrl="@GetColorChoiceImageUrl(opt, o)"
+                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
                                                 <span>@FormatOptionLabel(o)</span>
                                                 @if (active)
                                                 {
@@ -504,16 +434,9 @@
                                             var active = string.Equals(currentValue, o, StringComparison.OrdinalIgnoreCase);
                                             <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "")"
                                                     @onclick="@(() => OnProcessOptionValueChanged(opt.ConfigKey, o))">
-                                                <span class="pcs-choice-swatch pcs-option-image-frame">
-                                                    <img class="pcs-option-image"
-                                                         src="@GetCardChoiceOptionImageUrl(opt, o)"
-                                                         alt=""
-                                                         loading="lazy"
-                                                         onerror="@OptionImageFallbackScript" />
-                                                    <span class="pcs-option-image-fallback" hidden>
-                                                        <MudIcon Icon="@GetOptionIcon(opt.ConfigKey)" Size="Size.Small" />
-                                                    </span>
-                                                </span>
+                                                <OptionImageFrame Class="pcs-choice-swatch"
+                                                                  ImageUrl="@GetCardChoiceOptionImageUrl(opt, o)"
+                                                                  FallbackIcon="@GetOptionIcon(opt.ConfigKey)" />
                                                 <div class="pcs-choice-info">
                                                     <div class="pcs-choice-name">@FormatOptionLabel(o)</div>
                                                     @if (!string.IsNullOrWhiteSpace(opt.HelpText))
@@ -560,16 +483,9 @@
                                 disabled="@(!HasSelectedProcess)"
                                 aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
                                 @onclick="@(() => OnInspectionChanged(inspection.Level))">
-                            <span class="pcs-choice-swatch pcs-option-image-frame">
-                                <img class="pcs-option-image"
-                                     src="@GetInspectionImageUrl(inspection.Level)"
-                                     alt=""
-                                     loading="lazy"
-                                     onerror="@OptionImageFallbackScript" />
-                                <span class="pcs-option-image-fallback" hidden>
-                                    <MudIcon Icon="@inspection.Icon" Size="Size.Small" />
-                                </span>
-                            </span>
+                            <OptionImageFrame Class="pcs-choice-swatch"
+                                              ImageUrl="@GetInspectionImageUrl(inspection.Level)"
+                                              FallbackIcon="@inspection.Icon" />
                             <div class="pcs-choice-info">
                                 <div class="pcs-choice-name">@inspection.Name</div>
                                 <div class="pcs-choice-sub">@inspection.Description</div>
@@ -1027,9 +943,10 @@
                 position: relative;
                 display: grid;
                 place-items: center;
-                overflow: hidden;
+                overflow: visible;
                 background: #fff;
                 color: var(--mud-palette-primary);
+                isolation: isolate;
             }
 
             .pcs-option-image-frame--small {
@@ -1043,6 +960,7 @@
                 height: 100%;
                 object-fit: cover;
                 background: #fff;
+                border-radius: inherit;
             }
 
             .pcs-option-image-fallback {
@@ -1055,6 +973,39 @@
 
             .pcs-option-image-fallback[hidden] {
                 display: none;
+            }
+
+            .pcs-image-preview-popout {
+                position: absolute;
+                left: calc(100% + 10px);
+                top: 50%;
+                z-index: 50;
+                width: min(220px, 64vw);
+                aspect-ratio: 1 / 1;
+                padding: 6px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 32%, var(--maliev-border));
+                border-radius: 8px;
+                background: var(--maliev-panel);
+                box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(-50%) translateX(-4px) scale(0.98);
+                transition: opacity 0.12s ease, transform 0.12s ease;
+            }
+
+            .pcs-option-image-frame:hover .pcs-image-preview-popout,
+            .pcs-option-image-frame:focus-within .pcs-image-preview-popout {
+                opacity: 1;
+                transform: translateY(-50%) translateX(0) scale(1);
+            }
+
+            .pcs-image-preview {
+                display: block;
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                border-radius: 5px;
+                background: #fff;
             }
 
             .pcs-mat-info,

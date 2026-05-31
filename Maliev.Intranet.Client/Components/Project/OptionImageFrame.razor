@@ -1,0 +1,37 @@
+@namespace Maliev.Intranet.Client.Components.Project
+
+<span class="@FrameClass">
+    <img class="pcs-option-image"
+         src="@ImageUrl"
+         alt=""
+         loading="lazy"
+         onerror="@OptionImageFallbackScript" />
+    <span class="pcs-option-image-fallback" hidden>
+        <MudIcon Icon="@FallbackIcon" Size="Size.Small" />
+    </span>
+    <span class="pcs-image-preview-popout" aria-hidden="true">
+        <img class="pcs-image-preview"
+             src="@ImageUrl"
+             alt=""
+             loading="lazy" />
+    </span>
+</span>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter, EditorRequired]
+    public string ImageUrl { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string FallbackIcon { get; set; } = string.Empty;
+
+    private const string OptionImageFallbackScript =
+        "this.hidden=true; const fallback=this.nextElementSibling; if(fallback){fallback.hidden=false;}";
+
+    private string FrameClass =>
+        string.IsNullOrWhiteSpace(Class)
+            ? "pcs-option-image-frame"
+            : $"pcs-option-image-frame {Class}";
+}

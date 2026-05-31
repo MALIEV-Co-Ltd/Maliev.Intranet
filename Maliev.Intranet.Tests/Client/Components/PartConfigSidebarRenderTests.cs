@@ -221,6 +221,30 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ConfiguratorOptionImages_RenderHoverPreviewPopouts()
+    {
+        var sidebarSource = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+        var imageFrameSource = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "OptionImageFrame.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("OptionImageFrame", sidebarSource, StringComparison.Ordinal);
+        Assert.Contains("class=\"pcs-image-preview-popout\"", imageFrameSource, StringComparison.Ordinal);
+        Assert.Contains("<img class=\"pcs-image-preview\"", imageFrameSource, StringComparison.Ordinal);
+        Assert.Contains(".pcs-option-image-frame:hover .pcs-image-preview-popout", sidebarSource, StringComparison.Ordinal);
+        Assert.Contains(".pcs-option-image-frame:focus-within .pcs-image-preview-popout", sidebarSource, StringComparison.Ordinal);
+        Assert.Contains("width: min(220px, 64vw);", sidebarSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MaterialCardStyles_UseLargeImageColumn()
     {
         var source = ReadRepoFile(
