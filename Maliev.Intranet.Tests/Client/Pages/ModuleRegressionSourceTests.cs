@@ -2066,6 +2066,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains(".pcs-process-row {\n                    gap: 10px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-card {\n                    flex: 0 0 112px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-photo {\n                    height: 78px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-swatch {\n                width: 52px;\n                height: 52px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-swatch {\n                    width: 58px;\n                    height: 58px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-mat-card,\n                .pcs-fin-card,\n                .pcs-choice-card {\n                    min-height: 56px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-qty-btn {\n                    width: 44px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-qty-input {\n                    height: 44px;", sidebar, StringComparison.Ordinal);
