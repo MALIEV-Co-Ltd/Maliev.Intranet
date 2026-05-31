@@ -245,7 +245,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void MaterialCardStyles_UseLargeImageColumn()
+    public void OptionImageStyles_UseConsistentBoundedPreviewSize()
     {
         var source = ReadRepoFile(
                 "Maliev.Intranet.Client",
@@ -254,9 +254,25 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
                 "PartConfigSidebar.razor")
             .ReplaceLineEndings("\n");
 
-        Assert.Contains("grid-template-columns: minmax(86px, 34%) minmax(0, 1fr) 18px;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-mat-swatch {\n                width: 100%;\n                min-height: 76px;\n                height: 100%;", source, StringComparison.Ordinal);
-        Assert.Contains("aspect-ratio: 4 / 3;", source, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 66px minmax(0, 1fr) 18px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-swatch,\n            .pcs-fin-swatch,\n            .pcs-choice-swatch,\n            .pcs-color-chip {\n                width: 58px;\n                height: 58px;", source, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", source, StringComparison.Ordinal);
+        Assert.Contains("object-fit: contain;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ManufacturingProcessSection_TranslatesMouseWheelToHorizontalScroll()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("data-config-section=\"manufacturing-process\"", source, StringComparison.Ordinal);
+        Assert.Contains("data-horizontal-wheel=\"true\"", source, StringComparison.Ordinal);
+        Assert.Contains("scrollLeft += event.deltaY", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -314,7 +330,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PartFeaturesAndInspection_WhenProcessIsNotSelected_RenderDisabled()
+    public void ProcessDependentConfiguration_WhenProcessIsNotSelected_IsHidden()
     {
         var part = new PartViewModel
         {
@@ -326,17 +342,19 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.All(cut.FindAll(".pcs-feature-card"), card =>
-        {
-            Assert.True(card.HasAttribute("disabled"));
-            Assert.Equal("true", card.GetAttribute("aria-disabled"));
-        });
-
-        Assert.All(cut.FindAll("[data-config-section='inspection'] .pcs-choice-card"), card =>
-        {
-            Assert.True(card.HasAttribute("disabled"));
-            Assert.Equal("true", card.GetAttribute("aria-disabled"));
-        });
+        Assert.NotNull(cut.Find("[data-config-section='manufacturing-process']"));
+        Assert.Empty(cut.FindAll("[data-config-section='material']"));
+        Assert.Empty(cut.FindAll("[data-config-section='surface-finish']"));
+        Assert.Empty(cut.FindAll("[data-config-section='tolerance']"));
+        Assert.Empty(cut.FindAll("[data-config-section='part-features']"));
+        Assert.Empty(cut.FindAll("[data-config-section='inspection']"));
+        Assert.Empty(cut.FindAll("[data-config-section='quantity']"));
+        Assert.DoesNotContain(">Material<", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Surface Finish<", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Tolerance<", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Part Features<", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Inspection<", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Quantity<", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

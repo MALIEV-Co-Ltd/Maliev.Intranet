@@ -259,7 +259,7 @@ const CONFIG = {
             diffuse:       { r: 1.00, g: 0.98, b: 0.95 },
             intensity:     1.35,
             shadowMapSize: 2048,
-            shadowDarkness: 0.20,
+            shadowDarkness: 0.10,
         },
         fill: {
             direction:  { x: 0.85, y: -0.40, z: -0.20 },
@@ -291,7 +291,7 @@ const CONFIG = {
             diffuse:       { r: 1.00, g: 0.84, b: 0.65 },
             intensity:     2.60,
             shadowMapSize: 2048,
-            shadowDarkness: 0.18,
+            shadowDarkness: 0.08,
         },
         rim: {
             direction:  { x: -0.80, y: -0.30, z: 0.55 },
@@ -2284,7 +2284,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                         if (shadowGen) {
                             shadowGen.addShadowCaster(m);
                         }
-                        m.receiveShadows = true;
+                        m.receiveShadows = false;
                     }
                 });
 
@@ -3855,15 +3855,15 @@ export function applyStudioLighting(canvasId, isDark) {
         key.position = new BABYLON.Vector3(mc.x - dist, mc.y - dist, bb.max.z + dist);
     }
 
-    // Re-register all model meshes as shadow casters / receivers
+    // Re-register model meshes as shadow casters without projecting shadows onto CAD surfaces or the mat.
     scene.meshes.forEach(m => {
         if (m.name?.startsWith('__cutting_mat')) {
-            m.receiveShadows = true;
+            m.receiveShadows = false;
             return;
         }
         if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis')) {
             shadowGen.addShadowCaster(m);
-            m.receiveShadows = true;
+            m.receiveShadows = false;
         }
     });
 }
@@ -4640,8 +4640,8 @@ export function showCuttingMat(canvasId) {
     // ── Hide the shadow catcher ───────────────────────────────────────────────
     // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
     // surface.  Leaving it visible causes z-fighting that makes the model shadow
-    // appear shifted / "ghosted" on the mat.  The mat already has receiveShadows=true
-    // so shadows render correctly directly on the mat surface without the catcher.
+    // appear shifted / "ghosted" on the mat and can leak through the slab when
+    // viewed from below. The mat is a visual reference surface, not a shadow receiver.
     const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
     if (shadowCatcher) shadowCatcher.isVisible = false;
 
@@ -4799,7 +4799,7 @@ function _syncCuttingMatRenderMode(canvasId) {
 
     [top, slab].forEach(mesh => {
         if (!mesh) return;
-        mesh.receiveShadows = true;
+        mesh.receiveShadows = false;
         disableSectionClippingForMesh(mesh);
     });
 }
@@ -5005,7 +5005,7 @@ function _createRoundedMatTopMesh(scene, outline, width, height) {
     vertexData.applyToMesh(mesh);
 
     mesh.isPickable = false;
-    mesh.receiveShadows = true;
+    mesh.receiveShadows = false;
     return markAnalysisHelperMesh(mesh);
 }
 
@@ -5046,7 +5046,7 @@ function _createRoundedMatSlabMesh(scene, outline, thickness) {
     vertexData.applyToMesh(mesh);
 
     mesh.isPickable = false;
-    mesh.receiveShadows = true;
+    mesh.receiveShadows = false;
     return markAnalysisHelperMesh(mesh);
 }
 

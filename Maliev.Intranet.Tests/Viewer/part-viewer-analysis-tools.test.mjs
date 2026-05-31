@@ -668,6 +668,8 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
             rawTextureDataLength: rawTextureCalls[0]?.data?.length,
             topTextureHasAlpha: top?.material?.diffuseTexture?.hasAlpha === true,
             topTransparencyMode: top?.material?.transparencyMode,
+            topReceivesShadows: top?.receiveShadows,
+            slabReceivesShadows: slab?.receiveShadows,
             firstOutlineUv: top?.vertexData?.uvs?.slice(2, 4),
             topVertexCount: (top?.vertexData?.positions?.length ?? 0) / 3,
             slabVertexCount: (slab?.vertexData?.positions?.length ?? 0) / 3,
@@ -681,6 +683,8 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.ok(result.rawTextureDataLength > 2048 * 256 * 4);
     assert.equal(result.topTextureHasAlpha, false);
     assert.equal(result.topTransparencyMode, 0);
+    assert.equal(result.topReceivesShadows, false);
+    assert.equal(result.slabReceivesShadows, false);
     assert.equal(result.firstOutlineUv[0], 0);
     assert.ok(result.topVertexCount > 12);
     assert.ok(result.slabVertexCount > 24);
@@ -912,7 +916,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(removedTicks.length, 3);
 });
 
-test('cutting mat keeps stable textured materials when realistic render mode is active', () => {
+test('cutting mat keeps stable textured materials without receiving shadows when realistic render mode is active', () => {
     const context = loadViewerContext();
     const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
     context.scene = {
@@ -946,8 +950,8 @@ test('cutting mat keeps stable textured materials when realistic render mode is 
     assert.equal(result.topIsPbr, false);
     assert.equal(result.slabIsPbr, false);
     assert.equal(result.topHasDiffuseTexture, true);
-    assert.equal(result.topReceivesShadows, true);
-    assert.equal(result.slabReceivesShadows, true);
+    assert.equal(result.topReceivesShadows, false);
+    assert.equal(result.slabReceivesShadows, false);
 });
 
 test('section hatch generation uses model meshes and excludes section ghost meshes', () => {

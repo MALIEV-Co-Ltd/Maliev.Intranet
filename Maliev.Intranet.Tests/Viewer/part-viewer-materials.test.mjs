@@ -148,7 +148,20 @@ test('solid CAD render mode prepares PBR environment lighting on first material 
     assert.equal(result.toneMappingEnabled, true);
 });
 
-test('realistic render mode preserves stable cutting mat texture materials', () => {
+test('studio lighting keeps shadows soft enough for dark studio mode', () => {
+    const context = loadViewerContext();
+
+    const result = vm.runInContext(`({
+        light: CONFIG.STUDIO_LIGHT.key.shadowDarkness,
+        dark: CONFIG.STUDIO_DARK.key.shadowDarkness
+    })`, context);
+
+    assert.ok(result.light <= 0.12);
+    assert.ok(result.dark <= 0.10);
+    assert.ok(result.dark <= result.light);
+});
+
+test('realistic render mode preserves stable cutting mat texture materials without receiving shadows', () => {
     const context = loadViewerContext();
     const matTexture = { name: 'cutting-mat-texture' };
     const model = {
@@ -203,6 +216,6 @@ test('realistic render mode preserves stable cutting mat texture materials', () 
     assert.equal(result.topIsPbr, false);
     assert.equal(result.slabIsPbr, false);
     assert.equal(result.actualTexturePreserved, true);
-    assert.equal(result.topReceivesShadows, true);
-    assert.equal(result.slabReceivesShadows, true);
+    assert.equal(result.topReceivesShadows, false);
+    assert.equal(result.slabReceivesShadows, false);
 });
