@@ -99,6 +99,7 @@ const createdCanvasContexts = [];
 
 function createCanvasContext() {
     const calls = [];
+    let font = '';
     const context = {
         calls,
         beginPath: () => calls.push(['beginPath']),
@@ -110,7 +111,7 @@ function createCanvasContext() {
         fill: (...args) => calls.push(['fill', ...args]),
         stroke: () => calls.push(['stroke']),
         strokeRect: (x, y, w, h) => calls.push(['strokeRect', x, y, w, h]),
-        fillText: (text, x, y) => calls.push(['fillText', text, x, y]),
+        fillText: (text, x, y) => calls.push(['fillText', text, x, y, font]),
         save: () => calls.push(['save']),
         restore: () => calls.push(['restore']),
         translate: (x, y) => calls.push(['translate', x, y]),
@@ -121,6 +122,13 @@ function createCanvasContext() {
             height,
         }),
     };
+    Object.defineProperty(context, 'font', {
+        get: () => font,
+        set: value => {
+            font = value;
+            calls.push(['font', value]);
+        },
+    });
     createdCanvasContexts.push(context);
     return context;
 }
@@ -528,8 +536,15 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     const drawCalls = createdCanvasContexts.at(-1)?.calls ?? [];
     const mirroredTextCalls = drawCalls.filter(call => call[0] === 'scale' && call[1] < 0);
     const titleCalls = drawCalls.filter(call => call[0] === 'fillText' && call[1] === 'CUTTING MAT 3022');
+    const numberTextCalls = drawCalls.filter(call => call[0] === 'fillText' && /^[0-9]+$/.test(call[1]));
     assert.equal(mirroredTextCalls.length, 0);
     assert.equal(titleCalls.length, 1);
+    assert.ok(numberTextCalls.length > 0);
+    const numericFontSizes = numberTextCalls
+        .map(call => /bold\s+(\d+)px/.exec(call[4])?.[1])
+        .filter(Boolean)
+        .map(Number);
+    assert.ok(numericFontSizes.every(size => size <= 32));
 
     const gridBorderIndex = drawCalls.findIndex(call => call[0] === 'strokeRect');
     assert.notEqual(gridBorderIndex, -1);

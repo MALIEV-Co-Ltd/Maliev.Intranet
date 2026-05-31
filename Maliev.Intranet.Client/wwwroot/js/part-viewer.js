@@ -4322,6 +4322,8 @@ const CUTTING_MAT_ANIMATION_MS = 240;
 const CUTTING_MAT_CAMERA_MIN_Z = 0.001;
 const CUTTING_MAT_MINOR_GRID_MM = 10;
 const CUTTING_MAT_MAJOR_GRID_MM = 100;
+const CUTTING_MAT_TITLE_FONT_MM = 5.6;
+const CUTTING_MAT_NUMBER_FONT_MM = 4.5;
 const cuttingMatAnimationStates = {};
 const cuttingMatCameraClipStates = {};
 
@@ -4422,12 +4424,13 @@ export function showCuttingMat(canvasId) {
         CUTTING_MAT_MAJOR_GRID_MM * px, 'rgba(255,255,255,0.70)', Math.max(1.5, px * 0.85), MPX, MPX);
 
     // ── Margin title + number labels ──────────────────────────────────────────
-    const LABEL_PX   = Math.round(px * 7.5);
-    const LABEL_STEP = 10 * px;
-    const colCount   = Math.round((matW - 2 * MARGIN) / 10);
-    const rowCount   = Math.round((matH - 2 * MARGIN) / 10);
-    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
-    ctx.font         = `bold ${LABEL_PX}px Arial, sans-serif`;
+    const TITLE_LABEL_PX  = Math.round(px * CUTTING_MAT_TITLE_FONT_MM);
+    const NUMBER_LABEL_PX = Math.round(px * CUTTING_MAT_NUMBER_FONT_MM);
+    const LABEL_STEP      = 10 * px;
+    const colCount        = Math.round((matW - 2 * MARGIN) / 10);
+    const rowCount        = Math.round((matH - 2 * MARGIN) / 10);
+    ctx.fillStyle         = 'rgba(255,255,255,0.88)';
+    ctx.font              = `bold ${TITLE_LABEL_PX}px Arial, sans-serif`;
 
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -4435,6 +4438,7 @@ export function showCuttingMat(canvasId) {
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = `bold ${NUMBER_LABEL_PX}px Arial, sans-serif`;
 
     // Bottom edge labels (column axis), matching the physical mat reference.
     for (let i = 0; i <= colCount; i++) {
