@@ -141,7 +141,7 @@ const CONFIG = {
         'aluminum': {
             albedoColor: { r: 0.82, g: 0.82, b: 0.80 },
             metallic: 0.95,
-            roughness: 0.22,
+            roughness: 0.34,
         },
         'steel': {
             albedoColor: { r: 0.42, g: 0.42, b: 0.40 },
@@ -243,6 +243,7 @@ const CONFIG = {
          *  180 = fully smooth all edges. Raised from 30 to 55 to handle low-poly
          *  CAD tesselation where facet angles routinely exceed 30 degrees. */
         smoothAngleDeg: 55,
+        normalPositionTolerance: 0.001,
     },
 
     // =========================================================================
@@ -3306,6 +3307,31 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
+function getSmoothNormalPositionKey(positions, offset) {
+    const tolerance = CONFIG.REALISTIC.normalPositionTolerance || 0.001;
+    const qx = Math.round(positions[offset] / tolerance);
+    const qy = Math.round(positions[offset + 1] / tolerance);
+    const qz = Math.round(positions[offset + 2] / tolerance);
+    return `${qx}|${qy}|${qz}`;
+}
+
+function normalizeNormalVector(normals, offset, fallback) {
+    let nx = normals?.[offset] ?? fallback?.x ?? 0;
+    let ny = normals?.[offset + 1] ?? fallback?.y ?? 0;
+    let nz = normals?.[offset + 2] ?? fallback?.z ?? 1;
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (len > 1e-10) {
+        nx /= len;
+        ny /= len;
+        nz /= len;
+    } else {
+        nx = fallback?.x ?? 0;
+        ny = fallback?.y ?? 0;
+        nz = fallback?.z ?? 1;
+    }
+    return { x: nx, y: ny, z: nz };
+}
+
 // ── Smooth normals for realistic edge softening ───────────────────────────────
 
 /**
@@ -3338,47 +3364,49 @@ function applySmoothNormals(canvasId) {
 
         const vertCount = positions.length / 3;
         const faceNormals = [];
+        const positionFaceMap = new Map();
         const smoothNormals = new Float32Array(vertCount * 3);
 
         // Pass 1 — compute face normals
         for (let i = 0; i < indices.length; i += 3) {
-            const i0 = indices[i] * 3, i1 = indices[i + 1] * 3, i2 = indices[i + 2] * 3;
+            const v0 = indices[i], v1 = indices[i + 1], v2 = indices[i + 2];
+            const i0 = v0 * 3, i1 = v1 * 3, i2 = v2 * 3;
             const ax = positions[i1] - positions[i0], ay = positions[i1 + 1] - positions[i0 + 1], az = positions[i1 + 2] - positions[i0 + 2];
             const bx = positions[i2] - positions[i0], by = positions[i2 + 1] - positions[i0 + 1], bz = positions[i2 + 2] - positions[i0 + 2];
             const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
             const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-            faceNormals.push(len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len } : { x: 0, y: 0, z: 1 });
+            const fn = len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len } : { x: 0, y: 0, z: 1 };
+            faceNormals.push(fn);
+
+            [v0, v1, v2].forEach(v => {
+                if (v >= vertCount) return;
+                const key = getSmoothNormalPositionKey(positions, v * 3);
+                const faces = positionFaceMap.get(key) || [];
+                faces.push(fn);
+                positionFaceMap.set(key, faces);
+            });
         }
 
-        // Pass 2 — accumulate face normals per vertex (angle-weighted)
-        const faceAdj = new Array(vertCount);
-        for (let v = 0; v < vertCount; v++) faceAdj[v] = [];
-
-        for (let f = 0; f < faceNormals.length; f++) {
-            const fn = faceNormals[f];
-            const v0 = indices[f * 3], v1 = indices[f * 3 + 1], v2 = indices[f * 3 + 2];
-            if (v0 < vertCount) faceAdj[v0].push({ nx: fn.x, ny: fn.y, nz: fn.z });
-            if (v1 < vertCount) faceAdj[v1].push({ nx: fn.x, ny: fn.y, nz: fn.z });
-            if (v2 < vertCount) faceAdj[v2].push({ nx: fn.x, ny: fn.y, nz: fn.z });
-        }
-
-        // Pass 3 — average normals, discarding faces beyond angle threshold
+        // Pass 2 — average normals by position, discarding faces beyond angle threshold.
+        // CAD/STL imports commonly duplicate vertices per triangle, so index-only
+        // adjacency leaves round surfaces faceted and causes jagged PBR reflections.
         for (let v = 0; v < vertCount; v++) {
-            const faces = faceAdj[v];
+            const key = getSmoothNormalPositionKey(positions, v * 3);
+            const faces = positionFaceMap.get(key) || [];
             if (faces.length === 0) { smoothNormals[v * 3 + 2] = 1; continue; }
 
             let sx = 0, sy = 0, sz = 0;
-            const ref = faces[0]; // use first face normal as reference
+            const refNormal = normalizeNormalVector(origNorms, v * 3, faces[0]);
             for (let j = 0; j < faces.length; j++) {
                 const f = faces[j];
-                const dot = ref.nx * f.nx + ref.ny * f.ny + ref.nz * f.nz;
-                if (dot >= cosThreshold) { sx += f.nx; sy += f.ny; sz += f.nz; }
+                const dot = refNormal.x * f.x + refNormal.y * f.y + refNormal.z * f.z;
+                if (dot >= cosThreshold) { sx += f.x; sy += f.y; sz += f.z; }
             }
             const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
             if (slen > 1e-10) { sx /= slen; sy /= slen; sz /= slen; }
-            smoothNormals[v * 3]     = slen > 1e-10 ? sx : 0;
-            smoothNormals[v * 3 + 1] = slen > 1e-10 ? sy : 0;
-            smoothNormals[v * 3 + 2] = slen > 1e-10 ? sz : 1;
+            smoothNormals[v * 3]     = slen > 1e-10 ? sx : refNormal.x;
+            smoothNormals[v * 3 + 1] = slen > 1e-10 ? sy : refNormal.y;
+            smoothNormals[v * 3 + 2] = slen > 1e-10 ? sz : refNormal.z;
         }
 
         mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, smoothNormals);

@@ -1,0 +1,71 @@
+namespace Maliev.Intranet.Tests.Client.Components;
+
+/// <summary>
+/// Source-level regressions for realistic 3D viewer rendering quality.
+/// </summary>
+public sealed class ModelViewerRenderingSourceTests
+{
+    private static string ViewerScript => ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js");
+
+    [Fact]
+    public void RealisticNormals_SmoothDuplicateCadVerticesByPosition()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("normalPositionTolerance", source, StringComparison.Ordinal);
+        Assert.Contains("function getSmoothNormalPositionKey", source, StringComparison.Ordinal);
+        Assert.Contains("positionFaceMap", source, StringComparison.Ordinal);
+        Assert.Contains("const refNormal = normalizeNormalVector(origNorms, v * 3, faces[0]);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("const ref = faces[0]; // use first face normal as reference", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticAluminum_UsesSatinRoughnessForSmootherReflections()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var aluminumBlock = ExtractBlock(source, "        'aluminum': {");
+
+        Assert.Contains("roughness: 0.34", aluminumBlock, StringComparison.Ordinal);
+    }
+
+    private static string ExtractBlock(string source, string start)
+    {
+        var startIndex = source.IndexOf(start, StringComparison.Ordinal);
+        Assert.True(startIndex >= 0, $"Unable to locate block start: {start}");
+
+        var depth = 0;
+        for (var i = startIndex; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+                depth++;
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    return source[startIndex..(i + 1)];
+            }
+        }
+
+        throw new InvalidDataException($"Unable to extract block starting at: {start}");
+    }
+
+    private static string ReadRepoFile(params string[] relativeParts)
+    {
+        return File.ReadAllText(FindRepoFile(relativeParts));
+    }
+
+    private static string FindRepoFile(params string[] relativeParts)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
+            if (File.Exists(candidate))
+                return candidate;
+            current = current.Parent;
+        }
+
+        throw new FileNotFoundException(
+            $"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
+    }
+}
