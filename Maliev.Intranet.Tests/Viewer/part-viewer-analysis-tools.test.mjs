@@ -719,6 +719,63 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.equal(majorGridLineCount, 5);
 });
 
+test('cutting mat expands the active camera fit to include the full mat footprint', () => {
+    const context = loadViewerContext();
+    const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
+    const camera = {
+        fov: 0.8,
+        radius: 80,
+        minZ: 0.1,
+        target: new Vector3(0, 0, 18),
+        mode: 0,
+        setPosition(position) {
+            this.position = position;
+        },
+    };
+    context.scene = {
+        meshes: [shadowCatcher],
+        activeCamera: camera,
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+    };
+    context.engine = {
+        getAspectRatio: () => 1.5,
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        engines.viewer = engine;
+        cameraProjection.viewer = 'orthographic';
+        fitRadiusMap.viewer = 80;
+        orthoZoomFactors.viewer = 1;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -30, y: -12, z: 0 },
+            max: { x: 30, y: 12, z: 36 }
+        };
+
+        showCuttingMat('viewer');
+        resetCamera('viewer', false);
+
+        ({
+            fitRadius: fitRadiusMap.viewer,
+            cameraRadius: scene.activeCamera.radius,
+            orthoLeft: scene.activeCamera.orthoLeft,
+            orthoRight: scene.activeCamera.orthoRight,
+            orthoTop: scene.activeCamera.orthoTop,
+            orthoBottom: scene.activeCamera.orthoBottom,
+            targetZ: scene.activeCamera.target.z
+        });
+    `, context);
+
+    assert.ok(result.fitRadius > 80);
+    assert.equal(result.cameraRadius, result.fitRadius);
+    assert.ok(result.orthoRight - result.orthoLeft >= 300);
+    assert.ok(result.orthoTop - result.orthoBottom >= 220);
+    assert.ok(result.targetZ < 18);
+});
+
 test('cutting mat fades in from below and fades out before disposal', () => {
     const context = loadViewerContext();
     let now = 1000;

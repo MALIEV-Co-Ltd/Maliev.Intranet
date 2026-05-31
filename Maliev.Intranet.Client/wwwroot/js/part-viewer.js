@@ -637,6 +637,8 @@ const cameraProjection      = {};   // canvasId → 'perspective' | 'orthographi
 const orthoZoomObservers    = {}; // canvasId → onViewMatrixChangedObservable handle
 const perspZoomObservers    = {}; // canvasId → onViewMatrixChangedObservable handle (perspective)
 const fitRadiusMap          = {};   // canvasId → initial camera radius from fitCameraToMesh
+const modelFitRadiusMap     = {};   // canvasId → model-only fit radius, restored when floor helpers are hidden
+const cuttingMatFrameBoundsMap = {}; // canvasId → union bounds used while the cutting mat is visible
 const orthoZoomFactors      = {};   // canvasId -> zoom factor (1.0 = full view, shrinks on zoom in)
 const edgeZoomObservers     = {};   // canvasId → onViewMatrixChangedObservable handle for dynamic edge width
 const perCanvasBodyMap      = {};   // canvasId → Map<bodyIndex, {rootNode, meshes[], colorMaterial, name}>
@@ -1462,7 +1464,62 @@ function fitCameraToMesh(cam, bb, meshCenter, canvasId) {
     cam.minZ = 0.1;
     cam.maxZ = meshRadius * CONFIG.CAMERA_FAR_PLANE;
     // Store initial radius for dynamic perspective edge width scaling
-    if (canvasId != null) fitRadiusMap[canvasId] = meshRadius;
+    if (canvasId != null) {
+        fitRadiusMap[canvasId] = meshRadius;
+        modelFitRadiusMap[canvasId] = meshRadius;
+    }
+}
+
+function _fitRadiusForBounds(cam, bb) {
+    const w = bb.max.x - bb.min.x;
+    const d = bb.max.y - bb.min.y;
+    const h = bb.max.z - bb.min.z;
+    const halfDiag = Math.sqrt(w * w + d * d + h * h) / 2;
+    const fov = cam.fov || CONFIG.CAMERA_FOV;
+    return Math.max(halfDiag / Math.tan(fov / 2) * 1.2, 1);
+}
+
+function _centerForBounds(bb) {
+    return new BABYLON.Vector3(
+        (bb.min.x + bb.max.x) / 2,
+        (bb.min.y + bb.max.y) / 2,
+        (bb.min.z + bb.max.z) / 2
+    );
+}
+
+function _applyCameraFitBounds(canvasId, bb) {
+    const cam = mainCameras[canvasId];
+    const engine = engines[canvasId];
+    if (!cam || !bb) return;
+
+    const previousFit = fitRadiusMap[canvasId] || cam.radius || 1;
+    const nextFit = _fitRadiusForBounds(cam, bb);
+    const previousZoom = cameraProjection[canvasId] === 'orthographic'
+        ? (orthoZoomFactors[canvasId] || 1)
+        : ((cam.radius || previousFit) / previousFit);
+    const zoom = Math.max(previousZoom, 1);
+
+    fitRadiusMap[canvasId] = nextFit;
+    cam.target = _centerForBounds(bb);
+    cam.radius = nextFit * zoom;
+    cam.lowerRadiusLimit = nextFit * CONFIG.CAMERA_LOWER_RADIUS_LIMIT;
+    cam.upperRadiusLimit = nextFit * CONFIG.CAMERA_UPPER_RADIUS_LIMIT;
+    cam.maxZ = nextFit * CONFIG.CAMERA_FAR_PLANE;
+
+    if (cameraProjection[canvasId] === 'orthographic' && engine) {
+        orthoZoomFactors[canvasId] = zoom;
+        const half = nextFit * zoom * ORTHO_RADIUS_FACTOR;
+        const aspect = engine.getAspectRatio(cam);
+        cam.orthoLeft = -half * aspect;
+        cam.orthoRight = half * aspect;
+        cam.orthoTop = half;
+        cam.orthoBottom = -half;
+        cam.minZ = Math.max(nextFit * CONFIG.CAMERA_NEAR_PLANE, 0.01);
+    }
+}
+
+function _activeCameraFitBounds(canvasId) {
+    return cuttingMatFrameBoundsMap[canvasId] ?? sceneBoundingBoxes[canvasId] ?? null;
 }
 
 /**
@@ -3906,7 +3963,7 @@ export function setRenderMode(canvasId, mode) {
 
 export function setCameraPreset(canvasId, preset, smooth = true) {
     const cam = mainCameras[canvasId];
-    const bb  = sceneBoundingBoxes[canvasId];
+    const bb  = _activeCameraFitBounds(canvasId);
     if (!cam) return;
 
     // Kill auto-rotation instantly — zeroing current speed prevents the lerp
@@ -3943,7 +4000,7 @@ export function stopAutoRotation(canvasId) {
 
 export function resetCamera(canvasId, smooth = true) {
     const cam = mainCameras[canvasId];
-    const bb  = sceneBoundingBoxes[canvasId];
+    const bb  = _activeCameraFitBounds(canvasId);
     if (!cam) return;
 
     // Kill auto-rotation instantly
@@ -4477,6 +4534,8 @@ export function showCuttingMat(canvasId) {
     const matW   = Math.ceil(Math.max(300, modelW + PAD * 2) / 10) * 10;
     const matH   = Math.ceil(Math.max(220, modelH + PAD * 2) / 10) * 10;
     const slideOffset = _cuttingMatSlideOffset(bb);
+    cuttingMatFrameBoundsMap[canvasId] = _cuttingMatFrameBounds(bb, matW, matH, THICK);
+    _applyCameraFitBounds(canvasId, cuttingMatFrameBoundsMap[canvasId]);
 
     // ── Texture ───────────────────────────────────────────────────────────────
     const TEX_W = 2048;
@@ -4621,6 +4680,30 @@ function _drawCuttingMatLogo(ctx, rightX, centerY, logoHeight) {
 function _cuttingMatSlideOffset(bb) {
     const modelHeight = Math.max(0, (bb?.max?.z ?? 0) - (bb?.min?.z ?? 0));
     return Math.max(12, Math.min(40, modelHeight * 0.35 || 18));
+}
+
+function _cuttingMatFrameBounds(modelBounds, matW, matH, thickness) {
+    return {
+        min: {
+            x: Math.min(modelBounds.min.x, -matW / 2),
+            y: Math.min(modelBounds.min.y, -matH / 2),
+            z: Math.min(modelBounds.min.z, -thickness),
+        },
+        max: {
+            x: Math.max(modelBounds.max.x, matW / 2),
+            y: Math.max(modelBounds.max.y, matH / 2),
+            z: modelBounds.max.z,
+        },
+    };
+}
+
+function _restoreModelCameraFit(canvasId) {
+    const modelFit = modelFitRadiusMap[canvasId];
+    const modelBounds = sceneBoundingBoxes[canvasId];
+    if (!modelFit || !modelBounds) return;
+
+    delete cuttingMatFrameBoundsMap[canvasId];
+    _applyCameraFitBounds(canvasId, modelBounds);
 }
 
 function _cuttingMatNow() {
@@ -5004,6 +5087,7 @@ export function hideCuttingMat(canvasId) {
 
     if (meshes.length === 0) {
         if (shadowCatcher) shadowCatcher.isVisible = true;
+        _restoreModelCameraFit(canvasId);
         _restoreCuttingMatCameraClipping(canvasId);
         return;
     }
@@ -5022,6 +5106,7 @@ export function hideCuttingMat(canvasId) {
         onComplete: () => {
             meshes.forEach(mesh => mesh.dispose(false, true));
             if (shadowCatcher) shadowCatcher.isVisible = true;
+            _restoreModelCameraFit(canvasId);
             _restoreCuttingMatCameraClipping(canvasId);
         },
     });
@@ -6127,6 +6212,8 @@ export function dispose(canvasId) {
     delete cameraProjection[canvasId];
     delete edgesEnabled[canvasId];
     delete fitRadiusMap[canvasId];
+    delete modelFitRadiusMap[canvasId];
+    delete cuttingMatFrameBoundsMap[canvasId];
     delete animStates[canvasId];
     delete autoSpeedCurrent[canvasId];
     delete autoSpeedTarget[canvasId];
