@@ -274,6 +274,26 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void MaterialPreviewAssets_MatchReferenceCanvasSize()
+    {
+        var referencePath = FindRepoFile(
+            "Maliev.Intranet.Client",
+            "wwwroot",
+            "images",
+            "materials",
+            "aluminum-6061-part-material.png");
+        var directory = Path.GetDirectoryName(referencePath)!;
+        var referenceSize = ReadPngDimensions(referencePath);
+
+        Assert.Equal((1254, 1254), referenceSize);
+
+        foreach (var file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            Assert.Equal(referenceSize, ReadPngDimensions(file));
+        }
+    }
+
+    [Fact]
     public void ProcessCardStyles_RenderActiveBorderAndCheckAboveImageInDarkMode()
     {
         var source = ReadRepoFile(
@@ -348,18 +368,40 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
     private static string ReadRepoFile(params string[] relativeParts)
     {
+        return File.ReadAllText(FindRepoFile(relativeParts));
+    }
+
+    private static string FindRepoFile(params string[] relativeParts)
+    {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
             var candidate = Path.Combine(new[] { current.FullName }.Concat(relativeParts).ToArray());
             if (File.Exists(candidate))
             {
-                return File.ReadAllText(candidate);
+                return candidate;
             }
 
             current = current.Parent;
         }
 
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
+    }
+
+    private static (int Width, int Height) ReadPngDimensions(string path)
+    {
+        Span<byte> header = stackalloc byte[24];
+        using var stream = File.OpenRead(path);
+        var read = stream.Read(header);
+        Assert.True(read == header.Length, $"Unable to read PNG header for {path}.");
+
+        var width = ReadBigEndianInt32(header[16..20]);
+        var height = ReadBigEndianInt32(header[20..24]);
+        return (width, height);
+    }
+
+    private static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
+    {
+        return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
     }
 }
