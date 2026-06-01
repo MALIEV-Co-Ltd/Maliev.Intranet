@@ -118,6 +118,7 @@ function createCanvasContext() {
         closePath: () => calls.push(['closePath']),
         clip: () => calls.push(['clip']),
         fill: (...args) => calls.push(['fill', ...args]),
+        fillRect: (x, y, w, h) => calls.push(['fillRect', x, y, w, h]),
         stroke: () => calls.push(['stroke']),
         strokeRect: (x, y, w, h) => calls.push(['strokeRect', x, y, w, h]),
         fillText: (text, x, y) => calls.push(['fillText', text, x, y, font]),
@@ -503,6 +504,54 @@ test('model mesh registry marks only real model geometry pickable for analysis',
     assert.deepEqual(result.filter(m => m.model).map(m => m.name), ['model']);
     assert.equal(result.find(m => m.name === 'model').pickable, true);
     assert.equal(result.find(m => m.name === '__section_ghost_1').pickable, false);
+});
+
+test('collectAdvisoryMeshBuffers exports only visible model mesh geometry', () => {
+    const context = loadViewerContext();
+    const model = makeMesh('model', {
+        uniqueId: 101,
+        positions: [0, 0, 0, 10, 0, 0, 0, 10, 0],
+        indices: [0, 1, 2],
+        totalVertices: 3,
+    });
+    const grid = makeMesh('__grid__', {
+        uniqueId: 102,
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        indices: [0, 1, 2],
+        totalVertices: 3,
+    });
+    const hidden = makeMesh('hidden-model', {
+        uniqueId: 103,
+        isVisible: false,
+        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+        indices: [0, 1, 2],
+        totalVertices: 3,
+    });
+    context.scene = { meshes: [model, grid, hidden] };
+
+    const buffers = vm.runInContext(`
+        scenes.viewer = scene;
+        tagModelMeshesForAnalysis('viewer', scene);
+        collectAdvisoryMeshBuffers('viewer');
+    `, context);
+
+    assert.equal(buffers.length, 1);
+    assert.deepEqual(Array.from(buffers[0].positions), [0, 0, 0, 10, 0, 0, 0, 10, 0]);
+    assert.deepEqual(Array.from(buffers[0].indices), [0, 1, 2]);
+});
+
+test('runtime asset resolver maps GeometryService manifest assets to same-origin BFF proxy', () => {
+    const context = loadViewerContext();
+
+    const urls = vm.runInContext(`
+        ({
+            worker: resolveRuntimeAssetUrl('/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js', '/api/v1/geometry/runtime/assets/'),
+            rejected: resolveRuntimeAssetUrl('/geometry/client-runtime/assets/../client-geometry-runtime.worker.js', '/api/v1/geometry/runtime/assets/')
+        });
+    `, context);
+
+    assert.equal(urls.worker, '/api/v1/geometry/runtime/assets/client-geometry-runtime.abc123.worker.js');
+    assert.equal(urls.rejected, null);
 });
 
 test('showGrid uses a low-contrast grid floor in light mode', () => {
