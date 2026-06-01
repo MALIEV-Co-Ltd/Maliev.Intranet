@@ -476,6 +476,9 @@ const environmentTextures = {};
 /** Per-canvas realistic material cache (Map<materialType, NodeMaterial/PBRMaterial>) */
 const realisticMaterialCache = {};
 
+/** Per-canvas last configurator material state key applied to the realistic pipeline */
+const realisticConfiguratorStateKeys = {};
+
 /** Per-canvas original vertex normals saved before smoothing (Map<uniqueId, Float32Array>) */
 const originalNormalData = {};
 
@@ -3118,32 +3121,32 @@ const SURFACE_EFFECTS = {
     'bead-blast': {
         key: 'bead-blast',
         kind: 1,
-        scale: 0.95,
-        strength: 0.18,
+        scale: 0.42,
+        strength: 0.10,
         stripeScale: 0.0,
         stripeStrength: 0.0,
     },
     brushed: {
         key: 'brushed',
         kind: 2,
-        scale: 0.12,
-        strength: 0.035,
-        stripeScale: 1.35,
-        stripeStrength: 0.14,
+        scale: 0.05,
+        strength: 0.018,
+        stripeScale: 0.72,
+        stripeStrength: 0.045,
     },
     machining: {
         key: 'machining',
         kind: 2,
-        scale: 0.12,
-        strength: 0.035,
-        stripeScale: 0.42,
-        stripeStrength: 0.060,
+        scale: 0.04,
+        strength: 0.016,
+        stripeScale: 0.34,
+        stripeStrength: 0.028,
     },
     'powder-grain': {
         key: 'powder-grain',
         kind: 3,
-        scale: 1.55,
-        strength: 0.105,
+        scale: 0.48,
+        strength: 0.080,
         stripeScale: 0.0,
         stripeStrength: 0.0,
     },
@@ -3304,9 +3307,11 @@ const REALISTIC_NODE_MATERIAL_BLOCKS = [
     'SimplexPerlin3DBlock',
     'ScaleBlock',
     'AddBlock',
-    'WaveBlock',
+    'TrigonometryBlock',
     'VectorSplitterBlock',
 ];
+
+const REALISTIC_TEXTURE_TAU = Math.PI * 2;
 
 function canUseRealisticNodeMaterial() {
     return REALISTIC_NODE_MATERIAL_BLOCKS.every(name => typeof BABYLON?.[name] === 'function')
@@ -3337,9 +3342,9 @@ function getAdditiveLayerLineStrength(canvasId, materialType) {
         return 0;
     }
 
-    if (isPowderBedProcess(processCode)) return 0.028;
-    if (isFdmProcess(processCode)) return 0.075;
-    return 0.045;
+    if (isPowderBedProcess(processCode)) return 0.010;
+    if (isFdmProcess(processCode)) return 0.022;
+    return 0.016;
 }
 
 function shouldApplyFdmLayerLines(canvasId, materialType) {
@@ -3349,6 +3354,7 @@ function shouldApplyFdmLayerLines(canvasId, materialType) {
 function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
     const layerLineStrength = getAdditiveLayerLineStrength(canvasId, materialType);
+    const processCode = perCanvasProcessCodes[canvasId];
     const profile = {
         surfaceEffectKey: surfaceEffect.kind > 0 ? surfaceEffect.key : null,
         normalStrength: 0,
@@ -3356,29 +3362,37 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
         stripeAxis: 'x',
         stripeScale: 0,
         stripeStrength: 0,
+        stripeWaveform: 'sine',
         layerAxis: 'z',
-        layerHeightMm: 0.2,
+        layerHeightMm: layerLineStrength > 0
+            ? isFdmProcess(processCode)
+                ? 0.9
+                : isPowderBedProcess(processCode)
+                    ? 1.35
+                    : 1.1
+            : 0,
         layerLineStrength,
+        layerWaveform: 'sine',
     };
 
     if (surfaceEffect.key === 'bead-blast') {
-        profile.normalStrength = 0.055;
-        profile.noiseScale = 0.85;
+        profile.normalStrength = 0.026;
+        profile.noiseScale = 0.42;
     } else if (surfaceEffect.key === 'brushed') {
         profile.normalStrength = 0.010;
-        profile.noiseScale = 0.09;
+        profile.noiseScale = 0.035;
         profile.stripeAxis = 'x';
-        profile.stripeScale = 1.35;
-        profile.stripeStrength = 0.050;
+        profile.stripeScale = 0.90;
+        profile.stripeStrength = 0.020;
     } else if (surfaceEffect.key === 'machining') {
-        profile.normalStrength = 0.006;
-        profile.noiseScale = 0.06;
+        profile.normalStrength = 0.004;
+        profile.noiseScale = 0.025;
         profile.stripeAxis = 'x';
-        profile.stripeScale = 0.42;
-        profile.stripeStrength = 0.030;
+        profile.stripeScale = 0.34;
+        profile.stripeStrength = 0.012;
     } else if (surfaceEffect.key === 'powder-grain') {
-        profile.normalStrength = 0.040;
-        profile.noiseScale = 1.40;
+        profile.normalStrength = 0.018;
+        profile.noiseScale = 0.48;
     }
 
     if (layerLineStrength > 0 && !profile.surfaceEffectKey) {
@@ -3452,18 +3466,16 @@ function createNoiseHeightOutput(worldPosition, strength, scale, name) {
 }
 
 function createStripeHeightOutput(worldPosition, axis, strength, scale, name) {
-    if (strength <= 0 || scale <= 0) return null;
+    if (strength <= 0 || scale <= 0 || !BABYLON.TrigonometryBlock || !BABYLON.TrigonometryBlockOperations) return null;
 
     const axisOutput = getWorldAxisOutput(worldPosition, axis, `${name} axis`);
     const coordinateScale = new BABYLON.ScaleBlock(`${name} coordinate scale`);
     const scaleInput = createNodeInputBlock(`${name} stripe scale`, scale);
-    const wave = new BABYLON.WaveBlock(`${name} wave`);
+    const wave = new BABYLON.TrigonometryBlock(`${name} sine wave`);
     const heightScale = new BABYLON.ScaleBlock(`${name} stripe height`);
     const strengthInput = createNodeInputBlock(`${name} stripe strength`, strength);
 
-    if (BABYLON.WaveBlockKind) {
-        wave.kind = BABYLON.WaveBlockKind.Triangle;
-    }
+    wave.operation = BABYLON.TrigonometryBlockOperations.Sin;
 
     connectNodeBlocks(axisOutput, coordinateScale.input);
     connectNodeBlocks(scaleInput.output, coordinateScale.factor);
@@ -3497,7 +3509,7 @@ function createRealisticNodeHeightOutput(worldPosition, profile) {
             worldPosition,
             profile.layerAxis,
             profile.layerLineStrength,
-            profile.layerHeightMm > 0 ? 1 / profile.layerHeightMm : 5,
+            profile.layerHeightMm > 0 ? REALISTIC_TEXTURE_TAU / profile.layerHeightMm : 0,
             'fdm layer lines'),
         'layered finish height');
 
@@ -3737,6 +3749,46 @@ function disposeDetachedMaterial(material) {
     try { material?.dispose?.(); } catch (_) {}
 }
 
+function normalizeConfiguratorToken(value) {
+    return String(value ?? '').trim().toUpperCase();
+}
+
+function resolveConfiguratorCustomAlbedo(materialKey, colorHex) {
+    if (!colorHex || !/^#[0-9a-fA-F]{6}$/.test(colorHex) || INTRINSIC_COLOR_PRESET_KEYS.has(materialKey)) {
+        return { color: null, key: '' };
+    }
+
+    const r = parseInt(colorHex.slice(1, 3), 16) / 255;
+    const g = parseInt(colorHex.slice(3, 5), 16) / 255;
+    const b = parseInt(colorHex.slice(5, 7), 16) / 255;
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        return { color: null, key: '' };
+    }
+
+    return {
+        color: { r, g, b },
+        key: colorHex.toLowerCase(),
+    };
+}
+
+function getConfiguratorStateKey(materialKey, colorKey, finishCode, roughnessCode, processCode) {
+    return [
+        materialKey,
+        colorKey,
+        normalizeConfiguratorToken(finishCode),
+        normalizeConfiguratorToken(roughnessCode),
+        normalizeConfiguratorToken(processCode),
+    ].join('|');
+}
+
+function isCachedRealisticMaterialAssigned(canvasId, materialType) {
+    const scene = scenes[canvasId];
+    const material = realisticMaterialCache[canvasId]?.[materialType];
+    if (!scene || !material) return false;
+
+    return scene.meshes.some(mesh => !isSystemMesh(mesh) && mesh.material === material);
+}
+
 /**
  * Applies the selected realistic material to all model meshes in the scene.
  * Multi-body assemblies receive the same shared configurator-colour material
@@ -3785,6 +3837,7 @@ export function setMaterialType(canvasId, materialType) {
     perCanvasSurfaceEffects[canvasId] = getSurfaceEffect(null);
     perCanvasFinishModifiers[canvasId] = { roughnessOffset: 0, metallicOffset: 0 };
     delete perCanvasProcessCodes[canvasId];
+    delete realisticConfiguratorStateKeys[canvasId];
 
     const detachedMaterials = detachAllCachedRealisticMaterials(canvasId);
     materialTypes[canvasId] = materialType;
@@ -3809,6 +3862,7 @@ export function setMaterialColor(canvasId, hexColor) {
     if (isNaN(r) || isNaN(g) || isNaN(b)) return;
 
     customAlbedoColors[canvasId] = { r, g, b };
+    delete realisticConfiguratorStateKeys[canvasId];
 
     // Update albedo in-place on all cached realistic materials
     const cache = realisticMaterialCache[canvasId];
@@ -3843,36 +3897,50 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
         materialKey = 'aluminum';
     }
 
-    // Reset custom colour if none provided, otherwise store it. Colour-keyed
-    // POM presets keep their tuned albedo because the sidebar swatch is only
-    // used to choose the preset and can be lighter than the thumbnail material.
-    if (colorHex && /^#[0-9a-fA-F]{6}$/.test(colorHex) && !INTRINSIC_COLOR_PRESET_KEYS.has(materialKey)) {
-        const r = parseInt(colorHex.slice(1, 3), 16) / 255;
-        const g = parseInt(colorHex.slice(3, 5), 16) / 255;
-        const b = parseInt(colorHex.slice(5, 7), 16) / 255;
-        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-            customAlbedoColors[canvasId] = { r, g, b };
-        }
-    } else {
-        delete customAlbedoColors[canvasId];
-    }
+    // Colour-keyed POM presets keep their tuned albedo because the sidebar
+    // swatch is only used to choose the preset and can be lighter than the
+    // thumbnail material.
+    const customAlbedo = resolveConfiguratorCustomAlbedo(materialKey, colorHex);
 
     // Determine roughness/metallic modifiers from finish type
     const finishModifiers = getFinishModifiers(finishCode);
     // Ra roughness code overrides the finish-derived roughness with an absolute value
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
     const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
-
-    materialTypes[canvasId] = materialKey;
-    perCanvasProcessCodes[canvasId] = processCode;
-    // Store finish modifiers + resolved roughness so setRenderMode can re-apply them
-    perCanvasFinishModifiers[canvasId] = {
+    const nextFinishModifiers = {
         ...finishModifiers,
         // Specific finishes own the visual roughness; Ra applies only when
         // there is no finish-specific target.
         absoluteRoughness: finishModifiers.absoluteRoughness ?? raRoughness,
     };
+    const nextStateKey = getConfiguratorStateKey(
+        materialKey,
+        customAlbedo.key,
+        finishCode,
+        roughnessCode,
+        processCode);
+
+    if (realisticConfiguratorStateKeys[canvasId] === nextStateKey) {
+        materialTypes[canvasId] = materialKey;
+        if (currentRenderModes[canvasId] === 'realistic'
+            && !isCachedRealisticMaterialAssigned(canvasId, materialKey)) {
+            applyRealisticMaterial(canvasId, materialKey);
+        }
+        return;
+    }
+
+    if (customAlbedo.color) {
+        customAlbedoColors[canvasId] = customAlbedo.color;
+    } else {
+        delete customAlbedoColors[canvasId];
+    }
+
+    materialTypes[canvasId] = materialKey;
+    perCanvasProcessCodes[canvasId] = processCode;
+    // Store finish modifiers + resolved roughness so setRenderMode can re-apply them
+    perCanvasFinishModifiers[canvasId] = nextFinishModifiers;
     perCanvasSurfaceEffects[canvasId] = surfaceEffect;
+    realisticConfiguratorStateKeys[canvasId] = nextStateKey;
 
     // Invalidate the cached material so getRealisticMaterial creates a fresh
     // instance directly from the final colour/finish state. Do not mutate the
@@ -6900,6 +6968,7 @@ export function dispose(canvasId) {
     delete originalNormalData[canvasId];
     delete currentRenderModes[canvasId];
     delete customAlbedoColors[canvasId];
+    delete realisticConfiguratorStateKeys[canvasId];
     delete perCanvasFinishModifiers[canvasId];
     delete perCanvasSurfaceEffects[canvasId];
     delete perCanvasProcessCodes[canvasId];

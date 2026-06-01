@@ -162,6 +162,11 @@ function loadViewerContext() {
             ScaleBlock: NodeMaterialBlockStub,
             AddBlock: NodeMaterialBlockStub,
             MultiplyBlock: NodeMaterialBlockStub,
+            TrigonometryBlock: NodeMaterialBlockStub,
+            TrigonometryBlockOperations: {
+                Cos: 0,
+                Sin: 1,
+            },
             WaveBlock: NodeMaterialBlockStub,
             VectorSplitterBlock: NodeMaterialBlockStub,
             RawCubeTexture: class RawCubeTexture {
@@ -733,6 +738,53 @@ test('realistic configurator uses NodeMaterial PBR profiles with procedural norm
     assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line normals');
 });
 
+test('realistic NodeMaterial profiles use smooth low-amplitude finish detail to avoid temporal flicker', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const profile = (materialKey, finishCode, roughnessCode, processCode) => {
+            configureMaterialFromConfigurator('viewer', materialKey, null, finishCode, roughnessCode, processCode);
+            setRenderMode('viewer', 'realistic');
+            return scene.meshes[0].material?._malievNodeMaterialProfile;
+        };
+        ({
+            brushed: profile('aluminum', 'BRUSHED', 'RA_1_6', 'CNC_MILL'),
+            machining: profile('aluminum', 'AS_MACHINED', 'RA_1_6', 'CNC_MILL'),
+            beadBlast: profile('aluminum', 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL'),
+            fdm: profile('pla', 'AS_PRINTED', null, 'FDM')
+        });
+    `, context);
+
+    assert.equal(result.brushed.stripeWaveform, 'sine');
+    assert.ok(result.brushed.stripeScale <= 0.9);
+    assert.ok(result.brushed.stripeStrength <= 0.02);
+    assert.ok(result.brushed.normalStrength <= 0.01);
+
+    assert.equal(result.machining.stripeWaveform, 'sine');
+    assert.ok(result.machining.stripeScale <= 0.5);
+    assert.ok(result.machining.stripeStrength <= 0.014);
+
+    assert.ok(result.beadBlast.noiseScale <= 0.55);
+    assert.ok(result.beadBlast.normalStrength <= 0.03);
+
+    assert.equal(result.fdm.layerWaveform, 'sine');
+    assert.ok(result.fdm.layerHeightMm >= 0.8);
+    assert.ok(result.fdm.layerLineStrength <= 0.025);
+});
+
 test('realistic configurator replaces visible material without temporary color mutation', () => {
     const context = loadViewerContext();
     const mesh = {
@@ -781,4 +833,41 @@ test('realistic configurator replaces visible material without temporary color m
     assert.equal(result.currentG, 0.6);
     assert.equal(result.currentB, 0.2);
     assert.equal(result.currentEffectKey, 'bead-blast');
+});
+
+test('realistic configurator does not recreate material for identical configuration pushes', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', '#336699', 'BRUSHED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const firstMaterial = scene.meshes[0].material;
+        const materialCountBefore = scene.materials.length;
+
+        configureMaterialFromConfigurator('viewer', 'aluminum', '#336699', 'BRUSHED', 'RA_1_6', 'CNC_MILL');
+
+        ({
+            materialReferenceStable: scene.meshes[0].material === firstMaterial,
+            materialCountBefore,
+            materialCountAfter: scene.materials.length,
+            effectKey: scene.meshes[0].material?._malievSurfaceEffect?.key ?? null
+        });
+    `, context);
+
+    assert.equal(result.materialReferenceStable, true);
+    assert.equal(result.materialCountAfter, result.materialCountBefore);
+    assert.equal(result.effectKey, 'brushed');
 });
