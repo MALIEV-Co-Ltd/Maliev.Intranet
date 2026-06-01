@@ -51,6 +51,52 @@ function createBoard() {
     return board;
 }
 
+function createFocusedBoard() {
+    const boardRect = { left: 20 };
+    const header = { getBoundingClientRect: () => ({ height: 48 }) };
+    const row = {
+        offsetTop: 420,
+        getBoundingClientRect: () => ({ left: 20, top: 420 }),
+    };
+    const slot = {
+        getAttribute: name => name === 'data-project-part-id'
+            ? '44444444-4444-4444-4444-444444444444'
+            : null,
+        getBoundingClientRect: () => ({ left: 760, right: 860 }),
+    };
+    const board = {
+        clientWidth: 500,
+        scrollWidth: 1600,
+        scrollLeft: 0,
+        scrollTop: 0,
+        scrollToArgs: null,
+        getBoundingClientRect: () => boardRect,
+        querySelector: selector => {
+            if (selector === '.psb-grid-header') {
+                return header;
+            }
+
+            if (selector === `.psb-machine-row[data-machine-id="FDM-01"]`) {
+                return row;
+            }
+
+            return null;
+        },
+        querySelectorAll: selector => {
+            if (selector === '[data-project-part-id]') {
+                return [slot];
+            }
+
+            return [];
+        },
+        scrollTo: args => {
+            board.scrollToArgs = args;
+        },
+    };
+
+    return board;
+}
+
 test('current time auto-scroll leaves about one hour of timeline before the now marker', () => {
     const context = loadScheduleBoardContext();
     const board = createBoard();
@@ -59,4 +105,18 @@ test('current time auto-scroll leaves about one hour of timeline before the now 
 
     assert.equal(board.scrollToArgs?.left, 360);
     assert.equal(board.scrollToArgs?.behavior, 'auto');
+});
+
+test('focused machine scroll brings the selected machine row and part slot into view', () => {
+    const context = loadScheduleBoardContext();
+    const board = createFocusedBoard();
+
+    context.window.malievProductionSchedule.scrollFocusedMachineIntoView(
+        board,
+        'FDM-01',
+        '44444444-4444-4444-4444-444444444444');
+
+    assert.equal(board.scrollToArgs?.top, 364);
+    assert.equal(board.scrollToArgs?.left, 520);
+    assert.equal(board.scrollToArgs?.behavior, 'smooth');
 });

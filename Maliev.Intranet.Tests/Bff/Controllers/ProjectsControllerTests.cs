@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Bff.Services;
@@ -49,6 +51,29 @@ public class ProjectsControllerTests
         var handler = new MockHttpMessageHandler((req, ct) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
         return new FacilityServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+    }
+
+    [Fact]
+    public void PlanningHoldEndpoints_RequireProjectReadAndJobWritePermissions()
+    {
+        var controllerPermission = Assert.IsType<RequirePermissionAttribute>(
+            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+        Assert.Equal(MalievPermissions.Project.Read, controllerPermission.Permission);
+
+        foreach (var methodName in new[]
+        {
+            nameof(ProjectsController.CreatePlanningHold),
+            nameof(ProjectsController.UpdatePlanningHold),
+            nameof(ProjectsController.CancelPlanningHold)
+        })
+        {
+            var method = typeof(ProjectsController).GetMethod(methodName);
+            Assert.NotNull(method);
+            var methodPermission = Assert.IsType<RequirePermissionAttribute>(
+                Assert.Single(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+            Assert.Equal(MalievPermissions.Job.Write, methodPermission.Permission);
+            Assert.Equal("Bearer,Cookies", methodPermission.AuthenticationSchemes);
+        }
     }
 
     // ── GET (list) ────────────────────────────────────────────────────────────

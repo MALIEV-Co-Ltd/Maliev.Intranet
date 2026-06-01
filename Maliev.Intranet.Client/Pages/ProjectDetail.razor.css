@@ -1471,6 +1471,10 @@
     gap: 14px;
 }
 
+.project-record-shell ::deep .project-record-body--planning {
+    overflow: hidden;
+}
+
 .project-record-shell ::deep .project-planning-toolbar {
     display: flex;
     align-items: center;
@@ -1485,16 +1489,40 @@
     font-weight: 700;
 }
 
+.project-record-shell ::deep .project-planning-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(420px, 0.78fr) minmax(0, 1.22fr);
+    gap: 14px;
+    align-items: stretch;
+}
+
+.project-record-shell ::deep .project-planning-routing,
+.project-record-shell ::deep .project-planning-queue {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.project-record-shell ::deep .project-planning-routing {
+    overflow: hidden;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-md);
+    background: var(--maliev-panel);
+}
+
 .project-record-shell ::deep .project-planning-table-wrap {
     width: 100%;
-    flex: 0 0 auto;
-    max-height: min(42vh, 420px);
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
     overflow: auto;
-    border-bottom: 1px solid var(--maliev-border-subtle);
 }
 
 .project-record-shell ::deep .project-planning-table {
-    min-width: 1240px;
+    min-width: 1080px;
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
@@ -1520,9 +1548,31 @@
     text-transform: uppercase;
 }
 
+.project-record-shell ::deep .project-planning-row {
+    cursor: pointer;
+}
+
+.project-record-shell ::deep .project-planning-row:hover,
+.project-record-shell ::deep .project-planning-row:focus-visible {
+    background: var(--maliev-info-bg);
+}
+
+.project-record-shell ::deep .project-planning-row:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--maliev-info), transparent 30%);
+    outline-offset: -2px;
+}
+
+.project-record-shell ::deep .project-planning-row.selected {
+    background: color-mix(in oklab, var(--maliev-info) 10%, var(--maliev-panel));
+}
+
+.project-record-shell ::deep .project-planning-row.selected td:first-child {
+    box-shadow: inset 3px 0 0 var(--maliev-info);
+}
+
 .project-record-shell ::deep .project-planning-table th:nth-child(1),
 .project-record-shell ::deep .project-planning-table td:nth-child(1) {
-    width: 22%;
+    width: 24%;
 }
 
 .project-record-shell ::deep .project-planning-table th:nth-child(2),
@@ -1532,27 +1582,22 @@
 
 .project-record-shell ::deep .project-planning-table th:nth-child(3),
 .project-record-shell ::deep .project-planning-table td:nth-child(3) {
-    width: 9%;
+    width: 10%;
 }
 
 .project-record-shell ::deep .project-planning-table th:nth-child(4),
 .project-record-shell ::deep .project-planning-table td:nth-child(4) {
-    width: 16%;
+    width: 18%;
 }
 
 .project-record-shell ::deep .project-planning-table th:nth-child(5),
 .project-record-shell ::deep .project-planning-table td:nth-child(5) {
-    width: 13%;
+    width: 14%;
 }
 
 .project-record-shell ::deep .project-planning-table th:nth-child(6),
 .project-record-shell ::deep .project-planning-table td:nth-child(6) {
-    width: 13%;
-}
-
-.project-record-shell ::deep .project-planning-table th:nth-child(7),
-.project-record-shell ::deep .project-planning-table td:nth-child(7) {
-    width: 10%;
+    width: 17%;
 }
 
 .project-record-shell ::deep .project-planning-table td > strong,
@@ -1625,15 +1670,67 @@
     min-width: 0;
 }
 
-.project-record-shell ::deep .project-planning-actions {
+.project-record-shell ::deep .project-planning-selected {
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    flex: 0 0 auto;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-md);
+    background: var(--maliev-panel);
+}
+
+.project-record-shell ::deep .project-planning-selected-main {
+    display: grid;
+    min-width: min(360px, 100%);
+    gap: 2px;
+}
+
+.project-record-shell ::deep .project-planning-selected-main span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-record-shell ::deep .project-planning-selected-main strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.project-record-shell ::deep .project-planning-selected-main small {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.3;
+}
+
+.project-record-shell ::deep .project-planning-selected-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.project-record-shell ::deep .project-planning-selected-actions .mlv-button {
+    min-height: 34px;
+    white-space: nowrap;
+}
+
+.project-record-shell ::deep .project-planning-selected-actions .danger {
+    border-color: color-mix(in oklab, var(--maliev-danger, #dc2626) 35%, var(--maliev-border));
+    color: var(--maliev-danger, #dc2626);
 }
 
 .project-record-shell ::deep .project-planning-schedule {
-    flex: 1 1 420px;
-    min-height: 320px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -1680,6 +1777,23 @@
     .project-record-shell ::deep .project-quote-layout,
     .project-record-shell ::deep .project-quote-workspace {
         grid-template-columns: 1fr;
+    }
+
+    .project-record-shell ::deep .project-record-body--planning {
+        overflow: auto;
+    }
+
+    .project-record-shell ::deep .project-planning-workspace {
+        grid-template-columns: 1fr;
+        overflow: visible;
+    }
+
+    .project-record-shell ::deep .project-planning-routing {
+        min-height: 340px;
+    }
+
+    .project-record-shell ::deep .project-planning-schedule {
+        min-height: 520px;
     }
 }
 

@@ -260,6 +260,9 @@
     /// <summary>Gets or sets the focused machine identifier.</summary>
     [Parameter] public string? FocusMachineId { get; set; }
 
+    /// <summary>Gets or sets a version token that requests the focused machine to scroll into view.</summary>
+    [Parameter] public int FocusRequestVersion { get; set; }
+
     /// <summary>Gets or sets the horizontal pixel gap applied inside each rendered schedule slot.</summary>
     [Parameter] public int SlotGapPixels { get; set; }
 
@@ -317,6 +320,8 @@
     private ElementReference _boardShellElement;
     private string? _pendingNowScrollKey;
     private string? _lastNowScrollKey;
+    private string? _pendingFocusScrollKey;
+    private string? _lastFocusScrollKey;
 
     private string BoardClass => string.Join(
         ' ',
@@ -443,17 +448,30 @@
         }
 
         QueueCurrentTimeAutoScroll();
+        QueueFocusedMachineAutoScroll();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (string.IsNullOrWhiteSpace(_pendingNowScrollKey) || !ShowCurrentTimeMarker || Board is null || VisibleMachines.Count == 0)
-            return;
+        if (!string.IsNullOrWhiteSpace(_pendingNowScrollKey) && ShowCurrentTimeMarker && Board is not null && VisibleMachines.Count > 0)
+        {
+            var appliedKey = _pendingNowScrollKey;
+            _pendingNowScrollKey = null;
+            await JSRuntime.InvokeVoidAsync("malievProductionSchedule.scrollCurrentTimeIntoView", _boardShellElement);
+            _lastNowScrollKey = appliedKey;
+        }
 
-        var appliedKey = _pendingNowScrollKey;
-        _pendingNowScrollKey = null;
-        await JSRuntime.InvokeVoidAsync("malievProductionSchedule.scrollCurrentTimeIntoView", _boardShellElement);
-        _lastNowScrollKey = appliedKey;
+        if (!string.IsNullOrWhiteSpace(_pendingFocusScrollKey) && Board is not null && VisibleMachines.Count > 0)
+        {
+            var appliedKey = _pendingFocusScrollKey;
+            _pendingFocusScrollKey = null;
+            await JSRuntime.InvokeVoidAsync(
+                "malievProductionSchedule.scrollFocusedMachineIntoView",
+                _boardShellElement,
+                ResolvedFocusMachineId,
+                SelectedPartIdText);
+            _lastFocusScrollKey = appliedKey;
+        }
     }
 
     private bool MatchesFilters(ProductionScheduleMachineDto machine)
@@ -710,6 +728,19 @@
                 && !string.Equals(_lastNowScrollKey, nextKey, StringComparison.Ordinal)))
         {
             _pendingNowScrollKey = nextKey;
+        }
+    }
+
+    private void QueueFocusedMachineAutoScroll()
+    {
+        if (FocusRequestVersion <= 0 || string.IsNullOrWhiteSpace(ResolvedFocusMachineId))
+            return;
+
+        var nextKey = $"{FocusRequestVersion}|{ResolvedFocusMachineId}|{SelectedPartIdText}";
+        if (!string.Equals(_pendingFocusScrollKey, nextKey, StringComparison.Ordinal)
+            && !string.Equals(_lastFocusScrollKey, nextKey, StringComparison.Ordinal))
+        {
+            _pendingFocusScrollKey = nextKey;
         }
     }
 

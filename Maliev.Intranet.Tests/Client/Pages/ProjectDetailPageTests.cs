@@ -225,12 +225,19 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
 
         Assert.Contains(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/production-plan");
         Assert.Contains("project-planning-panel", cut.Markup);
+        Assert.Contains("project-planning-workspace", cut.Markup);
+        Assert.Contains("project-planning-routing", cut.Markup);
+        Assert.Contains("project-planning-queue", cut.Markup);
+        Assert.Contains("project-planning-selected", cut.Markup);
         Assert.Contains("project-planning-table", cut.Markup);
         Assert.Contains("project-planning-part", cut.Markup);
+        Assert.Contains($"data-project-part-id=\"{_bracketPartId}\"", cut.Markup);
+        Assert.Contains($"data-selected-part-id=\"{_bracketPartId}\"", cut.Markup);
         Assert.Contains("https://storage.example/bracket-thumb.webp", cut.Markup);
         Assert.Contains("3 quoted parts", cut.Markup);
         Assert.Contains("Manufacturing", cut.Markup);
         Assert.Contains("Qty / DFM", cut.Markup);
+        Assert.DoesNotContain("<th>Actions</th>", cut.Markup, StringComparison.Ordinal);
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("120 x 64 x 18 mm", cut.Markup);
         Assert.Contains("CNC Milling", cut.Markup);
@@ -259,10 +266,12 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("bracket-left.stl", cut.Markup);
         Assert.Contains("sensor-cover.3mf", cut.Markup);
         Assert.DoesNotContain("project-planning-queue-panel", cut.Markup);
-        Assert.Contains("Create planning hold", cut.Markup);
+        Assert.Contains("Create 72-hour planning hold", cut.Markup);
+
+        cut.Find($"tr[data-project-part-id='{_sensorPartId}']").Click();
+
         Assert.Contains("Update planning hold", cut.Markup);
         Assert.Contains("Cancel planning hold", cut.Markup);
-        Assert.Contains("Open job", cut.Markup);
     }
 
     [Fact]
@@ -277,7 +286,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("CNC Mill 01", cut.Markup);
         Assert.Contains("data-focused-machine-id=\"CNC-01\"", cut.Markup);
 
-        await cut.InvokeAsync(() => cut.Find("button[aria-label='View machine queue for sensor-cover.3mf']").Click());
+        await cut.InvokeAsync(() => cut.Find($"tr[data-project-part-id='{_sensorPartId}']").Click());
+        await cut.InvokeAsync(() => cut.Find("button[aria-label='View selected machine queue']").Click());
 
         cut.WaitForAssertion(() =>
         {
@@ -285,6 +295,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             Assert.Contains("data-focused-machine-id=\"FDM-01\"", cut.Markup);
             Assert.Contains("class=\"psb-machine-row focused\"", cut.Markup);
             Assert.Contains($"data-project-part-id=\"{_sensorPartId}\"", cut.Markup);
+            Assert.Contains(
+                JSInterop.Invocations,
+                invocation => invocation.Identifier == "malievProductionSchedule.scrollFocusedMachineIntoView");
         });
     }
 
@@ -336,15 +349,17 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         cut.Find("button[data-tab='planning']").Click();
         cut.WaitForAssertion(() => Assert.Contains("Production planning", cut.Markup));
 
-        cut.Find("button[aria-label='Create planning hold']").Click();
+        cut.Find("button.project-planning-create-hold").Click();
         cut.WaitForAssertion(() =>
             Assert.Contains(_requestedRequests, request => request == $"POST /api/v1/projects/{_projectId}/parts/{_bracketPartId}/planning-hold"));
 
-        cut.Find("button[aria-label='Update planning hold']").Click();
+        cut.Find($"tr[data-project-part-id='{_sensorPartId}']").Click();
+
+        cut.Find("button.project-planning-update-hold").Click();
         cut.WaitForAssertion(() =>
             Assert.Contains(_requestedRequests, request => request == $"PATCH /api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}"));
 
-        cut.Find("button[aria-label='Cancel planning hold']").Click();
+        cut.Find("button.project-planning-cancel-hold").Click();
         cut.WaitForAssertion(() =>
             Assert.Contains(_requestedRequests, request => request == $"DELETE /api/v1/projects/{_projectId}/planning-holds/{_planningHoldId}"));
     }
@@ -569,12 +584,12 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-commercial-breakdown", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-commercial-totals", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-panel", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-workspace", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-table", css, StringComparison.Ordinal);
-        Assert.Contains("::deep .project-planning-actions", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-planning-selected-actions", css, StringComparison.Ordinal);
         Assert.Contains("::deep .production-schedule-board", css, StringComparison.Ordinal);
         Assert.Contains("::deep .production-schedule-board-shell", css, StringComparison.Ordinal);
         Assert.Contains("th:nth-child(6)", css, StringComparison.Ordinal);
-        Assert.Contains("th:nth-child(7)", css, StringComparison.Ordinal);
         Assert.Contains("text-align: right", css, StringComparison.Ordinal);
         Assert.Contains("width: 5%", css, StringComparison.Ordinal);
         Assert.Contains("width: 100%", css, StringComparison.Ordinal);

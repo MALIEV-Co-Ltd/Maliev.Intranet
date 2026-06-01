@@ -216,6 +216,7 @@
     private bool _thumbnailPreviewLoading;
     private bool _thumbnailPreview3dActive;
     private Guid? _selectedPlanningPartId;
+    private int _planningFocusRequestVersion;
 
     private IReadOnlyList<(string Key, string Label)> Tabs =>
     [
@@ -852,13 +853,18 @@
             content.CloseElement();
 
             content.OpenElement(23, "div");
-            content.AddAttribute(24, "class", "project-planning-table-wrap");
-            content.OpenElement(25, "table");
-            content.AddAttribute(26, "class", "project-planning-table");
-            content.OpenElement(27, "thead");
-            content.OpenElement(28, "tr");
-            var headerSequence = 29;
-            foreach (var heading in new[] { "Part", "Manufacturing", "Qty / DFM", "Routing", "Hold", "Job", "Actions" })
+            content.AddAttribute(24, "class", "project-planning-workspace");
+
+            content.OpenElement(25, "section");
+            content.AddAttribute(26, "class", "project-planning-routing");
+            content.OpenElement(27, "div");
+            content.AddAttribute(28, "class", "project-planning-table-wrap");
+            content.OpenElement(29, "table");
+            content.AddAttribute(30, "class", "project-planning-table");
+            content.OpenElement(31, "thead");
+            content.OpenElement(32, "tr");
+            var headerSequence = 33;
+            foreach (var heading in new[] { "Part", "Manufacturing", "Qty / DFM", "Routing", "Hold", "Job" })
             {
                 content.OpenElement(headerSequence++, "th");
                 content.AddContent(headerSequence++, heading);
@@ -872,22 +878,75 @@
             foreach (var plan in _productionPlan.Parts)
             {
                 content.OpenElement(sequence++, "tr");
+                content.AddAttribute(sequence++, "class", PlanningRowClass(plan));
+                content.AddAttribute(sequence++, "data-project-part-id", plan.PartId);
+                content.AddAttribute(sequence++, "aria-selected", IsSelectedPlanningPart(plan).ToString().ToLowerInvariant());
+                content.AddAttribute(sequence++, "tabindex", "0");
+                content.AddAttribute(sequence++, "role", "button");
+                content.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, () => SelectPlanningRoute(plan.PartId)));
                 AddPlanningPartCell(content, ref sequence, plan);
                 AddPlanningProcessCell(content, ref sequence, plan);
                 AddPlanningStateCell(content, ref sequence, plan);
                 AddPlanningRoutingCell(content, ref sequence, plan);
                 AddPlanningHoldCell(content, ref sequence, plan);
                 AddPlanningJobCell(content, ref sequence, plan);
-                AddPlanningActionsCell(content, ref sequence, plan);
                 content.CloseElement();
             }
             content.CloseElement();
             content.CloseElement();
             content.CloseElement();
+            content.CloseElement();
 
+            content.OpenElement(sequence++, "section");
+            content.AddAttribute(sequence++, "class", "project-planning-queue");
+            content.AddContent(sequence++, RenderPlanningSelectionRail());
             content.AddContent(sequence++, RenderPlanningScheduleBoard());
+            content.CloseElement();
+            content.CloseElement();
         }));
         builder.CloseComponent();
+    };
+
+    private RenderFragment RenderPlanningSelectionRail() => builder =>
+    {
+        var plan = ResolveSelectedPlanningPart();
+        var sequence = 0;
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-planning-selected");
+        if (plan is not null)
+            builder.AddAttribute(sequence++, "data-selected-part-id", plan.PartId);
+
+        if (plan is null)
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "project-planning-selected-main");
+            builder.OpenElement(sequence++, "strong");
+            builder.AddContent(sequence++, "No routed part selected");
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, "No active machine route.");
+            builder.CloseElement();
+            builder.CloseElement();
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "project-planning-selected-main");
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, "Selected part");
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "strong");
+        builder.AddContent(sequence++, plan.FileName);
+        builder.CloseElement();
+        builder.OpenElement(sequence++, "small");
+        builder.AddContent(sequence++, FormatPlanningSelectionMeta(plan));
+        builder.CloseElement();
+        builder.CloseElement();
+
+        AddPlanningSelectionActions(builder, ref sequence, plan);
+        builder.CloseElement();
     };
 
     private RenderFragment RenderPlanningScheduleBoard() => builder =>
@@ -908,9 +967,10 @@
         builder.AddAttribute(6, "Board", _productionPlan.ScheduleBoard);
         builder.AddAttribute(7, "SelectedPartId", selectedPlan?.PartId);
         builder.AddAttribute(8, "FocusMachineId", ResolvePlanningFocusMachineId(selectedPlan));
-        builder.AddAttribute(9, "SlotGapPixels", 6);
-        builder.AddAttribute(10, "SlotDropped", EventCallback.Factory.Create<ProductionScheduleSlotMoveRequest>(this, MovePlanningSlotAsync));
-        builder.AddAttribute(11, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
+        builder.AddAttribute(9, "FocusRequestVersion", _planningFocusRequestVersion);
+        builder.AddAttribute(10, "SlotGapPixels", 6);
+        builder.AddAttribute(11, "SlotDropped", EventCallback.Factory.Create<ProductionScheduleSlotMoveRequest>(this, MovePlanningSlotAsync));
+        builder.AddAttribute(12, "OnRefresh", EventCallback.Factory.Create(this, LoadProductionPlanAsync));
         builder.CloseComponent();
         builder.CloseElement();
     };
@@ -1055,101 +1115,97 @@
         builder.CloseElement();
     }
 
-    private void AddPlanningActionsCell(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
+    private void AddPlanningSelectionActions(RenderTreeBuilder builder, ref int sequence, ProjectProductionPartPlanDto plan)
     {
         var saving = _holdSavingPartIds.Contains(plan.PartId);
         var hasRoute = plan.Routing is not null && plan.Routing.MachineId != Guid.Empty;
-        builder.OpenElement(sequence++, "td");
         builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", "project-planning-actions");
+        builder.AddAttribute(sequence++, "class", "project-planning-selected-actions");
 
-        builder.OpenComponent<MudTooltip>(sequence++);
-        builder.AddAttribute(sequence++, "Text", hasRoute ? "View machine queue" : "No active route available");
-        builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
-        {
-            var childSequence = 0;
-            content.OpenComponent<MudIconButton>(childSequence++);
-            content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.AltRoute);
-            content.AddAttribute(childSequence++, "Size", Size.Small);
-            content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
-            content.AddAttribute(childSequence++, "Disabled", !hasRoute);
-            content.AddAttribute(childSequence++, "aria-label", $"View machine queue for {plan.FileName}");
-            content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, () => SelectPlanningRoute(plan.PartId)));
-            content.CloseComponent();
-        }));
-        builder.CloseComponent();
+        AddPlanningActionButton(
+            builder,
+            ref sequence,
+            "secondary project-planning-view-queue",
+            Icons.Material.Outlined.AltRoute,
+            "View machine queue",
+            "View selected machine queue",
+            !hasRoute,
+            EventCallback.Factory.Create<MouseEventArgs>(this, _ => FocusSelectedPlanningRouteAsync(plan)));
 
         if (plan.JobId is not null)
         {
-            builder.OpenComponent<MudTooltip>(sequence++);
-            builder.AddAttribute(sequence++, "Text", "Open job");
-            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
-            {
-                var childSequence = 0;
-                content.OpenComponent<MudIconButton>(childSequence++);
-                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.OpenInNew);
-                content.AddAttribute(childSequence++, "Size", Size.Small);
-                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
-                content.AddAttribute(childSequence++, "aria-label", "Open job");
-                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenProductionJob(plan)));
-                content.CloseComponent();
-            }));
-            builder.CloseComponent();
+            AddPlanningActionButton(
+                builder,
+                ref sequence,
+                "secondary project-planning-open-job",
+                Icons.Material.Outlined.OpenInNew,
+                "Open job",
+                "Open production job",
+                false,
+                EventCallback.Factory.Create<MouseEventArgs>(this, _ => OpenProductionJob(plan)));
         }
 
         if (plan.ActiveHold is null)
         {
-            builder.OpenComponent<MudTooltip>(sequence++);
-            builder.AddAttribute(sequence++, "Text", plan.CanCreateHold && hasRoute ? "Create 72-hour planning hold" : plan.HoldBlockReason ?? "No active route available");
-            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
-            {
-                var childSequence = 0;
-                content.OpenComponent<MudIconButton>(childSequence++);
-                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.EventAvailable);
-                content.AddAttribute(childSequence++, "Size", Size.Small);
-                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
-                content.AddAttribute(childSequence++, "Disabled", saving || !plan.CanCreateHold || !hasRoute);
-                content.AddAttribute(childSequence++, "aria-label", "Create planning hold");
-                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => CreatePlanningHoldAsync(plan)));
-                content.CloseComponent();
-            }));
-            builder.CloseComponent();
+            AddPlanningActionButton(
+                builder,
+                ref sequence,
+                "primary project-planning-create-hold",
+                Icons.Material.Outlined.EventAvailable,
+                "Create 72-hour planning hold",
+                "Create planning hold",
+                saving || !plan.CanCreateHold || !hasRoute,
+                EventCallback.Factory.Create<MouseEventArgs>(this, _ => CreatePlanningHoldAsync(plan)));
         }
         else
         {
-            builder.OpenComponent<MudTooltip>(sequence++);
-            builder.AddAttribute(sequence++, "Text", "Refresh hold with current route");
-            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
-            {
-                var childSequence = 0;
-                content.OpenComponent<MudIconButton>(childSequence++);
-                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.Update);
-                content.AddAttribute(childSequence++, "Size", Size.Small);
-                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
-                content.AddAttribute(childSequence++, "Disabled", saving);
-                content.AddAttribute(childSequence++, "aria-label", "Update planning hold");
-                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => UpdatePlanningHoldAsync(plan)));
-                content.CloseComponent();
-            }));
-            builder.CloseComponent();
+            AddPlanningActionButton(
+                builder,
+                ref sequence,
+                "secondary project-planning-update-hold",
+                Icons.Material.Outlined.Update,
+                "Update planning hold",
+                "Update planning hold",
+                saving,
+                EventCallback.Factory.Create<MouseEventArgs>(this, _ => UpdatePlanningHoldAsync(plan)));
 
-            builder.OpenComponent<MudTooltip>(sequence++);
-            builder.AddAttribute(sequence++, "Text", "Cancel planning hold");
-            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(content =>
-            {
-                var childSequence = 0;
-                content.OpenComponent<MudIconButton>(childSequence++);
-                content.AddAttribute(childSequence++, "Icon", Icons.Material.Outlined.EventBusy);
-                content.AddAttribute(childSequence++, "Size", Size.Small);
-                content.AddAttribute(childSequence++, "Variant", Variant.Outlined);
-                content.AddAttribute(childSequence++, "Disabled", saving);
-                content.AddAttribute(childSequence++, "aria-label", "Cancel planning hold");
-                content.AddAttribute(childSequence++, "OnClick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => CancelPlanningHoldAsync(plan)));
-                content.CloseComponent();
-            }));
-            builder.CloseComponent();
+            AddPlanningActionButton(
+                builder,
+                ref sequence,
+                "secondary danger project-planning-cancel-hold",
+                Icons.Material.Outlined.EventBusy,
+                "Cancel planning hold",
+                "Cancel planning hold",
+                saving,
+                EventCallback.Factory.Create<MouseEventArgs>(this, _ => CancelPlanningHoldAsync(plan)));
         }
 
+        builder.CloseElement();
+    }
+
+    private static void AddPlanningActionButton(
+        RenderTreeBuilder builder,
+        ref int sequence,
+        string className,
+        string icon,
+        string label,
+        string ariaLabel,
+        bool disabled,
+        EventCallback<MouseEventArgs> onClick)
+    {
+        builder.OpenElement(sequence++, "button");
+        builder.AddAttribute(sequence++, "type", "button");
+        builder.AddAttribute(sequence++, "class", $"mlv-button {className}");
+        builder.AddAttribute(sequence++, "aria-label", ariaLabel);
+        if (disabled)
+            builder.AddAttribute(sequence++, "disabled", true);
+        builder.AddAttribute(sequence++, "onclick", onClick);
+        builder.OpenComponent<MudIcon>(sequence++);
+        builder.AddAttribute(sequence++, "Icon", icon);
+        builder.AddAttribute(sequence++, "Size", Size.Small);
+        builder.CloseComponent();
+        builder.OpenElement(sequence++, "span");
+        builder.AddContent(sequence++, label);
         builder.CloseElement();
         builder.CloseElement();
     }
@@ -1199,6 +1255,21 @@
 
     private static bool HasActiveRoute(ProjectProductionPartPlanDto plan) =>
         plan.Routing is not null && plan.Routing.MachineId != Guid.Empty;
+
+    private bool IsSelectedPlanningPart(ProjectProductionPartPlanDto plan) =>
+        ResolveSelectedPlanningPart()?.PartId == plan.PartId;
+
+    private string PlanningRowClass(ProjectProductionPartPlanDto plan) =>
+        IsSelectedPlanningPart(plan) ? "project-planning-row selected" : "project-planning-row";
+
+    private static string FormatPlanningSelectionMeta(ProjectProductionPartPlanDto plan)
+    {
+        if (plan.Routing is null)
+            return "No active route";
+
+        var route = FirstNonEmpty(plan.Routing.MachineName, plan.Routing.MachineCode, "Machine not assigned");
+        return $"{FormatProcess(plan.ProcessType)} / {route} / {plan.Routing.QueueAhead} queued ahead";
+    }
 
     private RenderFragment RenderPartsTable(bool compact) => builder =>
     {
@@ -1909,6 +1980,13 @@
         }
 
         _selectedPlanningPartId = plan.PartId;
+    }
+
+    private async Task FocusSelectedPlanningRouteAsync(ProjectProductionPartPlanDto plan)
+    {
+        SelectPlanningRoute(plan.PartId);
+        _planningFocusRequestVersion++;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void OpenProductionJob(ProjectProductionPartPlanDto plan)

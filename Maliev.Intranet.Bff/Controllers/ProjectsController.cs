@@ -582,7 +582,7 @@ public class ProjectsController(
     /// <summary>
     /// Creates a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/parts/{partId:guid}/planning-hold")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CreatePlanningHold(
         Guid id,
@@ -607,7 +607,7 @@ public class ProjectsController(
     /// <summary>
     /// Updates a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPatch("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> UpdatePlanningHold(
         Guid id,
@@ -627,7 +627,7 @@ public class ProjectsController(
     /// <summary>
     /// Cancels a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpDelete("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CancelPlanningHold(
         Guid id,
