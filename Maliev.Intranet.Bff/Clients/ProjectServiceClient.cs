@@ -297,10 +297,26 @@ public class ProjectServiceClient(HttpClient httpClient)
         Guid projectId,
         GenerateQuotationRequest? request = null,
         CancellationToken ct = default)
-        => await httpClient.PostAsJsonAsync(
+    {
+        var quotationRequest = request ?? new GenerateQuotationRequest();
+        var downstreamRequest = new
+        {
+            quotationRequest.ValidityDays,
+            quotationRequest.DeliveryExpectations,
+            quotationRequest.BulkDiscountAmount,
+            quotationRequest.ManualDiscountAmount,
+            quotationRequest.ShippingCost,
+            quotationRequest.TaxAmount,
+            quotationRequest.QuotationTerms,
+            quotationRequest.ChangeSummary,
+            quotationRequest.IdempotencyKey
+        };
+
+        return await httpClient.PostAsJsonAsync(
             $"/project/v1/projects/{projectId}/generate-quotation",
-            request ?? new GenerateQuotationRequest(),
+            downstreamRequest,
             ct);
+    }
 
     /// <summary>
     /// Marks a project's quotation as accepted by the customer.

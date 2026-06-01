@@ -382,11 +382,12 @@ public class ProjectsController(
         [FromBody] GenerateQuotationRequest? request,
         CancellationToken ct)
     {
-        var response = await client.GenerateQuotationAsync(id, request ?? new GenerateQuotationRequest(), ct);
+        var quotationRequest = request ?? new GenerateQuotationRequest();
+        var response = await client.GenerateQuotationAsync(id, quotationRequest, ct);
         if (response.IsSuccessStatusCode)
         {
             var generatedProject = await ReadGeneratedProjectAsync(response, ct);
-            var pdfGenerated = await TryGenerateQuotationPdfAsync(id, generatedProject, ct);
+            var pdfGenerated = await TryGenerateQuotationPdfAsync(id, generatedProject, quotationRequest.PdfData, ct);
             if (!pdfGenerated)
                 return StatusCode(StatusCodes.Status502BadGateway, "Quotation generated, but automatic PDF generation failed.");
 
@@ -412,7 +413,11 @@ public class ProjectsController(
         }
     }
 
-    private async Task<bool> TryGenerateQuotationPdfAsync(Guid projectId, ProjectDetailDto? generatedProject, CancellationToken ct)
+    private async Task<bool> TryGenerateQuotationPdfAsync(
+        Guid projectId,
+        ProjectDetailDto? generatedProject,
+        QuotationPdfData? submittedPdfData,
+        CancellationToken ct)
     {
         if (quotationClient is null || pdfClient is null)
         {
@@ -440,7 +445,9 @@ public class ProjectsController(
         }
 
         var customerDetail = await TryGetCustomerDetailAsync(project.CustomerId, ct);
-        var pdfData = ProjectQuotationPdfDataFactory.Build(project, quotation, customerDetail);
+        var pdfData = submittedPdfData is null || submittedPdfData.Items.Count == 0
+            ? ProjectQuotationPdfDataFactory.Build(project, quotation, customerDetail)
+            : ProjectQuotationPdfDataFactory.ApplyFormalQuotationMetadata(submittedPdfData, project, quotation, customerDetail);
         QuotationPdfMetadataApplicator.Apply(pdfData, HttpContext?.User);
 
         var pdfUrl = await pdfClient.GeneratePdfAsync(

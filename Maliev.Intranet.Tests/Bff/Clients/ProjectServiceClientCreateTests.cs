@@ -278,13 +278,19 @@ public class ProjectServiceClientCreateTests
             new GenerateQuotationRequest
             {
                 ValidityDays = 45,
-                DeliveryExpectations = "Standard lead time"
+                DeliveryExpectations = "Standard lead time",
+                PdfData = new QuotationPdfData
+                {
+                    QuotationNumber = "DRAFT-123",
+                    CustomerName = "Draft customer"
+                }
             });
 
         Assert.NotNull(body);
         using var json = System.Text.Json.JsonDocument.Parse(body);
         Assert.Equal(45, json.RootElement.GetProperty("validityDays").GetInt32());
         Assert.Equal("Standard lead time", json.RootElement.GetProperty("deliveryExpectations").GetString());
+        Assert.False(json.RootElement.TryGetProperty("pdfData", out _));
     }
 
     [Fact]

@@ -2807,22 +2807,7 @@ public partial class ProjectNew : IAsyncDisposable
     {
         try
         {
-            var customerDetail = await GetDraftPdfCustomerDetailAsync();
-            var nowUtc = DateTime.UtcNow;
-            var pdfData = ProjectQuotationPdfMapper.BuildDraftPdfData(
-                _tempProjectId,
-                _selectedCustomer,
-                customerDetail,
-                CurrencyService.Code,
-                nowUtc,
-                ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
-                _parts,
-                _processes,
-                _quotationTerms,
-                _shippingCost,
-                _manualDiscountAmount,
-                CurrencyService.ExchangeRate);
-
+            var pdfData = await BuildCurrentQuotationPdfDataAsync();
             var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (response.IsSuccessStatusCode)
             {
@@ -2842,6 +2827,26 @@ public partial class ProjectNew : IAsyncDisposable
         {
             Snackbar.Add($"PDF generation error: {ex.Message}", MudBlazor.Severity.Error);
         }
+    }
+
+    private async Task<QuotationPdfData> BuildCurrentQuotationPdfDataAsync()
+    {
+        var customerDetail = await GetDraftPdfCustomerDetailAsync();
+        var nowUtc = DateTime.UtcNow;
+
+        return ProjectQuotationPdfMapper.BuildDraftPdfData(
+            _tempProjectId,
+            _selectedCustomer,
+            customerDetail,
+            CurrencyService.Code,
+            nowUtc,
+            ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
+            _parts,
+            _processes,
+            _quotationTerms,
+            _shippingCost,
+            _manualDiscountAmount,
+            CurrencyService.ExchangeRate);
     }
 
     private async Task<CustomerDetailDto?> GetDraftPdfCustomerDetailAsync()
@@ -2917,25 +2922,15 @@ public partial class ProjectNew : IAsyncDisposable
             if (!await SyncProjectPartsForQuoteAsync(projectId))
                 return;
 
-            if (!await ConfirmProjectPartPricesForQuoteAsync(projectId))
+            var pdfData = await BuildCurrentQuotationPdfDataAsync();
+
+            if (!await ConfirmProjectPartPricesForQuoteAsync(projectId, pdfData))
                 return;
 
+            var quoteRequest = BuildGenerateQuotationRequest(projectId, isUpdatingExistingProject, pdfData);
             using var quoteResponse = await Http.PostAsJsonAsync(
                 $"api/v1/projects/{projectId}/generate-quotation",
-                new GenerateQuotationRequest
-                {
-                    ValidityDays = 30,
-                    DeliveryExpectations = ProjectQuotationPdfMapper.BuildDeliveryExpectation(_selectedLeadTime),
-                    BulkDiscountAmount = CalculateBulkDiscountAmount(),
-                    ManualDiscountAmount = Math.Max(0m, _manualDiscountAmount),
-                    ShippingCost = Math.Max(0m, _shippingCost),
-                    TaxAmount = CalculateQuotationTaxAmount(),
-                    QuotationTerms = _quotationTerms,
-                    ChangeSummary = isUpdatingExistingProject
-                        ? "Regenerated from employee project quote workspace."
-                        : "Initial quotation generated from employee project quote workspace.",
-                    IdempotencyKey = $"{projectId:N}:{DateTime.UtcNow:yyyyMMddHHmmssfff}"
-                });
+                quoteRequest);
             if (!quoteResponse.IsSuccessStatusCode)
             {
                 var errorContent = await quoteResponse.Content.ReadAsStringAsync();
@@ -2975,6 +2970,36 @@ public partial class ProjectNew : IAsyncDisposable
         isUpdatingExistingProject
             ? "Project updated but quotation generation failed."
             : "Project created but quotation generation failed.";
+
+    private static GenerateQuotationRequest BuildGenerateQuotationRequest(
+        Guid projectId,
+        bool isUpdatingExistingProject,
+        QuotationPdfData pdfData) => new()
+    {
+        ValidityDays = ResolveValidityDays(pdfData),
+        DeliveryExpectations = pdfData.DeliveryExpectations,
+        BulkDiscountAmount = ResolveDiscountAmount(pdfData, "Automatic bulk-order savings"),
+        ManualDiscountAmount = ResolveDiscountAmount(pdfData, "Manual discount"),
+        ShippingCost = Math.Max(0m, pdfData.ShippingCost),
+        TaxAmount = Math.Max(0m, pdfData.TaxAmount),
+        QuotationTerms = pdfData.SpecialTerms,
+        PdfData = pdfData,
+        ChangeSummary = isUpdatingExistingProject
+            ? "Regenerated from employee project quote workspace."
+            : "Initial quotation generated from employee project quote workspace.",
+        IdempotencyKey = $"{projectId:N}:{DateTime.UtcNow:yyyyMMddHHmmssfff}"
+    };
+
+    private static int ResolveValidityDays(QuotationPdfData pdfData)
+    {
+        var days = (pdfData.ValidityEnd.Date - pdfData.ValidityStart.Date).Days;
+        return days <= 0 ? 30 : Math.Clamp(days, 1, 365);
+    }
+
+    private static decimal ResolveDiscountAmount(QuotationPdfData pdfData, string condition) =>
+        pdfData.Discounts
+            .Where(discount => string.Equals(discount.Conditions, condition, StringComparison.OrdinalIgnoreCase))
+            .Sum(discount => Math.Max(0m, discount.DiscountValue));
 
     private async Task<bool> SyncProjectPartsForQuoteAsync(Guid projectId)
     {
@@ -3023,17 +3048,21 @@ public partial class ProjectNew : IAsyncDisposable
         return true;
     }
 
-    private async Task<bool> ConfirmProjectPartPricesForQuoteAsync(Guid projectId)
+    private async Task<bool> ConfirmProjectPartPricesForQuoteAsync(Guid projectId, QuotationPdfData pdfData)
     {
-        foreach (var part in _parts.Where(p => p.IsFullyConfigured))
+        var quotedParts = _parts.Where(p => p.IsFullyConfigured).ToList();
+
+        for (var index = 0; index < quotedParts.Count; index++)
         {
+            var part = quotedParts[index];
             if (!part.ServerPartId.HasValue)
             {
                 Snackbar.Add($"Part '{part.Name}' has not been saved to the project yet.", Severity.Warning);
                 return false;
             }
 
-            var unitPrice = ResolvePartUnitPriceForConfirmation(part);
+            var pdfItem = ResolvePdfItemForPart(pdfData.Items, index, part);
+            var unitPrice = ResolvePartUnitPriceForConfirmation(part, pdfItem);
             if (!unitPrice.HasValue || unitPrice.Value <= 0m)
             {
                 Snackbar.Add($"Part '{part.Name}' has no calculated price yet.", Severity.Warning);
@@ -3054,28 +3083,29 @@ public partial class ProjectNew : IAsyncDisposable
         return true;
     }
 
-    private static decimal? ResolvePartUnitPriceForConfirmation(PartViewModel part)
+    private static QuotationPdfItem? ResolvePdfItemForPart(
+        IReadOnlyList<QuotationPdfItem> pdfItems,
+        int index,
+        PartViewModel part)
     {
-        if (part.EstimatedBaseUnitPrice.HasValue && part.EstimatedUnitPrice.HasValue && part.EstimatedBaseUnitPrice.Value > part.EstimatedUnitPrice.Value)
-            return part.EstimatedBaseUnitPrice.Value;
+        if (index < pdfItems.Count && string.Equals(pdfItems[index].PartName, part.Name, StringComparison.Ordinal))
+            return pdfItems[index];
 
-        if (part.EstimatedUnitPrice.HasValue)
-            return part.EstimatedUnitPrice.Value;
+        return pdfItems.FirstOrDefault(item => string.Equals(item.PartName, part.Name, StringComparison.Ordinal));
+    }
+
+    private static decimal? ResolvePartUnitPriceForConfirmation(PartViewModel part, QuotationPdfItem? pdfItem = null)
+    {
+        if (pdfItem?.UnitPrice > 0m)
+            return pdfItem.UnitPrice;
+
+        var baseUnitPrice = ProjectQuotationPdfMapper.ResolveBaseUnitPrice(part);
+        if (baseUnitPrice > 0m)
+            return baseUnitPrice;
 
         return part.Quantity > 0 && part.EstimatedTotalAmount.HasValue
             ? part.EstimatedTotalAmount.Value / part.Quantity
             : null;
-    }
-
-    private decimal CalculateBulkDiscountAmount() =>
-        _parts.Sum(ProjectQuotationPdfMapper.ResolveBulkDiscount);
-
-    private decimal CalculateQuotationTaxAmount()
-    {
-        var lineSubtotal = _parts.Sum(ProjectQuotationPdfMapper.ResolveBaseLineTotal);
-        var discount = Math.Min(lineSubtotal, CalculateBulkDiscountAmount() + Math.Max(0m, _manualDiscountAmount));
-        var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, _shippingCost);
-        return Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
     }
 
     // ── Task 15: Duplicate project ─────────────────────────────────────

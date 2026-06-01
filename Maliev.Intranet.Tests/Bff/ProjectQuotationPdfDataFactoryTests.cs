@@ -124,6 +124,76 @@ public class ProjectQuotationPdfDataFactoryTests
     }
 
     /// <summary>
+    /// Verifies submitted ProjectNew PDF payloads keep their line data while receiving formal quotation metadata.
+    /// </summary>
+    [Fact]
+    public void ApplyFormalQuotationMetadata_PreservesSubmittedPayloadAndStampsQuotationNumber()
+    {
+        var submitted = new QuotationPdfData
+        {
+            QuotationNumber = "DRAFT-111111111111111111",
+            CustomerName = "Submitted Customer",
+            Currency = "USD",
+            DeliveryExpectations = "Standard: 5 business days after order confirmation",
+            SpecialTerms = "50% deposit before production.",
+            Items =
+            [
+                new QuotationPdfItem
+                {
+                    Index = 1,
+                    PartName = "submitted-part.step",
+                    MaterialName = "PLA",
+                    Quantity = 2,
+                    UnitPrice = 125m,
+                    LineTotal = 250m
+                }
+            ],
+            SubtotalBeforeDiscount = 250m,
+            Subtotal = 250m,
+            TaxAmount = 17.5m,
+            TotalAmount = 267.5m
+        };
+        var project = new ProjectDetailDto
+        {
+            ProjectNumber = "PRJ-2026-0001",
+            CustomerName = "Project Customer",
+            CreatedAt = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc),
+            ValidUntil = new DateTime(2026, 5, 31, 0, 0, 0, DateTimeKind.Utc),
+            Currency = "THB"
+        };
+        var quotation = new QuotationDetailDto
+        {
+            QuotationNumber = "Q-FORMAL",
+            CurrentVersionNumber = 2,
+            CurrencyCode = "THB",
+            CreatedAt = new DateTime(2026, 5, 2, 0, 0, 0, DateTimeKind.Utc),
+            ValidityPeriodStart = new DateTime(2026, 5, 2, 0, 0, 0, DateTimeKind.Utc),
+            ValidityPeriodEnd = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    VersionNumber = 2,
+                    CurrencyCode = "THB",
+                    ChangeSummary = "Formal version"
+                }
+            ]
+        };
+
+        var data = ProjectQuotationPdfDataFactory.ApplyFormalQuotationMetadata(submitted, project, quotation);
+
+        Assert.Equal("Q-FORMAL", data.QuotationNumber);
+        Assert.Equal(2, data.VersionNumber);
+        Assert.Equal("Submitted Customer", data.CustomerName);
+        Assert.Equal("USD", data.Currency);
+        Assert.Equal("submitted-part.step", data.Items[0].PartName);
+        Assert.Equal(125m, data.Items[0].UnitPrice);
+        Assert.Equal(267.5m, data.TotalAmount);
+        Assert.Equal("Formal version", data.ChangeSummary);
+        Assert.Equal(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc), data.ValidityEnd);
+    }
+
+    /// <summary>
     /// Verifies the automatic PDF uses the same part order as the generated quotation line items.
     /// </summary>
     [Fact]

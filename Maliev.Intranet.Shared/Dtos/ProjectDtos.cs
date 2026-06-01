@@ -812,6 +812,9 @@ public class GenerateQuotationRequest
     [MaxLength(2000)]
     public string? QuotationTerms { get; set; }
 
+    /// <summary>Gets or sets the exact PDF payload captured from the quoting workspace submit state.</summary>
+    public QuotationPdfData? PdfData { get; set; }
+
     /// <summary>Gets or sets the change summary captured on the quotation version.</summary>
     [MaxLength(1000)]
     public string? ChangeSummary { get; set; }

@@ -714,6 +714,8 @@ public class ProjectsControllerTests
         var projectId = Guid.NewGuid();
         var quotationId = Guid.NewGuid();
         const string QuotationNumber = "Q-3EF52DCB";
+        const string SubmittedCustomerName = "Submitted PDF Customer";
+        const string SubmittedPartName = "submitted-fixture.step";
         var projectReloadCount = 0;
         var attachedPdfArtifact = false;
         JsonElement? pdfRequestPayload = null;
@@ -822,7 +824,36 @@ public class ProjectsControllerTests
             quotationClient: new QuotationServiceClient(new HttpClient(quotationHandler) { BaseAddress = new Uri("http://test") }),
             pdfClient: new PdfServiceClient(new HttpClient(pdfHandler) { BaseAddress = new Uri("http://test") }));
 
-        var result = await controller.GenerateQuotation(projectId, new GenerateQuotationRequest(), CancellationToken.None);
+        var result = await controller.GenerateQuotation(
+            projectId,
+            new GenerateQuotationRequest
+            {
+                PdfData = new QuotationPdfData
+                {
+                    QuotationNumber = "DRAFT-OLD",
+                    CustomerName = SubmittedCustomerName,
+                    Currency = "USD",
+                    DeliveryExpectations = "Standard: 5 business days after order confirmation",
+                    SpecialTerms = "50% deposit before production.",
+                    Items =
+                    [
+                        new QuotationPdfItem
+                        {
+                            Index = 1,
+                            PartName = SubmittedPartName,
+                            MaterialName = "PLA",
+                            Quantity = 2,
+                            UnitPrice = 321m,
+                            LineTotal = 642m
+                        }
+                    ],
+                    SubtotalBeforeDiscount = 642m,
+                    Subtotal = 642m,
+                    TotalAmount = 686.94m,
+                    TaxAmount = 44.94m
+                }
+            },
+            CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Equal(0, projectReloadCount);
@@ -830,6 +861,12 @@ public class ProjectsControllerTests
         Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("documentType").GetString());
         Assert.Equal(QuotationNumber, pdfRequestPayload.Value.GetProperty("referenceId").GetString());
         Assert.Equal("Quotation", pdfRequestPayload.Value.GetProperty("templateCode").GetString());
+        var pdfData = pdfRequestPayload.Value.GetProperty("data");
+        Assert.Equal(QuotationNumber, pdfData.GetProperty("QuotationNumber").GetString());
+        Assert.Equal(SubmittedCustomerName, pdfData.GetProperty("CustomerName").GetString());
+        Assert.Equal("USD", pdfData.GetProperty("Currency").GetString());
+        Assert.Equal(SubmittedPartName, pdfData.GetProperty("Items")[0].GetProperty("PartName").GetString());
+        Assert.Equal(321m, pdfData.GetProperty("Items")[0].GetProperty("UnitPrice").GetDecimal());
         Assert.True(attachedPdfArtifact);
     }
 

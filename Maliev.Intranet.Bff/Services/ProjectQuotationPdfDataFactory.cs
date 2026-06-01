@@ -57,6 +57,48 @@ internal static class ProjectQuotationPdfDataFactory
         };
     }
 
+    public static QuotationPdfData ApplyFormalQuotationMetadata(
+        QuotationPdfData pdfData,
+        ProjectDetailDto project,
+        QuotationDetailDto quotation,
+        CustomerDetailDto? customerDetail = null)
+    {
+        var currentVersion = ResolveCurrentVersion(quotation);
+
+        pdfData.QuotationNumber = FirstNonEmpty(quotation.QuotationNumber, project.QuotationNumber, pdfData.QuotationNumber) ?? string.Empty;
+        pdfData.VersionNumber = currentVersion?.VersionNumber ?? quotation.CurrentVersionNumber;
+        pdfData.CustomerName = FirstNonEmpty(pdfData.CustomerName, ResolveCustomerName(project, quotation, customerDetail)) ?? "-";
+        pdfData.CustomerType = FirstNonEmpty(pdfData.CustomerType, ResolveCustomerType(project, customerDetail)) ?? "Corporate";
+        pdfData.CustomerBranch = FirstNonEmpty(pdfData.CustomerBranch, project.CustomerBranch, ResolveCustomerBranch(project, customerDetail));
+        pdfData.CustomerTaxId = FirstNonEmpty(pdfData.CustomerTaxId, project.CustomerTaxId, customerDetail?.CompanyVatNumber, customerDetail?.CompanyRegistrationNumber);
+        pdfData.CustomerPhone = FirstNonEmpty(pdfData.CustomerPhone, project.CustomerCompanyPhone, project.CustomerPhone, customerDetail?.CompanyPhone, customerDetail?.Mobile, customerDetail?.Landline);
+
+        if (pdfData.CustomerDisplayLines.Count == 0)
+            pdfData.CustomerDisplayLines = BuildCustomerDisplayLines(project, customerDetail);
+
+        var billingAddressLines = ResolveBillingAddressLines(customerDetail);
+        var shippingAddressLines = ResolveShippingAddressLines(customerDetail);
+        pdfData.CustomerAddress = FirstNonEmpty(pdfData.CustomerAddress, project.BillingAddressLine, project.ShippingAddressLine, FormatAddressText(billingAddressLines));
+        pdfData.BillingAddress = FirstNonEmpty(pdfData.BillingAddress, project.BillingAddressLine, FormatAddressText(billingAddressLines));
+        if (pdfData.BillingAddressLines.Count == 0)
+            pdfData.BillingAddressLines = SplitAddressLines(project.BillingAddressLine, billingAddressLines);
+
+        pdfData.ShippingAddress = FirstNonEmpty(pdfData.ShippingAddress, project.ShippingAddressLine, FormatAddressText(shippingAddressLines));
+        if (pdfData.ShippingAddressLines.Count == 0)
+            pdfData.ShippingAddressLines = SplitAddressLines(project.ShippingAddressLine, shippingAddressLines);
+
+        pdfData.ContactPerson = FirstNonEmpty(pdfData.ContactPerson, project.CustomerName, customerDetail?.Name);
+        pdfData.QuotationDate = quotation.CreatedAt == default ? project.CreatedAt : quotation.CreatedAt;
+        pdfData.ValidityStart = quotation.ValidityPeriodStart == default ? pdfData.ValidityStart : quotation.ValidityPeriodStart;
+        pdfData.ValidityEnd = quotation.ValidityPeriodEnd == default ? pdfData.ValidityEnd : quotation.ValidityPeriodEnd;
+        pdfData.Currency = FirstNonEmpty(pdfData.Currency, currentVersion?.CurrencyCode, quotation.CurrencyCode, project.Currency) ?? "THB";
+        pdfData.DeliveryExpectations = FirstNonEmpty(pdfData.DeliveryExpectations, currentVersion?.DeliveryExpectations, quotation.DeliveryExpectations);
+        pdfData.SpecialTerms = FirstNonEmpty(pdfData.SpecialTerms, currentVersion?.SpecialTerms);
+        pdfData.ChangeSummary = FirstNonEmpty(currentVersion?.ChangeSummary, pdfData.ChangeSummary);
+
+        return pdfData;
+    }
+
     private static QuotationVersionDto? ResolveCurrentVersion(QuotationDetailDto quotation) =>
         quotation.Versions?
             .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)

@@ -1490,6 +1490,9 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             MaterialId = materialId,
             MaterialCode = "AL6061",
             Quantity = 2,
+            EstimatedBaseUnitPrice = 1500m,
+            EstimatedDiscountedUnitPriceBeforeFinish = 1000m,
+            FinishAdditionalUnitCost = 250m,
             EstimatedUnitPrice = 1250m,
             EstimatedTotalAmount = 2500m,
             IsManifold = true,
@@ -1504,12 +1507,23 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
 
         Assert.True(confirmIndex >= 0, $"The quote flow must persist the calculated part price before generating the quotation. Requests: {string.Join(", ", paths)}");
         Assert.True(quoteIndex > confirmIndex, $"The quotation endpoint must run after part prices are confirmed. Requests: {string.Join(", ", paths)}");
-        Assert.Equal(1250m, confirmedPrice);
+        Assert.Equal(1750m, confirmedPrice);
         Assert.NotNull(quotationBody);
         using (var json = JsonDocument.Parse(quotationBody))
         {
             Assert.Equal(30, json.RootElement.GetProperty("validityDays").GetInt32());
             Assert.Contains("Standard", json.RootElement.GetProperty("deliveryExpectations").GetString(), StringComparison.Ordinal);
+            Assert.Equal(1000m, json.RootElement.GetProperty("bulkDiscountAmount").GetDecimal());
+            Assert.Equal(175m, json.RootElement.GetProperty("taxAmount").GetDecimal());
+
+            var pdfData = json.RootElement.GetProperty("pdfData");
+            Assert.Equal("THB", pdfData.GetProperty("currency").GetString());
+            Assert.Equal(3500m, pdfData.GetProperty("subtotalBeforeDiscount").GetDecimal());
+            Assert.Equal(1000m, pdfData.GetProperty("totalDiscount").GetDecimal());
+            Assert.Equal(2500m, pdfData.GetProperty("subtotal").GetDecimal());
+            Assert.Equal(175m, pdfData.GetProperty("taxAmount").GetDecimal());
+            Assert.Equal(1750m, pdfData.GetProperty("items")[0].GetProperty("unitPrice").GetDecimal());
+            Assert.Equal(3500m, pdfData.GetProperty("items")[0].GetProperty("lineTotal").GetDecimal());
         }
         Assert.EndsWith($"/sales/projects/{projectId}", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
         var snackbar = Services.GetRequiredService<ISnackbar>();
