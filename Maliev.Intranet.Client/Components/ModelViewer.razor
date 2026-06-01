@@ -861,6 +861,7 @@
 
         return mat switch
         {
+            _ when mat.Contains("PEEK") => "peek",
             _ when mat.Contains("BRASS") => "brass",
             _ when mat.Contains("COPPER") => "copper",
             _ when mat.Contains("BRONZE") => "bronze",
@@ -875,7 +876,6 @@
                     // Transparent/clear/natural filaments — translucent frosted look
                     _ when mat.Contains("TRANSPARENT") || mat.Contains("CLEAR") || mat.Contains("TRANSP") => "petg-clear",
                     _ when mat.Contains("CARBON") => "carbon-fiber",
-                    _ when mat.Contains("PEEK") => "peek",
                     _ when mat.Contains("ABS") => "abs",
                     _ when mat.Contains("PETG") => "petg",
                     _ when mat.Contains("NYLON") || mat.Contains("PA") => "nylon",

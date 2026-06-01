@@ -104,6 +104,25 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void RealisticConfigurator_MapsPeekBeforeProcessSpecificFallbacks()
+    {
+        var source = ModelViewer.ReplaceLineEndings("\n");
+        var mapping = ExtractExpression(
+            source,
+            "private static string MapConfiguratorMaterialToPreset(string? processCode, string? materialCode, string? colorHex)",
+            "    private async Task ResetCamera()");
+
+        var peekIndex = mapping.IndexOf("_ when mat.Contains(\"PEEK\") => \"peek\"", StringComparison.Ordinal);
+        var fdmFallbackIndex = mapping.IndexOf("_ when key is \"FDM\" or \"FDM_3D_PRINTING\" =>", StringComparison.Ordinal);
+
+        Assert.True(peekIndex >= 0, "PEEK must map to the intrinsic tan PEEK material preset.");
+        Assert.True(fdmFallbackIndex >= 0, "Unable to locate the FDM fallback branch.");
+        Assert.True(
+            peekIndex < fdmFallbackIndex,
+            "PEEK must be mapped before process-specific fallbacks so CNC PEEK does not render as aluminum.");
+    }
+
+    [Fact]
     public void RealisticConfigurator_PartDetailCardRepushesWhenProcessChanges()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
