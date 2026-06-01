@@ -165,6 +165,43 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void MaterialColorOption_WhenMijfNaturalGreyIsAvailable_UsesNaturalGreyThumbnail()
+    {
+        var materialId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "MJF",
+            MaterialId = materialId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "PA12", "PA12", "Plastic", null, "MJF nylon powder", 10),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "material_color",
+                    "Material color",
+                    "dropdown",
+                    "Natural Grey",
+                    "[\"Natural Grey\",\"Natural Gray\",\"Gray\"]",
+                    null,
+                    null,
+                    false,
+                    10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+    }
+
+    [Fact]
     public void ConfiguratorOptionImages_UsePartBasedRepresentationsForAllOptionGroups()
     {
         var materialId = Guid.NewGuid();
