@@ -124,7 +124,7 @@ internal static class ProjectQuotationPdfDataFactory
 
         return orderedParts.Select((part, index) =>
         {
-            var lineItem = FindLineItemForPart(part, lineItems);
+            var lineItem = ResolveLineItemForPart(part, lineItems, index);
             var unitPrice = lineItem?.UnitPrice > 0m ? lineItem.UnitPrice : GetPartUnitPrice(part);
             var quantity = lineItem?.Quantity > 0m ? lineItem.Quantity : part.Quantity;
 
@@ -172,8 +172,21 @@ internal static class ProjectQuotationPdfDataFactory
     private static QuotationItemDto? FindLineItemForPart(ProjectPartDto part, IReadOnlyList<QuotationItemDto> lineItems) =>
         lineItems.FirstOrDefault(lineItem => LineItemDescribesPart(lineItem, part));
 
+    private static QuotationItemDto? ResolveLineItemForPart(
+        ProjectPartDto part,
+        IReadOnlyList<QuotationItemDto> lineItems,
+        int index)
+    {
+        var byDescription = FindLineItemForPart(part, lineItems);
+        if (byDescription is not null)
+            return byDescription;
+
+        return index < lineItems.Count ? lineItems[index] : null;
+    }
+
     private static bool LineItemDescribesPart(QuotationItemDto lineItem, ProjectPartDto part) =>
         !string.IsNullOrWhiteSpace(part.FileName)
+        && !string.IsNullOrWhiteSpace(lineItem.Description)
         && lineItem.Description.StartsWith(part.FileName, StringComparison.OrdinalIgnoreCase);
 
     private static List<string> BuildCustomerDisplayLines(ProjectDetailDto project, CustomerDetailDto? customerDetail)

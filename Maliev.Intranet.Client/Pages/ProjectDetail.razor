@@ -1385,6 +1385,14 @@
         _pdfLoading = true;
         try
         {
+            var existingPdfUrl = await ResolveExistingQuotePdfUrlAsync();
+            if (!string.IsNullOrWhiteSpace(existingPdfUrl))
+            {
+                _quotePdfUrl = existingPdfUrl;
+                await JS.InvokeVoidAsync("window.open", existingPdfUrl, "_blank");
+                return;
+            }
+
             var pdfData = BuildProjectQuotationPdfData(_project);
             var response = await Http.PostAsJsonAsync("api/v1/quotations/draft-pdf", pdfData);
             if (!response.IsSuccessStatusCode)
@@ -1412,6 +1420,21 @@
         {
             _pdfLoading = false;
         }
+    }
+
+    private async Task<string?> ResolveExistingQuotePdfUrlAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_quotePdfUrl))
+            return _quotePdfUrl;
+
+        if (_project?.QuotationId is not Guid quotationId)
+            return null;
+
+        var versionPdfUrl = ResolveCurrentQuotationVersion()?.PdfArtifactUrl;
+        if (!string.IsNullOrWhiteSpace(versionPdfUrl))
+            return versionPdfUrl;
+
+        return await LoadLatestQuotePdfUrlAsync(quotationId);
     }
 
     private QuotationPdfData BuildProjectQuotationPdfData(ProjectDetailDto project)
@@ -1459,22 +1482,49 @@
             DeliveryExpectations = QuoteLeadTime,
             SpecialTerms = currentVersion?.SpecialTerms,
             Discounts = BuildProjectDiscounts(currentVersion?.DiscountStructure, structuredDiscount, manualDiscount),
-            Items = project.Parts.Select((part, index) => new QuotationPdfItem
+            Items = project.Parts.Select((part, index) =>
             {
-                Index = index + 1,
-                PartName = part.FileName,
-                MaterialName = FirstNonEmpty(part.MaterialName, part.MaterialCode, "-"),
-                ManufacturingProcess = FormatProcess(part.ProcessType),
-                DetailLines = BuildProjectPartDetailLines(part),
-                Quantity = part.Quantity,
-                QuantityUnit = "pcs",
-                UnitPrice = GetPartUnitPrice(part),
-                LineTotal = GetPartLineTotal(part),
-                Notes = BuildProjectPartNotes(part),
-                ThumbnailUrl = part.ThumbnailUrl
+                var lineItem = ResolveQuotationLineItem(currentVersion?.LineItems, index, part);
+                var quantity = lineItem?.Quantity > 0m ? lineItem.Quantity : part.Quantity;
+                var unitPrice = lineItem?.UnitPrice > 0m ? lineItem.UnitPrice : GetPartUnitPrice(part);
+
+                return new QuotationPdfItem
+                {
+                    Index = index + 1,
+                    PartName = part.FileName,
+                    MaterialName = FirstNonEmpty(part.MaterialName, part.MaterialCode, "-"),
+                    ManufacturingProcess = FormatProcess(part.ProcessType),
+                    DetailLines = BuildProjectPartDetailLines(part),
+                    Quantity = quantity,
+                    QuantityUnit = "pcs",
+                    UnitPrice = unitPrice,
+                    LineTotal = quantity * unitPrice,
+                    Notes = BuildProjectPartNotes(part),
+                    ThumbnailUrl = part.ThumbnailUrl
+                };
             }).ToList()
         };
     }
+
+    private static QuotationItemDto? ResolveQuotationLineItem(
+        IReadOnlyList<QuotationItemDto>? lineItems,
+        int index,
+        ProjectPartDto part)
+    {
+        if (lineItems is null || lineItems.Count == 0)
+            return null;
+
+        var byDescription = lineItems.FirstOrDefault(item => LineItemDescribesPart(item, part));
+        if (byDescription is not null)
+            return byDescription;
+
+        return index < lineItems.Count ? lineItems[index] : null;
+    }
+
+    private static bool LineItemDescribesPart(QuotationItemDto lineItem, ProjectPartDto part) =>
+        !string.IsNullOrWhiteSpace(part.FileName)
+        && !string.IsNullOrWhiteSpace(lineItem.Description)
+        && lineItem.Description.StartsWith(part.FileName, StringComparison.OrdinalIgnoreCase);
 
     private QuotationVersionDto? ResolveCurrentQuotationVersion()
     {

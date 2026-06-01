@@ -134,45 +134,33 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ProjectDetail_QuoteActions_GeneratePdfFromProjectDetailAndAcceptQuote()
+    public void ProjectDetail_QuoteActions_ReusesExistingPdfAndAcceptQuote()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
 
         cut.WaitForAssertion(() => Assert.Contains("project-action-download", cut.Markup));
+        cut.Find("button[data-tab='quote']").Click();
+        cut.WaitForAssertion(() => Assert.Contains("https://storage.example/quote-v2.pdf", cut.Markup));
+
         cut.Find("button.project-action-download").Click();
         cut.Find("button.project-action-accept").Click();
 
         cut.WaitForAssertion(() =>
         {
-            Assert.Contains(_requestedPaths, path => path == "/api/v1/quotations/draft-pdf");
+            Assert.DoesNotContain(_requestedPaths, path => path == "/api/v1/quotations/draft-pdf");
+            Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/quotations/{_quotationId}/pdf/latest");
             Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/quotations/{_quotationId}/pdf");
             Assert.DoesNotContain(_requestedPaths, path => path == $"/api/v1/projects/{_projectId}/accept-quotation");
-            Assert.NotNull(_quotationPdfRequest);
-
-            var root = _quotationPdfRequest.RootElement;
-            Assert.Equal("QT-2026-0098", root.GetProperty("quotationNumber").GetString());
-            Assert.Equal("Axion Robotics Co., Ltd.", root.GetProperty("customerName").GetString());
-            Assert.Equal("2200 Industrial Pkwy, Fremont, CA 94538", root.GetProperty("shippingAddress").GetString());
-            Assert.Equal("7-10 business days", root.GetProperty("deliveryExpectations").GetString());
-            Assert.Equal("50% deposit required before production.", root.GetProperty("specialTerms").GetString());
-            Assert.Equal(20650m, root.GetProperty("subtotalBeforeDiscount").GetDecimal());
-            Assert.Equal(2000m, root.GetProperty("totalDiscount").GetDecimal());
-            Assert.Equal(800m, root.GetProperty("manualDiscountAmount").GetDecimal());
-            Assert.Equal(500m, root.GetProperty("shippingCost").GetDecimal());
-            Assert.Equal(19150m, root.GetProperty("subtotal").GetDecimal());
-            Assert.Equal(1340.50m, root.GetProperty("taxAmount").GetDecimal());
-            Assert.Equal(20490.50m, root.GetProperty("totalAmount").GetDecimal());
-            Assert.Equal(3, root.GetProperty("items").GetArrayLength());
-            var firstItem = root.GetProperty("items")[0];
-            Assert.Equal("bracket-left.stl", firstItem.GetProperty("partName").GetString());
-            Assert.Equal("Aluminium 6061-T6", firstItem.GetProperty("materialName").GetString());
-            Assert.Equal("CNC Milling", firstItem.GetProperty("manufacturingProcess").GetString());
-            Assert.Equal(4m, firstItem.GetProperty("quantity").GetDecimal());
-            Assert.Equal(2500m, firstItem.GetProperty("unitPrice").GetDecimal());
+            Assert.Null(_quotationPdfRequest);
+            Assert.Contains(
+                JSInterop.Invocations,
+                invocation => invocation.Identifier == "window.open"
+                    && invocation.Arguments.Count == 2
+                    && string.Equals(invocation.Arguments[0]?.ToString(), "https://storage.example/quote-v2.pdf", StringComparison.Ordinal)
+                    && string.Equals(invocation.Arguments[1]?.ToString(), "_blank", StringComparison.Ordinal));
         });
 
-        cut.Find("button[data-tab='quote']").Click();
-        cut.WaitForAssertion(() => Assert.Contains("https://storage.example/quote.pdf", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("https://storage.example/quote-v2.pdf", cut.Markup));
 
         cut.Find("button.project-accept-confirm").Click();
 

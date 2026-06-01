@@ -266,4 +266,77 @@ public class ProjectQuotationPdfDataFactoryTests
         Assert.Contains("Tolerance: ISO 2768-c", data.Items[0].DetailLines);
         Assert.Contains("Tolerance: ISO 2768-c", data.Items[1].DetailLines);
     }
+
+    /// <summary>
+    /// Verifies the automatic PDF keeps quotation line item pricing when the quotation service does not echo part descriptions.
+    /// </summary>
+    [Fact]
+    public void Build_WhenQuotationLineItemsHaveNoDescriptions_UsesLineItemPricesByOrder()
+    {
+        var project = new ProjectDetailDto
+        {
+            CustomerName = "Nat Buyer",
+            CreatedAt = new DateTime(2026, 5, 7, 0, 0, 0, DateTimeKind.Utc),
+            Currency = "THB",
+            Parts =
+            [
+                new ProjectPartDto
+                {
+                    FileName = "alpha.step",
+                    ProcessType = "CNC_MILLING",
+                    MaterialName = "Aluminum 6061-T6",
+                    Quantity = 2,
+                    ConfirmedPrice = 0m,
+                },
+                new ProjectPartDto
+                {
+                    FileName = "bravo.step",
+                    ProcessType = "CNC_MILLING",
+                    MaterialName = "Aluminum 6061-T6",
+                    Quantity = 3,
+                    ConfirmedPrice = 0m,
+                },
+            ],
+        };
+        var quotation = new QuotationDetailDto
+        {
+            QuotationNumber = "Q-PRICING",
+            CustomerName = "Nat Buyer",
+            CurrentVersionNumber = 1,
+            CreatedAt = project.CreatedAt,
+            CurrencyCode = "THB",
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    VersionNumber = 1,
+                    LineItems =
+                    [
+                        new QuotationItemDto
+                        {
+                            Description = string.Empty,
+                            Quantity = 2,
+                            UnitPrice = 100m,
+                        },
+                        new QuotationItemDto
+                        {
+                            Description = " ",
+                            Quantity = 3,
+                            UnitPrice = 200m,
+                        },
+                    ],
+                },
+            ],
+        };
+
+        var data = ProjectQuotationPdfDataFactory.Build(project, quotation);
+
+        Assert.Equal("alpha.step", data.Items[0].PartName);
+        Assert.Equal(100m, data.Items[0].UnitPrice);
+        Assert.Equal(200m, data.Items[0].LineTotal);
+        Assert.Equal("bravo.step", data.Items[1].PartName);
+        Assert.Equal(200m, data.Items[1].UnitPrice);
+        Assert.Equal(600m, data.Items[1].LineTotal);
+        Assert.Equal(800m, data.SubtotalBeforeDiscount);
+    }
 }
