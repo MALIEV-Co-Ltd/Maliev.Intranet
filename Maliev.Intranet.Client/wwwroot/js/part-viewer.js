@@ -4757,12 +4757,28 @@ const CUTTING_MAT_PERSPECTIVE_CAMERA_MIN_Z = 0.01;
 const CUTTING_MAT_MINOR_GRID_MM = 10;
 const CUTTING_MAT_MAJOR_GRID_MM = 100;
 const CUTTING_MAT_NUMBER_FONT_MM = 4.5;
+const CUTTING_MAT_SURFACE_COLOR = '#2d7a4f';
+const CUTTING_MAT_TOP_OVERLAP_MM = 0.6;
 const MALIEV_LOGO_VIEWBOX = { width: 449.33078, height: 103.18751 };
 const MALIEV_LOGO_GROUP_TRANSLATE = { x: 178.09872, y: -25.13541 };
 // Source: wwwroot/images/logo.svg. Keep this path in sync with the asset.
 const MALIEV_LOGO_PATH = 'M 246.47181,25.13541 220.60482,96.206993 194.73651,25.13541 H 112.1492 v 103.1875 h 82.12005 l -7.5983,-20.90209 H 135.43254 V 86.783323 l 43.73483,-10e-4 -7.02072,-19.31352 h -36.71411 v -21.69583 l 42.02139,10e-4 30.04555,82.548947 h 26.17523 L 271.23205,25.13541 Z M 83.045039,128.32291 H 106.32837 V 25.13541 H 83.045039 Z m -126.51,-41.538527 11.54854,-30.12334 11.54985,30.12228 z m 85.235,-61.648973 h -24.87084 v 91.01666 l -36.7284,-91.01666 h -24.17312 l -36.72973,91.01666 V 25.13541 h -24.341659 l -24.34167,42.212423 -24.34167,-42.212423 h -24.34167 v 103.1875 h 24.34167 V 76.729163 l 17.03996,30.691657 h 14.60474 l 17.03864,-30.691657 v 51.593747 h 45.682159 l 8.01502,-20.90209 h 38.92153 l 8.0139697,20.90209 H 76.959619 v -20.90209 h -35.18958 z';
 const cuttingMatAnimationStates = {};
 const cuttingMatCameraClipStates = {};
+
+function _cuttingMatSlabOutline(width, height, radius) {
+    return _roundedRectPoints(width, height, radius, 8);
+}
+
+function _cuttingMatTopOutline(width, height, radius) {
+    const overlap = CUTTING_MAT_TOP_OVERLAP_MM;
+    return _roundedRectPoints(width + overlap * 2, height + overlap * 2, radius + overlap, 8);
+}
+
+function _primeCuttingMatTextureBleedGuard(ctx, width, height) {
+    ctx.fillStyle = CUTTING_MAT_SURFACE_COLOR;
+    ctx.fillRect(0, 0, width, height);
+}
 
 /**
  * Renders a realistic cutting-mat floor at model base (Z=0).
@@ -4820,6 +4836,7 @@ export function showCuttingMat(canvasId) {
     rawCanvas.width  = TEX_W;
     rawCanvas.height = TEX_H;
     const ctx = rawCanvas.getContext('2d');
+    _primeCuttingMatTextureBleedGuard(ctx, TEX_W, TEX_H);
 
     // Helper: build a rounded-rect path on ctx
     const _rrPath = (x, y, w, h, r) => {
@@ -4838,7 +4855,7 @@ export function showCuttingMat(canvasId) {
 
     // ── Background with rounded corners ───────────────────────────────────────
     _rrPath(0, 0, TEX_W, TEX_H, CPX);
-    ctx.fillStyle = '#2d7a4f';
+    ctx.fillStyle = CUTTING_MAT_SURFACE_COLOR;
     ctx.fill();
     // Clip all subsequent drawing to the rounded rectangle
     _rrPath(0, 0, TEX_W, TEX_H, CPX);
@@ -4890,15 +4907,16 @@ export function showCuttingMat(canvasId) {
     const tex = _createCuttingMatTexture(scene, rawCanvas, TEX_W, TEX_H);
 
     // ── Rounded top surface and slab body ─────────────────────────────────────
-    const outline = _roundedRectPoints(matW, matH, CORNER, 8);
-    const topMesh = _createRoundedMatTopMesh(scene, outline, matW, matH);
+    const slabOutline = _cuttingMatSlabOutline(matW, matH, CORNER);
+    const topOutline = _cuttingMatTopOutline(matW, matH, CORNER);
+    const topMesh = _createRoundedMatTopMesh(scene, topOutline, matW, matH);
 
     const topMat = _createCuttingMatTopMaterial(scene, canvasId, tex, 0);
     topMesh.material = topMat;
     topMesh.metadata = { ...(topMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
     disableSectionClippingForMesh(topMesh);
 
-    const slabMesh = _createRoundedMatSlabMesh(scene, outline, THICK);
+    const slabMesh = _createRoundedMatSlabMesh(scene, slabOutline, THICK);
 
     const slabMat = _createCuttingMatSlabMaterial(scene, canvasId, 0);
     slabMesh.material = slabMat;

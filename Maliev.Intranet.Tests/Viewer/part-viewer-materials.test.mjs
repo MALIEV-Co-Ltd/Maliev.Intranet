@@ -287,6 +287,48 @@ test('cutting mat slab meets textured top surface without perspective edge crack
     assert.equal(result.slabTopUniqueZ, '0');
 });
 
+test('cutting mat textured top cap overlaps slab edge to hide perspective raster cracks', () => {
+    const context = loadViewerContext();
+
+    const result = vm.runInContext(`
+        const slabOutline = _cuttingMatSlabOutline(300, 220, 8);
+        const topOutline = _cuttingMatTopOutline(300, 220, 8);
+        const bounds = pts => ({
+            minX: Math.min(...pts.map(p => p.x)),
+            maxX: Math.max(...pts.map(p => p.x)),
+            minY: Math.min(...pts.map(p => p.y)),
+            maxY: Math.max(...pts.map(p => p.y)),
+        });
+        ({
+            slab: bounds(slabOutline),
+            top: bounds(topOutline)
+        });
+    `, context);
+
+    assert.ok(result.top.minX < result.slab.minX, `expected top cap to extend past slab minX, got ${result.top.minX} >= ${result.slab.minX}`);
+    assert.ok(result.top.maxX > result.slab.maxX, `expected top cap to extend past slab maxX, got ${result.top.maxX} <= ${result.slab.maxX}`);
+    assert.ok(result.top.minY < result.slab.minY, `expected top cap to extend past slab minY, got ${result.top.minY} >= ${result.slab.minY}`);
+    assert.ok(result.top.maxY > result.slab.maxY, `expected top cap to extend past slab maxY, got ${result.top.maxY} <= ${result.slab.maxY}`);
+});
+
+test('cutting mat texture pads outside rounded rect with green to prevent filtered black edge bleed', () => {
+    const context = loadViewerContext();
+
+    const result = vm.runInContext(`
+        const calls = [];
+        const ctx = {
+            set fillStyle(value) { calls.push({ method: 'fillStyle', value }); },
+            fillRect(x, y, w, h) { calls.push({ method: 'fillRect', x, y, w, h }); },
+        };
+        _primeCuttingMatTextureBleedGuard(ctx, 2048, 1024);
+        calls;
+    `, context);
+
+    assert.equal(result.map(call => call.method).join(','), 'fillStyle,fillRect');
+    assert.equal(result[0].value, '#2d7a4f');
+    assert.equal(JSON.stringify({ x: result[1].x, y: result[1].y, w: result[1].w, h: result[1].h }), '{"x":0,"y":0,"w":2048,"h":1024}');
+});
+
 test('realistic render mode smooths near-coincident CAD vertices across conversion tolerance', () => {
     const context = loadViewerContext();
     const positions = new Float32Array([
