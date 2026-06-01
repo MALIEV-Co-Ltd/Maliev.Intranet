@@ -37,6 +37,17 @@
     z-index: 2;
 }
 
+.project-list-table tbody tr:hover > td:first-child,
+.project-list-table tbody tr:focus-within > td:first-child {
+    position: relative;
+    z-index: 80;
+}
+
+.project-part-preview-strip:hover,
+.project-part-preview-strip:focus-within {
+    z-index: 90;
+}
+
 .project-list-table,
 .project-list-table td {
     overflow: visible;
@@ -77,6 +88,7 @@
 .project-part-thumb-count {
     font-size: var(--maliev-font-small);
     font-weight: 700;
+    position: static;
     background: var(--maliev-accent-soft);
     color: var(--maliev-accent);
 }
@@ -128,7 +140,8 @@
 
 .project-part-overflow-popout {
     top: 100%;
-    right: 0;
+    left: 0;
+    right: auto;
     width: min(336px, calc(100vw - 48px));
     padding-top: 8px;
     text-align: left;

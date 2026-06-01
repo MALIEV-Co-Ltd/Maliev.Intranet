@@ -150,12 +150,69 @@ public class ProjectsListThumbnailTests : BunitContext
     [Fact]
     public void ProjectsPageCss_DefinesThumbnailHoverPreviewAndOverflowPopout()
     {
-        var css = File.ReadAllText(FindProjectsCssPath());
+        var css = ReadProjectsCss();
 
         Assert.Contains(".project-part-thumb:hover .project-part-thumb-preview", css, StringComparison.Ordinal);
         Assert.Contains(".project-part-thumb:focus-within .project-part-thumb-preview", css, StringComparison.Ordinal);
         Assert.Contains(".project-part-thumb-count:hover .project-part-overflow-popout", css, StringComparison.Ordinal);
         Assert.Contains(".project-part-thumb-count:focus-within .project-part-overflow-popout", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectsPageCss_KeepsThumbnailPopoutsInsidePageAndAboveNeighborRows()
+    {
+        var css = ReadProjectsCss();
+        var countBlock = ExtractCssBlock(css, ".project-part-thumb-count");
+        var popoutBlock = ExtractCssBlock(css, ".project-part-overflow-popout");
+
+        Assert.Contains(".project-list-table tbody tr:hover > td:first-child", css, StringComparison.Ordinal);
+        Assert.Contains(".project-list-table tbody tr:focus-within > td:first-child", css, StringComparison.Ordinal);
+        Assert.Contains(".project-part-preview-strip:hover", css, StringComparison.Ordinal);
+        Assert.Contains(".project-part-preview-strip:focus-within", css, StringComparison.Ordinal);
+        Assert.Contains("position: static;", countBlock, StringComparison.Ordinal);
+        Assert.Contains("left: 0;", popoutBlock, StringComparison.Ordinal);
+        Assert.Contains("right: auto;", popoutBlock, StringComparison.Ordinal);
+    }
+
+    private static string ReadProjectsCss() => File.ReadAllText(FindProjectsCssPath());
+
+    private static string ExtractCssBlock(string css, string selector)
+    {
+        var selectorPattern = $"{selector} {{";
+        var selectorIndex = -1;
+        var candidateIndex = css.IndexOf(selectorPattern, StringComparison.Ordinal);
+        while (candidateIndex >= 0)
+        {
+            var previousNonWhitespaceIndex = PreviousNonWhitespaceIndex(css, candidateIndex - 1);
+            if (previousNonWhitespaceIndex < 0 || css[previousNonWhitespaceIndex] == '}')
+            {
+                selectorIndex = candidateIndex;
+                break;
+            }
+
+            candidateIndex = css.IndexOf(selectorPattern, candidateIndex + selectorPattern.Length, StringComparison.Ordinal);
+        }
+
+        Assert.True(selectorIndex >= 0, $"Expected selector '{selector}' in Projects.razor.css.");
+
+        var blockStart = css.IndexOf('{', selectorIndex);
+        Assert.True(blockStart >= 0, $"Expected declaration block for selector '{selector}'.");
+
+        var blockEnd = css.IndexOf('}', blockStart);
+        Assert.True(blockEnd >= 0, $"Expected declaration block end for selector '{selector}'.");
+
+        return css[blockStart..blockEnd];
+    }
+
+    private static int PreviousNonWhitespaceIndex(string value, int startIndex)
+    {
+        for (var index = startIndex; index >= 0; index--)
+        {
+            if (!char.IsWhiteSpace(value[index]))
+                return index;
+        }
+
+        return -1;
     }
 
     private static string FindProjectsCssPath()
