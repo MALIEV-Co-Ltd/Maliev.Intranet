@@ -732,3 +732,53 @@ test('realistic configurator uses NodeMaterial PBR profiles with procedural norm
     assert.equal(result.sla.nodeEffectKey, 'fdm-layer-lines');
     assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line normals');
 });
+
+test('realistic configurator replaces visible material without temporary color mutation', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', '#336699', 'BRUSHED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+
+        const previousMaterial = scene.meshes[0].material;
+        const oldSet = previousMaterial.albedoColor.set.bind(previousMaterial.albedoColor);
+        const oldMaterialColorWrites = [];
+        previousMaterial.albedoColor.set = (r, g, b) => {
+            oldMaterialColorWrites.push({ r, g, b });
+            oldSet(r, g, b);
+        };
+
+        configureMaterialFromConfigurator('viewer', 'aluminum', '#669933', 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL');
+
+        const currentMaterial = scene.meshes[0].material;
+        ({
+            oldMaterialColorWriteCount: oldMaterialColorWrites.length,
+            oldMaterialColorWrites,
+            materialWasReplaced: currentMaterial !== previousMaterial,
+            currentR: Number(currentMaterial.albedoColor.r.toFixed(3)),
+            currentG: Number(currentMaterial.albedoColor.g.toFixed(3)),
+            currentB: Number(currentMaterial.albedoColor.b.toFixed(3)),
+            currentEffectKey: currentMaterial?._malievSurfaceEffect?.key ?? null
+        });
+    `, context);
+
+    assert.equal(result.oldMaterialColorWriteCount, 0);
+    assert.equal(result.materialWasReplaced, true);
+    assert.equal(result.currentR, 0.4);
+    assert.equal(result.currentG, 0.6);
+    assert.equal(result.currentB, 0.2);
+    assert.equal(result.currentEffectKey, 'bead-blast');
+});

@@ -2323,13 +2323,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 });
                 tagModelMeshesForAnalysis(canvasId, _scene);
 
-                // ── Store material type and apply realistic mode on initial load ──
+                // ── Store material type for setRenderMode below ──
                 materialTypes[canvasId] = viewerSettings.materialType || 'aluminum';
-                currentRenderModes[canvasId] = viewerSettings.renderMode;
-                if (viewerSettings.renderMode === 'realistic') {
-                    applyRealisticMaterial(canvasId, materialTypes[canvasId]);
-                    applySmoothNormals(canvasId);
-                }
 
                 // Position directional light to correctly cast shadows from the top, front-left
                 const dist = Math.max(
@@ -3720,6 +3715,28 @@ function getRealisticMaterial(scene, canvasId, materialType) {
     return pbr;
 }
 
+function detachCachedRealisticMaterial(canvasId, materialType) {
+    const cache = realisticMaterialCache[canvasId];
+    if (!cache) return null;
+
+    const material = cache[materialType] || null;
+    delete cache[materialType];
+    return material;
+}
+
+function detachAllCachedRealisticMaterials(canvasId) {
+    const cache = realisticMaterialCache[canvasId];
+    if (!cache) return [];
+
+    const materials = Object.values(cache).filter(Boolean);
+    realisticMaterialCache[canvasId] = {};
+    return materials;
+}
+
+function disposeDetachedMaterial(material) {
+    try { material?.dispose?.(); } catch (_) {}
+}
+
 /**
  * Applies the selected realistic material to all model meshes in the scene.
  * Multi-body assemblies receive the same shared configurator-colour material
@@ -3769,24 +3786,10 @@ export function setMaterialType(canvasId, materialType) {
     perCanvasFinishModifiers[canvasId] = { roughnessOffset: 0, metallicOffset: 0 };
     delete perCanvasProcessCodes[canvasId];
 
-    // Reset albedo on all cached materials back to their respective presets
-    const cache = realisticMaterialCache[canvasId];
-    if (cache) {
-        Object.entries(cache).forEach(([key, mat]) => {
-            const preset = CONFIG.MATERIAL_REALISTIC[key];
-            if (preset) {
-                syncRealisticMaterialProperties(
-                    mat,
-                    preset,
-                    null,
-                    perCanvasFinishModifiers[canvasId],
-                    resolveRealisticNodeMaterialProfile(canvasId, key));
-            }
-        });
-    }
-
+    const detachedMaterials = detachAllCachedRealisticMaterials(canvasId);
     materialTypes[canvasId] = materialType;
     applyRealisticMaterial(canvasId, materialType);
+    detachedMaterials.forEach(disposeDetachedMaterial);
 }
 
 /**
@@ -3871,52 +3874,18 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     };
     perCanvasSurfaceEffects[canvasId] = surfaceEffect;
 
-    // Reset albedo on all cached materials back to their respective presets
-    const cache = realisticMaterialCache[canvasId];
-    if (cache) {
-        Object.entries(cache).forEach(([key, mat]) => {
-            const preset = CONFIG.MATERIAL_REALISTIC[key];
-            if (preset) {
-                syncRealisticMaterialProperties(
-                    mat,
-                    preset,
-                    null,
-                    perCanvasFinishModifiers[canvasId],
-                    resolveRealisticNodeMaterialProfile(canvasId, key));
-            }
-        });
-    }
-
-    // Re-apply custom colour if present (overrides the preset albedo)
-    const custom = customAlbedoColors[canvasId];
-    if (custom && cache) {
-        Object.entries(cache).forEach(([key, mat]) => {
-            const preset = CONFIG.MATERIAL_REALISTIC[key];
-            if (!preset) return;
-            syncRealisticMaterialProperties(
-                mat,
-                preset,
-                custom,
-                perCanvasFinishModifiers[canvasId],
-                resolveRealisticNodeMaterialProfile(canvasId, key));
-        });
-    }
-
     // Invalidate the cached material so getRealisticMaterial creates a fresh
-    // instance with the new colour/finish — regardless of current render mode.
-    // This ensures the new colour is used when the user later switches to
-    // realistic mode. BabylonJS ignores mesh.material = sameReference, so a
-    // stale cached instance would silently skip the update.
-    if (realisticMaterialCache[canvasId]) {
-        const old = realisticMaterialCache[canvasId][materialKey];
-        delete realisticMaterialCache[canvasId][materialKey];
-        try { old?.dispose(); } catch (_) {}
-    }
+    // instance directly from the final colour/finish state. Do not mutate the
+    // currently visible material through a preset colour first; that produces a
+    // frame-visible flash in realistic mode.
+    const detachedMaterial = detachCachedRealisticMaterial(canvasId, materialKey);
 
     // Only apply immediately if we are already in realistic mode.
     if (currentRenderModes[canvasId] === 'realistic') {
         applyRealisticMaterial(canvasId, materialKey);
     }
+
+    disposeDetachedMaterial(detachedMaterial);
 }
 
 /**
