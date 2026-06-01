@@ -419,6 +419,40 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     assert.equal(result.effectKind, 1);
 });
 
+test('realistic configurator keeps intrinsic blue POM darker than the UI swatch override', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'blue-pom', '#2f6fd6', 'AS_MACHINED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        ({
+            r: material?.albedoColor?.r ?? null,
+            g: material?.albedoColor?.g ?? null,
+            b: material?.albedoColor?.b ?? null,
+            materialName: material?.name ?? null
+        });
+    `, context);
+
+    assert.equal(result.materialName, '__realistic_blue-pom__');
+    assert.equal(result.r, 0.08);
+    assert.equal(result.g, 0.28);
+    assert.equal(result.b, 0.62);
+});
+
 test('realistic configurator makes CNC surface finishes visibly distinct even when Ra is present', () => {
     const context = loadViewerContext();
     const mesh = {

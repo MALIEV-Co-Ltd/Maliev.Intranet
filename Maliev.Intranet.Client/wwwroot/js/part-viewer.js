@@ -3042,6 +3042,7 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
 // Applied only to FDM plastic presets in realistic mode.
 
 const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
+const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom']);
 
 let FdmLayerPluginClass = null;
 
@@ -3440,8 +3441,10 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
         materialKey = 'aluminum';
     }
 
-    // Reset custom colour if none provided, otherwise store it
-    if (colorHex && /^#[0-9a-fA-F]{6}$/.test(colorHex)) {
+    // Reset custom colour if none provided, otherwise store it. Colour-keyed
+    // POM presets keep their tuned albedo because the sidebar swatch is only
+    // used to choose the preset and can be lighter than the thumbnail material.
+    if (colorHex && /^#[0-9a-fA-F]{6}$/.test(colorHex) && !INTRINSIC_COLOR_PRESET_KEYS.has(materialKey)) {
         const r = parseInt(colorHex.slice(1, 3), 16) / 255;
         const g = parseInt(colorHex.slice(3, 5), 16) / 255;
         const b = parseInt(colorHex.slice(5, 7), 16) / 255;
