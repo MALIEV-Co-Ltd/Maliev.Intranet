@@ -447,6 +447,18 @@
             "black-pom" => "black-pom",
             "white-pom" => "white-pom",
             "blue-pom" => "blue-pom",
+            "brass" => "brass",
+            "copper" => "copper",
+            "bronze" => "bronze",
+            "titanium" => "titanium",
+            "pla" => "pla",
+            "abs" => "abs",
+            "petg" => "petg",
+            "petg-clear" => "petg-clear",
+            "nylon" => "nylon",
+            "nylon-powder" => "nylon-powder",
+            "carbon-fiber" => "carbon-fiber",
+            "resin" => "resin",
             _ => "aluminum",
         };
 
@@ -753,8 +765,9 @@
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
             if (target == "wireframe")
                 await _module.InvokeVoidAsync("toggleEdges", _canvasId, false);
-            if (target == "realistic")
-                await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
+            // Note: setMaterialType is intentionally NOT called here. setRenderMode already applies
+            // materialTypes[canvasId] (kept in sync by configureMaterialFromConfigurator). Calling
+            // setMaterialType would clear customAlbedoColors, wiping any configurator colour.
         }
 
         await NotifyViewerSettingsChangedAsync();
@@ -805,6 +818,75 @@
         _hasCustomColor = false;
         if (_module != null && _renderMode == "realistic")
             await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
+    }
+    /// <summary>
+    /// Applies a material configuration from the part configurator sidebar.
+    /// Maps catalog material codes and process-specific colours to the 3D viewer.
+    /// </summary>
+    /// <param name="processCode">Manufacturing process code (e.g. "FDM", "CNC_MILL").</param>
+    /// <param name="materialCode">Catalog material code (e.g. "Brass_C360", "PLA").</param>
+    /// <param name="colorHex">Optional hex colour from configurator (e.g. "#2f6fd6").</param>
+    /// <param name="finishCode">Optional surface finish code (e.g. "anodized", "bead_blasted").</param>
+    /// <param name="roughnessCode">Optional Ra roughness code (e.g. "RA_3_2"). Overrides finish-derived roughness.</param>
+    public async Task ApplyConfiguratorMaterialAsync(string? processCode, string? materialCode, string? colorHex, string? finishCode, string? roughnessCode = null)
+    {
+        _materialType = MapConfiguratorMaterialToPreset(processCode, materialCode, colorHex);
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("configureMaterialFromConfigurator",
+                _canvasId, _materialType, colorHex, finishCode ?? string.Empty, roughnessCode, processCode);
+            await NotifyViewerSettingsChangedAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Viewer was disposed before the material update could apply — safe to ignore
+        }
+    }
+
+    /// <summary>Maps catalog material codes to JS realistic PBR material preset keys.</summary>
+    private static string MapConfiguratorMaterialToPreset(string? processCode, string? materialCode, string? colorHex)
+    {
+        var key = (processCode ?? string.Empty).ToUpperInvariant();
+        var mat = (materialCode ?? string.Empty).ToUpperInvariant();
+
+        // For POM materials, colour determines which preset to use
+        if (mat.Contains("POM") || mat.Contains("DELRIN") || mat.Contains("ACETAL"))
+        {
+            var colorLower = (colorHex ?? "").Trim().ToLowerInvariant();
+            if (colorLower is "#2f6fd6") return "blue-pom";   // Blue
+            if (colorLower is "#111111") return "black-pom";   // Black
+            return "white-pom";  // Natural, White, or custom
+        }
+
+        return mat switch
+        {
+            _ when mat.Contains("BRASS") => "brass",
+            _ when mat.Contains("COPPER") => "copper",
+            _ when mat.Contains("BRONZE") => "bronze",
+            _ when mat.Contains("TITANIUM") => "titanium",
+            _ when mat.Contains("ALUMIN") => "aluminum",
+            _ when mat.Contains("STEEL") && mat.Contains("STAINLESS") => "stainless-steel",
+            _ when mat.Contains("STEEL") => "steel",
+            _ when key is "MJF" or "SLS" or "SLS_PA" or "SJS" => "nylon-powder",
+            _ when key is "FDM" or "FDM_3D_PRINTING" =>
+                mat switch
+                {
+                    // Transparent/clear/natural filaments — translucent frosted look
+                    _ when mat.Contains("TRANSPARENT") || mat.Contains("CLEAR") || mat.Contains("TRANSP") => "petg-clear",
+                    _ when mat.Contains("CARBON") => "carbon-fiber",
+                    _ when mat.Contains("PEEK") => "peek",
+                    _ when mat.Contains("ABS") => "abs",
+                    _ when mat.Contains("PETG") => "petg",
+                    _ when mat.Contains("NYLON") || mat.Contains("PA") => "nylon",
+                    _ when mat.Contains("PC") => "pla",
+                    _ when mat.Contains("TPU") => "pla",
+                    _ => "pla",
+                },
+            _ when key is "SLA" or "SLA_DLP" or "DLP" => "resin",
+            _ when key is "CNC_MILL" or "CNC_TURN" or "CNC" => "aluminum",
+            _ => "aluminum",
+        };
     }
 
     private async Task ResetCamera()

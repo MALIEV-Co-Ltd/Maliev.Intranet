@@ -63,6 +63,37 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("configureRealisticPbrQuality(pbr);", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RealisticConfigurator_ForwardsProcessCodeForSurfaceEffects()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(
+            "_canvasId, _materialType, colorHex, finishCode ?? string.Empty, roughnessCode, processCode",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticConfigurator_MapsPowderBedProcessesToNylonPowderPreset()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("\"nylon-powder\" => \"nylon-powder\"", source, StringComparison.Ordinal);
+        Assert.Contains("key is \"MJF\" or \"SLS\" or \"SLS_PA\" or \"SJS\" => \"nylon-powder\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticConfigurator_PartDetailCardRepushesWhenProcessChanges()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("materialChanged || colorChanged || finishChanged || roughnessChanged || processChanged || initialPush", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

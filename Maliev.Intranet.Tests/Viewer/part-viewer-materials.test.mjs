@@ -294,3 +294,114 @@ test('realistic render mode smooths near-coincident CAD vertices across conversi
     assert.ok(Math.abs(result.firstNormalX - result.fourthNormalX) < 0.001);
     assert.ok(Math.abs(result.firstNormalY - result.fourthNormalY) < 0.001);
 });
+
+test('realistic configurator applies bead blasted procedural surface effect', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        ({
+            materialType: materialTypes.viewer,
+            roughness: scene.meshes[0].material?.roughness ?? null,
+            metallic: scene.meshes[0].material?.metallic ?? null,
+            effectKey: scene.meshes[0].material?._malievSurfaceEffect?.key ?? null,
+            effectKind: scene.meshes[0].material?._malievSurfaceEffect?.kind ?? null
+        });
+    `, context);
+
+    assert.equal(result.materialType, 'aluminum');
+    assert.equal(result.roughness, 0.52);
+    assert.equal(result.metallic, 0.85);
+    assert.equal(result.effectKey, 'bead-blast');
+    assert.equal(result.effectKind, 1);
+});
+
+test('realistic configurator applies CNC machining surface effect when no finish hides tool marks', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        ({
+            roughness: scene.meshes[0].material?.roughness ?? null,
+            effectKey: scene.meshes[0].material?._malievSurfaceEffect?.key ?? null,
+            effectKind: scene.meshes[0].material?._malievSurfaceEffect?.kind ?? null
+        });
+    `, context);
+
+    assert.equal(result.roughness, 0.34);
+    assert.equal(result.effectKey, 'machining');
+    assert.equal(result.effectKind, 2);
+});
+
+test('realistic configurator applies powder-grain effect for MJF and SLS nylon powder', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        ({
+            powderPresetExists: !!CONFIG.MATERIAL_REALISTIC['nylon-powder'],
+            mjf: (() => {
+                configureMaterialFromConfigurator('viewer', 'nylon-powder', null, 'AS_PRINTED', null, 'MJF');
+                setRenderMode('viewer', 'realistic');
+                return {
+                    materialType: materialTypes.viewer,
+                    roughness: scene.meshes[0].material?.roughness ?? null,
+                    effectKey: scene.meshes[0].material?._malievSurfaceEffect?.key ?? null,
+                    effectKind: scene.meshes[0].material?._malievSurfaceEffect?.kind ?? null
+                };
+            })(),
+            slsEffect: (() => {
+                configureMaterialFromConfigurator('viewer', 'nylon-powder', null, 'DYED_BLACK', null, 'SLS');
+                setRenderMode('viewer', 'realistic');
+                return scene.meshes[0].material?._malievSurfaceEffect?.key ?? null;
+            })()
+        });
+    `, context);
+
+    assert.equal(result.powderPresetExists, true);
+    assert.equal(result.mjf.materialType, 'nylon-powder');
+    assert.ok(result.mjf.roughness >= 0.68);
+    assert.equal(result.mjf.effectKey, 'powder-grain');
+    assert.equal(result.mjf.effectKind, 3);
+    assert.equal(result.slsEffect, 'powder-grain');
+});

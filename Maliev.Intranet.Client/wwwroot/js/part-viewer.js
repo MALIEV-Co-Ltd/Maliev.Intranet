@@ -208,6 +208,11 @@ const CONFIG = {
             metallic: 0.0,
             roughness: 0.52,
         },
+        'nylon-powder': {
+            albedoColor: { r: 0.70, g: 0.69, b: 0.65 },
+            metallic: 0.0,
+            roughness: 0.72,
+        },
         'peek': {
             albedoColor: { r: 0.70, g: 0.67, b: 0.62 },
             metallic: 0.0,
@@ -479,6 +484,9 @@ const customAlbedoColors = {};
 
 /** Per-canvas finish modifiers for roughness/metallic adjustments */
 const perCanvasFinishModifiers = {};
+
+/** Per-canvas procedural surface effect for realistic mode */
+const perCanvasSurfaceEffects = {};
 
 /** Per-canvas DefaultRenderingPipeline for post-processing */
 const perCanvasPipelines = {};
@@ -3088,6 +3096,178 @@ function getFdmLayerPluginClass() {
     return FdmLayerPluginClass;
 }
 
+// ── Procedural manufacturing-surface MaterialPlugin ──────────────────────────
+// Adds subtle, UV-independent finish/process texture in realistic mode.
+// Effects are intentionally visual-only: they perturb the shaded colour, not geometry.
+
+const SURFACE_EFFECTS = {
+    none: {
+        key: 'none',
+        kind: 0,
+        scale: 1.0,
+        strength: 0.0,
+        stripeScale: 0.0,
+        stripeStrength: 0.0,
+    },
+    'bead-blast': {
+        key: 'bead-blast',
+        kind: 1,
+        scale: 0.95,
+        strength: 0.085,
+        stripeScale: 0.0,
+        stripeStrength: 0.0,
+    },
+    machining: {
+        key: 'machining',
+        kind: 2,
+        scale: 0.12,
+        strength: 0.035,
+        stripeScale: 0.42,
+        stripeStrength: 0.060,
+    },
+    'powder-grain': {
+        key: 'powder-grain',
+        kind: 3,
+        scale: 1.55,
+        strength: 0.105,
+        stripeScale: 0.0,
+        stripeStrength: 0.0,
+    },
+};
+
+let SurfaceEffectPluginClass = null;
+
+function getSurfaceEffect(effectKey) {
+    if (!effectKey) return { ...SURFACE_EFFECTS.none };
+    return { ...(SURFACE_EFFECTS[effectKey] || SURFACE_EFFECTS.none) };
+}
+
+function isPowderBedProcess(processCode) {
+    const process = String(processCode || '').trim().toUpperCase();
+    return process === 'MJF' || process === 'SLS' || process === 'SLS_PA' || process === 'SJS';
+}
+
+function isCncProcess(processCode) {
+    const process = String(processCode || '').trim().toUpperCase();
+    return process === 'CNC' || process === 'CNC_MILL' || process === 'CNC_TURN' || process.startsWith('CNC_');
+}
+
+function shouldApplyMachiningEffect(finishCode) {
+    const lower = String(finishCode || '').toLowerCase();
+    if (!lower) return true;
+    if (lower.includes('bead') || lower.includes('blast') || lower.includes('polish')
+        || lower.includes('paint') || lower.includes('plate')) {
+        return false;
+    }
+
+    return lower.includes('machine')
+        || lower.includes('machined')
+        || lower.includes('mill')
+        || lower.includes('turn')
+        || lower.includes('ra')
+        || lower.includes('standard')
+        || lower.includes('as_');
+}
+
+function resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers) {
+    if (finishModifiers?.surfaceEffectKey) {
+        return getSurfaceEffect(finishModifiers.surfaceEffectKey);
+    }
+
+    if (isPowderBedProcess(processCode) || materialKey === 'nylon-powder') {
+        return getSurfaceEffect('powder-grain');
+    }
+
+    if (isCncProcess(processCode) && shouldApplyMachiningEffect(finishCode)) {
+        return getSurfaceEffect('machining');
+    }
+
+    return getSurfaceEffect(null);
+}
+
+function getSurfaceEffectPluginClass() {
+    if (SurfaceEffectPluginClass) return SurfaceEffectPluginClass;
+
+    SurfaceEffectPluginClass = class SurfaceEffectPlugin extends BABYLON.MaterialPluginBase {
+        constructor(material, effect) {
+            super(material, 'MalievSurfaceEffect', 210, { MALIEV_SURFACE_EFFECT: false });
+            this._effect = getSurfaceEffect(effect?.key);
+            material._malievSurfaceEffect = this._effect;
+            this.isEnabled = this._effect.kind > 0;
+        }
+
+        getClassName() { return 'SurfaceEffectPlugin'; }
+
+        prepareDefines(defines) {
+            defines.MALIEV_SURFACE_EFFECT = this._isEnabled;
+        }
+
+        getUniforms() {
+            return {
+                ubo: [
+                    { name: 'surfaceEffectKind', size: 1, type: 'float' },
+                    { name: 'surfaceEffectScale', size: 1, type: 'float' },
+                    { name: 'surfaceEffectStrength', size: 1, type: 'float' },
+                    { name: 'surfaceEffectStripeScale', size: 1, type: 'float' },
+                    { name: 'surfaceEffectStripeStrength', size: 1, type: 'float' },
+                ],
+            };
+        }
+
+        bindForSubMesh(uniformBuffer) {
+            if (!this._isEnabled) return;
+            uniformBuffer.updateFloat('surfaceEffectKind', this._effect.kind);
+            uniformBuffer.updateFloat('surfaceEffectScale', this._effect.scale);
+            uniformBuffer.updateFloat('surfaceEffectStrength', this._effect.strength);
+            uniformBuffer.updateFloat('surfaceEffectStripeScale', this._effect.stripeScale);
+            uniformBuffer.updateFloat('surfaceEffectStripeStrength', this._effect.stripeStrength);
+        }
+
+        getCustomCode(shaderType) {
+            if (shaderType !== 'fragment') return null;
+            return {
+                CUSTOM_FRAGMENT_DEFINITIONS: `
+                #ifdef MALIEV_SURFACE_EFFECT
+                float malievSurfaceNoise3(vec3 p) {
+                    return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453123);
+                }
+                #endif
+            `,
+                CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+                #ifdef MALIEV_SURFACE_EFFECT
+                {
+                    float _kind = surfaceEffectKind;
+                    float _scale = max(surfaceEffectScale, 0.0001);
+                    float _strength = clamp(surfaceEffectStrength, 0.0, 0.35);
+                    vec3 _p = vPositionW * _scale;
+                    float _n = malievSurfaceNoise3(floor(_p));
+
+                    if (_kind < 1.5) {
+                        float _fine = malievSurfaceNoise3(floor(_p * 1.7 + vec3(11.0, 17.0, 23.0)));
+                        float _grain = mix(_n, _fine, 0.5);
+                        color.rgb *= 1.0 - _strength * (0.22 + _grain * 0.70);
+                        color.rgb += vec3(_strength * 0.06 * (1.0 - _grain));
+                    } else if (_kind < 2.5) {
+                        float _jitter = malievSurfaceNoise3(floor(vPositionW * 0.035)) * 1.15;
+                        float _band = sin(vPositionW.x * surfaceEffectStripeScale + _jitter) * 0.5 + 0.5;
+                        float _line = smoothstep(0.72, 1.0, _band);
+                        color.rgb *= 1.0 - clamp(surfaceEffectStripeStrength, 0.0, 0.20) * _line;
+                    } else {
+                        float _fine = malievSurfaceNoise3(floor(_p * 2.1 + vec3(19.0, 3.0, 41.0)));
+                        float _grain = mix(_n, _fine, 0.55);
+                        float _powder = mix(1.0 - _strength, 1.0 + _strength * 0.28, _grain);
+                        color.rgb *= _powder;
+                    }
+                }
+                #endif
+            `,
+            };
+        }
+    };
+
+    return SurfaceEffectPluginClass;
+}
+
 // ── Realistic material ─────────────────────────────────────────────────────────
 
 function configureRealisticPbrQuality(pbr) {
@@ -3134,6 +3314,12 @@ function getRealisticMaterial(scene, canvasId, materialType) {
     if (FDM_LAYER_PRESET_KEYS.has(materialType)) {
         const FdmLayerPlugin = getFdmLayerPluginClass();
         new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
+    }
+
+    const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
+    if (surfaceEffect.kind > 0) {
+        const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
+        new SurfaceEffectPlugin(pbr, surfaceEffect);
     }
 
     cache[materialType] = pbr;
@@ -3185,6 +3371,7 @@ export function setMaterialType(canvasId, materialType) {
 
     // Clear custom color override so the preset albedo is restored
     delete customAlbedoColors[canvasId];
+    perCanvasSurfaceEffects[canvasId] = getSurfaceEffect(null);
 
     // Reset albedo on all cached materials back to their respective presets
     const cache = realisticMaterialCache[canvasId];
@@ -3237,8 +3424,9 @@ export function setMaterialColor(canvasId, hexColor) {
  * @param {string|null} colorHex - optional hex colour override (e.g. "#2f6fd6")
  * @param {string} finishCode - optional surface finish code (e.g. "anodized", "")
  * @param {string|null} roughnessCode - optional Ra roughness code (e.g. "RA_3_2", "RA_1_6", "RA_0_8")
+ * @param {string|null} processCode - optional manufacturing process code (e.g. "CNC_MILL", "MJF", "SLS")
  */
-export function configureMaterialFromConfigurator(canvasId, materialKey, colorHex, finishCode = '', roughnessCode = null) {
+export function configureMaterialFromConfigurator(canvasId, materialKey, colorHex, finishCode = '', roughnessCode = null, processCode = null) {
     if (!CONFIG.MATERIAL_REALISTIC[materialKey]) {
         console.warn(`[BabylonViewer] Unknown configurator material: ${materialKey}, falling back to aluminum`);
         materialKey = 'aluminum';
@@ -3260,6 +3448,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     const finishModifiers = getFinishModifiers(finishCode);
     // Ra roughness code overrides the finish-derived roughness with an absolute value
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
+    const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
 
     // Reset albedo on all cached materials back to their respective presets
     const cache = realisticMaterialCache[canvasId];
@@ -3292,6 +3481,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
         ...finishModifiers,
         absoluteRoughness: raRoughness,  // null = use offset, non-null = absolute override
     };
+    perCanvasSurfaceEffects[canvasId] = surfaceEffect;
 
     // Invalidate the cached material so getRealisticMaterial creates a fresh
     // instance with the new colour/finish — regardless of current render mode.
@@ -3316,13 +3506,13 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
  */
 function getFinishModifiers(finishCode) {
     const lower = (finishCode || '').toLowerCase();
-    if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05 };  // shinier, more metallic
-    if (lower.includes('polish')) return { roughnessOffset: -0.20, metallicOffset: 0.0 };   // very smooth
-    if (lower.includes('bead'))   return { roughnessOffset: 0.38, metallicOffset: -0.10 };  // heavily rough, fully matte
-    if (lower.includes('blast'))  return { roughnessOffset: 0.28, metallicOffset: -0.05 };   // roughened, matte
-    if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10 };    // less metallic
-    if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0 };   // slightly smoother
-    return { roughnessOffset: 0.0, metallicOffset: 0.0 };
+    if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
+    if (lower.includes('polish')) return { roughnessOffset: -0.20, metallicOffset: 0.0, surfaceEffectKey: null };   // very smooth
+    if (lower.includes('bead'))   return { roughnessOffset: 0.38, metallicOffset: -0.10, surfaceEffectKey: 'bead-blast' };  // heavily rough, fully matte
+    if (lower.includes('blast'))  return { roughnessOffset: 0.28, metallicOffset: -0.05, surfaceEffectKey: 'bead-blast' };   // roughened, matte
+    if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
+    if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
+    return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null };
 }
 
 /** Clamps a value between min and max. */

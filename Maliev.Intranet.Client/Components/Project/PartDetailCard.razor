@@ -452,6 +452,11 @@
     private readonly Dictionary<string, string> _resolvedUrls = [];
     private Guid _lastPartId;
     private string? _lastProcessCode;
+    private string? _lastMaterialCode;
+    private string? _lastMaterialColor;
+    private string? _lastFinishCode;
+    private string? _lastRoughnessCode;
+    private bool _hasPushedInitialMaterialConfig;
     private List<DfmIssue> _dfmIssues = [];
     private bool _viewerLoadFailed;
     private bool _downloading;
@@ -510,6 +515,7 @@
             {
                 _viewerLoadFailed = false;
                 _viewerErrorMessage = null;
+                _hasPushedInitialMaterialConfig = false;
             }
         }
 
@@ -518,6 +524,26 @@
         {
             _viewerLoadFailed = false;
             _viewerErrorMessage = null;
+
+            // Push material/colour/finish changes from the configurator sidebar to the 3D viewer
+            var materialColor = ColorNameToHex(GetMaterialColorFromOptions(Part));
+            var materialChanged = !string.Equals(Part.MaterialCode, _lastMaterialCode, StringComparison.Ordinal);
+            var colorChanged = !string.Equals(materialColor, _lastMaterialColor, StringComparison.Ordinal);
+            var finishChanged = !string.Equals(Part.FinishCode, _lastFinishCode, StringComparison.Ordinal);
+            var roughnessChanged = !string.Equals(Part.RoughnessCode, _lastRoughnessCode, StringComparison.Ordinal);
+            var initialPush = !_hasPushedInitialMaterialConfig
+                && !string.IsNullOrEmpty(Part.MaterialCode);
+            if (materialChanged || colorChanged || finishChanged || roughnessChanged || processChanged || initialPush)
+            {
+                _lastMaterialCode = Part.MaterialCode;
+                _lastMaterialColor = materialColor;
+                _lastFinishCode = Part.FinishCode;
+                _lastRoughnessCode = Part.RoughnessCode;
+                _hasPushedInitialMaterialConfig = true;
+                if (_modelViewer != null)
+                    await _modelViewer.ApplyConfiguratorMaterialAsync(
+                        Part.ProcessCode, Part.MaterialCode, materialColor, Part.FinishCode, Part.RoughnessCode);
+            }
 
             // Initialize multi-body viewer when bodies are available
             if (Part.BodyCount > 1 && Part.Bodies.Count > 0 && !_multiBodyInitialized)
@@ -714,6 +740,7 @@
                 await OnRequestFreshViewerUrl.InvokeAsync(storagePath);
                 _viewerLoadFailed = false;
                 _viewerErrorMessage = null;
+                _hasPushedInitialMaterialConfig = false;
             }
         }
         else
@@ -1053,4 +1080,68 @@
 
     private static string GetProcessName(string? code) =>
         ProcessDisplayHelper.GetName(code, "—");
+
+    private static string? GetMaterialColorFromOptions(PartViewModel part)
+    {
+        var finishLower = (part.FinishCode ?? "").ToLowerInvariant();
+
+        // Painted/powder: return paint hex; filament "color" must not override it
+        if (finishLower.Contains("paint") || finishLower.Contains("powder"))
+        {
+            part.ProcessOptionValues.TryGetValue("paint_color_hex", out var hex);
+            return string.IsNullOrWhiteSpace(hex) ? null : hex;
+        }
+
+        // Anodized: dye colour — Clear/Natural means no albedo override
+        if (finishLower.Contains("anod"))
+        {
+            foreach (var k in new[] { "anodize_color", "anodise_color" })
+            {
+                if (part.ProcessOptionValues.TryGetValue(k, out var anod)
+                    && !string.IsNullOrWhiteSpace(anod)
+                    && !string.Equals(anod, "Clear", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(anod, "Natural", StringComparison.OrdinalIgnoreCase))
+                    return anod;
+            }
+            return null;
+        }
+
+        // All other finishes: material/filament colour
+        if (part.ProcessOptionValues.TryGetValue("material_color", out var materialColor)
+            && !string.IsNullOrWhiteSpace(materialColor))
+            return materialColor;
+
+        if (part.ProcessOptionValues.TryGetValue("color", out var color)
+            && !string.IsNullOrWhiteSpace(color))
+            return color;
+
+        return null;
+    }
+
+    private static string? ColorNameToHex(string? color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+            return null;
+        if (color.StartsWith('#') && color.Length >= 4)
+            return color;
+        return color.Trim().ToLowerInvariant() switch
+        {
+            "black" or "matte black" => "#111111",
+            "white" or "natural white" => "#f7f7f2",
+            "natural" => "#eee7d2",
+            "clear" or "transparent" => "#f6fbff",
+            "blue" => "#2f6fd6",
+            "red" => "#c8333a",
+            "green" => "#2f8f5b",
+            "yellow" => "#f1c232",
+            "gray" or "grey" or "silver" => "#9ba3af",
+            "orange" => "#e47c2f",
+            "gold" => "#d4a72c",
+            "purple" => "#7c4dff",
+            "peek natural" => "#B3AA9E",
+            "raw" => null,               // use material preset's intrinsic colour
+            "pink" => "#ff69b4",
+            _ => null,
+        };
+    }
 }
