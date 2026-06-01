@@ -283,7 +283,7 @@
     private string _sectionPanelId = $"section-panel-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
     private DotNetObjectReference<ModelViewer>? _dotNetRef;
-    private string _renderMode        = "solid";
+    private string _renderMode        = "realistic";
     private string _materialType      = "aluminum";
     private string _customColorHex    = "#D0D0D0";
     private bool   _hasCustomColor;
@@ -424,7 +424,7 @@
                 ? "transparent"
                 : string.Equals(mode, "realistic", StringComparison.OrdinalIgnoreCase)
                     ? "realistic"
-                    : "solid";
+                    : "realistic";
 
     private static string NormalizeProjection(string? mode) =>
         string.Equals(mode, "perspective", StringComparison.OrdinalIgnoreCase)

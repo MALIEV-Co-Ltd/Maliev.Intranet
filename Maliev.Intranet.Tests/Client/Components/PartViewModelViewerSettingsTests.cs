@@ -44,7 +44,7 @@ public class PartViewModelViewerSettingsTests
         Assert.Equal(4.5, restoredFirst.ViewerSettings.SectionOffsetMm);
         Assert.True(restoredFirst.ViewerSettings.SectionInverted);
 
-        Assert.Equal("solid", restoredSecond.ViewerSettings.RenderMode);
+        Assert.Equal("realistic", restoredSecond.ViewerSettings.RenderMode);
         Assert.False(restoredSecond.ViewerSettings.EdgesEnabled);
         Assert.True(restoredSecond.ViewerSettings.GridEnabled);
     }

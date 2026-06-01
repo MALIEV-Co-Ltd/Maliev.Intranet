@@ -283,7 +283,7 @@ public sealed class DraftPartState
 public sealed class PartViewerSettings
 {
     /// <summary>The active render mode: solid, wireframe, transparent, or realistic.</summary>
-    public string RenderMode { get; set; } = "solid";
+    public string RenderMode { get; set; } = "realistic";
 
     /// <summary>The material type key for realistic rendering (e.g. aluminum, steel, black-pom).</summary>
     public string MaterialType { get; set; } = "aluminum";

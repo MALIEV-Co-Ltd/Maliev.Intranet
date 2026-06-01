@@ -6,6 +6,7 @@ namespace Maliev.Intranet.Tests.Client.Components;
 public sealed class ModelViewerRenderingSourceTests
 {
     private static string ViewerScript => ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js");
+    private static string ModelViewer => ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor");
 
     [Fact]
     public void RealisticNormals_SmoothDuplicateCadVerticesByPosition()
@@ -39,6 +40,23 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("const positionTolerance = getSmoothNormalPositionTolerance(positions);", source, StringComparison.Ordinal);
         Assert.Contains("weight: area", source, StringComparison.Ordinal);
         Assert.Contains("sx += f.x * weight", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticMode_IsTheInitialModelViewerRenderMode()
+    {
+        var source = ModelViewer.ReplaceLineEndings("\n");
+
+        Assert.Contains("private string _renderMode        = \"realistic\";", source, StringComparison.Ordinal);
+        Assert.Contains(": \"realistic\";", ExtractRenderModeNormalizer(source), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RealisticMode_IsTheJavascriptFallbackRenderMode()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains(": 'realistic';", ExtractJavascriptRenderModeNormalizer(source), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -113,6 +131,23 @@ public sealed class ModelViewerRenderingSourceTests
         }
 
         throw new InvalidDataException($"Unable to extract block starting at: {start}");
+    }
+
+    private static string ExtractRenderModeNormalizer(string source)
+        => ExtractExpression(source, "private static string NormalizeRenderMode(string? mode) =>", "private static string NormalizeProjection");
+
+    private static string ExtractJavascriptRenderModeNormalizer(string source)
+        => ExtractExpression(source, "const renderMode = settings.renderMode === 'wireframe'", "const cameraMode = settings.cameraProjection");
+
+    private static string ExtractExpression(string source, string start, string end)
+    {
+        var startIndex = source.IndexOf(start, StringComparison.Ordinal);
+        Assert.True(startIndex >= 0, $"Unable to locate expression start: {start}");
+
+        var endIndex = source.IndexOf(end, startIndex, StringComparison.Ordinal);
+        Assert.True(endIndex > startIndex, $"Unable to locate expression end: {end}");
+
+        return source[startIndex..endIndex];
     }
 
     private static string ReadRepoFile(params string[] relativeParts)

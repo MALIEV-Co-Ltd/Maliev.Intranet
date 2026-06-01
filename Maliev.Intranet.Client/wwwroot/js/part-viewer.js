@@ -712,7 +712,7 @@ function normalizeViewerSettings(viewerSettings) {
     const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
     const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent' || settings.renderMode === 'realistic'
         ? settings.renderMode
-        : 'solid';
+        : 'realistic';
     const cameraMode = settings.cameraProjection === 'perspective'
         ? 'perspective'
         : 'orthographic';
