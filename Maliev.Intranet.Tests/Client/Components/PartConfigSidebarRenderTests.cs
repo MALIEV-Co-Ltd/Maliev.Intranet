@@ -485,7 +485,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ConfiguratorOptionImages_RaiseHoveredPreviewAboveSidebarAncestorsAndFooter()
+    public void ConfiguratorOptionImages_DoNotRaiseScrollAreaAboveRoutingFooter()
     {
         var source = ReadRepoFile(
                 "Maliev.Intranet.Client",
@@ -496,11 +496,11 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.Contains(".pcs-root:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-root:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-root:has(.pcs-option-image-frame:hover),\n            .pcs-root:has(.pcs-option-image-frame:focus-within) {\n                overflow: visible;\n                z-index:", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-scroll:has(.pcs-option-image-frame:hover)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-scroll:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:focus-within) {\n                z-index: 220;", source, StringComparison.Ordinal);
         Assert.Contains("pointer-events: auto;", source, StringComparison.Ordinal);
     }
 
