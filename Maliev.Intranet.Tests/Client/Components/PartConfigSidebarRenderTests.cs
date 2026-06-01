@@ -202,6 +202,130 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void PowderFusionColorOption_WhenFinishIsRaw_IsLimitedToNaturalGrey()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "MJF",
+            MaterialId = materialId,
+            FinishId = finishId,
+            FinishCode = "AS_PRINTED",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "PA12", "PA12", "Plastic", null, "MJF nylon powder", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "As printed", "AS_PRINTED", 0m, 0m, "Raw natural grey powder finish", 10),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "material_color",
+                    "Material color",
+                    "dropdown",
+                    "Black",
+                    "[\"Black\",\"White\",\"Natural Grey\"]",
+                    null,
+                    null,
+                    false,
+                    10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var colorChoices = cut.FindAll(".pcs-color-choice");
+
+        Assert.Single(colorChoices);
+        Assert.Contains("Natural Grey", colorChoices.First().TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Black", StringComparison.Ordinal));
+        Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("White", StringComparison.Ordinal));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+    }
+
+    [Fact]
+    public void PowderFusionColorOption_WhenFinishIsDyed_AllowsOnlyDyeColor()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "SLS",
+            MaterialId = materialId,
+            FinishId = finishId,
+            FinishCode = "DYED_BLACK",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "PA12", "PA12", "Plastic", null, "SLS nylon powder", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Dyed black", "DYED_BLACK", 0m, 0m, "Black dye post processing", 10),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "material_color",
+                    "Material color",
+                    "dropdown",
+                    "Natural Grey",
+                    "[\"Black\",\"White\",\"Natural Grey\"]",
+                    null,
+                    null,
+                    false,
+                    10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var colorChoices = cut.FindAll(".pcs-color-choice");
+
+        Assert.Single(colorChoices);
+        Assert.Contains("Black", colorChoices.First().TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("White", StringComparison.Ordinal));
+        Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Natural Grey", StringComparison.Ordinal));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-plastic-part-material.png']"));
+    }
+
+    [Fact]
+    public void PowderFusionSurfaceFinish_WhenRaw_UsesNaturalGreyPowderThumbnail()
+    {
+        var finishId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "MJF",
+            FinishId = finishId,
+            FinishCode = "AS_PRINTED",
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "As printed", "AS_PRINTED", 0m, 0m, "Raw natural grey powder finish", 10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+    }
+
+    [Fact]
     public void ConfiguratorOptionImages_UsePartBasedRepresentationsForAllOptionGroups()
     {
         var materialId = Guid.NewGuid();

@@ -405,8 +405,8 @@
                                 }
                                 else if (IsColorChoiceOption(opt))
                                 {
-                                    var currentValue = Part!.ProcessOptionValues.TryGetValue(opt.ConfigKey, out var v) ? v : opt.DefaultValue;
                                     var options = GetOptionChoices(opt).ToList();
+                                    var currentValue = GetCurrentOptionChoiceValue(opt, options);
                                     <div class="pcs-option-label">@opt.Label</div>
                                     <div class="pcs-color-choice-grid">
                                         @foreach (var o in options)

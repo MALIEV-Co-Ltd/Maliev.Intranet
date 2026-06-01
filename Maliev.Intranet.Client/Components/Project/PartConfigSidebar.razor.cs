@@ -82,6 +82,7 @@ public partial class PartConfigSidebar : ComponentBase
     private const string PaintColorHexKey = "paint_color_hex";
     private const string PaintColorReferenceKey = "paint_color_reference";
     private const string MaterialColorKey = "material_color";
+    private const string PowderFusionNaturalGreyColor = "Natural Grey";
     private const string MaterialImageBasePath = "/images/materials/";
 
     private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
@@ -270,6 +271,16 @@ public partial class PartConfigSidebar : ComponentBase
         "Red",
         "Yellow",
         "Green",
+    ];
+
+    private static readonly IReadOnlyList<string> PowderFusionRawColors =
+    [
+        PowderFusionNaturalGreyColor,
+    ];
+
+    private static readonly IReadOnlyList<string> PowderFusionDyeColors =
+    [
+        "Black",
     ];
 
     private static readonly IReadOnlyList<string> PomMaterialColors =
@@ -966,6 +977,12 @@ public partial class PartConfigSidebar : ComponentBase
             || label.Contains("colour", StringComparison.OrdinalIgnoreCase);
     }
 
+    private bool IsPowderFusionColorOption(ProcessConfigOptionDto option) =>
+        IsPowderFusionProcess
+        && !IsPaintColorOption(option)
+        && !IsAnodizeColorOption(option)
+        && (IsMaterialColorOption(option) || IsGenericColorOption(option));
+
     private bool IsPaintColorOption(ProcessConfigOptionDto option) =>
         IsPaintSpecificColorOption(option)
         || (IsPaintedFinish() && !HasPaintSpecificColorOption && IsGenericColorOption(option));
@@ -1081,11 +1098,43 @@ public partial class PartConfigSidebar : ComponentBase
         return new string(chars);
     }
 
+    private bool IsPowderFusionProcess =>
+        IsProcess("SLS") || IsProcess("MJF");
+
     private bool IsPaintedFinish() =>
-        Part?.FinishCode?.Contains("paint", StringComparison.OrdinalIgnoreCase) == true;
+        FinishContains("paint") && !FinishContains("unpaint");
+
+    private bool IsDyeFinish() =>
+        FinishContains("dye") || FinishContains("dyed");
+
+    private bool IsRawPowderFusionFinish =>
+        IsPowderFusionProcess && !IsPaintedFinish() && !IsDyeFinish();
 
     private bool IsAnodizeFinish() =>
-        Part?.FinishCode?.Contains("anod", StringComparison.OrdinalIgnoreCase) == true;
+        FinishContains("anod");
+
+    private bool FinishContains(string value) =>
+        Part?.FinishCode?.Contains(value, StringComparison.OrdinalIgnoreCase) == true
+        || SelectedFinish?.Code.Contains(value, StringComparison.OrdinalIgnoreCase) == true
+        || SelectedFinish?.Name.Contains(value, StringComparison.OrdinalIgnoreCase) == true
+        || SelectedFinish?.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsPowderFusionRawSurfaceFinish(CatalogSurfaceFinishDto finish) =>
+        (ContainsFinishText(finish, "as printed")
+            || ContainsFinishText(finish, "as-printed")
+            || ContainsFinishText(finish, "as_printed")
+            || ContainsFinishText(finish, "natural")
+            || ContainsFinishText(finish, "raw")
+            || ContainsFinishText(finish, "standard")
+            || ContainsFinishText(finish, "unpaint"))
+        && !ContainsFinishText(finish, "dye")
+        && !ContainsFinishText(finish, "dyed")
+        && (!ContainsFinishText(finish, "paint") || ContainsFinishText(finish, "unpaint"));
+
+    private static bool ContainsFinishText(CatalogSurfaceFinishDto finish, string value) =>
+        finish.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
+        || finish.Name.Contains(value, StringComparison.OrdinalIgnoreCase)
+        || finish.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true;
 
     private string GetToleranceRange(CatalogToleranceDto tolerance)
     {
@@ -1118,8 +1167,17 @@ public partial class PartConfigSidebar : ComponentBase
             .Replace("  ", " ", StringComparison.Ordinal)
             .Trim();
 
-    private static IEnumerable<string> GetOptionChoices(ProcessConfigOptionDto option)
+    private IEnumerable<string> GetOptionChoices(ProcessConfigOptionDto option)
     {
+        if (IsPowderFusionColorOption(option))
+        {
+            if (IsRawPowderFusionFinish)
+                return PowderFusionRawColors;
+
+            if (IsDyeFinish())
+                return PowderFusionDyeColors;
+        }
+
         if (!string.IsNullOrWhiteSpace(option.OptionsJson))
         {
             var parsed = ParseOptionChoices(option.OptionsJson);
@@ -1135,6 +1193,21 @@ public partial class PartConfigSidebar : ComponentBase
             return DefaultPlasticColors;
 
         return [];
+    }
+
+    private string? GetCurrentOptionChoiceValue(ProcessConfigOptionDto option, IReadOnlyList<string> options)
+    {
+        var currentValue = Part?.ProcessOptionValues.TryGetValue(option.ConfigKey, out var value) == true
+            ? value
+            : option.DefaultValue;
+
+        if (!string.IsNullOrWhiteSpace(currentValue)
+            && options.Contains(currentValue, StringComparer.OrdinalIgnoreCase))
+        {
+            return currentValue;
+        }
+
+        return options.FirstOrDefault();
     }
 
     private static List<string> ParseOptionChoices(string optionsJson)
@@ -1233,8 +1306,11 @@ public partial class PartConfigSidebar : ComponentBase
     private static string GetMaterialColorImageUrl(string color) =>
         MaterialImageBasePath + GetMappedImage(ColorImages, color, "natural-plastic-part-material.png");
 
-    private static string GetSurfaceFinishImageUrl(CatalogSurfaceFinishDto finish)
+    private string GetSurfaceFinishImageUrl(CatalogSurfaceFinishDto finish)
     {
+        if (IsPowderFusionProcess && IsPowderFusionRawSurfaceFinish(finish))
+            return MaterialImageBasePath + "natural-grey-plastic-part-material.png";
+
         var displayKey = GetSurfaceFinishDisplayKey(finish);
         foreach (var token in GetImageLookupTokens(displayKey, finish.Code, finish.Name, finish.Description))
         {
@@ -1275,8 +1351,11 @@ public partial class PartConfigSidebar : ComponentBase
     private static string GetCustomPaintImageUrl() =>
         MaterialImageBasePath + "finish-painted-part-surface.png";
 
-    private static string GetColorChoiceImageUrl(ProcessConfigOptionDto option, string value)
+    private string GetColorChoiceImageUrl(ProcessConfigOptionDto option, string value)
     {
+        if (IsPowderFusionColorOption(option))
+            return GetMaterialColorImageUrl(value);
+
         if (IsAnodizeColorOption(option))
             return MaterialImageBasePath + GetMappedImage(AnodizeColorImages, value, "finish-anodized-clear-part-surface.png");
 
@@ -1448,6 +1527,12 @@ public partial class PartConfigSidebar : ComponentBase
         {
             foreach (var key in Part.ProcessOptionValues.Keys.Where(IsMaterialColorOptionKey).ToList())
                 Part.ProcessOptionValues.Remove(key);
+        }
+
+        if (IsRawPowderFusionFinish)
+        {
+            foreach (var option in Part.AvailableProcessOptions.Where(IsPowderFusionColorOption))
+                Part.ProcessOptionValues[option.ConfigKey] = PowderFusionNaturalGreyColor;
         }
 
         if (!IsAnodizeFinish())
