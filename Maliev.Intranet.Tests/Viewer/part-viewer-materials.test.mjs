@@ -413,10 +413,60 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     `, context);
 
     assert.equal(result.materialType, 'aluminum');
-    assert.equal(result.roughness, 0.52);
-    assert.equal(result.metallic, 0.85);
+    assert.equal(result.roughness, 0.78);
+    assert.equal(result.metallic, 0.77);
     assert.equal(result.effectKey, 'bead-blast');
     assert.equal(result.effectKind, 1);
+});
+
+test('realistic configurator makes CNC surface finishes visibly distinct even when Ra is present', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshotFinish = (finishCode) => {
+            configureMaterialFromConfigurator('viewer', 'brass', null, finishCode, 'RA_1_6', 'CNC_MILL');
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                roughness: material?.roughness ?? null,
+                metallic: material?.metallic ?? null,
+                effectKey: material?._malievSurfaceEffect?.key ?? null,
+                effectKind: material?._malievSurfaceEffect?.kind ?? null
+            };
+        };
+        ({
+            beadBlast: snapshotFinish('BEAD_BLAST'),
+            brushed: snapshotFinish('BRUSHED'),
+            mirrorPolish: snapshotFinish('MIRROR_POLISH')
+        });
+    `, context);
+
+    assert.ok(
+        result.beadBlast.roughness > result.brushed.roughness,
+        `expected bead blasted to be rougher than brushed, got ${result.beadBlast.roughness} <= ${result.brushed.roughness}`
+    );
+    assert.ok(
+        result.brushed.roughness > result.mirrorPolish.roughness,
+        `expected brushed to be rougher than mirror polish, got ${result.brushed.roughness} <= ${result.mirrorPolish.roughness}`
+    );
+    assert.equal(result.beadBlast.effectKey, 'bead-blast');
+    assert.equal(result.brushed.effectKey, 'brushed');
+    assert.equal(result.brushed.effectKind, 2);
+    assert.equal(result.mirrorPolish.effectKey, null);
+    assert.ok(result.mirrorPolish.metallic >= result.brushed.metallic);
 });
 
 test('realistic configurator applies CNC machining surface effect when no finish hides tool marks', () => {

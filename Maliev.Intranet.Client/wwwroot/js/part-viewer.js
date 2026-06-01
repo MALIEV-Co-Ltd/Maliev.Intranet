@@ -3113,9 +3113,17 @@ const SURFACE_EFFECTS = {
         key: 'bead-blast',
         kind: 1,
         scale: 0.95,
-        strength: 0.085,
+        strength: 0.18,
         stripeScale: 0.0,
         stripeStrength: 0.0,
+    },
+    brushed: {
+        key: 'brushed',
+        kind: 2,
+        scale: 0.12,
+        strength: 0.035,
+        stripeScale: 1.35,
+        stripeStrength: 0.14,
     },
     machining: {
         key: 'machining',
@@ -3156,7 +3164,7 @@ function shouldApplyMachiningEffect(finishCode) {
     const lower = String(finishCode || '').toLowerCase();
     if (!lower) return true;
     if (lower.includes('bead') || lower.includes('blast') || lower.includes('polish')
-        || lower.includes('paint') || lower.includes('plate')) {
+        || lower.includes('brush') || lower.includes('paint') || lower.includes('plate')) {
         return false;
     }
 
@@ -3457,10 +3465,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
             const preset = CONFIG.MATERIAL_REALISTIC[key];
             if (preset) {
                 mat.albedoColor.set(preset.albedoColor.r, preset.albedoColor.g, preset.albedoColor.b);
-                // Ra roughness takes absolute priority; finish offset applies otherwise
-                mat.roughness = raRoughness !== null
-                    ? raRoughness
-                    : clamp(preset.roughness + finishModifiers.roughnessOffset, 0, 1);
+                mat.roughness = resolveFinishRoughness(preset, finishModifiers, raRoughness);
                 mat.metallic = clamp(preset.metallic + finishModifiers.metallicOffset, 0, 1);
             }
         });
@@ -3479,7 +3484,9 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     // Store finish modifiers + resolved roughness so setRenderMode can re-apply them
     perCanvasFinishModifiers[canvasId] = {
         ...finishModifiers,
-        absoluteRoughness: raRoughness,  // null = use offset, non-null = absolute override
+        // Specific finishes own the visual roughness; Ra applies only when
+        // there is no finish-specific target.
+        absoluteRoughness: finishModifiers.absoluteRoughness ?? raRoughness,
     };
     perCanvasSurfaceEffects[canvasId] = surfaceEffect;
 
@@ -3506,13 +3513,28 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
  */
 function getFinishModifiers(finishCode) {
     const lower = (finishCode || '').toLowerCase();
+    if (lower.includes('mirror') || lower.includes('electropolish') || lower.includes('polish')) {
+        return { roughnessOffset: -0.22, metallicOffset: 0.03, surfaceEffectKey: null, absoluteRoughness: 0.045 };
+    }
+    if (lower.includes('brush')) {
+        return { roughnessOffset: 0.14, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.44 };
+    }
     if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
-    if (lower.includes('polish')) return { roughnessOffset: -0.20, metallicOffset: 0.0, surfaceEffectKey: null };   // very smooth
-    if (lower.includes('bead'))   return { roughnessOffset: 0.38, metallicOffset: -0.10, surfaceEffectKey: 'bead-blast' };  // heavily rough, fully matte
-    if (lower.includes('blast'))  return { roughnessOffset: 0.28, metallicOffset: -0.05, surfaceEffectKey: 'bead-blast' };   // roughened, matte
+    if (lower.includes('bead'))   return { roughnessOffset: 0.38, metallicOffset: -0.18, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.78 };  // heavily rough, fully matte
+    if (lower.includes('blast'))  return { roughnessOffset: 0.28, metallicOffset: -0.12, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.68 };   // roughened, matte
     if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
     if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
     return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null };
+}
+
+function resolveFinishRoughness(preset, finishModifiers, raRoughness) {
+    if (finishModifiers.absoluteRoughness != null) {
+        return clamp(finishModifiers.absoluteRoughness, 0, 1);
+    }
+
+    return raRoughness !== null
+        ? raRoughness
+        : clamp(preset.roughness + finishModifiers.roughnessOffset, 0, 1);
 }
 
 /** Clamps a value between min and max. */
