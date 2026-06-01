@@ -1498,6 +1498,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("column-gap: 10px;", mobileNavLinkBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: 38px;", mobileNavLinkBlock, StringComparison.Ordinal);
         Assert.Contains("padding: 7px 10px;", mobileNavLinkBlock, StringComparison.Ordinal);
+        Assert.Contains("color: var(--maliev-ink);", mobileNavLinkBlock, StringComparison.Ordinal);
+        Assert.Contains("font-size: var(--mud-typography-body2-size);", mobileNavLinkBlock, StringComparison.Ordinal);
         var mobileNavIconBlock = ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-icon");
         Assert.Contains("display: inline-grid;", mobileNavIconBlock, StringComparison.Ordinal);
         Assert.Contains("width: 28px;", mobileNavIconBlock, StringComparison.Ordinal);
@@ -1518,6 +1520,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("column-gap: 10px;", mobileGroupTitleBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: 28px;", mobileGroupTitleBlock, StringComparison.Ordinal);
         Assert.Contains("padding: 4px 10px;", mobileGroupTitleBlock, StringComparison.Ordinal);
+        Assert.Contains("border-radius: var(--maliev-radius-xs);", mobileGroupTitleBlock, StringComparison.Ordinal);
+        Assert.Contains("background: color-mix(in oklab, var(--mud-palette-primary) 8%, transparent);", mobileGroupTitleBlock, StringComparison.Ordinal);
+        Assert.Contains("color: color-mix(in oklab, var(--mud-palette-primary) 56%, var(--maliev-ink));", mobileGroupTitleBlock, StringComparison.Ordinal);
+        Assert.Contains("font-size: var(--mud-typography-overline-size);", mobileGroupTitleBlock, StringComparison.Ordinal);
+        Assert.Contains("font-weight: 900;", mobileGroupTitleBlock, StringComparison.Ordinal);
         var mobileGroupIconBlock = ExtractCssBlock(compactNavStyles, ".topbar-mobile-nav-group-icon");
         Assert.Contains("display: inline-grid;", mobileGroupIconBlock, StringComparison.Ordinal);
         Assert.Contains("width: 28px;", mobileGroupIconBlock, StringComparison.Ordinal);

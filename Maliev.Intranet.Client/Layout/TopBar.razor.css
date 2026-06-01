@@ -734,8 +734,8 @@
         min-height: 38px;
         padding: 7px 10px;
         border-radius: var(--maliev-radius-xs);
-        color: var(--maliev-muted);
-        font-size: var(--maliev-font-base);
+        color: var(--maliev-ink);
+        font-size: var(--mud-typography-body2-size);
         font-weight: 600;
         line-height: 1.2;
         text-decoration: none;
@@ -804,9 +804,11 @@
         column-gap: 10px;
         min-height: 28px;
         padding: 4px 10px;
-        color: var(--maliev-muted-2);
-        font-size: var(--maliev-font-micro);
-        font-weight: 800;
+        border-radius: var(--maliev-radius-xs);
+        background: color-mix(in oklab, var(--mud-palette-primary) 8%, transparent);
+        color: color-mix(in oklab, var(--mud-palette-primary) 56%, var(--maliev-ink));
+        font-size: var(--mud-typography-overline-size);
+        font-weight: 900;
         letter-spacing: 0;
         text-transform: uppercase;
     }
