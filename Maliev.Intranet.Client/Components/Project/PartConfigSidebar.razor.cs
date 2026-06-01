@@ -87,6 +87,19 @@ public partial class PartConfigSidebar : ComponentBase
     private const string PowderFusionRawImage = "natural-grey-plastic-part-material.png";
     private const string PowderFusionDyedBlackImage = "dyed-black-powder-fusion-part-material.png";
 
+    private static readonly Dictionary<string, string> PowderFusionColorImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["black"] = PowderFusionDyedBlackImage,
+        ["matteblack"] = PowderFusionDyedBlackImage,
+        ["dyedblack"] = PowderFusionDyedBlackImage,
+        ["red"] = "dyed-red-powder-fusion-part-material.png",
+        ["blue"] = "dyed-blue-powder-fusion-part-material.png",
+        ["green"] = "dyed-green-powder-fusion-part-material.png",
+        ["yellow"] = "dyed-yellow-powder-fusion-part-material.png",
+        ["orange"] = "dyed-orange-powder-fusion-part-material.png",
+        ["pink"] = "dyed-pink-powder-fusion-part-material.png",
+    };
+
     private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
     {
         ["al6061"] = "aluminum-6061-part-material.png",
@@ -283,6 +296,12 @@ public partial class PartConfigSidebar : ComponentBase
     private static readonly IReadOnlyList<string> PowderFusionDyeColors =
     [
         "Black",
+        "Red",
+        "Blue",
+        "Green",
+        "Yellow",
+        "Orange",
+        "Pink",
     ];
 
     private static readonly IReadOnlyList<string> PomMaterialColors =
@@ -1325,13 +1344,9 @@ public partial class PartConfigSidebar : ComponentBase
 
     private static string GetPowderFusionColorImageUrl(string color)
     {
-        var normalized = NormalizeOptionText(color);
-        if (normalized.Contains("black", StringComparison.Ordinal)
-            || normalized.Contains("dyed", StringComparison.Ordinal)
-            || normalized.Contains("dye", StringComparison.Ordinal))
-        {
-            return MaterialImageBasePath + PowderFusionDyedBlackImage;
-        }
+        foreach (var token in GetImageLookupTokens(color))
+            if (PowderFusionColorImages.TryGetValue(token, out var image))
+                return MaterialImageBasePath + image;
 
         return MaterialImageBasePath + PowderFusionRawImage;
     }

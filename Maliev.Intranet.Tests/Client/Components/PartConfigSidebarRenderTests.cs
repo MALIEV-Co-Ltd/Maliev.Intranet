@@ -275,7 +275,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PowderFusionColorOption_WhenFinishIsDyed_AllowsOnlyDyeColor()
+    public void PowderFusionColorOption_WhenFinishIsDyed_AllowsOnlyDyeColors()
     {
         var materialId = Guid.NewGuid();
         var finishId = Guid.NewGuid();
@@ -317,11 +317,22 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         var colorChoices = cut.FindAll(".pcs-color-choice");
 
-        Assert.Single(colorChoices);
-        Assert.Contains("Black", colorChoices.First().TextContent, StringComparison.Ordinal);
-        Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("White", StringComparison.Ordinal));
+        Assert.Equal(7, colorChoices.Count);
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Black", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Red", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Blue", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Green", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Yellow", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Orange", StringComparison.Ordinal));
+        Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Pink", StringComparison.Ordinal));
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Natural Grey", StringComparison.Ordinal));
         Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-black-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-red-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-blue-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-green-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-yellow-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-orange-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-pink-powder-fusion-part-material.png']"));
     }
 
     [Fact]
