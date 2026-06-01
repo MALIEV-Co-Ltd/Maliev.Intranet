@@ -505,7 +505,9 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.DoesNotContain(".pcs-scroll:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
-        Assert.Contains("pointer-events: auto;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-image-preview-popout {\n                position: absolute;", source, StringComparison.Ordinal);
+        Assert.Contains("pointer-events: none;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-image-preview-popout {\n                position: absolute;\n                left: calc(100% + 10px);\n                top: 50%;\n                z-index: 340;\n                width: min(220px, 64vw);\n                aspect-ratio: 1 / 1;\n                padding: 6px;\n                border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 32%, var(--maliev-border));\n                border-radius: 8px;\n                background: var(--maliev-panel);\n                box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);\n                opacity: 0;\n                pointer-events: auto;", source, StringComparison.Ordinal);
     }
 
     [Fact]
