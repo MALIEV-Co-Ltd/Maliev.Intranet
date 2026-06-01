@@ -94,7 +94,7 @@
 
 .project-record-shell ::deep .project-record-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2.2fr) minmax(340px, 520px);
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
     gap: 16px;
     align-items: stretch;
     min-height: 0;

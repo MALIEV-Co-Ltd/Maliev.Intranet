@@ -582,6 +582,22 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("height: 52px", css, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProjectDetailCss_KeepsOverviewSidebarCompact()
+    {
+        var cssPath = FindProjectDetailCssPath();
+        var css = File.ReadAllText(cssPath);
+
+        var gridRuleStart = css.IndexOf("::deep .project-record-grid {", StringComparison.Ordinal);
+        Assert.True(gridRuleStart >= 0, "Project detail CSS should define the overview grid.");
+
+        var gridRuleEnd = css.IndexOf('}', gridRuleStart);
+        var gridRule = css[gridRuleStart..gridRuleEnd];
+
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);", gridRule, StringComparison.Ordinal);
+        Assert.DoesNotContain("520px", gridRule, StringComparison.Ordinal);
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
