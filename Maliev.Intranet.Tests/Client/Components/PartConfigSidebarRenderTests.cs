@@ -500,8 +500,24 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-section:has(.pcs-option-image-frame:focus-within)", source, StringComparison.Ordinal);
-        Assert.Contains("overflow: visible;\n                z-index: 220;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-scroll:has(.pcs-option-image-frame:focus-within) {\n                z-index: 220;", source, StringComparison.Ordinal);
         Assert.Contains("pointer-events: auto;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfiguratorScrollContainer_PreservesOverflowWhenPreviewIsHovered()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-scroll {\n                flex: 1;\n                overflow-y: auto;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-scroll:has(.pcs-option-image-frame:hover) {\n                overflow: visible;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-scroll:has(.pcs-option-image-frame:focus-within) {\n                overflow: visible;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-footer {\n                border-top: 1px solid var(--maliev-border);\n                background: var(--maliev-panel);\n                flex-shrink: 0;\n                position: relative;\n                z-index: 180;", source, StringComparison.Ordinal);
     }
 
     [Fact]

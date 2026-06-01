@@ -746,7 +746,6 @@
 
             .pcs-scroll:has(.pcs-option-image-frame:hover),
             .pcs-scroll:has(.pcs-option-image-frame:focus-within) {
-                overflow: visible;
                 z-index: 220;
             }
 
@@ -1562,6 +1561,8 @@
                 border-top: 1px solid var(--maliev-border);
                 background: var(--maliev-panel);
                 flex-shrink: 0;
+                position: relative;
+                z-index: 180;
             }
 
             .pcs-routing-card {
