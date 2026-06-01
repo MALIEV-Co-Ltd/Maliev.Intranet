@@ -20,6 +20,47 @@ public class GeometryController(
     ILogger<GeometryController> logger) : ControllerBase
 {
     /// <summary>
+    /// Proxies the browser advisory geometry runtime manifest from GeometryService.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The runtime manifest JSON.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("runtime/manifest")]
+    public async Task<IActionResult> GetRuntimeManifest(CancellationToken ct = default)
+    {
+        using var response = await geometryServiceClient.GetRuntimeManifestAsync(ct);
+        return await ProxyRuntimeResponseAsync(
+            response,
+            "application/json; charset=utf-8",
+            ct);
+    }
+
+    /// <summary>
+    /// Proxies a content-hashed browser advisory geometry runtime asset from GeometryService.
+    /// </summary>
+    /// <param name="assetName">The content-hashed runtime asset file name.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The runtime asset content.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("runtime/assets/{assetName}")]
+    public async Task<IActionResult> GetRuntimeAsset(
+        string assetName,
+        CancellationToken ct = default)
+    {
+        if (assetName.Contains('/', StringComparison.Ordinal) ||
+            assetName.Contains('\\', StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        using var response = await geometryServiceClient.GetRuntimeAssetAsync(assetName, ct);
+        return await ProxyRuntimeResponseAsync(
+            response,
+            "text/javascript; charset=utf-8",
+            ct);
+    }
+
+    /// <summary>
     /// Runs DFM analysis for a specific manufacturing process on an uploaded file.
     /// This is the on-demand endpoint that only runs when the user selects a process.
     /// Supports cache-miss recovery by re-downloading from GCS when needed.
@@ -185,5 +226,26 @@ public class GeometryController(
                 storagePath);
             return null;
         }
+    }
+
+    private async Task<ContentResult> ProxyRuntimeResponseAsync(
+        HttpResponseMessage response,
+        string fallbackContentType,
+        CancellationToken ct)
+    {
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var cacheControl = response.Headers.CacheControl?.ToString();
+        if (!string.IsNullOrWhiteSpace(cacheControl))
+        {
+            Response.Headers.CacheControl = cacheControl;
+        }
+
+        return new ContentResult
+        {
+            StatusCode = (int)response.StatusCode,
+            Content = content,
+            ContentType = response.Content.Headers.ContentType?.ToString()
+                ?? fallbackContentType
+        };
     }
 }

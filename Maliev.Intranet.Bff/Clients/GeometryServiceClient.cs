@@ -133,4 +133,33 @@ public class GeometryServiceClient(HttpClient httpClient)
             };
         }
     }
+
+    /// <summary>
+    /// Gets the browser advisory geometry runtime manifest from GeometryService.
+    /// </summary>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The raw HTTP response so the BFF can preserve cache headers.</returns>
+    public Task<HttpResponseMessage> GetRuntimeManifestAsync(CancellationToken ct = default)
+    {
+        return _httpClient.GetAsync(
+            "/geometry/client-runtime/manifest.json",
+            HttpCompletionOption.ResponseHeadersRead,
+            ct);
+    }
+
+    /// <summary>
+    /// Gets a content-hashed browser advisory geometry runtime asset from GeometryService.
+    /// </summary>
+    /// <param name="assetName">The content-hashed runtime asset file name.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>The raw HTTP response so the BFF can preserve cache headers.</returns>
+    public Task<HttpResponseMessage> GetRuntimeAssetAsync(
+        string assetName,
+        CancellationToken ct = default)
+    {
+        return _httpClient.GetAsync(
+            $"/geometry/client-runtime/assets/{Uri.EscapeDataString(assetName)}",
+            HttpCompletionOption.ResponseHeadersRead,
+            ct);
+    }
 }

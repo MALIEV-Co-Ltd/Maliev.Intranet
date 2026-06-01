@@ -5,6 +5,7 @@ using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -64,8 +65,23 @@ public class GeometryControllerTests
         { BaseAddress = new Uri("http://test") });
     }
 
+    private static GeometryServiceClient MakeGeometryClient(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+    {
+        return new GeometryServiceClient(new HttpClient(new MockHttpMessageHandler(handler))
+        { BaseAddress = new Uri("http://test") });
+    }
+
     private static GeometryController MakeController(UploadServiceClient uploadClient, GeometryServiceClient geometryClient)
-        => new(geometryClient, uploadClient, NullLogger<GeometryController>.Instance);
+    {
+        return new(geometryClient, uploadClient, NullLogger<GeometryController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+    }
 
     [Fact]
     public async Task AnalyzeForProcess_Returns410_WhenFileNotInUploadService()
@@ -199,5 +215,86 @@ public class GeometryControllerTests
         using var document = JsonDocument.Parse(geometryRequestJson);
         Assert.Equal(currentPath, document.RootElement.GetProperty("storage_path").GetString());
         Assert.Equal(SignedUrl, document.RootElement.GetProperty("download_url").GetString());
+    }
+
+    [Fact]
+    public async Task GetRuntimeManifest_ProxiesGeometryServiceManifestWithNoCache()
+    {
+        string? requestedPath = null;
+        var geometryClient = MakeGeometryClient((req, _) =>
+        {
+            requestedPath = req.RequestUri!.PathAndQuery;
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "{\"runtimeVersion\":\"0.1.0\",\"assets\":{\"worker\":\"/geometry/client-runtime/assets/client-geometry-runtime.abc.worker.js\"}}",
+                    System.Text.Encoding.UTF8,
+                    "application/json")
+            };
+            response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+            {
+                NoCache = true
+            };
+            return Task.FromResult(response);
+        });
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeManifest(default);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(200, content.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", content.ContentType);
+        Assert.Contains("\"runtimeVersion\":\"0.1.0\"", content.Content, StringComparison.Ordinal);
+        Assert.Equal("/geometry/client-runtime/manifest.json", requestedPath);
+        Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task GetRuntimeAsset_ProxiesHashNamedAssetWithImmutableCache()
+    {
+        string? requestedPath = null;
+        var geometryClient = MakeGeometryClient((req, _) =>
+        {
+            requestedPath = req.RequestUri!.PathAndQuery;
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("self.__runtime=true;", System.Text.Encoding.UTF8, "text/javascript")
+            };
+            response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
+            {
+                Public = true,
+                MaxAge = TimeSpan.FromDays(365),
+            };
+            response.Headers.CacheControl.Extensions.Add(
+                new System.Net.Http.Headers.NameValueHeaderValue("immutable"));
+            return Task.FromResult(response);
+        });
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeAsset("client-geometry-runtime.abc.worker.js", default);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(200, content.StatusCode);
+        Assert.Equal("text/javascript; charset=utf-8", content.ContentType);
+        Assert.Equal("self.__runtime=true;", content.Content);
+        Assert.Equal("/geometry/client-runtime/assets/client-geometry-runtime.abc.worker.js", requestedPath);
+        Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetRuntimeAsset_Returns404_WhenGeometryServiceReturnsMissingAsset()
+    {
+        var geometryClient = MakeGeometryClient((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("{\"detail\":\"Runtime asset not found\"}", System.Text.Encoding.UTF8, "application/json")
+            }));
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeAsset("missing.worker.js", default);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(404, content.StatusCode);
+        Assert.Contains("Runtime asset not found", content.Content, StringComparison.Ordinal);
     }
 }
