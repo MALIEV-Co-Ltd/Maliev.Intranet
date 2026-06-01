@@ -27,6 +27,51 @@ class Vector3 {
 
 function loadViewerContext() {
     const rawCubeTextures = [];
+    class NodeMaterialConnectionPoint {
+        connectTo() {}
+    }
+
+    class NodeMaterialBlockStub {
+        constructor(name) {
+            this.name = name;
+            this.output = new NodeMaterialConnectionPoint();
+            this.xyz = new NodeMaterialConnectionPoint();
+            this.rgb = new NodeMaterialConnectionPoint();
+            this.rgba = new NodeMaterialConnectionPoint();
+            this.lighting = new NodeMaterialConnectionPoint();
+            this.reflection = new NodeMaterialConnectionPoint();
+            this.vector = new NodeMaterialConnectionPoint();
+            this.transform = new NodeMaterialConnectionPoint();
+            this.worldPosition = new NodeMaterialConnectionPoint();
+            this.worldNormal = new NodeMaterialConnectionPoint();
+            this.view = new NodeMaterialConnectionPoint();
+            this.cameraPosition = new NodeMaterialConnectionPoint();
+            this.perturbedNormal = new NodeMaterialConnectionPoint();
+            this.baseColor = new NodeMaterialConnectionPoint();
+            this.metallic = new NodeMaterialConnectionPoint();
+            this.roughness = new NodeMaterialConnectionPoint();
+            this.position = new NodeMaterialConnectionPoint();
+            this.world = new NodeMaterialConnectionPoint();
+            this.input = new NodeMaterialConnectionPoint();
+            this.factor = new NodeMaterialConnectionPoint();
+            this.left = new NodeMaterialConnectionPoint();
+            this.right = new NodeMaterialConnectionPoint();
+            this.seed = new NodeMaterialConnectionPoint();
+            this.xyzw = new NodeMaterialConnectionPoint();
+            this.x = new NodeMaterialConnectionPoint();
+            this.y = new NodeMaterialConnectionPoint();
+            this.z = new NodeMaterialConnectionPoint();
+        }
+
+        setAsAttribute(attributeName) {
+            this.attributeName = attributeName;
+        }
+
+        setAsSystemValue(systemValue) {
+            this.systemValue = systemValue;
+        }
+    }
+
     const context = {
         console,
         document: {
@@ -70,6 +115,55 @@ function loadViewerContext() {
                     scene?.materials?.push(this);
                 }
             },
+            NodeMaterial: class NodeMaterial {
+                constructor(name, scene) {
+                    this.name = name;
+                    this.metadata = {};
+                    this.outputNodes = [];
+                    scene?.materials?.push(this);
+                }
+
+                addOutputNode(node) {
+                    this.outputNodes.push(node);
+                }
+
+                build() {
+                    this.wasBuilt = true;
+                }
+            },
+            NodeMaterialBlockTargets: {
+                Vertex: 1,
+                Fragment: 2,
+                VertexAndFragment: 3,
+                Neutral: 4,
+            },
+            NodeMaterialModes: {
+                Material: 0,
+            },
+            NodeMaterialSystemValues: {
+                World: 1,
+                View: 2,
+                ViewProjection: 4,
+                CameraPosition: 7,
+            },
+            WaveBlockKind: {
+                SawTooth: 0,
+                Square: 1,
+                Triangle: 2,
+            },
+            InputBlock: NodeMaterialBlockStub,
+            TransformBlock: NodeMaterialBlockStub,
+            VertexOutputBlock: NodeMaterialBlockStub,
+            FragmentOutputBlock: NodeMaterialBlockStub,
+            PBRMetallicRoughnessBlock: NodeMaterialBlockStub,
+            ReflectionBlock: NodeMaterialBlockStub,
+            HeightToNormalBlock: NodeMaterialBlockStub,
+            SimplexPerlin3DBlock: NodeMaterialBlockStub,
+            ScaleBlock: NodeMaterialBlockStub,
+            AddBlock: NodeMaterialBlockStub,
+            MultiplyBlock: NodeMaterialBlockStub,
+            WaveBlock: NodeMaterialBlockStub,
+            VectorSplitterBlock: NodeMaterialBlockStub,
             RawCubeTexture: class RawCubeTexture {
                 constructor(scene, faces, size, format, type, generateMipMaps, invertY, samplingMode) {
                     this.scene = scene;
@@ -577,4 +671,64 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.equal(result.mjf.effectKey, 'powder-grain');
     assert.equal(result.mjf.effectKind, 3);
     assert.equal(result.slsEffect, 'powder-grain');
+});
+
+test('realistic configurator uses NodeMaterial PBR profiles with procedural normal detail for textured finishes', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshot = (materialKey, finishCode, roughnessCode, processCode) => {
+            configureMaterialFromConfigurator('viewer', materialKey, null, finishCode, roughnessCode, processCode);
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                isNodeMaterial: material instanceof BABYLON.NodeMaterial,
+                pipeline: material?._malievMaterialPipeline ?? null,
+                wasBuilt: material?.wasBuilt === true,
+                effectKey: material?._malievSurfaceEffect?.key ?? null,
+                nodeEffectKey: material?._malievNodeMaterialProfile?.surfaceEffectKey ?? null,
+                normalStrength: material?._malievNodeMaterialProfile?.normalStrength ?? 0,
+                stripeStrength: material?._malievNodeMaterialProfile?.stripeStrength ?? 0,
+                layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? 0
+            };
+        };
+        ({
+            beadBlast: snapshot('aluminum', 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL'),
+            brushed: snapshot('aluminum', 'BRUSHED', 'RA_1_6', 'CNC_MILL'),
+            fdm: snapshot('pla', 'AS_PRINTED', null, 'FDM'),
+            sla: snapshot('resin', 'AS_PRINTED', null, 'SLA')
+        });
+    `, context);
+
+    assert.equal(result.beadBlast.isNodeMaterial, true);
+    assert.equal(result.beadBlast.pipeline, 'node-pbr-procedural');
+    assert.equal(result.beadBlast.wasBuilt, true);
+    assert.equal(result.beadBlast.effectKey, 'bead-blast');
+    assert.equal(result.beadBlast.nodeEffectKey, 'bead-blast');
+    assert.ok(result.beadBlast.normalStrength > 0, 'bead blast should perturb normals with grain');
+
+    assert.equal(result.brushed.isNodeMaterial, true);
+    assert.equal(result.brushed.nodeEffectKey, 'brushed');
+    assert.ok(result.brushed.stripeStrength > 0, 'brushed finish should include directional stripe normals');
+
+    assert.equal(result.fdm.isNodeMaterial, true);
+    assert.equal(result.fdm.nodeEffectKey, 'fdm-layer-lines');
+    assert.ok(result.fdm.layerLineStrength > 0, 'FDM printing should include visible layer-line normals');
+
+    assert.equal(result.sla.isNodeMaterial, true);
+    assert.equal(result.sla.nodeEffectKey, 'fdm-layer-lines');
+    assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line normals');
 });

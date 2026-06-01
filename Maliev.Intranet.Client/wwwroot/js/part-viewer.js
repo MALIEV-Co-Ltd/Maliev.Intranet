@@ -473,7 +473,7 @@ const materialTypes = {};
 /** Per-canvas environment texture for PBR reflections */
 const environmentTextures = {};
 
-/** Per-canvas realistic PBR material cache (Map<materialType, PBRMaterial>) */
+/** Per-canvas realistic material cache (Map<materialType, NodeMaterial/PBRMaterial>) */
 const realisticMaterialCache = {};
 
 /** Per-canvas original vertex normals saved before smoothing (Map<uniqueId, Float32Array>) */
@@ -487,6 +487,9 @@ const perCanvasFinishModifiers = {};
 
 /** Per-canvas procedural surface effect for realistic mode */
 const perCanvasSurfaceEffects = {};
+
+/** Per-canvas manufacturing process code used by the realistic material pipeline */
+const perCanvasProcessCodes = {};
 
 /** Per-canvas DefaultRenderingPipeline for post-processing */
 const perCanvasPipelines = {};
@@ -3042,7 +3045,14 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
 // Applied only to FDM plastic presets in realistic mode.
 
 const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
+const ADDITIVE_LAYER_PRESET_KEYS = new Set([
+    ...FDM_LAYER_PRESET_KEYS,
+    'petg-clear',
+    'resin',
+    'nylon-powder',
+]);
 const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom']);
+const FDM_LAYER_EFFECT_KEY = 'fdm-layer-lines';
 
 let FdmLayerPluginClass = null;
 
@@ -3081,8 +3091,8 @@ function getFdmLayerPluginClass() {
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef FDMLAYER
                 {
-                    // Periodic groove at each layer boundary (Y = vertical / stacking axis)
-                    float _lPhase = vPositionW.y / max(fdmLayerH, 0.001);
+                    // Periodic groove at each layer boundary (Z = viewer vertical / stacking axis)
+                    float _lPhase = vPositionW.z / max(fdmLayerH, 0.001);
                     float _ridge  = sin(_lPhase * 6.28318) * 0.5 + 0.5; // 1 = layer centre, 0 = boundary
                     // Narrow dark groove at boundaries; transparent preset skips (alpha already < 1)
                     float _groove = smoothstep(0.70, 1.0, 1.0 - _ridge) * 0.18;
@@ -3287,13 +3297,412 @@ function configureRealisticPbrQuality(pbr) {
     pbr.realTimeFilteringQuality = BABYLON.Constants.TEXTURE_FILTERING_QUALITY_HIGH;
 }
 
+const REALISTIC_NODE_MATERIAL_BLOCKS = [
+    'NodeMaterial',
+    'InputBlock',
+    'TransformBlock',
+    'VertexOutputBlock',
+    'FragmentOutputBlock',
+    'PBRMetallicRoughnessBlock',
+    'ReflectionBlock',
+    'HeightToNormalBlock',
+    'SimplexPerlin3DBlock',
+    'ScaleBlock',
+    'AddBlock',
+    'WaveBlock',
+    'VectorSplitterBlock',
+];
+
+function canUseRealisticNodeMaterial() {
+    return REALISTIC_NODE_MATERIAL_BLOCKS.every(name => typeof BABYLON?.[name] === 'function')
+        && BABYLON.NodeMaterialModes
+        && BABYLON.NodeMaterialSystemValues;
+}
+
+function isFdmProcess(processCode) {
+    const process = String(processCode || '').trim().toUpperCase();
+    return process === 'FDM' || process === 'FDM_3D_PRINTING' || process === 'FFF';
+}
+
+function isLayeredAdditiveProcess(processCode) {
+    const process = String(processCode || '').trim().toUpperCase();
+    return isFdmProcess(process)
+        || process === 'SLA'
+        || process === 'SLA_DLP'
+        || process === 'DLP'
+        || process === 'MJF'
+        || process === 'SLS'
+        || process === 'SLS_PA'
+        || process === 'SJS';
+}
+
+function getAdditiveLayerLineStrength(canvasId, materialType) {
+    const processCode = perCanvasProcessCodes[canvasId];
+    if (!ADDITIVE_LAYER_PRESET_KEYS.has(materialType) || !isLayeredAdditiveProcess(processCode)) {
+        return 0;
+    }
+
+    if (isPowderBedProcess(processCode)) return 0.028;
+    if (isFdmProcess(processCode)) return 0.075;
+    return 0.045;
+}
+
+function shouldApplyFdmLayerLines(canvasId, materialType) {
+    return getAdditiveLayerLineStrength(canvasId, materialType) > 0;
+}
+
+function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
+    const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
+    const layerLineStrength = getAdditiveLayerLineStrength(canvasId, materialType);
+    const profile = {
+        surfaceEffectKey: surfaceEffect.kind > 0 ? surfaceEffect.key : null,
+        normalStrength: 0,
+        noiseScale: 0,
+        stripeAxis: 'x',
+        stripeScale: 0,
+        stripeStrength: 0,
+        layerAxis: 'z',
+        layerHeightMm: 0.2,
+        layerLineStrength,
+    };
+
+    if (surfaceEffect.key === 'bead-blast') {
+        profile.normalStrength = 0.055;
+        profile.noiseScale = 0.85;
+    } else if (surfaceEffect.key === 'brushed') {
+        profile.normalStrength = 0.010;
+        profile.noiseScale = 0.09;
+        profile.stripeAxis = 'x';
+        profile.stripeScale = 1.35;
+        profile.stripeStrength = 0.050;
+    } else if (surfaceEffect.key === 'machining') {
+        profile.normalStrength = 0.006;
+        profile.noiseScale = 0.06;
+        profile.stripeAxis = 'x';
+        profile.stripeScale = 0.42;
+        profile.stripeStrength = 0.030;
+    } else if (surfaceEffect.key === 'powder-grain') {
+        profile.normalStrength = 0.040;
+        profile.noiseScale = 1.40;
+    }
+
+    if (layerLineStrength > 0 && !profile.surfaceEffectKey) {
+        profile.surfaceEffectKey = FDM_LAYER_EFFECT_KEY;
+    }
+
+    return profile;
+}
+
+function createNodeInputBlock(name, value) {
+    const input = new BABYLON.InputBlock(name);
+    input.value = value;
+    input.isConstant = false;
+    return input;
+}
+
+function createNodeAttributeBlock(name) {
+    const input = new BABYLON.InputBlock(name);
+    input.setAsAttribute(name);
+    return input;
+}
+
+function createNodeSystemBlock(name, systemValue) {
+    const input = new BABYLON.InputBlock(name);
+    input.setAsSystemValue(systemValue);
+    return input;
+}
+
+function connectNodeBlocks(output, input) {
+    if (!output || !input || typeof output.connectTo !== 'function') return;
+    output.connectTo(input);
+}
+
+function addHeightOutput(left, right, name) {
+    if (!left) return right;
+    if (!right) return left;
+
+    const add = new BABYLON.AddBlock(name);
+    connectNodeBlocks(left, add.left);
+    connectNodeBlocks(right, add.right);
+    return add.output;
+}
+
+function getWorldAxisOutput(worldPosition, axis, name) {
+    const splitter = new BABYLON.VectorSplitterBlock(name);
+    connectNodeBlocks(worldPosition.xyz, splitter.xyzIn || splitter.xyz);
+
+    return axis === 'z'
+        ? splitter.z
+        : axis === 'y'
+            ? splitter.y
+            : splitter.x;
+}
+
+function createNoiseHeightOutput(worldPosition, strength, scale, name) {
+    if (strength <= 0 || scale <= 0) return null;
+
+    const positionScale = new BABYLON.ScaleBlock(`${name} position scale`);
+    const scaleInput = createNodeInputBlock(`${name} scale`, scale);
+    const noise = new BABYLON.SimplexPerlin3DBlock(`${name} noise`);
+    const heightScale = new BABYLON.ScaleBlock(`${name} height scale`);
+    const strengthInput = createNodeInputBlock(`${name} strength`, strength);
+
+    connectNodeBlocks(worldPosition.xyz, positionScale.input);
+    connectNodeBlocks(scaleInput.output, positionScale.factor);
+    connectNodeBlocks(positionScale.output, noise.seed);
+    connectNodeBlocks(noise.output, heightScale.input);
+    connectNodeBlocks(strengthInput.output, heightScale.factor);
+
+    return heightScale.output;
+}
+
+function createStripeHeightOutput(worldPosition, axis, strength, scale, name) {
+    if (strength <= 0 || scale <= 0) return null;
+
+    const axisOutput = getWorldAxisOutput(worldPosition, axis, `${name} axis`);
+    const coordinateScale = new BABYLON.ScaleBlock(`${name} coordinate scale`);
+    const scaleInput = createNodeInputBlock(`${name} stripe scale`, scale);
+    const wave = new BABYLON.WaveBlock(`${name} wave`);
+    const heightScale = new BABYLON.ScaleBlock(`${name} stripe height`);
+    const strengthInput = createNodeInputBlock(`${name} stripe strength`, strength);
+
+    if (BABYLON.WaveBlockKind) {
+        wave.kind = BABYLON.WaveBlockKind.Triangle;
+    }
+
+    connectNodeBlocks(axisOutput, coordinateScale.input);
+    connectNodeBlocks(scaleInput.output, coordinateScale.factor);
+    connectNodeBlocks(coordinateScale.output, wave.input);
+    connectNodeBlocks(wave.output, heightScale.input);
+    connectNodeBlocks(strengthInput.output, heightScale.factor);
+
+    return heightScale.output;
+}
+
+function createRealisticNodeHeightOutput(worldPosition, profile) {
+    let heightOutput = createNoiseHeightOutput(
+        worldPosition,
+        profile.normalStrength,
+        profile.noiseScale,
+        'finish');
+
+    heightOutput = addHeightOutput(
+        heightOutput,
+        createStripeHeightOutput(
+            worldPosition,
+            profile.stripeAxis,
+            profile.stripeStrength,
+            profile.stripeScale,
+            'finish stripes'),
+        'finish height');
+
+    heightOutput = addHeightOutput(
+        heightOutput,
+        createStripeHeightOutput(
+            worldPosition,
+            profile.layerAxis,
+            profile.layerLineStrength,
+            profile.layerHeightMm > 0 ? 1 / profile.layerHeightMm : 5,
+            'fdm layer lines'),
+        'layered finish height');
+
+    return heightOutput;
+}
+
+function syncRealisticMaterialProperties(material, preset, custom, finishMod, profile) {
+    if (!material || !preset) return;
+
+    const albedo = custom ? toColor3(custom) : toColor3(preset.albedoColor);
+    const metallic = clamp(preset.metallic + (finishMod?.metallicOffset || 0), 0, 1);
+    const roughness = finishMod?.absoluteRoughness != null
+        ? finishMod.absoluteRoughness
+        : clamp(preset.roughness + (finishMod?.roughnessOffset || 0), 0, 1);
+
+    if (material.albedoColor?.set) {
+        material.albedoColor.set(albedo.r, albedo.g, albedo.b);
+    } else {
+        material.albedoColor = albedo;
+    }
+
+    material.metallic = metallic;
+    material.roughness = roughness;
+    material._malievNodeMaterialProfile = profile;
+
+    if (material._malievNodeInputs) {
+        material._malievNodeInputs.baseColor.value = albedo;
+        material._malievNodeInputs.metallic.value = metallic;
+        material._malievNodeInputs.roughness.value = roughness;
+        material._malievNodeInputs.alpha.value = preset.alpha ?? 1;
+    }
+
+    if (preset.alpha != null && preset.alpha < 1.0) {
+        material.alpha = preset.alpha;
+        material.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
+        material.needDepthPrePass = true;
+    } else {
+        material.alpha = 1;
+        material.transparencyMode = BABYLON.Material?.MATERIAL_OPAQUE ?? 0;
+        material.needDepthPrePass = false;
+    }
+}
+
+function createRealisticNodeMaterial(scene, canvasId, materialType, preset) {
+    if (!canUseRealisticNodeMaterial()) return null;
+
+    const profile = resolveRealisticNodeMaterialProfile(canvasId, materialType);
+    const custom = customAlbedoColors[canvasId];
+    const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+    const albedo = custom ? toColor3(custom) : toColor3(preset.albedoColor);
+    const metallic = clamp(preset.metallic + (finishMod.metallicOffset || 0), 0, 1);
+    const roughness = finishMod.absoluteRoughness != null
+        ? finishMod.absoluteRoughness
+        : clamp(preset.roughness + (finishMod.roughnessOffset || 0), 0, 1);
+    const alpha = preset.alpha ?? 1;
+
+    let nodeMaterial = null;
+    try {
+        nodeMaterial = new BABYLON.NodeMaterial(`__realistic_${materialType}__`, scene);
+        nodeMaterial.mode = BABYLON.NodeMaterialModes.Material;
+        nodeMaterial.maxSimultaneousLights = 4;
+
+        const position = createNodeAttributeBlock('position');
+        const normal = createNodeAttributeBlock('normal');
+        const world = createNodeSystemBlock('World', BABYLON.NodeMaterialSystemValues.World);
+        const view = createNodeSystemBlock('View', BABYLON.NodeMaterialSystemValues.View);
+        const viewProjection = createNodeSystemBlock('ViewProjection', BABYLON.NodeMaterialSystemValues.ViewProjection);
+        const cameraPosition = createNodeSystemBlock('cameraPosition', BABYLON.NodeMaterialSystemValues.CameraPosition);
+
+        const worldPosition = new BABYLON.TransformBlock('World position');
+        worldPosition.complementZ = 0;
+        worldPosition.complementW = 1;
+        connectNodeBlocks(position.output, worldPosition.vector);
+        connectNodeBlocks(world.output, worldPosition.transform);
+
+        const worldViewProjection = new BABYLON.TransformBlock('World position view projection');
+        worldViewProjection.complementZ = 0;
+        worldViewProjection.complementW = 1;
+        connectNodeBlocks(worldPosition.output, worldViewProjection.vector);
+        connectNodeBlocks(viewProjection.output, worldViewProjection.transform);
+
+        const vertexOutput = new BABYLON.VertexOutputBlock('Vertex output');
+        connectNodeBlocks(worldViewProjection.output, vertexOutput.vector);
+
+        const worldNormal = new BABYLON.TransformBlock('World normal');
+        worldNormal.complementZ = 0;
+        worldNormal.complementW = 0;
+        connectNodeBlocks(normal.output, worldNormal.vector);
+        connectNodeBlocks(world.output, worldNormal.transform);
+
+        const pbr = new BABYLON.PBRMetallicRoughnessBlock('Manufacturing PBR');
+        configureRealisticPbrQuality(pbr);
+        pbr.environmentIntensity = CONFIG.REALISTIC.environmentIntensity;
+        pbr.useEnergyConservation = true;
+        pbr.useRadianceOcclusion = true;
+        pbr.useHorizonOcclusion = true;
+        pbr.useAlphaBlending = alpha < 1;
+
+        const baseColorInput = createNodeInputBlock('base color', albedo);
+        const metallicInput = createNodeInputBlock('metallic', metallic);
+        const roughnessInput = createNodeInputBlock('roughness', roughness);
+        const alphaInput = createNodeInputBlock('alpha', alpha);
+
+        connectNodeBlocks(worldPosition.output, pbr.worldPosition);
+        connectNodeBlocks(worldNormal.output, pbr.worldNormal);
+        connectNodeBlocks(view.output, pbr.view);
+        connectNodeBlocks(cameraPosition.output, pbr.cameraPosition);
+        connectNodeBlocks(baseColorInput.output, pbr.baseColor);
+        connectNodeBlocks(metallicInput.output, pbr.metallic);
+        connectNodeBlocks(roughnessInput.output, pbr.roughness);
+        if (pbr.opacity) connectNodeBlocks(alphaInput.output, pbr.opacity);
+
+        const reflection = new BABYLON.ReflectionBlock('Studio reflection');
+        reflection.useSphericalHarmonics = true;
+        reflection.forceIrradianceInFragment = false;
+        connectNodeBlocks(position.output, reflection.position);
+        connectNodeBlocks(world.output, reflection.world);
+        connectNodeBlocks(reflection.reflection, pbr.reflection);
+
+        const heightOutput = createRealisticNodeHeightOutput(worldPosition, profile);
+        if (heightOutput) {
+            const heightToNormal = new BABYLON.HeightToNormalBlock('Manufacturing height to normal');
+            heightToNormal.generateInWorldSpace = true;
+            connectNodeBlocks(heightOutput, heightToNormal.input);
+            connectNodeBlocks(worldPosition.xyz, heightToNormal.worldPosition);
+            connectNodeBlocks(worldNormal.xyz, heightToNormal.worldNormal);
+            connectNodeBlocks(heightToNormal.output, pbr.perturbedNormal);
+        }
+
+        const fragmentOutput = new BABYLON.FragmentOutputBlock('Fragment output');
+        connectNodeBlocks(pbr.lighting, fragmentOutput.rgb);
+        if (pbr.alpha && fragmentOutput.a) connectNodeBlocks(pbr.alpha, fragmentOutput.a);
+
+        nodeMaterial.addOutputNode(vertexOutput);
+        nodeMaterial.addOutputNode(fragmentOutput);
+        nodeMaterial.build(false);
+
+        nodeMaterial._malievNodeInputs = {
+            baseColor: baseColorInput,
+            metallic: metallicInput,
+            roughness: roughnessInput,
+            alpha: alphaInput,
+        };
+        nodeMaterial._malievMaterialPipeline = 'node-pbr-procedural';
+        const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
+        nodeMaterial._malievSurfaceEffect = surfaceEffect.kind > 0 ? surfaceEffect : null;
+        nodeMaterial.metadata = {
+            ...(nodeMaterial.metadata || {}),
+            malievMaterialPipeline: 'node-pbr-procedural',
+        };
+        syncRealisticMaterialProperties(nodeMaterial, preset, custom, finishMod, profile);
+
+        return nodeMaterial;
+    } catch (error) {
+        console.warn('[BabylonViewer] NodeMaterial realistic pipeline failed; falling back to PBRMaterial.', error);
+        try { nodeMaterial?.dispose(); } catch (_) {}
+        return null;
+    }
+}
+
+function createFallbackPbrMaterial(scene, canvasId, materialType, preset) {
+    const custom = customAlbedoColors[canvasId];
+    const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+    const profile = resolveRealisticNodeMaterialProfile(canvasId, materialType);
+
+    const pbr = new BABYLON.PBRMaterial(`__realistic_${materialType}__`, scene);
+    configureRealisticPbrQuality(pbr);
+    syncRealisticMaterialProperties(pbr, preset, custom, finishMod, profile);
+
+    // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
+    if (preset.alpha != null && preset.alpha < 1.0) {
+        pbr.alpha            = preset.alpha;
+        pbr.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
+        pbr.needDepthPrePass = true;
+    }
+
+    // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
+    if (shouldApplyFdmLayerLines(canvasId, materialType)) {
+        const FdmLayerPlugin = getFdmLayerPluginClass();
+        new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
+    }
+
+    const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
+    if (surfaceEffect.kind > 0) {
+        const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
+        new SurfaceEffectPlugin(pbr, surfaceEffect);
+    }
+
+    pbr._malievMaterialPipeline = 'pbr-plugin-fallback';
+    pbr._malievNodeMaterialProfile = profile;
+    return pbr;
+}
+
 /**
- * Returns (or lazily creates) a PBRMaterial for the given material type.
+ * Returns (or lazily creates) a realistic material for the given material type.
  * Each material type is cached per canvas so it is shared across all meshes.
  * @param {BABYLON.Scene} scene
  * @param {string} canvasId
  * @param {string} materialType - key in CONFIG.MATERIAL_REALISTIC
- * @returns {BABYLON.PBRMaterial}
+ * @returns {BABYLON.Material}
  */
 function getRealisticMaterial(scene, canvasId, materialType) {
     if (!realisticMaterialCache[canvasId]) realisticMaterialCache[canvasId] = {};
@@ -3304,32 +3713,8 @@ function getRealisticMaterial(scene, canvasId, materialType) {
     const preset = CONFIG.MATERIAL_REALISTIC[materialType]
                 || CONFIG.MATERIAL_REALISTIC['aluminum'];
 
-    const custom = customAlbedoColors[canvasId];
-
-    const pbr = new BABYLON.PBRMaterial(`__realistic_${materialType}__`, scene);
-    pbr.albedoColor = custom ? toColor3(custom) : toColor3(preset.albedoColor);
-    pbr.metallic     = preset.metallic;
-    pbr.roughness    = preset.roughness;
-    configureRealisticPbrQuality(pbr);
-
-    // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
-    if (preset.alpha != null && preset.alpha < 1.0) {
-        pbr.alpha            = preset.alpha;
-        pbr.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
-        pbr.needDepthPrePass = true;
-    }
-
-    // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
-    if (FDM_LAYER_PRESET_KEYS.has(materialType)) {
-        const FdmLayerPlugin = getFdmLayerPluginClass();
-        new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
-    }
-
-    const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
-    if (surfaceEffect.kind > 0) {
-        const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
-        new SurfaceEffectPlugin(pbr, surfaceEffect);
-    }
+    const pbr = createRealisticNodeMaterial(scene, canvasId, materialType, preset)
+        || createFallbackPbrMaterial(scene, canvasId, materialType, preset);
 
     cache[materialType] = pbr;
     return pbr;
@@ -3354,14 +3739,14 @@ function applyRealisticMaterial(canvasId, materialType) {
         if (isSystemMesh(mesh)) return;
 
         mesh.material = getRealisticMaterial(scene, canvasId, materialType);
-        if (mesh.material instanceof BABYLON.PBRMaterial) {
-            const preset = CONFIG.MATERIAL_REALISTIC[materialType]
-                        || CONFIG.MATERIAL_REALISTIC['aluminum'];
-            mesh.material.metallic  = clamp(preset.metallic + finishMod.metallicOffset, 0, 1);
-            mesh.material.roughness = finishMod.absoluteRoughness != null
-                ? finishMod.absoluteRoughness
-                : clamp(preset.roughness + finishMod.roughnessOffset, 0, 1);
-        }
+        const preset = CONFIG.MATERIAL_REALISTIC[materialType]
+                    || CONFIG.MATERIAL_REALISTIC['aluminum'];
+        syncRealisticMaterialProperties(
+            mesh.material,
+            preset,
+            customAlbedoColors[canvasId],
+            finishMod,
+            resolveRealisticNodeMaterialProfile(canvasId, materialType));
     });
 }
 
@@ -3381,6 +3766,8 @@ export function setMaterialType(canvasId, materialType) {
     // Clear custom color override so the preset albedo is restored
     delete customAlbedoColors[canvasId];
     perCanvasSurfaceEffects[canvasId] = getSurfaceEffect(null);
+    perCanvasFinishModifiers[canvasId] = { roughnessOffset: 0, metallicOffset: 0 };
+    delete perCanvasProcessCodes[canvasId];
 
     // Reset albedo on all cached materials back to their respective presets
     const cache = realisticMaterialCache[canvasId];
@@ -3388,7 +3775,12 @@ export function setMaterialType(canvasId, materialType) {
         Object.entries(cache).forEach(([key, mat]) => {
             const preset = CONFIG.MATERIAL_REALISTIC[key];
             if (preset) {
-                mat.albedoColor.set(preset.albedoColor.r, preset.albedoColor.g, preset.albedoColor.b);
+                syncRealisticMaterialProperties(
+                    mat,
+                    preset,
+                    null,
+                    perCanvasFinishModifiers[canvasId],
+                    resolveRealisticNodeMaterialProfile(canvasId, key));
             }
         });
     }
@@ -3418,8 +3810,15 @@ export function setMaterialColor(canvasId, hexColor) {
     // Update albedo in-place on all cached realistic materials
     const cache = realisticMaterialCache[canvasId];
     if (cache) {
-        Object.values(cache).forEach(mat => {
-            mat.albedoColor.set(r, g, b);
+        Object.entries(cache).forEach(([key, mat]) => {
+            const preset = CONFIG.MATERIAL_REALISTIC[key];
+            if (!preset) return;
+            syncRealisticMaterialProperties(
+                mat,
+                preset,
+                customAlbedoColors[canvasId],
+                perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 },
+                resolveRealisticNodeMaterialProfile(canvasId, key));
         });
     }
 }
@@ -3461,29 +3860,8 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
     const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
 
-    // Reset albedo on all cached materials back to their respective presets
-    const cache = realisticMaterialCache[canvasId];
-    if (cache) {
-        Object.entries(cache).forEach(([key, mat]) => {
-            const preset = CONFIG.MATERIAL_REALISTIC[key];
-            if (preset) {
-                mat.albedoColor.set(preset.albedoColor.r, preset.albedoColor.g, preset.albedoColor.b);
-                mat.roughness = resolveFinishRoughness(preset, finishModifiers, raRoughness);
-                mat.metallic = clamp(preset.metallic + finishModifiers.metallicOffset, 0, 1);
-            }
-        });
-    }
-
-    // Re-apply custom colour if present (overrides the preset albedo)
-    const custom = customAlbedoColors[canvasId];
-    if (custom && cache) {
-        Object.values(cache).forEach(mat => {
-            mat.albedoColor.set(custom.r, custom.g, custom.b);
-        });
-    }
-
     materialTypes[canvasId] = materialKey;
-
+    perCanvasProcessCodes[canvasId] = processCode;
     // Store finish modifiers + resolved roughness so setRenderMode can re-apply them
     perCanvasFinishModifiers[canvasId] = {
         ...finishModifiers,
@@ -3492,6 +3870,37 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
         absoluteRoughness: finishModifiers.absoluteRoughness ?? raRoughness,
     };
     perCanvasSurfaceEffects[canvasId] = surfaceEffect;
+
+    // Reset albedo on all cached materials back to their respective presets
+    const cache = realisticMaterialCache[canvasId];
+    if (cache) {
+        Object.entries(cache).forEach(([key, mat]) => {
+            const preset = CONFIG.MATERIAL_REALISTIC[key];
+            if (preset) {
+                syncRealisticMaterialProperties(
+                    mat,
+                    preset,
+                    null,
+                    perCanvasFinishModifiers[canvasId],
+                    resolveRealisticNodeMaterialProfile(canvasId, key));
+            }
+        });
+    }
+
+    // Re-apply custom colour if present (overrides the preset albedo)
+    const custom = customAlbedoColors[canvasId];
+    if (custom && cache) {
+        Object.entries(cache).forEach(([key, mat]) => {
+            const preset = CONFIG.MATERIAL_REALISTIC[key];
+            if (!preset) return;
+            syncRealisticMaterialProperties(
+                mat,
+                preset,
+                custom,
+                perCanvasFinishModifiers[canvasId],
+                resolveRealisticNodeMaterialProfile(canvasId, key));
+        });
+    }
 
     // Invalidate the cached material so getRealisticMaterial creates a fresh
     // instance with the new colour/finish — regardless of current render mode.
@@ -4210,13 +4619,13 @@ export function setRenderMode(canvasId, mode) {
             // All bodies (single or multi) share the same configurator-colour realistic material.
             // Original per-body materials are never mutated — solid mode restores them intact.
             mesh.material = getRealisticMaterial(scene, canvasId, matType);
-            if (mesh.material instanceof BABYLON.PBRMaterial) {
-                const preset = CONFIG.MATERIAL_REALISTIC[matType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
-                mesh.material.metallic  = clamp(preset.metallic + finishMod.metallicOffset, 0, 1);
-                mesh.material.roughness = finishMod.absoluteRoughness != null
-                    ? finishMod.absoluteRoughness
-                    : clamp(preset.roughness + finishMod.roughnessOffset, 0, 1);
-            }
+            const preset = CONFIG.MATERIAL_REALISTIC[matType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
+            syncRealisticMaterialProperties(
+                mesh.material,
+                preset,
+                customAlbedoColors[canvasId],
+                finishMod,
+                resolveRealisticNodeMaterialProfile(canvasId, matType));
             safeDisableEdges(mesh);
 
         } else {
@@ -6523,6 +6932,8 @@ export function dispose(canvasId) {
     delete currentRenderModes[canvasId];
     delete customAlbedoColors[canvasId];
     delete perCanvasFinishModifiers[canvasId];
+    delete perCanvasSurfaceEffects[canvasId];
+    delete perCanvasProcessCodes[canvasId];
 
     scenes[canvasId]?.dispose();
     engine?.dispose();
