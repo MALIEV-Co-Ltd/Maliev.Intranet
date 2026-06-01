@@ -54,6 +54,13 @@ function loadViewerContext() {
                 Identity: () => ({}),
                 RotationX: () => ({}),
             },
+            Mesh: class Mesh {
+                constructor(name, scene) {
+                    this.name = name;
+                    this.metadata = {};
+                    scene?.meshes?.push(this);
+                }
+            },
             PBRMaterial: class PBRMaterial {
                 constructor(name, scene) {
                     this.name = name;
@@ -88,6 +95,20 @@ function loadViewerContext() {
                 TEXTURE_TRILINEAR_SAMPLINGMODE: 3,
             },
             Vector3,
+            VertexData: class VertexData {
+                applyToMesh(mesh) {
+                    mesh.vertexData = {
+                        positions: this.positions,
+                        indices: this.indices,
+                        normals: this.normals,
+                        uvs: this.uvs,
+                    };
+                }
+
+                static ComputeNormals(_positions, _indices, normals) {
+                    normals.length = 0;
+                }
+            },
             VertexBuffer: {
                 NormalKind: 'normal',
                 PositionKind: 'position',
@@ -238,6 +259,32 @@ test('realistic render mode preserves stable cutting mat texture materials witho
     assert.equal(result.actualTexturePreserved, true);
     assert.equal(result.topReceivesShadows, false);
     assert.equal(result.slabReceivesShadows, false);
+});
+
+test('cutting mat slab meets textured top surface without perspective edge cracks', () => {
+    const context = loadViewerContext();
+    const scene = makeScene({
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+    });
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        const outline = _roundedRectPoints(300, 220, 8, 4);
+        const top = _createRoundedMatTopMesh(scene, outline, 300, 220);
+        const slab = _createRoundedMatSlabMesh(scene, outline, 3);
+        const topRingZ = top.vertexData.positions.slice(5).filter((_, index) => index % 3 === 0);
+        const slabTopRingZ = slab.vertexData.positions.slice(2, outline.length * 3).filter((_, index) => index % 3 === 0);
+        ({
+            topUniqueZ: [...new Set(topRingZ)].join(','),
+            slabTopUniqueZ: [...new Set(slabTopRingZ)].join(',')
+        });
+    `, context);
+
+    assert.equal(result.topUniqueZ, '0');
+    assert.equal(result.slabTopUniqueZ, '0');
 });
 
 test('realistic render mode smooths near-coincident CAD vertices across conversion tolerance', () => {

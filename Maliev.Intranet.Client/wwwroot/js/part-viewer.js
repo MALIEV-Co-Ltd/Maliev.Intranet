@@ -5296,7 +5296,7 @@ function _createRoundedMatSlabMesh(scene, outline, thickness) {
     const mesh = new BABYLON.Mesh('__cutting_mat_slab__', scene);
     const positions = [];
     const indices = [];
-    const topZ = -0.08;
+    const topZ = 0;
     const bottomZ = -thickness;
 
     outline.forEach(p => positions.push(p.x, p.y, topZ));
