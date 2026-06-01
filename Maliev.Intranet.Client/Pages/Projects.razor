@@ -50,7 +50,7 @@
         <PanelCard Class="mlv-data-results-panel">
             @if (_projects.Count > 0)
             {
-                <table class="mlv-table">
+                <table class="mlv-table project-list-table">
                     <thead>
                         <tr>
                             <th>Project</th>
@@ -67,12 +67,16 @@
                             <tr @onclick="@(() => Navigation.NavigateTo($"/sales/projects/{project.Id}"))">
                                 <td>
                                     <div class="project-row-identity">
+                                        <div class="project-row-copy">
+                                            <div class="mlv-row-main mlv-mono">@project.ProjectNumber</div>
+                                            <div class="mlv-row-sub">@Display(project.Title)</div>
+                                        </div>
                                         <div class="project-part-preview-strip" aria-label="@ProjectPartPreviewLabel(project)">
                                             @if (project.PartPreviews.Count > 0)
                                             {
                                                 @foreach (var part in project.PartPreviews.Take(MaxPartPreviewThumbnails))
                                                 {
-                                                    <span class="project-part-thumb" title="@PartPreviewTitle(part)">
+                                                    <span class="project-part-thumb" tabindex="0" title="@PartPreviewTitle(part)">
                                                         @if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
                                                         {
                                                             <img src="@part.ThumbnailUrl"
@@ -80,6 +84,11 @@
                                                                  class="project-part-thumb-img"
                                                                  loading="lazy"
                                                                  onerror="this.closest('.project-part-thumb')?.classList.add('image-failed')" />
+                                                            <span class="project-part-thumb-preview" role="tooltip">
+                                                                <img src="@part.ThumbnailUrl"
+                                                                     alt="@($"{Display(part.FileName)} larger preview")"
+                                                                     loading="lazy" />
+                                                            </span>
                                                         }
                                                         else
                                                         {
@@ -90,7 +99,42 @@
 
                                                 @if (HiddenPartCount(project) > 0)
                                                 {
-                                                    <span class="project-part-thumb-count" title="@($"{HiddenPartCount(project):N0} more part previews")">+@HiddenPartCount(project).ToString("N0")</span>
+                                                    <span class="project-part-thumb-count" tabindex="0" title="@($"{HiddenPartCount(project):N0} more part previews")">
+                                                        +@HiddenPartCount(project).ToString("N0")
+                                                        <span class="project-part-overflow-popout" role="tooltip" aria-label="All part previews">
+                                                            <span class="project-part-overflow-panel">
+                                                                <span class="project-part-overflow-title">All part previews</span>
+                                                                <span class="project-part-overflow-grid">
+                                                                    @foreach (var part in project.PartPreviews)
+                                                                    {
+                                                                        <span class="project-part-overflow-item" tabindex="0" title="@PartPreviewTitle(part)">
+                                                                            <span class="project-part-overflow-frame">
+                                                                                @if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
+                                                                                {
+                                                                                    <img src="@part.ThumbnailUrl"
+                                                                                         alt="@PartPreviewAlt(part)"
+                                                                                         loading="lazy" />
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                                                                                }
+                                                                            </span>
+                                                                            <span class="project-part-overflow-name">@Display(part.FileName)</span>
+                                                                            @if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
+                                                                            {
+                                                                                <span class="project-part-thumb-preview project-part-overflow-preview" role="tooltip">
+                                                                                    <img src="@part.ThumbnailUrl"
+                                                                                         alt="@($"{Display(part.FileName)} larger preview")"
+                                                                                         loading="lazy" />
+                                                                                </span>
+                                                                            }
+                                                                        </span>
+                                                                    }
+                                                                </span>
+                                                            </span>
+                                                        </span>
+                                                    </span>
                                                 }
                                             }
                                             else if (project.PartsCount > 0)
@@ -103,10 +147,6 @@
                                             {
                                                 <span class="project-part-preview-empty">-</span>
                                             }
-                                        </div>
-                                        <div class="project-row-copy">
-                                            <div class="mlv-row-main mlv-mono">@project.ProjectNumber</div>
-                                            <div class="mlv-row-sub">@Display(project.Title)</div>
                                         </div>
                                     </div>
                                 </td>

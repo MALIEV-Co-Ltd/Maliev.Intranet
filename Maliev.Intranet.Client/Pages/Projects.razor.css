@@ -9,12 +9,14 @@
 
 .project-row-identity {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
     min-width: 280px;
 }
 
 .project-row-copy {
+    width: 100%;
     min-width: 0;
 }
 
@@ -31,10 +33,18 @@
     gap: 6px;
     min-width: 0;
     flex: 0 0 auto;
+    position: relative;
+    z-index: 2;
+}
+
+.project-list-table,
+.project-list-table td {
+    overflow: visible;
 }
 
 .project-part-thumb,
 .project-part-thumb-count {
+    position: relative;
     width: 34px;
     height: 34px;
     border: 1px solid var(--maliev-border);
@@ -45,7 +55,7 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 34px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .project-part-thumb.empty {
@@ -56,6 +66,7 @@
     display: block;
     width: 100%;
     height: 100%;
+    border-radius: calc(var(--maliev-radius-sm) - 1px);
     object-fit: cover;
 }
 
@@ -68,6 +79,149 @@
     font-weight: 700;
     background: var(--maliev-accent-soft);
     color: var(--maliev-accent);
+}
+
+.project-part-thumb:focus,
+.project-part-thumb-count:focus,
+.project-part-overflow-item:focus {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.project-part-thumb-preview,
+.project-part-overflow-popout {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+    visibility: hidden;
+    z-index: 30;
+}
+
+.project-part-thumb-preview {
+    top: calc(100% + 8px);
+    left: 0;
+    width: 184px;
+    min-height: 132px;
+    padding: 6px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-md);
+}
+
+.project-part-thumb-preview img {
+    display: block;
+    width: 100%;
+    max-height: 180px;
+    border-radius: calc(var(--maliev-radius-sm) - 2px);
+    object-fit: contain;
+}
+
+.project-part-thumb:hover .project-part-thumb-preview,
+.project-part-thumb:focus-within .project-part-thumb-preview {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.project-part-overflow-popout {
+    top: 100%;
+    right: 0;
+    width: min(336px, calc(100vw - 48px));
+    padding-top: 8px;
+    text-align: left;
+}
+
+.project-part-thumb-count:hover .project-part-overflow-popout,
+.project-part-thumb-count:focus-within .project-part-overflow-popout {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+.project-part-overflow-panel {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-md);
+}
+
+.project-part-overflow-title {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.project-part-overflow-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.project-part-overflow-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px;
+    border-radius: var(--maliev-radius-sm);
+    color: var(--maliev-text);
+    font-size: var(--maliev-font-small);
+    font-weight: 700;
+}
+
+.project-part-overflow-item:hover,
+.project-part-overflow-item:focus-within {
+    background: var(--maliev-panel-2);
+}
+
+.project-part-overflow-frame {
+    display: inline-grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+    color: var(--maliev-muted);
+}
+
+.project-part-overflow-frame img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.project-part-overflow-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-part-overflow-preview {
+    top: 50%;
+    left: calc(100% + 10px);
+    transform: translate(6px, -50%);
+}
+
+.project-part-overflow-item:hover .project-part-overflow-preview,
+.project-part-overflow-item:focus-within .project-part-overflow-preview {
+    opacity: 1;
+    transform: translate(0, -50%);
+    visibility: visible;
 }
 
 .project-part-preview-empty {
