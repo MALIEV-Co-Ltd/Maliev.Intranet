@@ -465,7 +465,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void ConfiguratorOptionImages_RaiseHoveredCardAboveSiblingCards()
+    public void ConfiguratorOptionImages_RaiseOnlyImageHoveredCardAboveSiblingCards()
     {
         var source = ReadRepoFile(
                 "Maliev.Intranet.Client",
@@ -474,10 +474,14 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
                 "PartConfigSidebar.razor")
             .ReplaceLineEndings("\n");
 
-        Assert.Contains(".pcs-mat-card:hover,\n            .pcs-mat-card:focus-within,", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-fin-card:hover,\n            .pcs-fin-card:focus-within,", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-choice-card:hover,\n            .pcs-choice-card:focus-within,", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-color-choice:hover,\n            .pcs-color-choice:focus-within", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-mat-card:hover,\n            .pcs-mat-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-fin-card:hover,\n            .pcs-fin-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-choice-card:hover,\n            .pcs-choice-card:focus-within,", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-color-choice:hover,\n            .pcs-color-choice:focus-within,", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-mat-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-fin-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-choice-card:has(.pcs-option-image-frame:hover),", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-color-choice:has(.pcs-option-image-frame:hover)", source, StringComparison.Ordinal);
         Assert.Contains("z-index: 320;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-option-image-frame:hover,\n            .pcs-option-image-frame:focus-within {\n                z-index: 330;", source, StringComparison.Ordinal);
         Assert.Contains("z-index: 340;", source, StringComparison.Ordinal);
