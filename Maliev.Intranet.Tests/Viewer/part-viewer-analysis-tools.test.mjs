@@ -780,6 +780,40 @@ test('cutting mat expands the active camera fit to include the full mat footprin
     assert.ok(result.targetZ < 18);
 });
 
+test('cutting mat keeps perspective camera near plane high enough to avoid depth tearing', () => {
+    const context = loadViewerContext();
+    const camera = { minZ: 0.1 };
+    context.scene = {
+        meshes: [],
+        activeCamera: camera,
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        cameraProjection.viewer = 'perspective';
+        sceneBoundingBoxes.viewer = {
+            min: { x: -30, y: -12, z: 0 },
+            max: { x: 30, y: 12, z: 36 }
+        };
+
+        showCuttingMat('viewer');
+        const activeMinZ = scene.activeCamera.minZ;
+        hideCuttingMat('viewer');
+
+        ({
+            activeMinZ,
+            restoredMinZ: scene.activeCamera.minZ
+        });
+    `, context);
+
+    assert.equal(result.activeMinZ, 0.01);
+    assert.equal(result.restoredMinZ, 0.1);
+});
+
 test('cutting mat fades in from below and fades out before disposal', () => {
     const context = loadViewerContext();
     let now = 1000;
@@ -810,6 +844,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     const start = vm.runInContext(`
         (() => {
             scenes.viewer = scene;
+            cameraProjection.viewer = 'orthographic';
             sceneBoundingBoxes.viewer = {
                 min: { x: -30, y: -12, z: 0 },
                 max: { x: 30, y: 12, z: 36 }

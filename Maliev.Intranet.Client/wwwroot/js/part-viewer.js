@@ -4752,7 +4752,8 @@ export function hideGrid(canvasId) {
 // ── showCuttingMat / hideCuttingMat ───────────────────────────────────────────
 
 const CUTTING_MAT_ANIMATION_MS = 240;
-const CUTTING_MAT_CAMERA_MIN_Z = 0.001;
+const CUTTING_MAT_ORTHOGRAPHIC_CAMERA_MIN_Z = 0.001;
+const CUTTING_MAT_PERSPECTIVE_CAMERA_MIN_Z = 0.01;
 const CUTTING_MAT_MINOR_GRID_MM = 10;
 const CUTTING_MAT_MAJOR_GRID_MM = 100;
 const CUTTING_MAT_NUMBER_FONT_MM = 4.5;
@@ -5079,11 +5080,19 @@ function _cuttingMatCamera(canvasId, scene) {
     return mainCameras[canvasId] ?? scene?.activeCamera ?? null;
 }
 
+function _cuttingMatCameraMinZ(canvasId) {
+    return cameraProjection[canvasId] === 'orthographic'
+        ? CUTTING_MAT_ORTHOGRAPHIC_CAMERA_MIN_Z
+        : CUTTING_MAT_PERSPECTIVE_CAMERA_MIN_Z;
+}
+
 function _enforceCuttingMatCameraClipping(canvasId, scene) {
     const state = cuttingMatCameraClipStates[canvasId];
     const camera = _cuttingMatCamera(canvasId, scene);
     if (!state || !camera || typeof camera.minZ !== 'number') return;
-    camera.minZ = CUTTING_MAT_CAMERA_MIN_Z;
+    const minZ = _cuttingMatCameraMinZ(canvasId);
+    state.targetMinZ = minZ;
+    camera.minZ = minZ;
 }
 
 function _hasCuttingMatMesh(scene) {
@@ -5101,7 +5110,13 @@ function _relaxCuttingMatCameraClipping(canvasId, scene, force = false) {
     }
 
     if (!cuttingMatCameraClipStates[canvasId]) {
-        cuttingMatCameraClipStates[canvasId] = { camera, minZ: camera.minZ, scene, observer: null };
+        cuttingMatCameraClipStates[canvasId] = {
+            camera,
+            minZ: camera.minZ,
+            targetMinZ: _cuttingMatCameraMinZ(canvasId),
+            scene,
+            observer: null,
+        };
     }
 
     const activeState = cuttingMatCameraClipStates[canvasId];
@@ -5122,8 +5137,9 @@ function _restoreCuttingMatCameraClipping(canvasId) {
         state.scene.onBeforeRenderObservable.remove(state.observer);
     }
 
+    const targetMinZ = state.targetMinZ ?? _cuttingMatCameraMinZ(canvasId);
     if (state.camera && typeof state.camera.minZ === 'number'
-        && state.camera.minZ <= CUTTING_MAT_CAMERA_MIN_Z + 0.000001) {
+        && state.camera.minZ <= targetMinZ + 0.000001) {
         state.camera.minZ = state.minZ;
     }
 
