@@ -716,7 +716,10 @@ function toWorldPoint(point) {
 
 function normalizeViewerSettings(viewerSettings) {
     const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
-    const renderMode = settings.renderMode === 'wireframe' || settings.renderMode === 'transparent' || settings.renderMode === 'realistic'
+    const renderMode = settings.renderMode === 'solid'
+        || settings.renderMode === 'wireframe'
+        || settings.renderMode === 'transparent'
+        || settings.renderMode === 'realistic'
         ? settings.renderMode
         : 'realistic';
     const cameraMode = settings.cameraProjection === 'perspective'
@@ -1973,6 +1976,8 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             disableUniformBuffers: true,
         });
         const scene  = new BABYLON.Scene(engine);
+        engines[canvasId] = engine;
+        scenes[canvasId]  = scene;
         engine.resize();
 
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
@@ -2018,6 +2023,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 console.warn('[BabylonViewer] GLB pre-fetch failed, falling back to direct URL:', _fetchErr.message);
                 _resolvedUrl = fileUrl;
             }
+        }
+        if (loadGenerations[canvasId] !== currentGen || engines[canvasId] !== engine || scenes[canvasId] !== scene) {
+            try { engine.stopRenderLoop(); } catch { }
+            try { scene.dispose(); } catch { }
+            try { engine.dispose(); } catch { }
+            return;
         }
         const _effectiveFileUrl = _resolvedUrl;
 
@@ -2343,10 +2354,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     cam.upVector = new BABYLON.Vector3(0, 0, 1);
                     fitCameraToMesh(cam, finalBb, meshCenters[canvasId], canvasId);
                     applyPreset(cam, 'iso');
-                    // Apply projection after fit: engines[canvasId] is now set (assigned after
-                    // _loadAttempt is started, before the async callback fires), so
-                    // setCameraProjection will no longer return early. This also recalculates
-                    // ortho bounds using the correct model-scale radius.
+                    // Apply projection after fit: engines[canvasId] is registered before async
+                    // model loading starts, so setCameraProjection can recalculate ortho bounds
+                    // using the correct model-scale radius.
                     setCameraProjection(canvasId, viewerSettings.cameraProjection);
                 }
 
@@ -2470,9 +2480,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         };
         window.addEventListener('resize', resizeHandler);
         engine._resizeHandler = resizeHandler;
-
-        engines[canvasId] = engine;
-        scenes[canvasId]  = scene;
 
     } catch (err) {
         modelLoadState[canvasId] = 'error';

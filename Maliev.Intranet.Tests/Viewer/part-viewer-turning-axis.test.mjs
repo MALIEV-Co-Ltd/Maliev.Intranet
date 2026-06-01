@@ -304,6 +304,23 @@ test('render loop ignores stale engines from previous part loads', () => {
     assert.match(source, /engine\.runRenderLoop\(\(\) => \{\s+if \(loadGenerations\[canvasId\] !== currentGen \|\| engines\[canvasId\] !== engine \|\| scenes\[canvasId\] !== scene\)/);
 });
 
+test('viewer registers engines before asynchronous model loading can be superseded', () => {
+    const source = viewerSource();
+    const sceneCreation = source.indexOf('const scene  = new BABYLON.Scene(engine);');
+    const engineRegistration = source.indexOf('engines[canvasId] = engine;');
+    const sceneRegistration = source.indexOf('scenes[canvasId]  = scene;');
+    const modelPrefetch = source.indexOf('let _resolvedUrl = fileUrl;');
+
+    assert.notEqual(sceneCreation, -1, 'Scene creation was not found.');
+    assert.notEqual(engineRegistration, -1, 'Engine registration was not found.');
+    assert.notEqual(sceneRegistration, -1, 'Scene registration was not found.');
+    assert.notEqual(modelPrefetch, -1, 'GLB prefetch boundary was not found.');
+    assert.ok(engineRegistration > sceneCreation, 'Engine must be registered after it is created.');
+    assert.ok(sceneRegistration > sceneCreation, 'Scene must be registered after it is created.');
+    assert.ok(engineRegistration < modelPrefetch, 'Engine must be registered before awaited GLB prefetch/load work.');
+    assert.ok(sceneRegistration < modelPrefetch, 'Scene must be registered before awaited GLB prefetch/load work.');
+});
+
 test('viewer avoids WebGL uniform-buffer reuse across Babylon engine swaps', () => {
     const source = viewerSource();
 

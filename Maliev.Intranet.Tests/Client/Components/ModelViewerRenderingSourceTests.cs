@@ -52,6 +52,17 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void SolidMode_RoundTripsThroughViewerSettingsNormalizer()
+    {
+        var csharpNormalizer = ExtractRenderModeNormalizer(ModelViewer.ReplaceLineEndings("\n"));
+        var javascriptNormalizer = ExtractJavascriptRenderModeNormalizer(ViewerScript.ReplaceLineEndings("\n"));
+
+        Assert.Contains("string.Equals(mode, \"solid\", StringComparison.OrdinalIgnoreCase)", csharpNormalizer, StringComparison.Ordinal);
+        Assert.Contains("? \"solid\"", csharpNormalizer, StringComparison.Ordinal);
+        Assert.Contains("settings.renderMode === 'solid'", javascriptNormalizer, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RealisticMode_IsTheJavascriptFallbackRenderMode()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
@@ -156,7 +167,7 @@ public sealed class ModelViewerRenderingSourceTests
         => ExtractExpression(source, "private static string NormalizeRenderMode(string? mode) =>", "private static string NormalizeProjection");
 
     private static string ExtractJavascriptRenderModeNormalizer(string source)
-        => ExtractExpression(source, "const renderMode = settings.renderMode === 'wireframe'", "const cameraMode = settings.cameraProjection");
+        => ExtractExpression(source, "const renderMode =", "const cameraMode = settings.cameraProjection");
 
     private static string ExtractExpression(string source, string start, string end)
     {

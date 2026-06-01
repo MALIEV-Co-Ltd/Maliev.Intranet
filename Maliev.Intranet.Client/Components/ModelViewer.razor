@@ -418,13 +418,15 @@
             settings.SectionInverted);
 
     private static string NormalizeRenderMode(string? mode) =>
-        string.Equals(mode, "wireframe", StringComparison.OrdinalIgnoreCase)
-            ? "wireframe"
-            : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
-                ? "transparent"
-                : string.Equals(mode, "realistic", StringComparison.OrdinalIgnoreCase)
-                    ? "realistic"
-                    : "realistic";
+        string.Equals(mode, "solid", StringComparison.OrdinalIgnoreCase)
+            ? "solid"
+            : string.Equals(mode, "wireframe", StringComparison.OrdinalIgnoreCase)
+                ? "wireframe"
+                : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
+                    ? "transparent"
+                    : string.Equals(mode, "realistic", StringComparison.OrdinalIgnoreCase)
+                        ? "realistic"
+                        : "realistic";
 
     private static string NormalizeProjection(string? mode) =>
         string.Equals(mode, "perspective", StringComparison.OrdinalIgnoreCase)
