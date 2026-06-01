@@ -202,6 +202,29 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void PowderFusionMaterial_WhenPa12IsSelected_UsesNaturalGreyPowderThumbnail()
+    {
+        var materialId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "SLS",
+            MaterialId = materialId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "PA12 Nylon", "PA12", "Plastic", null, "SLS nylon powder", 10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+    }
+
+    [Fact]
     public void PowderFusionColorOption_WhenFinishIsRaw_IsLimitedToNaturalGrey()
     {
         var materialId = Guid.NewGuid();
@@ -298,7 +321,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains("Black", colorChoices.First().TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("White", StringComparison.Ordinal));
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Natural Grey", StringComparison.Ordinal));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-black-powder-fusion-part-material.png']"));
     }
 
     [Fact]
@@ -323,6 +346,30 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Processes, []));
 
         Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+    }
+
+    [Fact]
+    public void PowderFusionSurfaceFinish_WhenDyed_UsesDyedBlackPowderThumbnail()
+    {
+        var finishId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "MJF",
+            FinishId = finishId,
+            FinishCode = "DYED_BLACK",
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Dyed black", "DYED_BLACK", 0m, 0m, "Black dye post processing", 10),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/dyed-black-powder-fusion-part-material.png']"));
     }
 
     [Fact]

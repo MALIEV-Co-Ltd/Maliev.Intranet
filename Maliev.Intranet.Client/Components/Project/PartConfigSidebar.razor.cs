@@ -84,6 +84,8 @@ public partial class PartConfigSidebar : ComponentBase
     private const string MaterialColorKey = "material_color";
     private const string PowderFusionNaturalGreyColor = "Natural Grey";
     private const string MaterialImageBasePath = "/images/materials/";
+    private const string PowderFusionRawImage = "natural-grey-plastic-part-material.png";
+    private const string PowderFusionDyedBlackImage = "dyed-black-powder-fusion-part-material.png";
 
     private static readonly Dictionary<string, string> MaterialImages = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -1131,10 +1133,22 @@ public partial class PartConfigSidebar : ComponentBase
         && !ContainsFinishText(finish, "dyed")
         && (!ContainsFinishText(finish, "paint") || ContainsFinishText(finish, "unpaint"));
 
+    private static bool IsPowderFusionDyedSurfaceFinish(CatalogSurfaceFinishDto finish) =>
+        ContainsFinishText(finish, "dye")
+        || ContainsFinishText(finish, "dyed");
+
     private static bool ContainsFinishText(CatalogSurfaceFinishDto finish, string value) =>
         finish.Code.Contains(value, StringComparison.OrdinalIgnoreCase)
         || finish.Name.Contains(value, StringComparison.OrdinalIgnoreCase)
         || finish.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsPowderFusionMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description} {material.Category}");
+        return normalized.Contains("pa12", StringComparison.Ordinal)
+            || normalized.Contains("nylon", StringComparison.Ordinal)
+            || normalized.Contains("polyamide", StringComparison.Ordinal);
+    }
 
     private string GetToleranceRange(CatalogToleranceDto tolerance)
     {
@@ -1292,8 +1306,11 @@ public partial class PartConfigSidebar : ComponentBase
             .Replace("-", " ", StringComparison.Ordinal)
             .Trim();
 
-    private static string GetMaterialImageUrl(CatalogMaterialDto material)
+    private string GetMaterialImageUrl(CatalogMaterialDto material)
     {
+        if (IsPowderFusionProcess && IsPowderFusionMaterial(material))
+            return MaterialImageBasePath + PowderFusionRawImage;
+
         foreach (var token in GetImageLookupTokens(material.Code, material.Name, material.Category, material.Description))
         {
             if (MaterialImages.TryGetValue(token, out var image))
@@ -1306,10 +1323,26 @@ public partial class PartConfigSidebar : ComponentBase
     private static string GetMaterialColorImageUrl(string color) =>
         MaterialImageBasePath + GetMappedImage(ColorImages, color, "natural-plastic-part-material.png");
 
+    private static string GetPowderFusionColorImageUrl(string color)
+    {
+        var normalized = NormalizeOptionText(color);
+        if (normalized.Contains("black", StringComparison.Ordinal)
+            || normalized.Contains("dyed", StringComparison.Ordinal)
+            || normalized.Contains("dye", StringComparison.Ordinal))
+        {
+            return MaterialImageBasePath + PowderFusionDyedBlackImage;
+        }
+
+        return MaterialImageBasePath + PowderFusionRawImage;
+    }
+
     private string GetSurfaceFinishImageUrl(CatalogSurfaceFinishDto finish)
     {
+        if (IsPowderFusionProcess && IsPowderFusionDyedSurfaceFinish(finish))
+            return MaterialImageBasePath + PowderFusionDyedBlackImage;
+
         if (IsPowderFusionProcess && IsPowderFusionRawSurfaceFinish(finish))
-            return MaterialImageBasePath + "natural-grey-plastic-part-material.png";
+            return MaterialImageBasePath + PowderFusionRawImage;
 
         var displayKey = GetSurfaceFinishDisplayKey(finish);
         foreach (var token in GetImageLookupTokens(displayKey, finish.Code, finish.Name, finish.Description))
@@ -1354,7 +1387,7 @@ public partial class PartConfigSidebar : ComponentBase
     private string GetColorChoiceImageUrl(ProcessConfigOptionDto option, string value)
     {
         if (IsPowderFusionColorOption(option))
-            return GetMaterialColorImageUrl(value);
+            return GetPowderFusionColorImageUrl(value);
 
         if (IsAnodizeColorOption(option))
             return MaterialImageBasePath + GetMappedImage(AnodizeColorImages, value, "finish-anodized-clear-part-surface.png");
