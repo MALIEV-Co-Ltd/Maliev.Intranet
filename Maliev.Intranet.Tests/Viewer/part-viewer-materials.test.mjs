@@ -239,3 +239,58 @@ test('realistic render mode preserves stable cutting mat texture materials witho
     assert.equal(result.topReceivesShadows, false);
     assert.equal(result.slabReceivesShadows, false);
 });
+
+test('realistic render mode smooths near-coincident CAD vertices across conversion tolerance', () => {
+    const context = loadViewerContext();
+    const positions = new Float32Array([
+        0, 0, 0,
+        -1, 0, 0,
+        0, 0, 1,
+        0.024, 0, 0,
+        0.024, 0, 1,
+        1, 0.2, 0,
+    ]);
+    const indices = [0, 1, 2, 3, 4, 5];
+    const normals = new Float32Array([
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        -0.2009, 0.9796, 0,
+        -0.2009, 0.9796, 0,
+        -0.2009, 0.9796, 0,
+    ]);
+    let smoothedNormals = null;
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: kind => kind === 'position' ? positions : normals,
+        getIndices: () => indices,
+        setVerticesData: (kind, data) => {
+            if (kind === 'normal') {
+                smoothedNormals = data;
+            }
+        },
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    vm.runInContext(`
+        scenes.viewer = scene;
+        setRenderMode('viewer', 'realistic');
+    `, context);
+
+    const result = {
+        firstNormalX: smoothedNormals?.[0] ?? null,
+        firstNormalY: smoothedNormals?.[1] ?? null,
+        fourthNormalX: smoothedNormals?.[9] ?? null,
+        fourthNormalY: smoothedNormals?.[10] ?? null,
+    };
+
+    assert.ok(result.firstNormalX < -0.05, `expected seam normal to blend with adjacent face, got ${result.firstNormalX}`);
+    assert.ok(result.firstNormalY < 1, `expected seam normal Y to change from hard face normal, got ${result.firstNormalY}`);
+    assert.ok(Math.abs(result.firstNormalX - result.fourthNormalX) < 0.001);
+    assert.ok(Math.abs(result.firstNormalY - result.fourthNormalY) < 0.001);
+});

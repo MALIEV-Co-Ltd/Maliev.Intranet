@@ -245,8 +245,10 @@ const CONFIG = {
          *  STL/CAD tesselation while preserving true 90-degree edges. */
         smoothAngleDeg: 75,
         normalPositionTolerance: 0.001,
-        normalPositionToleranceMin: 0.01,
-        normalPositionToleranceRatio: 0.00005,
+        // STEP-to-GLB tessellation can split visually shared curve vertices by
+        // a few hundredths of a millimeter, which leaves metallic reflections striped.
+        normalPositionToleranceMin: 0.05,
+        normalPositionToleranceRatio: 0.00012,
     },
 
     // =========================================================================
