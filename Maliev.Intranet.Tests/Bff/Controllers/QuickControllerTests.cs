@@ -61,6 +61,58 @@ public class QuickControllerTests
     }
 
     [Fact]
+    public async Task Quotations_GetById_RefreshesVersionPdfUrlFromStoragePath()
+    {
+        var quotationId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var quotation = new QuotationDetailDto
+        {
+            Id = quotationId,
+            QuotationNumber = "Q-100",
+            CustomerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            CustomerName = "Axion Robotics",
+            CurrentVersionNumber = 1,
+            Status = "Generated",
+            ValidityPeriodStart = DateTime.UtcNow,
+            ValidityPeriodEnd = DateTime.UtcNow.AddDays(30),
+            Versions =
+            [
+                new QuotationVersionDto
+                {
+                    VersionNumber = 1,
+                    PdfArtifactUrl = "https://storage.example/stale.pdf?X-Goog-Signature=expired",
+                    PdfArtifactStoragePath = "pdfs/quotation/Q-100/quote.pdf",
+                    PdfGeneratedAt = DateTime.UtcNow.AddHours(-2)
+                }
+            ]
+        };
+        JsonDocument? signedUrlRequest = null;
+        var uploadHandler = new MockHttpMessageHandler(async (req, ct) =>
+        {
+            Assert.Equal(HttpMethod.Post, req.Method);
+            Assert.EndsWith("/upload/v1/files/by-path/signed-url", req.RequestUri!.AbsolutePath);
+            signedUrlRequest = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(ct));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { signedUrl = "https://storage.example/fresh.pdf?X-Goog-Signature=fresh" })
+            };
+        });
+
+        var controller = new QuotationsController(
+            new QuotationServiceClient(CreateClient(quotation)),
+            CreatePdfClient(),
+            new UploadServiceClient(new HttpClient(uploadHandler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.GetById(quotationId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<QuotationDetailDto>(ok.Value);
+        Assert.Equal("https://storage.example/fresh.pdf?X-Goog-Signature=fresh", Assert.Single(body.Versions).PdfArtifactUrl);
+        Assert.NotNull(signedUrlRequest);
+        Assert.Equal("pdfs/quotation/Q-100/quote.pdf", signedUrlRequest.RootElement.GetProperty("storagePath").GetString());
+        Assert.Equal(10080, signedUrlRequest.RootElement.GetProperty("expirationMinutes").GetInt32());
+    }
+
+    [Fact]
     public async Task Quotations_GenerateDraftPdf_StampsQuotedByFromAuthenticatedEmployee()
     {
         JsonDocument? capturedRequest = null;

@@ -61,6 +61,32 @@ public class PdfServiceClient(HttpClient httpClient)
         string? templateCode = null,
         CancellationToken ct = default)
     {
+        var artifact = await GeneratePdfArtifactAsync(
+            documentType,
+            referenceId,
+            data,
+            templateCode,
+            ct);
+
+        return artifact?.StorageUrl;
+    }
+
+    /// <summary>
+    /// Generates a PDF document synchronously and returns URL plus durable storage-path metadata when provided.
+    /// </summary>
+    /// <param name="documentType">The type of document to generate.</param>
+    /// <param name="referenceId">The business reference ID.</param>
+    /// <param name="data">The data payload for the PDF template.</param>
+    /// <param name="templateCode">Optional template code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The generated PDF artifact metadata.</returns>
+    public async Task<PdfGenerationResult?> GeneratePdfArtifactAsync(
+        PdfDocumentType documentType,
+        string referenceId,
+        object data,
+        string? templateCode = null,
+        CancellationToken ct = default)
+    {
         var documentTypeEnum = documentType switch
         {
             PdfDocumentType.Quotation => "Quotation",
@@ -90,12 +116,58 @@ public class PdfServiceClient(HttpClient httpClient)
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-            if (result.TryGetProperty("storageUrl", out var url))
+            var storageUrl = ReadString(result, "storageUrl", "pdfUrl", "url");
+            if (string.IsNullOrWhiteSpace(storageUrl))
+                return null;
+
+            var storagePath = ReadString(result, "storagePath", "pdfArtifactStoragePath");
+            if (string.IsNullOrWhiteSpace(storagePath) && LooksLikeStoragePath(storageUrl))
+                storagePath = storageUrl;
+
+            return new PdfGenerationResult
             {
-                return url.GetString();
+                StorageUrl = storageUrl,
+                StoragePath = storagePath
+            };
+        }
+
+        return null;
+    }
+
+    private static string? ReadString(JsonElement element, params string[] propertyNames)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+            return element.GetString();
+
+        if (element.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var propertyName in propertyNames)
+        {
+            if (element.TryGetProperty(propertyName, out var property) &&
+                property.ValueKind == JsonValueKind.String)
+            {
+                return property.GetString();
             }
         }
 
         return null;
     }
+
+    private static bool LooksLikeStoragePath(string value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !Uri.TryCreate(value, UriKind.Absolute, out _) &&
+        value.Contains('/', StringComparison.Ordinal);
+}
+
+/// <summary>
+/// Metadata returned after PdfService generates a document.
+/// </summary>
+public sealed class PdfGenerationResult
+{
+    /// <summary>The browser-accessible URL returned by PdfService.</summary>
+    public string StorageUrl { get; set; } = string.Empty;
+
+    /// <summary>The durable UploadService storage path, when PdfService returns one.</summary>
+    public string? StoragePath { get; set; }
 }

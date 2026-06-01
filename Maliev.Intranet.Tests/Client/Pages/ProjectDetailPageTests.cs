@@ -199,6 +199,21 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectDetail_QuoteTab_RendersPdfObjectWithFallbackInsteadOfIframe()
+    {
+        var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
+
+        cut.WaitForAssertion(() => Assert.Contains("Quote", cut.Markup));
+        cut.Find("button[data-tab='quote']").Click();
+
+        Assert.Contains("<object", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("type=\"application/pdf\"", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("data=\"https://storage.example/quote-v2.pdf\"", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("PDF preview could not be loaded", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("<iframe", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectDetail_PlanningTab_RendersMultiMachineScheduleBoard()
     {
         var cut = Render<ProjectDetail>(parameters => parameters.Add(page => page.Id, _projectId));
@@ -509,6 +524,8 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.Contains("::deep .project-config-stack", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-part-thumb-button", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-part-attachments", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-document-preview-object", css, StringComparison.Ordinal);
+        Assert.Contains("::deep .project-document-preview-fallback", css, StringComparison.Ordinal);
         Assert.Contains("overflow-wrap: anywhere", css, StringComparison.Ordinal);
         Assert.Contains("word-break: break-word", css, StringComparison.Ordinal);
         Assert.Contains("::deep .project-planning-part > div", css, StringComparison.Ordinal);

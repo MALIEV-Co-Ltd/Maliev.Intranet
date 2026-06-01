@@ -450,18 +450,24 @@ public class ProjectsController(
             : ProjectQuotationPdfDataFactory.ApplyFormalQuotationMetadata(submittedPdfData, project, quotation, customerDetail);
         QuotationPdfMetadataApplicator.Apply(pdfData, HttpContext?.User);
 
-        var pdfUrl = await pdfClient.GeneratePdfAsync(
+        var pdfArtifact = await pdfClient.GeneratePdfArtifactAsync(
             PdfDocumentType.Quotation,
             quotation.QuotationNumber,
             pdfData,
             ct: ct);
+        var pdfUrl = pdfArtifact?.StorageUrl;
 
         if (!string.IsNullOrWhiteSpace(pdfUrl))
         {
             var versionNumber = project.CurrentQuotationVersionNumber ?? quotation.CurrentVersionNumber;
             if (versionNumber > 0)
             {
-                var attached = await quotationClient.AttachVersionPdfArtifactAsync(quotationId, versionNumber, pdfUrl, ct);
+                var attached = await quotationClient.AttachVersionPdfArtifactAsync(
+                    quotationId,
+                    versionNumber,
+                    pdfUrl,
+                    pdfArtifact?.StoragePath,
+                    ct);
                 if (!attached)
                 {
                     _logger.LogWarning(

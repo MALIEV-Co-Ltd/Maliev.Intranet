@@ -75,15 +75,22 @@ public class QuotationServiceClient(HttpClient httpClient)
     /// <param name="id">The quotation ID.</param>
     /// <param name="versionNumber">The quotation version number.</param>
     /// <param name="pdfUrl">The generated PDF URL.</param>
+    /// <param name="pdfStoragePath">The durable UploadService storage path, when available.</param>
     /// <param name="ct">The cancellation token.</param>
     /// <returns>True when the version artifact was updated.</returns>
-    public async Task<bool> AttachVersionPdfArtifactAsync(Guid id, int versionNumber, string pdfUrl, CancellationToken ct = default)
+    public async Task<bool> AttachVersionPdfArtifactAsync(
+        Guid id,
+        int versionNumber,
+        string pdfUrl,
+        string? pdfStoragePath = null,
+        CancellationToken ct = default)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/quotation/v1/quotations/{id}/versions/{versionNumber}/pdf-artifact",
             new
             {
                 pdfArtifactUrl = pdfUrl,
+                pdfArtifactStoragePath = pdfStoragePath,
                 pdfGeneratedAt = DateTime.UtcNow
             },
             ct);

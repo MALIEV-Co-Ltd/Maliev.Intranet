@@ -1048,12 +1048,23 @@
     overflow: hidden;
 }
 
-.project-record-shell ::deep .project-document-preview iframe {
+.project-record-shell ::deep .project-document-preview-object {
     display: block;
     width: 100%;
     height: 520px;
     border: 0;
     background: var(--maliev-panel);
+}
+
+.project-record-shell ::deep .project-document-preview-fallback {
+    display: grid;
+    min-height: 100%;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    padding: 28px;
+    color: var(--maliev-muted);
+    text-align: center;
 }
 
 .project-record-shell ::deep .project-document-preview.empty {
@@ -1072,7 +1083,19 @@
     font-size: var(--maliev-font-base);
 }
 
+.project-record-shell ::deep .project-document-preview-fallback strong {
+    color: var(--maliev-ink);
+    font-size: var(--maliev-font-base);
+}
+
 .project-record-shell ::deep .project-document-preview.empty span {
+    max-width: 360px;
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-small);
+    line-height: 1.45;
+}
+
+.project-record-shell ::deep .project-document-preview-fallback span {
     max-width: 360px;
     color: var(--maliev-muted);
     font-size: var(--maliev-font-small);

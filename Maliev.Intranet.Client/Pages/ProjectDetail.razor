@@ -614,9 +614,24 @@
             }
             else
             {
-                content.OpenElement(56, "iframe");
-                content.AddAttribute(57, "title", "Quote PDF preview");
-                content.AddAttribute(58, "src", _quotePdfUrl);
+                content.OpenElement(56, "object");
+                content.AddAttribute(57, "class", "project-document-preview-object");
+                content.AddAttribute(58, "data", _quotePdfUrl);
+                content.AddAttribute(59, "type", "application/pdf");
+                content.AddAttribute(60, "aria-label", "Quote PDF preview");
+                content.OpenElement(61, "div");
+                content.AddAttribute(62, "class", "project-document-preview-fallback");
+                content.OpenComponent<MudIcon>(63);
+                content.AddAttribute(64, "Icon", Icons.Material.Outlined.Description);
+                content.AddAttribute(65, "Size", Size.Large);
+                content.CloseComponent();
+                content.OpenElement(66, "strong");
+                content.AddContent(67, "PDF preview could not be loaded");
+                content.CloseElement();
+                content.OpenElement(68, "span");
+                content.AddContent(69, "Open the PDF in a new tab or regenerate it to refresh the document link.");
+                content.CloseElement();
+                content.CloseElement();
                 content.CloseElement();
             }
             content.CloseElement();

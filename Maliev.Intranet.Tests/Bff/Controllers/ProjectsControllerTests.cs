@@ -718,6 +718,7 @@ public class ProjectsControllerTests
         const string SubmittedPartName = "submitted-fixture.step";
         var projectReloadCount = 0;
         var attachedPdfArtifact = false;
+        JsonDocument? attachedArtifactRequest = null;
         JsonElement? pdfRequestPayload = null;
         var generatedProject = new ProjectDetailDto
         {
@@ -790,21 +791,22 @@ public class ProjectsControllerTests
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
-        var quotationHandler = new MockHttpMessageHandler((req, _) =>
+        var quotationHandler = new MockHttpMessageHandler(async (req, ct) =>
         {
             if (req.Method == HttpMethod.Post &&
                 req.RequestUri!.AbsolutePath.EndsWith($"/quotation/v1/quotations/{quotationId}/versions/1/pdf-artifact", StringComparison.Ordinal))
             {
                 attachedPdfArtifact = true;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                attachedArtifactRequest = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(ct));
+                return new HttpResponseMessage(HttpStatusCode.OK);
             }
 
             Assert.Equal(HttpMethod.Get, req.Method);
             Assert.EndsWith($"/quotation/v1/quotations/{quotationId}", req.RequestUri!.AbsolutePath);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = JsonContent.Create(quotation)
-            });
+            };
         });
         var pdfHandler = new MockHttpMessageHandler(async (req, ct) =>
         {
@@ -813,7 +815,11 @@ public class ProjectsControllerTests
             pdfRequestPayload = await req.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = JsonContent.Create(new { storageUrl = "https://storage.example/quote.pdf" })
+                Content = JsonContent.Create(new
+                {
+                    storageUrl = "https://storage.example/quote.pdf",
+                    storagePath = "pdfs/quotation/Q-3EF52DCB/quote.pdf"
+                })
             };
         });
         var controller = new ProjectsController(
@@ -868,6 +874,10 @@ public class ProjectsControllerTests
         Assert.Equal(SubmittedPartName, pdfData.GetProperty("Items")[0].GetProperty("PartName").GetString());
         Assert.Equal(321m, pdfData.GetProperty("Items")[0].GetProperty("UnitPrice").GetDecimal());
         Assert.True(attachedPdfArtifact);
+        Assert.NotNull(attachedArtifactRequest);
+        var attachedArtifact = attachedArtifactRequest.RootElement;
+        Assert.Equal("https://storage.example/quote.pdf", attachedArtifact.GetProperty("pdfArtifactUrl").GetString());
+        Assert.Equal("pdfs/quotation/Q-3EF52DCB/quote.pdf", attachedArtifact.GetProperty("pdfArtifactStoragePath").GetString());
     }
 
     [Fact]

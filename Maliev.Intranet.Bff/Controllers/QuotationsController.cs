@@ -14,10 +14,14 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// </summary>
 /// <param name="client">The quotation service client.</param>
 /// <param name="pdfClient">The PDF service client.</param>
+/// <param name="uploadClient">The upload service client used to refresh stored PDF artifact URLs.</param>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class QuotationsController(QuotationServiceClient client, PdfServiceClient pdfClient) : ControllerBase
+public class QuotationsController(
+    QuotationServiceClient client,
+    PdfServiceClient pdfClient,
+    UploadServiceClient? uploadClient = null) : ControllerBase
 {
     /// <summary>
     /// Retrieves a paged list of quotations.
@@ -38,13 +42,18 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
     /// Retrieves detailed information for a single quotation.
     /// </summary>
     /// <param name="id">The quotation ID.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>The quotation details.</returns>
     [RequirePermission(MalievPermissions.Quotation.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<QuotationDetailDto>> GetById(Guid id)
+    public async Task<ActionResult<QuotationDetailDto>> GetById(Guid id, CancellationToken ct = default)
     {
-        var result = await client.GetQuotationByIdAsync(id);
-        return result != null ? Ok(result) : NotFound();
+        var result = await client.GetQuotationByIdAsync(id, ct);
+        if (result is null)
+            return NotFound();
+
+        await RefreshQuotationPdfArtifactUrlsAsync(result, ct);
+        return Ok(result);
     }
 
     /// <summary>
@@ -200,11 +209,49 @@ public class QuotationsController(QuotationServiceClient client, PdfServiceClien
         if (quotation == null)
             return NotFound();
 
+        var currentVersion = ResolveCurrentVersion(quotation);
+        if (!string.IsNullOrWhiteSpace(currentVersion?.PdfArtifactStoragePath) && uploadClient is not null)
+        {
+            var freshUrl = await uploadClient.GetDownloadUrlByPathAsync(
+                currentVersion.PdfArtifactStoragePath,
+                ct,
+                expirationMinutes: 10080);
+
+            if (!string.IsNullOrWhiteSpace(freshUrl))
+                return Ok(new { storageUrl = freshUrl });
+        }
+
         var pdfUrl = await pdfClient.GetLatestPdfUrlAsync(PdfDocumentType.Quotation, quotation.QuotationNumber, ct);
         return string.IsNullOrWhiteSpace(pdfUrl)
             ? NotFound()
             : Ok(new { storageUrl = pdfUrl });
     }
+
+    private async Task RefreshQuotationPdfArtifactUrlsAsync(QuotationDetailDto quotation, CancellationToken ct)
+    {
+        if (uploadClient is null)
+            return;
+
+        foreach (var version in quotation.Versions)
+        {
+            if (string.IsNullOrWhiteSpace(version.PdfArtifactStoragePath))
+                continue;
+
+            var freshUrl = await uploadClient.GetDownloadUrlByPathAsync(
+                version.PdfArtifactStoragePath,
+                ct,
+                expirationMinutes: 10080);
+
+            if (!string.IsNullOrWhiteSpace(freshUrl))
+                version.PdfArtifactUrl = freshUrl;
+        }
+    }
+
+    private static QuotationVersionDto? ResolveCurrentVersion(QuotationDetailDto quotation) =>
+        quotation.Versions?
+            .OrderByDescending(version => version.VersionNumber == quotation.CurrentVersionNumber)
+            .ThenByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
 
     private static decimal ResolveDiscountAmount(SalesDiscountStructureDto? discount, decimal lineSubtotal)
     {
