@@ -66,8 +66,49 @@
                         {
                             <tr @onclick="@(() => Navigation.NavigateTo($"/sales/projects/{project.Id}"))">
                                 <td>
-                                    <div class="mlv-row-main mlv-mono">@project.ProjectNumber</div>
-                                    <div class="mlv-row-sub">@Display(project.Title)</div>
+                                    <div class="project-row-identity">
+                                        <div class="project-part-preview-strip" aria-label="@ProjectPartPreviewLabel(project)">
+                                            @if (project.PartPreviews.Count > 0)
+                                            {
+                                                @foreach (var part in project.PartPreviews.Take(MaxPartPreviewThumbnails))
+                                                {
+                                                    <span class="project-part-thumb" title="@PartPreviewTitle(part)">
+                                                        @if (!string.IsNullOrWhiteSpace(part.ThumbnailUrl))
+                                                        {
+                                                            <img src="@part.ThumbnailUrl"
+                                                                 alt="@PartPreviewAlt(part)"
+                                                                 class="project-part-thumb-img"
+                                                                 loading="lazy"
+                                                                 onerror="this.closest('.project-part-thumb')?.classList.add('image-failed')" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                                                        }
+                                                    </span>
+                                                }
+
+                                                @if (HiddenPartCount(project) > 0)
+                                                {
+                                                    <span class="project-part-thumb-count" title="@($"{HiddenPartCount(project):N0} more part previews")">+@HiddenPartCount(project).ToString("N0")</span>
+                                                }
+                                            }
+                                            else if (project.PartsCount > 0)
+                                            {
+                                                <span class="project-part-thumb empty" title="@($"{project.PartsCount:N0} part{(project.PartsCount == 1 ? "" : "s")} awaiting thumbnail")">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" />
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="project-part-preview-empty">-</span>
+                                            }
+                                        </div>
+                                        <div class="project-row-copy">
+                                            <div class="mlv-row-main mlv-mono">@project.ProjectNumber</div>
+                                            <div class="mlv-row-sub">@Display(project.Title)</div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>@Display(project.CustomerName)</td>
                                 <td><StatusBadge Status="@project.Status" /></td>
@@ -123,6 +164,8 @@
     private int _pageSize = 20;
     private List<ProjectSummaryDto> _projects = [];
     private PaginationMeta _meta = new();
+
+    private const int MaxPartPreviewThumbnails = 3;
 
     private string? ActiveStatus => string.IsNullOrWhiteSpace(_status) ? null : _status;
     private string ActiveStatusLabel => _statusTabs.FirstOrDefault(t => string.Equals(t.Value, ActiveStatus, StringComparison.OrdinalIgnoreCase)).Label ?? "All";
@@ -248,4 +291,28 @@
     };
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static int HiddenPartCount(ProjectSummaryDto project) =>
+        Math.Max(0, project.PartsCount - Math.Min(project.PartPreviews.Count, MaxPartPreviewThumbnails));
+
+    private static string ProjectPartPreviewLabel(ProjectSummaryDto project)
+    {
+        if (project.PartPreviews.Count > 0)
+            return $"Part previews for {project.ProjectNumber}";
+
+        return project.PartsCount > 0
+            ? $"{project.PartsCount:N0} part{(project.PartsCount == 1 ? "" : "s")} awaiting thumbnail"
+            : "No parts";
+    }
+
+    private static string PartPreviewAlt(ProjectPartPreviewDto part) => $"{Display(part.FileName)} thumbnail";
+
+    private static string PartPreviewTitle(ProjectPartPreviewDto part)
+    {
+        var details = new List<string> { Display(part.FileName) };
+        if (!string.IsNullOrWhiteSpace(part.ProcessType)) details.Add(part.ProcessType);
+        if (!string.IsNullOrWhiteSpace(part.MaterialName)) details.Add(part.MaterialName);
+        if (part.Quantity > 1) details.Add($"Qty {part.Quantity:N0}");
+        return string.Join(" | ", details);
+    }
 }

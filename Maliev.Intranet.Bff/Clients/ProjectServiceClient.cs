@@ -381,7 +381,47 @@ public class ProjectServiceClient(HttpClient httpClient)
             PartsCount = PartsCount,
             TotalPrice = ResolveTotalPrice(TotalEstimatedPrice, TotalPrice),
             CurrentQuotationVersionNumber = CurrentQuotationVersionNumber,
+            PartPreviews = PartPreviews.Select(part => part.ToIntranetDto()).ToList(),
             CreatedAt = CreatedAt
+        };
+
+        public List<ProjectServiceProjectPartPreviewResponse> PartPreviews { get; set; } = [];
+    }
+
+    private sealed class ProjectServiceProjectPartPreviewResponse
+    {
+        public Guid Id { get; set; }
+
+        public int PartNumber { get; set; }
+
+        public string FileName { get; set; } = string.Empty;
+
+        public string? FileReference { get; set; }
+
+        public string? ThumbnailUrl { get; set; }
+
+        public string? ThumbnailSmallGcsPath { get; set; }
+
+        public string? ThumbnailLargeGcsPath { get; set; }
+
+        public string? ProcessType { get; set; }
+
+        public string? MaterialName { get; set; }
+
+        public int Quantity { get; set; }
+
+        public ProjectPartPreviewDto ToIntranetDto() => new()
+        {
+            Id = Id,
+            PartNumber = PartNumber,
+            FileName = FileName,
+            FileReference = FileReference,
+            ThumbnailUrl = ThumbnailUrl,
+            ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
+            ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
+            ProcessType = ProcessType,
+            MaterialName = MaterialName,
+            Quantity = Quantity
         };
     }
 

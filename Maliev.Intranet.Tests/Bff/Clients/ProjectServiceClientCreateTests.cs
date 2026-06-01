@@ -92,6 +92,67 @@ public class ProjectServiceClientCreateTests
     }
 
     [Fact]
+    public async Task GetProjectsAsync_WhenProjectServiceReturnsPartPreviews_MapsPreviewWireShape()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            id = projectId,
+                            projectNumber = "PRJ-2026-0003",
+                            customerName = "Pimchanok Garcia",
+                            title = "Project 2026-06-01",
+                            status = "Configuring",
+                            partsCount = 1,
+                            totalEstimatedPrice = 0m,
+                            createdAt = new DateTime(2026, 6, 1, 9, 0, 0, DateTimeKind.Utc),
+                            partPreviews = new[]
+                            {
+                                new
+                                {
+                                    id = partId,
+                                    partNumber = 1,
+                                    fileName = "bracket.stl",
+                                    fileReference = "customers/c1/projects/p1/source/bracket.stl",
+                                    thumbnailUrl = "https://signed.example/bracket.webp",
+                                    thumbnailSmallGcsPath = "customers/c1/projects/p1/source/bracket_small.webp",
+                                    thumbnailLargeGcsPath = "customers/c1/projects/p1/source/bracket_large.webp",
+                                    processType = "FDM",
+                                    materialName = "PLA",
+                                    quantity = 2
+                                }
+                            }
+                        }
+                    },
+                    currentPage = 1,
+                    pageSize = 20,
+                    totalCount = 1,
+                    totalPages = 1
+                })
+            }));
+        var client = new ProjectServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        var result = await client.GetProjectsAsync("Configuring");
+
+        var project = Assert.Single(result.Data);
+        var preview = Assert.Single(project.PartPreviews);
+        Assert.Equal(partId, preview.Id);
+        Assert.Equal("bracket.stl", preview.FileName);
+        Assert.Equal("https://signed.example/bracket.webp", preview.ThumbnailUrl);
+        Assert.Equal("customers/c1/projects/p1/source/bracket_small.webp", preview.ThumbnailSmallGcsPath);
+        Assert.Equal("FDM", preview.ProcessType);
+        Assert.Equal("PLA", preview.MaterialName);
+        Assert.Equal(2, preview.Quantity);
+    }
+
+    [Fact]
     public async Task GetProjectByIdAsync_WhenProjectServiceShape_ReturnsMappedIntranetDto()
     {
         var projectId = Guid.NewGuid();

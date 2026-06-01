@@ -35,8 +35,47 @@ public class ProjectSummaryDto
     /// <summary>Gets or sets the current quotation version number, if a quotation has been generated.</summary>
     public int? CurrentQuotationVersionNumber { get; set; }
 
+    /// <summary>Gets or sets small preview records for the first parts in this project.</summary>
+    public List<ProjectPartPreviewDto> PartPreviews { get; set; } = [];
+
     /// <summary>Gets or sets the date the project was created.</summary>
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Compact part preview for project list views.
+/// </summary>
+public class ProjectPartPreviewDto
+{
+    /// <summary>Gets or sets the unique part identifier.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>Gets or sets the sequential part number within the project.</summary>
+    public int PartNumber { get; set; }
+
+    /// <summary>Gets or sets the original uploaded filename.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the raw uploaded file reference.</summary>
+    public string? FileReference { get; set; }
+
+    /// <summary>Gets or sets the signed thumbnail URL for display.</summary>
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the small thumbnail artifact.</summary>
+    public string? ThumbnailSmallGcsPath { get; set; }
+
+    /// <summary>Gets or sets the raw GCS path for the large thumbnail artifact.</summary>
+    public string? ThumbnailLargeGcsPath { get; set; }
+
+    /// <summary>Gets or sets the manufacturing process type.</summary>
+    public string? ProcessType { get; set; }
+
+    /// <summary>Gets or sets the material display name.</summary>
+    public string? MaterialName { get; set; }
+
+    /// <summary>Gets or sets the ordered quantity.</summary>
+    public int Quantity { get; set; }
 }
 
 /// <summary>

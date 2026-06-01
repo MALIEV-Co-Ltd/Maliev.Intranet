@@ -59,6 +59,9 @@ public class ProjectsController(
         CancellationToken ct = default)
     {
         var result = await client.GetProjectsAsync(status, search, customerId, page, pageSize, ct);
+        if (uploadClient is not null)
+            await EnrichProjectSummaryPreviewsAsync(result.Data, uploadClient, analysisStatusService, ct);
+
         return Ok(result);
     }
 
@@ -1404,6 +1407,46 @@ public class ProjectsController(
         CancellationToken ct)
     {
         await EnrichPartArtifactsAsync(part, upload, analysisStatusService: null, ct);
+    }
+
+    private static async Task EnrichProjectSummaryPreviewsAsync(
+        IEnumerable<ProjectSummaryDto> projects,
+        UploadServiceClient upload,
+        IFileAnalysisStatusService? analysisStatusService,
+        CancellationToken ct)
+    {
+        var previews = projects
+            .SelectMany(project => project.PartPreviews)
+            .ToList();
+
+        await Task.WhenAll(previews.Select(preview =>
+            EnrichProjectSummaryPreviewAsync(preview, upload, analysisStatusService, ct)));
+    }
+
+    private static async Task EnrichProjectSummaryPreviewAsync(
+        ProjectPartPreviewDto preview,
+        UploadServiceClient upload,
+        IFileAnalysisStatusService? analysisStatusService,
+        CancellationToken ct)
+    {
+        if (analysisStatusService is not null && !string.IsNullOrWhiteSpace(preview.FileReference))
+        {
+            var status = await analysisStatusService.GetStatusAsync(preview.FileReference, ct);
+            if (status is not null)
+            {
+                preview.ThumbnailUrl = FirstNonEmpty(
+                    preview.ThumbnailUrl,
+                    status.PreviewUrls?.ThumbnailSmall,
+                    status.ThumbnailUrl,
+                    status.HiResThumbnailUrl);
+                preview.ThumbnailSmallGcsPath = FirstNonEmpty(preview.ThumbnailSmallGcsPath, status.PreviewUrls?.ThumbnailSmallGcsPath);
+                preview.ThumbnailLargeGcsPath = FirstNonEmpty(preview.ThumbnailLargeGcsPath, status.PreviewUrls?.ThumbnailLargeGcsPath);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(preview.ThumbnailUrl))
+            preview.ThumbnailUrl = await GetSignedUrlIfPresentAsync(upload, preview.ThumbnailSmallGcsPath, ct)
+                ?? await GetSignedUrlIfPresentAsync(upload, preview.ThumbnailLargeGcsPath, ct);
     }
 
     private static async Task EnrichProjectDetailArtifactsAsync(
