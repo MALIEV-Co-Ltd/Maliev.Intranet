@@ -221,10 +221,14 @@ public class QuotationsController(
                 return Ok(new { storageUrl = freshUrl });
         }
 
-        var pdfUrl = await pdfClient.GetLatestPdfUrlAsync(PdfDocumentType.Quotation, quotation.QuotationNumber, ct);
-        return string.IsNullOrWhiteSpace(pdfUrl)
+        var repairedArtifact = await TryRefreshCurrentQuotationVersionPdfArtifactAsync(quotation, currentVersion, ct);
+        if (repairedArtifact is not null)
+            return Ok(new { storageUrl = repairedArtifact.StorageUrl, storagePath = repairedArtifact.StoragePath });
+
+        var pdfArtifact = await pdfClient.GetLatestPdfArtifactAsync(PdfDocumentType.Quotation, quotation.QuotationNumber, ct);
+        return string.IsNullOrWhiteSpace(pdfArtifact?.StorageUrl)
             ? NotFound()
-            : Ok(new { storageUrl = pdfUrl });
+            : Ok(new { storageUrl = pdfArtifact.StorageUrl, storagePath = pdfArtifact.StoragePath });
     }
 
     private async Task RefreshQuotationPdfArtifactUrlsAsync(QuotationDetailDto quotation, CancellationToken ct)
@@ -232,6 +236,7 @@ public class QuotationsController(
         if (uploadClient is null)
             return;
 
+        var currentVersion = ResolveCurrentVersion(quotation);
         foreach (var version in quotation.Versions)
         {
             if (string.IsNullOrWhiteSpace(version.PdfArtifactStoragePath))
@@ -245,6 +250,53 @@ public class QuotationsController(
             if (!string.IsNullOrWhiteSpace(freshUrl))
                 version.PdfArtifactUrl = freshUrl;
         }
+
+        if (currentVersion is not null && string.IsNullOrWhiteSpace(currentVersion.PdfArtifactStoragePath))
+            await TryRefreshCurrentQuotationVersionPdfArtifactAsync(quotation, currentVersion, ct);
+    }
+
+    private async Task<PdfGenerationResult?> TryRefreshCurrentQuotationVersionPdfArtifactAsync(
+        QuotationDetailDto quotation,
+        QuotationVersionDto? currentVersion,
+        CancellationToken ct)
+    {
+        if (currentVersion is null || uploadClient is null || string.IsNullOrWhiteSpace(quotation.QuotationNumber))
+            return null;
+
+        var latestArtifact = await pdfClient.GetLatestPdfArtifactAsync(
+            PdfDocumentType.Quotation,
+            quotation.QuotationNumber,
+            ct);
+
+        if (string.IsNullOrWhiteSpace(latestArtifact?.StoragePath))
+            return null;
+
+        var freshUrl = await uploadClient.GetDownloadUrlByPathAsync(
+            latestArtifact.StoragePath,
+            ct,
+            expirationMinutes: 10080);
+        var refreshedUrl = FirstNonEmpty(freshUrl, latestArtifact.StorageUrl);
+        if (string.IsNullOrWhiteSpace(refreshedUrl))
+            return null;
+
+        currentVersion.PdfArtifactUrl = refreshedUrl;
+        currentVersion.PdfArtifactStoragePath = latestArtifact.StoragePath;
+
+        if (currentVersion.VersionNumber > 0)
+        {
+            await client.AttachVersionPdfArtifactAsync(
+                quotation.Id,
+                currentVersion.VersionNumber,
+                refreshedUrl,
+                latestArtifact.StoragePath,
+                ct);
+        }
+
+        return new PdfGenerationResult
+        {
+            StorageUrl = refreshedUrl,
+            StoragePath = latestArtifact.StoragePath
+        };
     }
 
     private static QuotationVersionDto? ResolveCurrentVersion(QuotationDetailDto quotation) =>

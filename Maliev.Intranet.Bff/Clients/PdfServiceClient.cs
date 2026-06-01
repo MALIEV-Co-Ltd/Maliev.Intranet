@@ -20,19 +20,26 @@ public class PdfServiceClient(HttpClient httpClient)
         string referenceId,
         CancellationToken ct = default)
     {
+        var artifact = await GetLatestPdfArtifactAsync(documentType, referenceId, ct);
+        return artifact?.StorageUrl;
+    }
+
+    /// <summary>
+    /// Gets the latest completed PDF artifact metadata for a business reference.
+    /// </summary>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="referenceId">The stable business reference ID used for PDF generation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The latest generated PDF artifact, if one exists.</returns>
+    public async Task<PdfGenerationResult?> GetLatestPdfArtifactAsync(
+        PdfDocumentType documentType,
+        string referenceId,
+        CancellationToken ct = default)
+    {
         if (string.IsNullOrWhiteSpace(referenceId))
             return null;
 
-        var documentTypeValue = documentType switch
-        {
-            PdfDocumentType.Quotation => "Quotation",
-            PdfDocumentType.Invoice => "Invoice",
-            PdfDocumentType.Receipt => "Receipt",
-            PdfDocumentType.Report => "Report",
-            PdfDocumentType.DeliveryNote => "DeliveryNote",
-            PdfDocumentType.CommerceBom => "CommerceBom",
-            _ => documentType.ToString()
-        };
+        var documentTypeValue = ToPdfServiceDocumentType(documentType);
 
         var url = $"/pdf/v1/generations/latest?documentType={Uri.EscapeDataString(documentTypeValue)}&referenceId={Uri.EscapeDataString(referenceId)}";
         var response = await httpClient.GetAsync(url, ct);
@@ -40,9 +47,7 @@ public class PdfServiceClient(HttpClient httpClient)
             return null;
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        return result.TryGetProperty("storageUrl", out var storageUrl) && storageUrl.ValueKind == JsonValueKind.String
-            ? storageUrl.GetString()
-            : null;
+        return ReadArtifact(result);
     }
 
     /// <summary>
@@ -87,16 +92,7 @@ public class PdfServiceClient(HttpClient httpClient)
         string? templateCode = null,
         CancellationToken ct = default)
     {
-        var documentTypeEnum = documentType switch
-        {
-            PdfDocumentType.Quotation => "Quotation",
-            PdfDocumentType.Invoice => "Invoice",
-            PdfDocumentType.Receipt => "Receipt",
-            PdfDocumentType.Report => "Report",
-            PdfDocumentType.DeliveryNote => "DeliveryNote",
-            PdfDocumentType.CommerceBom => "CommerceBom",
-            _ => documentType.ToString()
-        };
+        var documentTypeEnum = ToPdfServiceDocumentType(documentType);
 
         var request = new
         {
@@ -116,22 +112,39 @@ public class PdfServiceClient(HttpClient httpClient)
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-            var storageUrl = ReadString(result, "storageUrl", "pdfUrl", "url");
-            if (string.IsNullOrWhiteSpace(storageUrl))
-                return null;
-
-            var storagePath = ReadString(result, "storagePath", "pdfArtifactStoragePath");
-            if (string.IsNullOrWhiteSpace(storagePath) && LooksLikeStoragePath(storageUrl))
-                storagePath = storageUrl;
-
-            return new PdfGenerationResult
-            {
-                StorageUrl = storageUrl,
-                StoragePath = storagePath
-            };
+            return ReadArtifact(result);
         }
 
         return null;
+    }
+
+    private static string ToPdfServiceDocumentType(PdfDocumentType documentType) =>
+        documentType switch
+        {
+            PdfDocumentType.Quotation => "Quotation",
+            PdfDocumentType.Invoice => "Invoice",
+            PdfDocumentType.Receipt => "Receipt",
+            PdfDocumentType.Report => "Report",
+            PdfDocumentType.DeliveryNote => "DeliveryNote",
+            PdfDocumentType.CommerceBom => "CommerceBom",
+            _ => documentType.ToString()
+        };
+
+    private static PdfGenerationResult? ReadArtifact(JsonElement result)
+    {
+        var storageUrl = ReadString(result, "storageUrl", "pdfUrl", "url");
+        if (string.IsNullOrWhiteSpace(storageUrl))
+            return null;
+
+        var storagePath = ReadString(result, "storagePath", "pdfArtifactStoragePath");
+        if (string.IsNullOrWhiteSpace(storagePath) && LooksLikeStoragePath(storageUrl))
+            storagePath = storageUrl;
+
+        return new PdfGenerationResult
+        {
+            StorageUrl = storageUrl,
+            StoragePath = storagePath
+        };
     }
 
     private static string? ReadString(JsonElement element, params string[] propertyNames)
