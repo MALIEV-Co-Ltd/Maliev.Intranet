@@ -161,6 +161,9 @@ public class PartConfigSidebarTests
         Assert.Contains("column-width: 360px", source);
         Assert.Contains("break-inside: avoid", source);
         Assert.Contains("column-span: all", source);
+        Assert.Contains("column-count: 2;", source);
+        Assert.Contains("@@media (max-width: 640px)", source);
+        Assert.Contains("column-count: 1;\n                    column-width: auto;\n                    padding: 8px;", source.ReplaceLineEndings("\n"), StringComparison.Ordinal);
         Assert.DoesNotContain(
             "grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));",
             source,
