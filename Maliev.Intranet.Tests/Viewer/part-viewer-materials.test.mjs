@@ -954,6 +954,49 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
     assert.doesNotMatch(result.fdmBeforeFragColor, /\bcolor\.rgb\b/);
 });
 
+test('realistic smoothing does not synthesize normals for no-normal meshes', () => {
+    const context = loadViewerContext();
+    const setDataCalls = [];
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: kind => kind === 'position'
+            ? new Float32Array([
+                0, 0, 0,
+                1, 0, 0,
+                0, 1, 0,
+            ])
+            : null,
+        getIndices: () => [0, 1, 2],
+        setVerticesData: (kind, data) => setDataCalls.push({ kind, length: data?.length ?? 0 }),
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+    context.setDataCalls = setDataCalls;
+
+    const result = vm.runInContext(`
+        let computeNormalsCalls = 0;
+        BABYLON.VertexData.ComputeNormals = (_positions, _indices, normals) => {
+            computeNormalsCalls++;
+            normals.push(0, 0, 1, 0, 0, 1, 0, 0, 1);
+        };
+        scenes.viewer = scene;
+        setRenderMode('viewer', 'realistic');
+        ({
+            computeNormalsCalls,
+            setDataCalls,
+            savedNormalCount: originalNormalData.viewer?.size ?? 0
+        });
+    `, context);
+
+    assert.equal(result.computeNormalsCalls, 0);
+    assert.deepEqual(result.setDataCalls, []);
+    assert.equal(result.savedNormalCount, 0);
+});
+
 test('bead blasted surface shader renders fine satin aluminum micrograin without coarse relief', () => {
     const context = loadViewerContext();
     const mesh = {

@@ -4151,19 +4151,11 @@ function applySmoothNormals(canvasId) {
 
         const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
         const indices   = mesh.getIndices();
-        let origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
-        if (!positions || !indices) return;
-
-        if (!origNorms) {
-            const generatedNormals = [];
-            BABYLON.VertexData.ComputeNormals(positions, indices, generatedNormals);
-            if (generatedNormals.length > 0) {
-                mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, generatedNormals);
-                origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind) || generatedNormals;
-            }
-        }
-
-        if (!origNorms) return;
+        const origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        // Do not synthesize normals here. Some GLBs intentionally render from
+        // position/color only; feeding generated face normals into this smoothing
+        // pass can average unrelated triangles and create broken black facets.
+        if (!positions || !indices || !origNorms) return;
 
         // Save original (hard) normals for restoration
         saved.set(mesh.uniqueId, new Float32Array(origNorms));
