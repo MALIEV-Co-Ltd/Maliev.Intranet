@@ -576,8 +576,8 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     `, context);
 
     assert.equal(result.materialType, 'aluminum');
-    assert.ok(result.roughness >= 0.72 && result.roughness <= 0.82, `expected diffuse bead-blast roughness, got ${result.roughness}`);
-    assert.ok(result.metallic >= 0.84 && result.metallic <= 0.90, `expected bead-blasted aluminum to keep metal response without mirror reflections, got ${result.metallic}`);
+    assert.ok(result.roughness >= 0.86 && result.roughness <= 0.94, `expected zoom-stable matte bead-blast roughness, got ${result.roughness}`);
+    assert.ok(result.metallic >= 0.72 && result.metallic <= 0.82, `expected bead-blasted aluminum to keep muted metal response without zoom-out reflections, got ${result.metallic}`);
     assert.equal(result.effectKey, 'bead-blast');
     assert.equal(result.effectKind, 1);
     assert.ok(result.effectScale >= 16.0, `expected fine bead-blast micrograin scale, got ${result.effectScale}`);
@@ -1033,8 +1033,8 @@ test('bead blasted surface shader renders fine satin aluminum micrograin without
         });
     `, context);
 
-    assert.ok(result.roughness >= 0.72 && result.roughness <= 0.82, `expected diffuse bead-blast roughness, got ${result.roughness}`);
-    assert.ok(result.metallic >= 0.84 && result.metallic <= 0.90, `expected bead-blasted aluminum to keep metal response without mirror reflections, got ${result.metallic}`);
+    assert.ok(result.roughness >= 0.86 && result.roughness <= 0.94, `expected zoom-stable matte bead-blast roughness, got ${result.roughness}`);
+    assert.ok(result.metallic >= 0.72 && result.metallic <= 0.82, `expected bead-blasted aluminum to keep muted metal response without zoom-out reflections, got ${result.metallic}`);
     assert.ok(result.scale >= 16.0, `expected fine bead-blast grain scale, got ${result.scale}`);
     assert.ok(result.strength <= 0.045, `expected subtle bead-blast roughness variation, got ${result.strength}`);
     assert.ok(result.bump <= 0.035, `expected fine particle bead-blast relief amplitude, got ${result.bump}`);
@@ -1050,6 +1050,7 @@ test('bead blasted surface shader renders fine satin aluminum micrograin without
     assert.match(result.updateAlbedo, /_isBead/);
     assert.match(result.updateAlbedo, /malievSurfaceRelief/);
     assert.match(result.updateMetallicRoughness, /surfaceEffectBump/);
+    assert.match(result.updateMetallicRoughness, /max\(metallicRoughness\.g,\s*mix\(0\.0,\s*0\.88,\s*_isBead\)\)/);
     assert.match(result.beforeFragColor, /_isBead/);
     assert.match(result.beforeFragColor, /malievSurfaceSpeckle/);
     assert.match(result.beforeFragColor, /malievSurfaceRelief/);

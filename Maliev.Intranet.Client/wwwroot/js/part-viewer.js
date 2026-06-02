@@ -3562,6 +3562,7 @@ function getSurfaceEffectPluginClass() {
                                 * _ra * mix(1.6, 0.45, _isBead),
                         0.06,
                         1.0);
+                    metallicRoughness.g = max(metallicRoughness.g, mix(0.0, 0.88, _isBead));
                 }
                 #endif
             `,
@@ -4058,8 +4059,8 @@ function getFinishModifiers(finishCode, materialKey = '') {
         return { roughnessOffset: 0.14, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.44 };
     }
     if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
-    if (lower.includes('bead'))   return { roughnessOffset: 0.36, metallicOffset: -0.08, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.76 };  // diffuse fine-particle micro-etched aluminum
-    if (lower.includes('blast'))  return { roughnessOffset: 0.34, metallicOffset: -0.07, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.74 };  // diffuse fine-particle micro-etched aluminum
+    if (lower.includes('bead'))   return { roughnessOffset: 0.48, metallicOffset: -0.18, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.90 };  // matte fine-particle micro-etched aluminum
+    if (lower.includes('blast'))  return { roughnessOffset: 0.46, metallicOffset: -0.16, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.88 };  // matte fine-particle micro-etched aluminum
     if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
     if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
     if (isSteelLikeMaterial(materialKey) && isRawMachinedFinish(lower)) {
