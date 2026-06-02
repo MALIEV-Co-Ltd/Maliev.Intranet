@@ -3321,10 +3321,10 @@ const SURFACE_EFFECTS = {
         key: 'machining',
         kind: 4,           // orientation-aware CNC tool marks (face vs side milling); distinct from brushed (2)
         scale: 1.0,
-        strength: 0.012,
-        stripeScale: 4.2,  // fine raw-machined feed marks for bright steel/stainless reflections
-        stripeStrength: 0.020,
-        bump: 0.014,       // subtle tool-mark normal bump; raw steel should be polished, not gouged
+        strength: 0.020,
+        stripeScale: 4.6,  // fine raw-machined feed marks for bright steel/stainless reflections
+        stripeStrength: 0.030,
+        bump: 0.028,       // readable tool-mark normal bump; raw steel should be machined, not gouged
     },
     'powder-grain': {
         key: 'powder-grain',
@@ -3578,13 +3578,58 @@ function getSurfaceEffectPluginClass() {
                     vec3 gradient = vec3(hx, hy, hz) / (2.0 * e);
                     return gradient - n * dot(gradient, n);
                 }
+                vec2 malievMachinedFaceUv(vec3 p, vec3 n) {
+                    vec3 an = abs(normalize(n));
+                    if (an.z >= an.x && an.z >= an.y) {
+                        return p.xy;
+                    }
+                    if (an.x >= an.y) {
+                        return p.yz;
+                    }
+                    return p.xz;
+                }
+                vec2 malievMachinedSideUv(vec3 p, vec3 n) {
+                    vec3 an = abs(normalize(n));
+                    if (an.x >= an.y) {
+                        return vec2(p.y, p.z);
+                    }
+                    return vec2(p.x, p.z);
+                }
+                float malievFaceMillingHeight(vec3 p, float scl, float sScl, vec3 n) {
+                    vec2 uv = malievMachinedFaceUv(p, n);
+                    float waviness = malievVNoise(vec3(uv.x * scl * 0.045, uv.y * scl * 0.035, 61.0));
+                    float cutterArc = sin(
+                        (length(vec2(uv.x * 0.30, uv.y * 0.18 + sin(uv.x * 0.045) * 5.5))
+                            + uv.x * 0.10)
+                        * sScl * 0.95
+                        + waviness * 0.65) * 0.5 + 0.5;
+                    float passSweep = sin((uv.y + sin(uv.x * 0.070) * 6.0) * sScl * 0.34) * 0.5 + 0.5;
+                    float stepOver = sin(uv.x * sScl * 0.56 + waviness * 0.45) * 0.5 + 0.5;
+                    float fineFeed = malievVNoise(vec3(uv.x * scl * 1.10, uv.y * scl * 3.80, 73.0));
+                    return clamp(cutterArc * 0.48 + passSweep * 0.25 + stepOver * 0.20 + fineFeed * 0.07, 0.0, 1.0);
+                }
+                float malievSideMillingHeight(vec3 p, float scl, float sScl, vec3 n) {
+                    vec2 uv = malievMachinedSideUv(p, n);
+                    float waviness = malievVNoise(vec3(uv.x * scl * 0.09, uv.y * scl * 0.035, 89.0));
+                    float verticalFlutes = sin(uv.x * sScl * 0.92 + uv.y * 0.045 + waviness * 0.55) * 0.5 + 0.5;
+                    float stepDownScallop = sin(uv.y * sScl * 1.28 + waviness * 0.45) * 0.5 + 0.5;
+                    float ridge = smoothstep(0.48, 1.0, stepDownScallop);
+                    float fineScratches = malievVNoise(vec3(uv.x * scl * 2.40, uv.y * scl * 0.32, 101.0));
+                    return clamp(verticalFlutes * 0.44 + ridge * 0.34 + fineScratches * 0.22, 0.0, 1.0);
+                }
+                float malievMachinedHeight(vec3 p, float scl, float sScl, vec3 n) {
+                    n = normalize(n);
+                    float faceBlend = smoothstep(0.50, 0.88, abs(n.z));
+                    float faceMarks = malievFaceMillingHeight(p, scl, sScl, n);
+                    float sideMarks = malievSideMillingHeight(p, scl, sScl, n);
+                    return mix(sideMarks, faceMarks, faceBlend);
+                }
                 // Procedural micro-surface HEIGHT in [0,1] for the selected finish (world-space, UV-free).
                 // Its value drives albedo grain and roughness wobble.
                 // 'n' is the local geometric/shading normal used to choose a face-oriented projection.
                 float malievHeight(vec3 p, float kind, float scl, float sScl, vec3 n) {
                     scl = max(scl, 0.0001);
                     n = normalize(n);
-                    float up = abs(n.z);
                     if (kind < 1.5) {
                         // Bead blasted: 2-octave isotropic grain.
                         float smoothGrain = malievVNoise(p * scl) * 0.65 + malievVNoise(p * scl * 2.7) * 0.35;
@@ -3596,12 +3641,8 @@ function getSurfaceEffectPluginClass() {
                         // Powder (MJF/SLS): sintered nylon aggregate, fine powder, and darker pores.
                         return malievPowderBedHeight(p, scl);
                     }
-                    // CNC as-machined: face milling (top/bottom) vs side milling (walls).
-                    float fa = sin(p.x * sScl) * 0.5 + 0.5;        // feed cross-hatch in XY
-                    float fb = sin(p.y * sScl * 0.92 + 1.7) * 0.5 + 0.5;
-                    float faceMark = fa * 0.6 + fb * 0.4;
-                    float sideMark = sin(p.z * sScl * 1.7) * 0.5 + 0.5; // scallop lines stacked along wall height
-                    return mix(sideMark, faceMark, up);
+                    // CNC as-machined: face milling cutter arcs on top/bottom faces, side-milling marks on walls.
+                    return malievMachinedHeight(p, scl, sScl, n);
                 }
                 vec3 malievHeightGradient(vec3 p, float kind, float scl, float sScl, vec3 n) {
                     float e = max(0.12, 0.35 / max(scl, 0.0001));
@@ -3663,7 +3704,7 @@ function getSurfaceEffectPluginClass() {
                             length(dFdx(vPositionW * surfaceEffectStripeScale)),
                             length(dFdy(vPositionW * surfaceEffectStripeScale)));
                         float _machinedAa = 1.0 - smoothstep(0.75, 1.65, _machinedFootprint);
-                        normalW = normalize(_machinedBaseNormal - _machinedGradient * surfaceEffectBump * 0.16 * _machinedAa);
+                        normalW = normalize(_machinedBaseNormal - _machinedGradient * surfaceEffectBump * 0.44 * _machinedAa);
                     }
                 }
                 #endif
@@ -3896,11 +3937,11 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
         profile.stripeScale = 0.90;
         profile.stripeStrength = 0.020;
     } else if (surfaceEffect.key === 'machining') {
-        profile.normalStrength = 0.004;
+        profile.normalStrength = 0.007;
         profile.noiseScale = 0.025;
         profile.stripeAxis = 'x';
-        profile.stripeScale = 0.34;
-        profile.stripeStrength = 0.012;
+        profile.stripeScale = 0.40;
+        profile.stripeStrength = 0.020;
     } else if (surfaceEffect.key === 'powder-grain') {
         profile.normalStrength = 0.026;
         profile.noiseScale = 0.22;

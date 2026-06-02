@@ -821,6 +821,47 @@ test('realistic configurator applies CNC machining surface effect when no finish
     assert.equal(result.effectKind, 4);
 });
 
+test('as-machined shader separates face milling cutter arcs from side milling wall scallops', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        const surfacePlugin = material?._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+        const customCode = surfacePlugin?.getCustomCode('fragment') ?? {};
+        ({
+            effectKey: material?._malievSurfaceEffect?.key ?? null,
+            definitions: customCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+            beforeLights: customCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? ''
+        });
+    `, context);
+
+    assert.equal(result.effectKey, 'machining');
+    assert.match(result.definitions, /malievMachinedFaceUv/);
+    assert.match(result.definitions, /malievMachinedSideUv/);
+    assert.match(result.definitions, /malievFaceMillingHeight/);
+    assert.match(result.definitions, /malievSideMillingHeight/);
+    assert.match(result.definitions, /malievMachinedHeight/);
+    assert.match(result.definitions, /mix\(sideMarks,\s*faceMarks,\s*faceBlend\)/);
+    assert.doesNotMatch(result.definitions, /float\s+fa\s*=\s*sin\(p\.x\s*\*\s*sScl\)/);
+    assert.match(result.beforeLights, /malievHeightGradient/);
+    assert.match(result.beforeLights, /normalW\s*=\s*normalize/);
+});
+
 test('realistic configurator renders raw steel and stainless as bright machined metal', () => {
     const context = loadViewerContext();
     const mesh = {
@@ -873,8 +914,8 @@ test('realistic configurator renders raw steel and stainless as bright machined 
         assert.ok(material.metallic >= 0.97, `${name} should stay highly metallic, got ${material.metallic}`);
         assert.ok(material.roughness >= 0.20 && material.roughness <= 0.30, `${name} should be smooth raw metal, got ${material.roughness}`);
         assert.equal(material.anisotropyEnabled, false, `${name} should not enable tangent-dependent anisotropy on CAD meshes`);
-        assert.ok(material.effectStripeStrength <= 0.025, `${name} machining marks should be subtle, got ${material.effectStripeStrength}`);
-        assert.ok(material.effectBump <= 0.016, `${name} machining bump should avoid scanline banding, got ${material.effectBump}`);
+        assert.ok(material.effectStripeStrength >= 0.025 && material.effectStripeStrength <= 0.035, `${name} machining marks should be readable, got ${material.effectStripeStrength}`);
+        assert.ok(material.effectBump >= 0.024 && material.effectBump <= 0.032, `${name} machining bump should be visible without gouging, got ${material.effectBump}`);
         assert.equal(material.profile?.surfaceEffectKey, 'machining', `${name} profile should carry machining`);
         assert.ok(material.profile?.stripeStrength >= 0.012, `${name} should keep visible directional tool marks`);
         assert.match(material.beforeLights, /_isMachined/);
@@ -1285,7 +1326,7 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
 
     assert.equal(result.machining.stripeWaveform, 'sine');
     assert.ok(result.machining.stripeScale <= 0.5);
-    assert.ok(result.machining.stripeStrength <= 0.014);
+    assert.ok(result.machining.stripeStrength >= 0.018 && result.machining.stripeStrength <= 0.024);
 
     assert.ok(result.beadBlast.noiseScale >= 8.8 && result.beadBlast.noiseScale <= 10.5, `expected larger visible bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
     assert.ok(result.beadBlast.normalStrength >= 0.006 && result.beadBlast.normalStrength <= 0.008, `expected readable bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
