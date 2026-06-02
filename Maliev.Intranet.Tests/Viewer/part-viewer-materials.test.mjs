@@ -382,6 +382,66 @@ test('realistic render mode assigns a PBRMaterial that uses the scene environmen
     assert.notEqual(result.realTimeFiltering, true);
 });
 
+test('transparent manufacturing presets use alpha-blended PBR material depth handling', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshot = (materialKey, colorHex, processCode) => {
+            configureMaterialFromConfigurator('viewer', materialKey, colorHex, 'AS_PRINTED', null, processCode);
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                materialName: material?.name ?? null,
+                isPbr: material instanceof BABYLON.PBRMaterial,
+                alpha: material?.alpha ?? null,
+                transparencyMode: material?.transparencyMode ?? null,
+                needDepthPrePass: material?.needDepthPrePass ?? null,
+                separateCullingPass: material?.separateCullingPass ?? null,
+                backFaceCulling: material?.backFaceCulling ?? null,
+                metallic: material?.metallic ?? null,
+                roughness: material?.roughness ?? null,
+                albedoB: material?.albedoColor?.b ?? null,
+                indexOfRefraction: material?.indexOfRefraction ?? null
+            };
+        };
+        ({
+            petg: snapshot('petg-clear', '#f6fbff', 'FDM'),
+            resin: snapshot('resin-clear', null, 'SLA_DLP'),
+            acrylic: snapshot('acrylic-clear', null, 'CNC_MILL')
+        });
+    `, context);
+
+    for (const [name, material] of Object.entries(result)) {
+        assert.equal(material.isPbr, true, `${name} should render through the PBR pipeline`);
+        assert.equal(material.transparencyMode, context.BABYLON.Material.MATERIAL_ALPHABLEND, `${name} should use alpha blend`);
+        assert.equal(material.needDepthPrePass, true, `${name} should write a depth pre-pass for stable transparent sorting`);
+        assert.equal(material.separateCullingPass, true, `${name} should draw back/front faces separately`);
+        assert.equal(material.backFaceCulling, false, `${name} should keep interior transparent surfaces visible`);
+        assert.equal(material.metallic, 0, `${name} should be dielectric, not metal`);
+        assert.ok(material.alpha > 0.30 && material.alpha < 0.70, `${name} should be translucent, got alpha ${material.alpha}`);
+        assert.ok(material.roughness <= 0.16, `${name} should stay clear/glossy instead of frosted matte, got ${material.roughness}`);
+        assert.ok(material.albedoB >= 0.93, `${name} should keep a bright clear-material albedo, got blue channel ${material.albedoB}`);
+        assert.ok(material.indexOfRefraction >= 1.45 && material.indexOfRefraction <= 1.55, `${name} should use plastic/resin IOR, got ${material.indexOfRefraction}`);
+    }
+
+    assert.equal(result.petg.materialName, '__realistic_petg-clear__');
+    assert.equal(result.resin.materialName, '__realistic_resin-clear__');
+    assert.equal(result.acrylic.materialName, '__realistic_acrylic-clear__');
+});
+
 test('viewer module imports before Babylon globals are loaded', async () => {
     const previousWindow = globalThis.window;
     delete globalThis.BABYLON;

@@ -224,17 +224,34 @@ const CONFIG = {
             roughness: 0.72,
         },
         'petg-clear': {
-            // Translucent/frosted plastic — like light through a napkin, not clear glass.
+            // Clear PETG filament is translucent and slightly milky, not optical glass.
             // alpha < 1 enables ALPHABLEND so the mesh is semi-opaque.
-            albedoColor: { r: 0.97, g: 0.97, b: 0.96 },
+            albedoColor: { r: 0.96, g: 0.98, b: 1.00 },
             metallic: 0.0,
-            roughness: 0.10,
-            alpha: 0.78,
+            roughness: 0.14,
+            alpha: 0.58,
+            indexOfRefraction: 1.48,
+        },
+        'acrylic-clear': {
+            // CNC-machined PMMA/acrylic: clear dielectric with crisp highlights.
+            albedoColor: { r: 0.98, g: 0.99, b: 1.00 },
+            metallic: 0.0,
+            roughness: 0.035,
+            alpha: 0.38,
+            indexOfRefraction: 1.49,
         },
         'resin': {
             albedoColor: { r: 0.78, g: 0.78, b: 0.78 },
             metallic: 0.0,
             roughness: 0.22,
+        },
+        'resin-clear': {
+            // Clear SLA/DLP resin usually has a faint blue-grey cast and light haze.
+            albedoColor: { r: 0.93, g: 0.97, b: 1.00 },
+            metallic: 0.0,
+            roughness: 0.10,
+            alpha: 0.46,
+            indexOfRefraction: 1.52,
         },
     },
 
@@ -3135,9 +3152,10 @@ const ADDITIVE_LAYER_PRESET_KEYS = new Set([
     ...FDM_LAYER_PRESET_KEYS,
     'petg-clear',
     'resin',
+    'resin-clear',
     'nylon-powder',
 ]);
-const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom']);
+const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'petg-clear', 'acrylic-clear', 'resin-clear']);
 const FDM_LAYER_EFFECT_KEY = 'fdm-layer-lines';
 const FDM_LAYER_HEIGHT_MM = 0.2;
 const POWDER_BED_LAYER_HEIGHT_MM = 0.3;
@@ -4023,12 +4041,20 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
 
     if (preset.alpha != null && preset.alpha < 1.0) {
         material.alpha = preset.alpha;
-        material.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
+        material.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
         material.needDepthPrePass = true;
+        material.separateCullingPass = true;
+        material.backFaceCulling = false;
+        material.useAlphaFromAlbedoTexture = false;
+        if (preset.indexOfRefraction != null) {
+            material.indexOfRefraction = preset.indexOfRefraction;
+        }
     } else {
         material.alpha = 1;
         material.transparencyMode = BABYLON.Material?.MATERIAL_OPAQUE ?? 0;
         material.needDepthPrePass = false;
+        material.separateCullingPass = false;
+        material.backFaceCulling = true;
     }
 }
 
@@ -4044,8 +4070,10 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
     // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
     if (preset.alpha != null && preset.alpha < 1.0) {
         pbr.alpha            = preset.alpha;
-        pbr.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
+        pbr.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
         pbr.needDepthPrePass = true;
+        pbr.separateCullingPass = true;
+        pbr.backFaceCulling = false;
     }
 
     // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)

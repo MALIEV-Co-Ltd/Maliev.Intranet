@@ -457,10 +457,12 @@
             "abs" => "abs",
             "petg" => "petg",
             "petg-clear" => "petg-clear",
+            "acrylic-clear" => "acrylic-clear",
             "nylon" => "nylon",
             "nylon-powder" => "nylon-powder",
             "carbon-fiber" => "carbon-fiber",
             "resin" => "resin",
+            "resin-clear" => "resin-clear",
             _ => "aluminum",
         };
 
@@ -851,11 +853,11 @@
     {
         var key = (processCode ?? string.Empty).ToUpperInvariant();
         var mat = (materialCode ?? string.Empty).ToUpperInvariant();
+        var colorLower = (colorHex ?? "").Trim().ToLowerInvariant();
 
         // For POM materials, colour determines which preset to use
         if (mat.Contains("POM") || mat.Contains("DELRIN") || mat.Contains("ACETAL"))
         {
-            var colorLower = (colorHex ?? "").Trim().ToLowerInvariant();
             if (colorLower is "#2f6fd6") return "blue-pom";   // Blue
             if (colorLower is "#111111") return "black-pom";   // Black
             return "white-pom";  // Natural, White, or custom
@@ -868,6 +870,8 @@
             _ when mat.Contains("COPPER") => "copper",
             _ when mat.Contains("BRONZE") => "bronze",
             _ when mat.Contains("TITANIUM") => "titanium",
+            _ when IsCncAcrylicMaterial(mat) => "acrylic-clear",
+            _ when (key is "SLA" or "SLA_DLP" or "DLP") && IsClearMaterialSelection(mat, colorLower) => "resin-clear",
             _ when mat.Contains("ALUMIN") => "aluminum",
             _ when mat.Contains("STEEL") && mat.Contains("STAINLESS") => "stainless-steel",
             _ when mat.Contains("STEEL") => "steel",
@@ -876,6 +880,7 @@
                 mat switch
                 {
                     // Transparent/clear/natural filaments — translucent frosted look
+                    _ when mat.Contains("PETG") && IsClearMaterialSelection(mat, colorLower) => "petg-clear",
                     _ when mat.Contains("TRANSPARENT") || mat.Contains("CLEAR") || mat.Contains("TRANSP") => "petg-clear",
                     _ when mat.Contains("CARBON") => "carbon-fiber",
                     _ when mat.Contains("ABS") => "abs",
@@ -889,6 +894,21 @@
             _ when key is "CNC_MILL" or "CNC_TURN" or "CNC" => "aluminum",
             _ => "aluminum",
         };
+    }
+
+    private static bool IsClearMaterialSelection(string materialCode, string colorHex)
+    {
+        return materialCode.Contains("CLEAR", StringComparison.Ordinal)
+            || materialCode.Contains("TRANSPARENT", StringComparison.Ordinal)
+            || materialCode.Contains("TRANSP", StringComparison.Ordinal)
+            || colorHex is "#f6fbff" or "#dceeff";
+    }
+
+    private static bool IsCncAcrylicMaterial(string materialCode)
+    {
+        return materialCode.Contains("ACRYLIC", StringComparison.Ordinal)
+            || materialCode.Contains("PMMA", StringComparison.Ordinal)
+            || materialCode.Contains("PLEXIGLASS", StringComparison.Ordinal);
     }
 
     private async Task ResetCamera()

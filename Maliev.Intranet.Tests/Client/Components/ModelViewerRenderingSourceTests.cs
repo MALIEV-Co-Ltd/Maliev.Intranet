@@ -117,6 +117,24 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void RealisticConfigurator_MapsTransparentMaterialsToTransparentPresets()
+    {
+        var source = ModelViewer.ReplaceLineEndings("\n");
+        var mapping = ExtractExpression(
+            source,
+            "private static string MapConfiguratorMaterialToPreset(string? processCode, string? materialCode, string? colorHex)",
+            "    private async Task ResetCamera()");
+
+        Assert.Contains("\"petg-clear\" => \"petg-clear\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"acrylic-clear\" => \"acrylic-clear\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"resin-clear\" => \"resin-clear\"", source, StringComparison.Ordinal);
+        Assert.Contains("private static bool IsClearMaterialSelection(string materialCode, string colorHex)", source, StringComparison.Ordinal);
+        Assert.Contains("_ when IsCncAcrylicMaterial(mat) => \"acrylic-clear\"", mapping, StringComparison.Ordinal);
+        Assert.Contains("_ when (key is \"SLA\" or \"SLA_DLP\" or \"DLP\") && IsClearMaterialSelection(mat, colorLower) => \"resin-clear\"", mapping, StringComparison.Ordinal);
+        Assert.Contains("_ when mat.Contains(\"PETG\") && IsClearMaterialSelection(mat, colorLower) => \"petg-clear\"", mapping, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RealisticConfigurator_MapsPeekBeforeProcessSpecificFallbacks()
     {
         var source = ModelViewer.ReplaceLineEndings("\n");
