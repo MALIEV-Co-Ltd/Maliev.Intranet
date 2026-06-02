@@ -3145,11 +3145,11 @@ const SURFACE_EFFECTS = {
     'bead-blast': {
         key: 'bead-blast',
         kind: 1,
-        scale: 6.5,        // ~0.15 mm isotropic micrograin for satin bead-blasted aluminum
-        strength: 0.075,
+        scale: 18.0,       // ~0.055 mm isotropic micrograin; matches fine bead-blast media on mm-scale parts
+        strength: 0.035,
         stripeScale: 0.0,
         stripeStrength: 0.0,
-        bump: 0.065,       // fine crater normal bump; bead blasting should not look ridged
+        bump: 0.028,       // fine crater normal bump; bead blasting should not look like large sand impacts
     },
     brushed: {
         key: 'brushed',
@@ -3331,14 +3331,14 @@ function getSurfaceEffectPluginClass() {
                             vec2 rnd = malievHash2(cell + g);
                             vec2 center = g + rnd;
                             float d = length(f - center);
-                            float radius = 0.26 + rnd.y * 0.12;
+                            float radius = 0.16 + rnd.y * 0.08;
                             float bowl = pow(1.0 - smoothstep(0.0, radius, d), 2.0);
                             float rim = smoothstep(radius * 0.56, radius, d)
                                 * (1.0 - smoothstep(radius, radius * 1.36, d));
-                            pit = max(pit, bowl * (0.62 + rnd.x * 0.30) - rim * 0.14);
+                            pit = max(pit, bowl * (0.48 + rnd.x * 0.24) - rim * 0.08);
                         }
                     }
-                    return clamp(1.0 - pit * 0.78, 0.0, 1.0);
+                    return clamp(1.0 - pit * 0.52, 0.0, 1.0);
                 }
                 float malievBeadCraterHeight(vec3 p, vec3 n, float scl) {
                     vec2 uv = malievBeadSurfaceUv(p, n, max(scl, 0.0001));
@@ -3352,7 +3352,7 @@ function getSurfaceEffectPluginClass() {
                     return max(length(dFdx(uv)), length(dFdy(uv)));
                 }
                 vec3 malievBeadCraterGradient(vec3 p, vec3 n, float scl) {
-                    float e = max(0.012, 0.15 / max(scl, 0.0001));
+                    float e = max(0.004, 0.06 / max(scl, 0.0001));
                     float hx = malievBeadCraterHeight(p + vec3(e, 0.0, 0.0), n, scl)
                         - malievBeadCraterHeight(p - vec3(e, 0.0, 0.0), n, scl);
                     float hy = malievBeadCraterHeight(p + vec3(0.0, e, 0.0), n, scl)
@@ -3421,7 +3421,7 @@ function getSurfaceEffectPluginClass() {
                             vPositionW,
                             _beadBaseNormal,
                             surfaceEffectScale);
-                        float _beadCraterAa = 1.0 - smoothstep(0.38, 1.05, _beadCraterFootprint);
+                        float _beadCraterAa = 1.0 - smoothstep(0.25, 0.75, _beadCraterFootprint);
                         normalW = normalize(_beadBaseNormal - _beadCraterGradient * surfaceEffectBump * 2.0 * _beadCraterAa);
                     } else if (_isMachined > 0.5) {
                         vec3 _machinedBaseNormal = normalize(normalW);
@@ -3599,8 +3599,8 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     };
 
     if (surfaceEffect.key === 'bead-blast') {
-        profile.normalStrength = 0.006;
-        profile.noiseScale = 6.5;
+        profile.normalStrength = 0.003;
+        profile.noiseScale = 18.0;
     } else if (surfaceEffect.key === 'brushed') {
         profile.normalStrength = 0.010;
         profile.noiseScale = 0.035;
@@ -3979,8 +3979,8 @@ function getFinishModifiers(finishCode, materialKey = '') {
         return { roughnessOffset: 0.14, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.44 };
     }
     if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
-    if (lower.includes('bead'))   return { roughnessOffset: 0.24, metallicOffset: -0.03, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.58 };  // satin micro-etched aluminum
-    if (lower.includes('blast'))  return { roughnessOffset: 0.21, metallicOffset: -0.02, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.56 };  // satin micro-etched aluminum
+    if (lower.includes('bead'))   return { roughnessOffset: 0.36, metallicOffset: -0.08, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.76 };  // diffuse fine-particle micro-etched aluminum
+    if (lower.includes('blast'))  return { roughnessOffset: 0.34, metallicOffset: -0.07, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.74 };  // diffuse fine-particle micro-etched aluminum
     if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
     if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
     if (isSteelLikeMaterial(materialKey) && isRawMachinedFinish(lower)) {

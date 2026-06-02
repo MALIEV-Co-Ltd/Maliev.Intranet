@@ -576,13 +576,13 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     `, context);
 
     assert.equal(result.materialType, 'aluminum');
-    assert.ok(result.roughness >= 0.52 && result.roughness <= 0.62, `expected satin bead-blast roughness, got ${result.roughness}`);
-    assert.ok(result.metallic >= 0.90, `expected bead-blasted aluminum to stay metallic, got ${result.metallic}`);
+    assert.ok(result.roughness >= 0.72 && result.roughness <= 0.82, `expected diffuse bead-blast roughness, got ${result.roughness}`);
+    assert.ok(result.metallic >= 0.84 && result.metallic <= 0.90, `expected bead-blasted aluminum to keep metal response without mirror reflections, got ${result.metallic}`);
     assert.equal(result.effectKey, 'bead-blast');
     assert.equal(result.effectKind, 1);
-    assert.ok(result.effectScale >= 4.0, `expected fine bead-blast micrograin scale, got ${result.effectScale}`);
-    assert.ok(result.effectStrength <= 0.08, `expected low-amplitude bead-blast roughness variation, got ${result.effectStrength}`);
-    assert.ok(result.effectBump <= 0.08, `expected subtle bead-blast relief amplitude, got ${result.effectBump}`);
+    assert.ok(result.effectScale >= 16.0, `expected fine bead-blast micrograin scale, got ${result.effectScale}`);
+    assert.ok(result.effectStrength <= 0.045, `expected low-amplitude bead-blast roughness variation, got ${result.effectStrength}`);
+    assert.ok(result.effectBump <= 0.035, `expected fine particle bead-blast relief amplitude, got ${result.effectBump}`);
 });
 
 test('realistic configurator keeps intrinsic blue POM darker than the UI swatch override', () => {
@@ -969,11 +969,11 @@ test('bead blasted surface shader renders fine satin aluminum micrograin without
         });
     `, context);
 
-    assert.ok(result.roughness >= 0.52 && result.roughness <= 0.62, `expected satin bead-blast roughness, got ${result.roughness}`);
-    assert.ok(result.metallic >= 0.90, `expected bead-blasted aluminum to stay metallic, got ${result.metallic}`);
-    assert.ok(result.scale >= 4.0, `expected fine bead-blast grain scale, got ${result.scale}`);
-    assert.ok(result.strength <= 0.08, `expected subtle bead-blast roughness variation, got ${result.strength}`);
-    assert.ok(result.bump <= 0.08, `expected subtle bead-blast relief amplitude, got ${result.bump}`);
+    assert.ok(result.roughness >= 0.72 && result.roughness <= 0.82, `expected diffuse bead-blast roughness, got ${result.roughness}`);
+    assert.ok(result.metallic >= 0.84 && result.metallic <= 0.90, `expected bead-blasted aluminum to keep metal response without mirror reflections, got ${result.metallic}`);
+    assert.ok(result.scale >= 16.0, `expected fine bead-blast grain scale, got ${result.scale}`);
+    assert.ok(result.strength <= 0.045, `expected subtle bead-blast roughness variation, got ${result.strength}`);
+    assert.ok(result.bump <= 0.035, `expected fine particle bead-blast relief amplitude, got ${result.bump}`);
     assert.match(result.definitions, /malievHeightGradient/);
     assert.match(result.definitions, /malievSurfaceSpeckle/);
     assert.match(result.definitions, /malievBeadCraterHeight/);
@@ -1032,8 +1032,8 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
     assert.ok(result.machining.stripeScale <= 0.5);
     assert.ok(result.machining.stripeStrength <= 0.014);
 
-    assert.ok(result.beadBlast.noiseScale >= 4.0, `expected fine bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
-    assert.ok(result.beadBlast.normalStrength <= 0.008, `expected low bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
+    assert.ok(result.beadBlast.noiseScale >= 16.0, `expected fine bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
+    assert.ok(result.beadBlast.normalStrength <= 0.004, `expected low bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
 
     assert.equal(result.fdm.layerWaveform, 'sine');
     assert.ok(result.fdm.layerHeightMm >= 0.8);
