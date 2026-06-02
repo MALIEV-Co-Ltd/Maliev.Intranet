@@ -791,11 +791,26 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
             mjf: (() => {
                 configureMaterialFromConfigurator('viewer', 'nylon-powder', null, 'AS_PRINTED', null, 'MJF');
                 setRenderMode('viewer', 'realistic');
+                const material = scene.meshes[0].material;
+                const powderPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+                const powderCustomCode = powderPlugin?.getCustomCode('fragment') ?? {};
                 return {
                     materialType: materialTypes.viewer,
-                    roughness: scene.meshes[0].material?.roughness ?? null,
-                    effectKey: scene.meshes[0].material?._malievSurfaceEffect?.key ?? null,
-                    effectKind: scene.meshes[0].material?._malievSurfaceEffect?.kind ?? null
+                    roughness: material?.roughness ?? null,
+                    albedoR: material?.albedoColor?.r ?? null,
+                    albedoB: material?.albedoColor?.b ?? null,
+                    effectKey: material?._malievSurfaceEffect?.key ?? null,
+                    effectKind: material?._malievSurfaceEffect?.kind ?? null,
+                    effectScale: material?._malievSurfaceEffect?.scale ?? null,
+                    effectStrength: material?._malievSurfaceEffect?.strength ?? null,
+                    effectBump: material?._malievSurfaceEffect?.bump ?? null,
+                    layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? null,
+                    pluginNames: material?._pluginInstances?.map(plugin => plugin.name) ?? [],
+                    definitions: powderCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+                    beforeLights: powderCustomCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
+                    updateAlbedo: powderCustomCode.CUSTOM_FRAGMENT_UPDATE_ALBEDO ?? '',
+                    updateMetallicRoughness: powderCustomCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
+                    beforeFragColor: powderCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
                 };
             })(),
             slsEffect: (() => {
@@ -808,9 +823,26 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
 
     assert.equal(result.powderPresetExists, true);
     assert.equal(result.mjf.materialType, 'nylon-powder');
-    assert.ok(result.mjf.roughness >= 0.68);
+    assert.ok(result.mjf.roughness >= 0.80, `expected matte raw powder-bed nylon roughness, got ${result.mjf.roughness}`);
+    assert.ok(result.mjf.albedoR <= 0.62 && result.mjf.albedoB <= 0.62, `expected cool grey raw powder nylon, got r=${result.mjf.albedoR} b=${result.mjf.albedoB}`);
     assert.equal(result.mjf.effectKey, 'powder-grain');
     assert.equal(result.mjf.effectKind, 3);
+    assert.ok(result.mjf.effectScale >= 3.5 && result.mjf.effectScale <= 6.5, `expected fine powder grain scale, got ${result.mjf.effectScale}`);
+    assert.ok(result.mjf.effectStrength >= 0.18, `expected visible powder speckle strength, got ${result.mjf.effectStrength}`);
+    assert.ok(result.mjf.effectBump >= 0.20, `expected tactile powder bump, got ${result.mjf.effectBump}`);
+    assert.equal(result.mjf.layerLineStrength, 0);
+    assert.ok(!result.mjf.pluginNames.includes('FdmLayer'), 'MJF/SLS powder texture should not include FDM layer-line ridges');
+    assert.match(result.mjf.definitions, /malievPowderFineSpeckle/);
+    assert.match(result.mjf.definitions, /malievPowderBedPores/);
+    assert.match(result.mjf.definitions, /malievPowderBedHeight/);
+    assert.match(result.mjf.definitions, /malievPowderBedAa/);
+    assert.match(result.mjf.beforeLights, /_isPowder/);
+    assert.match(result.mjf.beforeLights, /normalW\s*=\s*normalize/);
+    assert.match(result.mjf.updateAlbedo, /malievPowderFineSpeckle/);
+    assert.match(result.mjf.updateAlbedo, /malievPowderBedPores/);
+    assert.match(result.mjf.updateMetallicRoughness, /_powderPores/);
+    assert.match(result.mjf.beforeFragColor, /_powderPoreShadow/);
+    assert.match(result.mjf.beforeFragColor, /_powderFine/);
     assert.equal(result.slsEffect, 'powder-grain');
 });
 

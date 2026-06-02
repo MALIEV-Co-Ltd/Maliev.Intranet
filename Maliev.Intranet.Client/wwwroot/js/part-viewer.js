@@ -209,9 +209,9 @@ const CONFIG = {
             roughness: 0.52,
         },
         'nylon-powder': {
-            albedoColor: { r: 0.70, g: 0.69, b: 0.65 },
+            albedoColor: { r: 0.56, g: 0.57, b: 0.55 },
             metallic: 0.0,
-            roughness: 0.72,
+            roughness: 0.84,
         },
         'peek': {
             albedoColor: { r: 0.70, g: 0.67, b: 0.62 },
@@ -3264,11 +3264,11 @@ const SURFACE_EFFECTS = {
     'powder-grain': {
         key: 'powder-grain',
         kind: 3,
-        scale: 1.2,        // ~0.83 mm sintered grain
-        strength: 0.13,
+        scale: 4.6,        // ~0.22 mm sintered nylon powder grain
+        strength: 0.22,
         stripeScale: 0.0,
         stripeStrength: 0.0,
-        bump: 0.15,
+        bump: 0.24,
     },
 };
 
@@ -3398,7 +3398,39 @@ function getSurfaceEffectPluginClass() {
                     float nx11 = mix(n011, n111, f.x);
                     return mix(mix(nx00, nx10, f.y), mix(nx01, nx11, f.y), f.z);
                 }
+                float malievPowderBedAa(vec3 p, float scl) {
+                    float footprint = max(
+                        length(dFdx(p * scl)),
+                        length(dFdy(p * scl)));
+                    return 1.0 - smoothstep(1.10, 2.80, footprint);
+                }
+                float malievPowderFineSpeckle(vec3 p, float scl) {
+                    float fine = malievVNoise(p * scl * 3.6 + vec3(5.7, 19.1, 37.3));
+                    float finer = malievVNoise(p * scl * 7.4 + vec3(41.0, 11.0, 23.0));
+                    return clamp(fine * 0.62 + finer * 0.38, 0.0, 1.0);
+                }
+                float malievPowderBedPores(vec3 p, float scl) {
+                    float openPores = smoothstep(
+                        0.70,
+                        0.96,
+                        malievVNoise(p * scl * 1.7 + vec3(29.0, 7.0, 13.0)));
+                    float pinPores = smoothstep(
+                        0.78,
+                        0.98,
+                        malievVNoise(p * scl * 5.1 + vec3(3.0, 47.0, 17.0)));
+                    return clamp(openPores * 0.58 + pinPores * 0.42, 0.0, 1.0);
+                }
+                float malievPowderBedHeight(vec3 p, float scl) {
+                    float aggregate = malievVNoise(p * scl * 0.72 + vec3(2.0, 13.0, 5.0));
+                    float grain = malievVNoise(p * scl * 1.85 + vec3(17.0, 3.0, 31.0));
+                    float fine = malievPowderFineSpeckle(p, scl);
+                    float pores = malievPowderBedPores(p, scl);
+                    return clamp(aggregate * 0.28 + grain * 0.36 + fine * 0.36 - pores * 0.18, 0.0, 1.0);
+                }
                 float malievSurfaceSpeckle(vec3 p, float kind, float scl) {
+                    if (kind >= 2.5 && kind < 3.5) {
+                        return malievPowderFineSpeckle(p, scl);
+                    }
                     float cellScale = kind < 1.5 ? max(scl, 2.0) : max(scl * 1.35, 1.0);
                     return malievVNoise(p * cellScale) * 0.68
                         + malievVNoise(p * cellScale * 2.35 + vec3(17.0, 31.0, 11.0)) * 0.32;
@@ -3468,8 +3500,8 @@ function getSurfaceEffectPluginClass() {
                         float lines = sin(p.y * sScl) * 0.5 + 0.5;
                         return lines * 0.78 + malievVNoise(vec3(p.x * scl * 3.0, p.y * scl, p.z * scl)) * 0.22;
                     } else if (kind < 3.5) {
-                        // Powder (MJF/SLS): coarse 2-octave sintered grain.
-                        return malievVNoise(p * scl) * 0.6 + malievVNoise(p * scl * 2.3) * 0.4;
+                        // Powder (MJF/SLS): sintered nylon aggregate, fine powder, and darker pores.
+                        return malievPowderBedHeight(p, scl);
                     }
                     // CNC as-machined: face milling (top/bottom) vs side milling (walls).
                     float fa = sin(p.x * sScl) * 0.5 + 0.5;        // feed cross-hatch in XY
@@ -3502,6 +3534,7 @@ function getSurfaceEffectPluginClass() {
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
+                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
                     float _isMachined = step(3.5, surfaceEffectKind);
                     if (_isBead > 0.5) {
                         vec3 _beadBaseNormal = normalize(normalW);
@@ -3515,6 +3548,17 @@ function getSurfaceEffectPluginClass() {
                             surfaceEffectScale);
                         float _beadCraterAa = 1.0 - smoothstep(0.25, 0.75, _beadCraterFootprint);
                         normalW = normalize(_beadBaseNormal - _beadCraterGradient * surfaceEffectBump * 2.0 * _beadCraterAa);
+                    } else if (_isPowder > 0.5) {
+                        vec3 _powderBaseNormal = normalize(normalW);
+                        float _powderUp = abs(_powderBaseNormal.z);
+                        vec3 _powderGradient = malievHeightGradient(
+                            vPositionW,
+                            surfaceEffectKind,
+                            surfaceEffectScale,
+                            surfaceEffectStripeScale,
+                            _powderUp);
+                        float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
+                        normalW = normalize(_powderBaseNormal - _powderGradient * surfaceEffectBump * 0.72 * _powderAa);
                     } else if (_isMachined > 0.5) {
                         vec3 _machinedBaseNormal = normalize(normalW);
                         float _machinedUp = abs(_machinedBaseNormal.z);
@@ -3541,6 +3585,10 @@ function getSurfaceEffectPluginClass() {
                     float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _up);
                     float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
+                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
+                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
+                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
                     float _relief = malievSurfaceRelief(
                         vPositionW,
                         surfaceEffectKind,
@@ -3549,12 +3597,17 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectBump,
                         _up);
                     float _grainAmplitude = mix(surfaceEffectBump, surfaceEffectStrength, _isBead);
-                    float _grain = (_h - 0.5) * _grainAmplitude * mix(0.72, 0.04, _isBead)
+                    float _standardGrain = (_h - 0.5) * _grainAmplitude * mix(0.72, 0.04, _isBead)
                         + (_speckle - 0.5) * _grainAmplitude * mix(0.24, 0.03, _isBead);
+                    float _powderGrain = ((_h - 0.5) * 0.55
+                            + (_powderFine - 0.5) * 1.15
+                            - _powderPores * 0.85)
+                        * surfaceEffectStrength * _powderAa;
+                    float _grain = mix(_standardGrain, _powderGrain, _isPowder);
                     surfaceAlbedo *= clamp(
-                        1.0 + _grain + _relief * mix(0.22, 0.0, _isBead),
-                        mix(0.75, 0.97, _isBead),
-                        mix(1.20, 1.03, _isBead));
+                        1.0 + _grain + _relief * mix(mix(0.22, 0.0, _isBead), 0.18, _isPowder),
+                        mix(mix(0.75, 0.97, _isBead), 0.58, _isPowder),
+                        mix(mix(1.20, 1.03, _isBead), 1.24, _isPowder));
                 }
                 #endif
             `,
@@ -3568,13 +3621,22 @@ function getSurfaceEffectPluginClass() {
                     float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
                     float _ra = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
-                    metallicRoughness.g = clamp(
+                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
+                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
+                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
+                    float _standardRoughness = clamp(
                         metallicRoughness.g
                             + ((_h - 0.5) * mix(0.72, 0.10, _isBead)
                                 + (_speckle - 0.5) * mix(0.45, 0.08, _isBead))
                                 * _ra * mix(1.6, 0.45, _isBead),
                         0.06,
                         1.0);
+                    float _powderRoughness = clamp(
+                        metallicRoughness.g + 0.03 + (_powderFine * 0.08 + _powderPores * 0.12) * _powderAa,
+                        0.82,
+                        1.0);
+                    metallicRoughness.g = mix(_standardRoughness, _powderRoughness, _isPowder);
                     metallicRoughness.g = max(metallicRoughness.g, mix(0.0, 0.88, _isBead));
                 }
                 #endif
@@ -3596,6 +3658,11 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectKind,
                         surfaceEffectScale);
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
+                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
+                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
+                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
+                    float _powderPoreShadow = _powderPores * surfaceEffectStrength * 1.15 * _powderAa;
                     float _finalBeadH = malievBeadCraterHeight(vPositionW, normalize(normalW), surfaceEffectScale);
                     float _finalSurfaceH = mix(_finalH, _finalBeadH, _isBead);
                     float _finalRelief = malievSurfaceRelief(
@@ -3605,13 +3672,18 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectStripeScale,
                         surfaceEffectBump,
                         _finalUp);
+                    float _standardLight =
+                        (_finalSurfaceH - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.55, 0.02, _isBead)
+                        + (_finalSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.24, 0.015, _isBead)
+                        + _finalRelief * mix(0.18, 0.0, _isBead);
+                    float _powderLight =
+                        (_powderFine - 0.5) * surfaceEffectStrength * 0.85 * _powderAa
+                        - _powderPoreShadow
+                        + _finalRelief * 0.34 * _powderAa;
                     finalColor.rgb *= clamp(
-                        1.0
-                            + (_finalSurfaceH - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.55, 0.02, _isBead)
-                            + (_finalSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.24, 0.015, _isBead)
-                            + _finalRelief * mix(0.18, 0.0, _isBead),
-                        mix(0.78, 0.97, _isBead),
-                        mix(1.18, 1.03, _isBead));
+                        1.0 + mix(_standardLight, _powderLight, _isPowder),
+                        mix(mix(0.78, 0.97, _isBead), 0.62, _isPowder),
+                        mix(mix(1.18, 1.03, _isBead), 1.16, _isPowder));
                 }
                 #endif
             `,
@@ -3658,7 +3730,9 @@ function getAdditiveLayerLineStrength(canvasId, materialType) {
         return 0;
     }
 
-    if (isPowderBedProcess(processCode)) return 0.010;
+    // Powder-bed parts are built in layers, but their raw finish reads as isotropic
+    // sintered powder grain, not the visible ridges used for FDM/SLA surfaces.
+    if (isPowderBedProcess(processCode)) return 0;
     if (isFdmProcess(processCode)) return 0.022;
     return 0.016;
 }
@@ -3707,8 +3781,8 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
         profile.stripeScale = 0.34;
         profile.stripeStrength = 0.012;
     } else if (surfaceEffect.key === 'powder-grain') {
-        profile.normalStrength = 0.018;
-        profile.noiseScale = 0.48;
+        profile.normalStrength = 0.026;
+        profile.noiseScale = 0.22;
     }
 
     if (layerLineStrength > 0 && !profile.surfaceEffectKey) {
