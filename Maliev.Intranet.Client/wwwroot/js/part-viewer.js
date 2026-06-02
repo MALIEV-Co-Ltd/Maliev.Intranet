@@ -243,7 +243,7 @@ const CONFIG = {
         environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
         contrast: 1.15,
         exposure: 1.1,
-        environmentTextureSize: 512,
+        environmentTextureSize: 256,
         /** Edge angle threshold in degrees for normal smoothing. Edges sharper
          *  than this stay hard; gentler creases get blended. 0 = no smoothing,
          *  180 = fully smooth all edges. Raised from 55 to 75 to handle coarse
@@ -2981,87 +2981,115 @@ function updateAxisLabels(canvasId, scene, axesCam) {
 function getOrCreateEnvironmentTexture(scene, canvasId) {
     if (environmentTextures[canvasId]) return environmentTextures[canvasId];
 
-    const size = CONFIG.REALISTIC.environmentTextureSize || 512;
+    const size = CONFIG.REALISTIC.environmentTextureSize || 256;
+
+    function clamp01(value) {
+        return Math.max(0, Math.min(1, value));
+    }
+
+    function normalizeDirection(x, y, z) {
+        const len = Math.sqrt(x * x + y * y + z * z) || 1;
+        return { x: x / len, y: y / len, z: z / len };
+    }
+
+    function faceDirection(faceIndex, x, y) {
+        const u = ((x + 0.5) / size) * 2 - 1;
+        const v = ((y + 0.5) / size) * 2 - 1;
+
+        switch (faceIndex) {
+            case 0: return normalizeDirection( 1, -v, -u); // +X
+            case 1: return normalizeDirection(-1, -v,  u); // -X
+            case 2: return normalizeDirection( u,  1,  v); // +Y
+            case 3: return normalizeDirection( u, -1, -v); // -Y
+            case 4: return normalizeDirection( u, -v,  1); // +Z
+            case 5: return normalizeDirection(-u, -v, -1); // -Z
+            default: return normalizeDirection(0, 1, 0);
+        }
+    }
+
+    const studioLobes = {
+        overheadA: normalizeDirection(-0.18, 0.94, -0.28),
+        overheadB: normalizeDirection(0.22, 0.98, 0.18),
+        warmKey: normalizeDirection(-0.72, 0.22, 0.64),
+        coolFill: normalizeDirection(0.78, 0.18, -0.60),
+        rim: normalizeDirection(0.12, 0.38, -0.92),
+    };
+
+    function directionalLobe(direction, target, power, strength) {
+        const dot = direction.x * target.x + direction.y * target.y + direction.z * target.z;
+        return Math.pow(clamp01(dot), power) * strength;
+    }
+
+    function studioColor(direction) {
+        const sky = clamp01(direction.y * 0.5 + 0.5);
+        const floor = Math.pow(clamp01(-direction.y), 1.8);
+
+        // Continuous neutral studio gradient. Evaluating it from direction avoids
+        // cubemap face panels reflecting as a visible square grey room.
+        let r = 70 + sky * 110;
+        let g = 72 + sky * 110;
+        let b = 76 + sky * 108;
+
+        r = r * (1 - floor * 0.66) + 30 * floor * 0.66;
+        g = g * (1 - floor * 0.66) + 30 * floor * 0.66;
+        b = b * (1 - floor * 0.66) + 33 * floor * 0.66;
+
+        // Broad asymmetric softboxes: enough structure for metals, no hard room walls.
+        const overhead = directionalLobe(direction, studioLobes.overheadA, 7, 76)
+            + directionalLobe(direction, studioLobes.overheadB, 18, 88);
+        const warmKey = directionalLobe(direction, studioLobes.warmKey, 24, 86);
+        const coolFill = directionalLobe(direction, studioLobes.coolFill, 26, 62);
+        const rim = directionalLobe(direction, studioLobes.rim, 34, 58);
+
+        r += overhead + warmKey * 1.00 + coolFill * 0.48 + rim * 0.62;
+        g += overhead + warmKey * 0.88 + coolFill * 0.76 + rim * 0.74;
+        b += overhead * 0.95 + warmKey * 0.64 + coolFill * 1.04 + rim * 1.02;
+
+        // Low-frequency studio-card variation breaks mirror-flat wall reflections
+        // while staying soft enough that it will not read as a photographic room.
+        const frontCard = clamp01(direction.z) * 22;
+        const rearCard = clamp01(-direction.z) * 16;
+        const sideCard = clamp01(-direction.x) * 14;
+        r += frontCard + sideCard * 0.8 + rearCard * 0.45;
+        g += frontCard * 0.88 + sideCard * 0.82 + rearCard * 0.60;
+        b += frontCard * 0.62 + sideCard * 0.92 + rearCard;
+
+        return { r, g, b };
+    }
 
     /**
-     * Generates a graduated studio-lighting cube face as a raw RGBA Uint8Array.
-     * Identical visual output to the old canvas-gradient approach but fully
-     * synchronous — no Image.onload latency — so PBR materials are lit correctly
-     * on the very first rendered frame after file upload.
+     * Generates one face of a continuous procedural studio reflection cubemap.
+     * This keeps the zero-I/O startup path of RawCubeTexture while avoiding the
+     * box-room look caused by independent per-face wall gradients.
      *
-     * @param {number} r - red 0-255
-     * @param {number} g - green 0-255
-     * @param {number} b - blue 0-255
-     * @param {'top'|'bottom'|'side'} kind - gradient direction
+     * @param {number} faceIndex
      * @returns {Uint8Array} RGBA pixels, size×size×4 bytes
      */
-    function rawFace(r, g, b, kind) {
+    function rawFace(faceIndex) {
         const pixels = new Uint8Array(size * size * 4);
-        const cx = size / 2, cy = size / 2;
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let fr, fg, fb;
-
-                if (kind === 'top') {
-                    // Radial gradient: inner r=size*0.1, outer r=size*0.72
-                    // stop 0 → bright, stop 0.45 → base, stop 1 → dark
-                    const innerR = size * 0.1, outerR = size * 0.72;
-                    const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
-                    const t = Math.min(1, Math.max(0, (dist - innerR) / (outerR - innerR)));
-                    if (t <= 0.45) {
-                        const u = t / 0.45;
-                        fr = Math.min(255, r + 30) * (1 - u) + r * u;
-                        fg = Math.min(255, g + 30) * (1 - u) + g * u;
-                        fb = Math.min(255, b + 22) * (1 - u) + b * u;
-                    } else {
-                        const u = (t - 0.45) / 0.55;
-                        fr = r * (1 - u) + Math.max(0, r - 55) * u;
-                        fg = g * (1 - u) + Math.max(0, g - 55) * u;
-                        fb = b * (1 - u) + Math.max(0, b - 48) * u;
-                    }
-                } else if (kind === 'bottom') {
-                    // Flat base with radial shadow overlay (centre 5% alpha → edge 55% alpha)
-                    const innerR = size * 0.05, outerR = size * 0.8;
-                    const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
-                    const t = Math.min(1, Math.max(0, (dist - innerR) / (outerR - innerR)));
-                    const shadow = 0.05 + t * 0.50;
-                    fr = r * (1 - shadow);
-                    fg = g * (1 - shadow);
-                    fb = b * (1 - shadow);
-                } else {
-                    // Side — linear vertical gradient (top bright, bottom dark)
-                    const t = y / (size - 1);
-                    if (t <= 0.55) {
-                        const u = t / 0.55;
-                        fr = r - 18 * u;
-                        fg = g - 18 * u;
-                        fb = b - 18 * u;
-                    } else {
-                        const u = (t - 0.55) / 0.45;
-                        fr = (r - 18) - 17 * u;
-                        fg = (g - 18) - 17 * u;
-                        fb = (b - 18) - 17 * u;
-                    }
-                }
+                const direction = faceDirection(faceIndex, x, y);
+                const { r, g, b } = studioColor(direction);
 
                 const idx = (y * size + x) * 4;
-                pixels[idx]     = Math.round(Math.max(0, Math.min(255, fr)));
-                pixels[idx + 1] = Math.round(Math.max(0, Math.min(255, fg)));
-                pixels[idx + 2] = Math.round(Math.max(0, Math.min(255, fb)));
+                pixels[idx]     = Math.round(Math.max(0, Math.min(255, r)));
+                pixels[idx + 1] = Math.round(Math.max(0, Math.min(255, g)));
+                pixels[idx + 2] = Math.round(Math.max(0, Math.min(255, b)));
                 pixels[idx + 3] = 255;
             }
         }
         return pixels;
     }
 
-    // Studio lighting: bright softbox above, dark floor, neutral grey walls.
+    // Studio lighting: continuous neutral gradient plus softbox/card highlights.
     // Face order for BabylonJS CubeTexture: [+X, -X, +Y, -Y, +Z, -Z]
-    const sidePosX = rawFace(165, 165, 170, 'side');   // +X
-    const sideNegX = rawFace(165, 165, 170, 'side');   // -X
-    const top      = rawFace(238, 238, 232, 'top');     // +Y — overhead softbox
-    const bottom   = rawFace(42,  42,  45,  'bottom'); // -Y — dark floor
-    const sidePosZ = rawFace(165, 165, 170, 'side');   // +Z
-    const sideNegZ = rawFace(155, 155, 160, 'side');   // -Z — slightly darker back wall
+    const sidePosX = rawFace(0); // +X
+    const sideNegX = rawFace(1); // -X
+    const top      = rawFace(2); // +Y
+    const bottom   = rawFace(3); // -Y
+    const sidePosZ = rawFace(4); // +Z
+    const sideNegZ = rawFace(5); // -Z
 
     // RawCubeTexture receives typed arrays directly — zero async I/O, zero Image.onload
     // latency. The old CubeTexture.CreateFromImages approach loaded PNG data-URLs through
@@ -3077,6 +3105,8 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
         false,  // invertY
         BABYLON.Constants.TEXTURE_TRILINEAR_SAMPLINGMODE
     );
+    cube.name = '__maliev_studio_reflection__';
+    cube._malievEnvironmentKind = 'procedural-studio';
 
     scene.environmentTexture = cube;
     scene.environmentIntensity = CONFIG.REALISTIC.environmentIntensity;

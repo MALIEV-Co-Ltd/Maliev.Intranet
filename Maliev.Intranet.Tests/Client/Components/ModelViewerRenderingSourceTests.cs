@@ -71,13 +71,15 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
-    public void RealisticEnvironment_UsesHigherResolutionFilteredStudioCube()
+    public void RealisticEnvironment_UsesLightweightProceduralStudioCube()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
 
-        Assert.Contains("environmentTextureSize: 512", source, StringComparison.Ordinal);
-        Assert.Contains("const size = CONFIG.REALISTIC.environmentTextureSize || 512;", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("const size = 256;", source, StringComparison.Ordinal);
+        Assert.Contains("environmentTextureSize: 256", source, StringComparison.Ordinal);
+        Assert.Contains("const size = CONFIG.REALISTIC.environmentTextureSize || 256;", source, StringComparison.Ordinal);
+        Assert.Contains("function studioColor(direction)", source, StringComparison.Ordinal);
+        Assert.Contains("cube._malievEnvironmentKind = 'procedural-studio';", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("environmentTextureSize: 512", source, StringComparison.Ordinal);
     }
 
     [Fact]

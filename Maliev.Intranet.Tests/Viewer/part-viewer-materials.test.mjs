@@ -256,6 +256,22 @@ function makeScene(mesh) {
     };
 }
 
+function sampleRgb(face, size, x, y) {
+    const offset = (y * size + x) * 4;
+    return {
+        r: face[offset],
+        g: face[offset + 1],
+        b: face[offset + 2],
+    };
+}
+
+function colorDistance(a, b) {
+    return Math.sqrt(
+        ((a.r - b.r) * (a.r - b.r))
+        + ((a.g - b.g) * (a.g - b.g))
+        + ((a.b - b.b) * (a.b - b.b)));
+}
+
 test('solid CAD render mode prepares PBR environment lighting on first material assignment', () => {
     const context = loadViewerContext();
     const mesh = {
@@ -285,6 +301,41 @@ test('solid CAD render mode prepares PBR environment lighting on first material 
     assert.equal(result.rawCubeTextureCount, 1);
     assert.equal(result.environmentIntensity, 1);
     assert.equal(result.toneMappingEnabled, true);
+});
+
+test('procedural studio reflection map avoids flat grey cube-room side panels', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        setRenderMode('viewer', 'solid');
+        const cube = rawCubeTextures[0];
+        ({
+            size: cube.size,
+            posX: Array.from(cube.faces[0])
+        });
+    `, context);
+
+    const sideFace = result.posX;
+    const size = result.size;
+    const middleY = Math.floor(size * 0.50);
+    const left = sampleRgb(sideFace, size, Math.floor(size * 0.18), middleY);
+    const right = sampleRgb(sideFace, size, Math.floor(size * 0.82), middleY);
+    const horizontalVariation = colorDistance(left, right);
+
+    assert.ok(size <= 256, `expected lightweight synthetic environment, got ${size}px cubemap`);
+    assert.ok(
+        horizontalVariation >= 18,
+        `expected non-flat studio side reflection, got horizontal color distance ${horizontalVariation}`);
 });
 
 test('realistic render mode assigns a PBRMaterial that uses the scene environment (regression: metals rendered black via broken NodeMaterial reflection)', () => {
