@@ -864,7 +864,9 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
                 setRenderMode('viewer', 'realistic');
                 const material = scene.meshes[0].material;
                 const powderPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+                const layerPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'FdmLayer');
                 const powderCustomCode = powderPlugin?.getCustomCode('fragment') ?? {};
+                const layerCustomCode = layerPlugin?.getCustomCode('fragment') ?? {};
                 return {
                     materialType: materialTypes.viewer,
                     roughness: material?.roughness ?? null,
@@ -875,19 +877,28 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
                     effectScale: material?._malievSurfaceEffect?.scale ?? null,
                     effectStrength: material?._malievSurfaceEffect?.strength ?? null,
                     effectBump: material?._malievSurfaceEffect?.bump ?? null,
+                    layerHeightMm: layerPlugin?._layerHeightMm ?? null,
                     layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? null,
+                    layerBump: layerPlugin?._layerBump ?? null,
                     pluginNames: material?._pluginInstances?.map(plugin => plugin.name) ?? [],
                     definitions: powderCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
                     beforeLights: powderCustomCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
                     updateAlbedo: powderCustomCode.CUSTOM_FRAGMENT_UPDATE_ALBEDO ?? '',
                     updateMetallicRoughness: powderCustomCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
-                    beforeFragColor: powderCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
+                    beforeFragColor: powderCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? '',
+                    layerDefinitions: layerCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+                    layerBeforeFragColor: layerCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
                 };
             })(),
             slsEffect: (() => {
                 configureMaterialFromConfigurator('viewer', 'nylon-powder', null, 'DYED_BLACK', null, 'SLS');
                 setRenderMode('viewer', 'realistic');
-                return scene.meshes[0].material?._malievSurfaceEffect?.key ?? null;
+                const material = scene.meshes[0].material;
+                const layerPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'FdmLayer');
+                return {
+                    effectKey: material?._malievSurfaceEffect?.key ?? null,
+                    layerHeightMm: layerPlugin?._layerHeightMm ?? null
+                };
             })()
         });
     `, context);
@@ -901,12 +912,16 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.ok(result.mjf.effectScale >= 3.5 && result.mjf.effectScale <= 6.5, `expected fine powder grain scale, got ${result.mjf.effectScale}`);
     assert.ok(result.mjf.effectStrength >= 0.18, `expected visible powder speckle strength, got ${result.mjf.effectStrength}`);
     assert.ok(result.mjf.effectBump >= 0.20, `expected tactile powder bump, got ${result.mjf.effectBump}`);
-    assert.equal(result.mjf.layerLineStrength, 0);
-    assert.ok(!result.mjf.pluginNames.includes('FdmLayer'), 'MJF/SLS powder texture should not include FDM layer-line ridges');
+    assert.ok(result.mjf.layerLineStrength >= 0.016 && result.mjf.layerLineStrength <= 0.022, `expected visible powder-bed layer strength, got ${result.mjf.layerLineStrength}`);
+    assert.ok(Math.abs(result.mjf.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm MJF/SLS layer height, got ${result.mjf.layerHeightMm}`);
+    assert.ok(result.mjf.layerBump >= 0.10 && result.mjf.layerBump <= 0.14, `expected visible powder-bed layer bump mixed with grain, got ${result.mjf.layerBump}`);
+    assert.ok(result.mjf.pluginNames.includes('FdmLayer'), 'MJF/SLS powder texture should include additive layer-line relief');
     assert.match(result.mjf.definitions, /malievPowderFineSpeckle/);
     assert.match(result.mjf.definitions, /malievPowderBedPores/);
     assert.match(result.mjf.definitions, /malievPowderBedHeight/);
     assert.match(result.mjf.definitions, /malievPowderBedAa/);
+    assert.match(result.mjf.layerDefinitions, /malievFdmLayerStepRelief/);
+    assert.match(result.mjf.layerBeforeFragColor, /malievFdmLayerRelief/);
     assert.match(result.mjf.beforeLights, /_isPowder/);
     assert.match(result.mjf.beforeLights, /normalW\s*=\s*normalize/);
     assert.match(result.mjf.updateAlbedo, /malievPowderFineSpeckle/);
@@ -914,7 +929,8 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.match(result.mjf.updateMetallicRoughness, /_powderPores/);
     assert.match(result.mjf.beforeFragColor, /_powderPoreShadow/);
     assert.match(result.mjf.beforeFragColor, /_powderFine/);
-    assert.equal(result.slsEffect, 'powder-grain');
+    assert.equal(result.slsEffect.effectKey, 'powder-grain');
+    assert.ok(Math.abs(result.slsEffect.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm SLS layer height, got ${result.slsEffect.layerHeightMm}`);
 });
 
 test('realistic configurator uses PBRMaterial + plugins carrying procedural surface profiles for textured finishes', () => {
@@ -946,14 +962,17 @@ test('realistic configurator uses PBRMaterial + plugins carrying procedural surf
                 nodeEffectKey: material?._malievNodeMaterialProfile?.surfaceEffectKey ?? null,
                 normalStrength: material?._malievNodeMaterialProfile?.normalStrength ?? 0,
                 stripeStrength: material?._malievNodeMaterialProfile?.stripeStrength ?? 0,
-                layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? 0
+                layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? 0,
+                layerHeightMm: material?._malievNodeMaterialProfile?.layerHeightMm ?? 0,
+                layerBump: material?._malievNodeMaterialProfile?.layerBump ?? 0
             };
         };
         ({
             beadBlast: snapshot('aluminum', 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL'),
             brushed: snapshot('aluminum', 'BRUSHED', 'RA_1_6', 'CNC_MILL'),
             fdm: snapshot('pla', 'AS_PRINTED', null, 'FDM'),
-            sla: snapshot('resin', 'AS_PRINTED', null, 'SLA')
+            sla: snapshot('resin', 'AS_PRINTED', null, 'SLA'),
+            powder: snapshot('nylon-powder', 'AS_PRINTED', null, 'MJF')
         });
     `, context);
 
@@ -973,10 +992,18 @@ test('realistic configurator uses PBRMaterial + plugins carrying procedural surf
     assert.equal(result.fdm.isPbr, true);
     assert.equal(result.fdm.nodeEffectKey, 'fdm-layer-lines');
     assert.ok(result.fdm.layerLineStrength > 0, 'FDM printing should include visible layer-line detail');
+    assert.ok(Math.abs(result.fdm.layerHeightMm - 0.2) < 0.001, `expected 0.2 mm FDM layer height, got ${result.fdm.layerHeightMm}`);
+    assert.ok(result.fdm.layerBump >= 0.20, `expected FDM profile to carry protruding extrusion-ridge bump, got ${result.fdm.layerBump}`);
 
     assert.equal(result.sla.isPbr, true);
     assert.equal(result.sla.nodeEffectKey, 'fdm-layer-lines');
     assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line detail');
+
+    assert.equal(result.powder.isPbr, true);
+    assert.equal(result.powder.effectKey, 'powder-grain');
+    assert.equal(result.powder.nodeEffectKey, 'powder-grain');
+    assert.ok(result.powder.layerLineStrength > 0, 'MJF/SLS printing should include visible 0.3 mm layer stepping');
+    assert.ok(Math.abs(result.powder.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm MJF/SLS layer height, got ${result.powder.layerHeightMm}`);
 });
 
 test('realistic material plugins enable Babylon shader defines through plugin API', () => {
@@ -1028,6 +1055,7 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
             fdmLayerStrength: fdmPlugin?._layerStrength ?? null,
             fdmLayerBump: fdmPlugin?._layerBump ?? null,
             fdmProfileLayerStrength: fdmProfile.layerLineStrength ?? null,
+            fdmProfileLayerBump: fdmProfile.layerBump ?? null,
             fdmDefinitions: fdmCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
             fdmBeforeLights: fdmCustomCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
             fdmUpdateMetallicRoughness: fdmCustomCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
@@ -1043,8 +1071,11 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
     assert.equal(result.fdmDefine, true);
     assert.equal(result.fdmLayerHeight, result.fdmProfileLayerHeight);
     assert.equal(result.fdmLayerStrength, result.fdmProfileLayerStrength);
-    assert.ok(result.fdmLayerBump >= 0.13 && result.fdmLayerBump <= 0.18, `expected pronounced FDM extrusion-ridge bump, got ${result.fdmLayerBump}`);
+    assert.equal(result.fdmLayerBump, result.fdmProfileLayerBump);
+    assert.ok(Math.abs(result.fdmLayerHeight - 0.2) < 0.001, `expected 0.2 mm FDM layer height, got ${result.fdmLayerHeight}`);
+    assert.ok(result.fdmLayerBump >= 0.20 && result.fdmLayerBump <= 0.26, `expected pronounced FDM extrusion-ridge bump, got ${result.fdmLayerBump}`);
     assert.match(result.fdmDefinitions, /malievFdmLayerAa/);
+    assert.match(result.fdmDefinitions, /malievFdmLayerStepRelief/);
     assert.match(result.fdmDefinitions, /malievFdmLayerRelief/);
     assert.match(result.fdmDefinitions, /malievFdmLayerRidge/);
     assert.match(result.fdmDefinitions, /dFdx/);
@@ -1193,7 +1224,8 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
             brushed: profile('aluminum', 'BRUSHED', 'RA_1_6', 'CNC_MILL'),
             machining: profile('aluminum', 'AS_MACHINED', 'RA_1_6', 'CNC_MILL'),
             beadBlast: profile('aluminum', 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL'),
-            fdm: profile('pla', 'AS_PRINTED', null, 'FDM')
+            fdm: profile('pla', 'AS_PRINTED', null, 'FDM'),
+            powder: profile('nylon-powder', 'AS_PRINTED', null, 'MJF')
         });
     `, context);
 
@@ -1209,9 +1241,15 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
     assert.ok(result.beadBlast.noiseScale >= 8.8 && result.beadBlast.noiseScale <= 10.5, `expected larger visible bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
     assert.ok(result.beadBlast.normalStrength >= 0.006 && result.beadBlast.normalStrength <= 0.008, `expected readable bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
 
-    assert.equal(result.fdm.layerWaveform, 'sine');
-    assert.ok(result.fdm.layerHeightMm >= 0.8);
-    assert.ok(result.fdm.layerLineStrength <= 0.025);
+    assert.equal(result.fdm.layerWaveform, 'stepped-extrusion');
+    assert.ok(Math.abs(result.fdm.layerHeightMm - 0.2) < 0.001, `expected physical 0.2 mm FDM layer height, got ${result.fdm.layerHeightMm}`);
+    assert.ok(result.fdm.layerLineStrength >= 0.03, `expected readable FDM layer strength, got ${result.fdm.layerLineStrength}`);
+    assert.ok(result.fdm.layerBump >= 0.20, `expected FDM protrusion/recess bump, got ${result.fdm.layerBump}`);
+
+    assert.equal(result.powder.layerWaveform, 'powder-bed-step');
+    assert.ok(Math.abs(result.powder.layerHeightMm - 0.3) < 0.001, `expected physical 0.3 mm MJF/SLS layer height, got ${result.powder.layerHeightMm}`);
+    assert.ok(result.powder.layerLineStrength >= 0.016 && result.powder.layerLineStrength <= 0.022, `expected MJF/SLS powder profile to carry visible layer stepping, got ${result.powder.layerLineStrength}`);
+    assert.ok(result.powder.layerBump >= 0.10 && result.powder.layerBump <= 0.14, `expected visible powder-bed layer bump, got ${result.powder.layerBump}`);
 });
 
 test('realistic configurator replaces visible material without temporary color mutation', () => {

@@ -3063,10 +3063,10 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
     return cube;
 }
 
-// ── FDM layer-line MaterialPlugin ─────────────────────────────────────────────
-// Simulates FDM printing layer lines as filtered world-space normal relief.
+// ── Additive layer-line MaterialPlugin ───────────────────────────────────────
+// Simulates additive manufacturing layer lines as filtered world-space normal relief.
 // UV-independent: works on any GLB regardless of UV quality.
-// Applied only to FDM plastic presets in realistic mode.
+// Applied to layered additive presets in realistic mode.
 
 const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
 const ADDITIVE_LAYER_PRESET_KEYS = new Set([
@@ -3077,6 +3077,9 @@ const ADDITIVE_LAYER_PRESET_KEYS = new Set([
 ]);
 const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom']);
 const FDM_LAYER_EFFECT_KEY = 'fdm-layer-lines';
+const FDM_LAYER_HEIGHT_MM = 0.2;
+const POWDER_BED_LAYER_HEIGHT_MM = 0.3;
+const SLA_LAYER_HEIGHT_MM = 0.1;
 
 let FdmLayerPluginClass = null;
 
@@ -3092,9 +3095,15 @@ function getFdmLayerPluginClass() {
             const layerHeightMm = profile
                 ? profile.layerHeightMm
                 : profileOrLayerHeightMm;
-            this._layerHeightMm = clamp(Number(layerHeightMm) || 0.9, 0.05, 4.0);
+            this._layerHeightMm = clamp(Number(layerHeightMm) || FDM_LAYER_HEIGHT_MM, 0.05, 4.0);
             this._layerStrength = clamp(Number(profile?.layerLineStrength ?? layerStrength) || 0.016, 0.0, 0.05);
-            this._layerBump = clamp(Math.max(0.14, this._layerStrength * 6.4), 0.0, 0.18);
+            const requestedBump = Number(profile?.layerBump);
+            this._layerBump = clamp(
+                Number.isFinite(requestedBump)
+                    ? requestedBump
+                    : Math.max(0.14, this._layerStrength * 6.4),
+                0.0,
+                0.28);
             // Activate through Babylon's plugin API so shader defines are compiled.
             this._isEnabled = true;
             this._enable(this._isEnabled);
@@ -3131,17 +3140,32 @@ function getFdmLayerPluginClass() {
                 #ifdef FDMLAYER
                 float malievFdmLayerAa(float phase) {
                     float footprint = max(abs(dFdx(phase)), abs(dFdy(phase)));
-                    return 1.0 - smoothstep(0.40, 1.10, footprint);
+                    return 1.0 - smoothstep(0.70, 2.20, footprint);
+                }
+                float malievFdmLayerStepRelief(float phase) {
+                    float f = fract(phase);
+                    float lowerShoulder = exp(-pow((f - 0.10) / 0.055, 2.0));
+                    float upperShoulder = exp(-pow((f - 0.90) / 0.055, 2.0));
+                    float roundedBeadSlope = sin(f * 6.28318530718) * 0.18;
+                    return clamp((lowerShoulder - upperShoulder) * 1.25 + roundedBeadSlope, -1.45, 1.45);
                 }
                 float malievFdmLayerWave(float phase) {
-                    return sin(phase * 6.28318530718);
+                    return malievFdmLayerStepRelief(phase);
                 }
                 float malievFdmLayerRidge(float phase) {
-                    float ridge = cos(phase * 6.28318530718) * 0.5 + 0.5;
-                    return pow(ridge, 0.58);
+                    float f = fract(phase);
+                    float bead = pow(max(sin(f * 3.14159265359), 0.0), 0.42);
+                    float groove = max(
+                        exp(-pow(f / 0.085, 2.0)),
+                        exp(-pow((f - 1.0) / 0.085, 2.0)));
+                    return clamp(bead * 0.92 + (1.0 - groove) * 0.08, 0.0, 1.0);
                 }
                 float malievFdmLayerGroove(float phase) {
-                    return pow(1.0 - malievFdmLayerRidge(phase), 1.25);
+                    float f = fract(phase);
+                    float groove = max(
+                        exp(-pow(f / 0.09, 2.0)),
+                        exp(-pow((f - 1.0) / 0.09, 2.0)));
+                    return clamp(groove, 0.0, 1.0);
                 }
                 vec3 malievFdmDerivativeNormal(vec3 p) {
                     vec3 n = normalize(cross(dFdx(p), dFdy(p)) + vec3(0.0, 0.0, 0.0001));
@@ -3205,15 +3229,16 @@ function getFdmLayerPluginClass() {
                     float _fdmRelief = malievFdmLayerRelief(vPositionW, _fdmFinalPhase, fdmLayerBump);
                     float _fdmRidge = malievFdmLayerRidge(_fdmFinalPhase);
                     float _fdmGroove = malievFdmLayerGroove(_fdmFinalPhase);
-                    float _fdmRidgeHighlight = smoothstep(0.48, 0.94, _fdmRidge) * 0.16;
-                    float _fdmGrooveShadow = smoothstep(0.28, 0.90, _fdmGroove) * 0.23;
+                    float _fdmVisualGain = clamp(fdmLayerStrength / 0.034, 0.25, 1.15);
+                    float _fdmRidgeHighlight = smoothstep(0.42, 0.90, _fdmRidge) * 0.20 * _fdmVisualGain;
+                    float _fdmGrooveShadow = smoothstep(0.24, 0.86, _fdmGroove) * 0.32 * _fdmVisualGain;
                     float _fdmLayerLight = (
-                        _fdmRelief * 1.35
+                        _fdmRelief * (1.45 + _fdmVisualGain * 0.35)
                         + _fdmRidgeHighlight
                         - _fdmGrooveShadow)
                         * _fdmFinalSideMask
                         * _fdmFinalAa;
-                    finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.76, 1.28);
+                    finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.66, 1.36);
                 }
                 #endif
             `,
@@ -3733,17 +3758,45 @@ function isLayeredAdditiveProcess(processCode) {
         || process === 'SJS';
 }
 
+function getAdditiveLayerProfile(processCode) {
+    const process = String(processCode || '').trim().toUpperCase();
+    if (isFdmProcess(process)) {
+        return {
+            layerHeightMm: FDM_LAYER_HEIGHT_MM,
+            layerLineStrength: 0.034,
+            layerBump: 0.235,
+            layerWaveform: 'stepped-extrusion',
+        };
+    }
+
+    if (isPowderBedProcess(process)) {
+        return {
+            layerHeightMm: POWDER_BED_LAYER_HEIGHT_MM,
+            layerLineStrength: 0.018,
+            layerBump: 0.12,
+            layerWaveform: 'powder-bed-step',
+        };
+    }
+
+    if (process === 'SLA' || process === 'SLA_DLP' || process === 'DLP') {
+        return {
+            layerHeightMm: SLA_LAYER_HEIGHT_MM,
+            layerLineStrength: 0.014,
+            layerBump: 0.075,
+            layerWaveform: 'smooth-layer',
+        };
+    }
+
+    return null;
+}
+
 function getAdditiveLayerLineStrength(canvasId, materialType) {
     const processCode = perCanvasProcessCodes[canvasId];
     if (!ADDITIVE_LAYER_PRESET_KEYS.has(materialType) || !isLayeredAdditiveProcess(processCode)) {
         return 0;
     }
 
-    // Powder-bed parts are built in layers, but their raw finish reads as isotropic
-    // sintered powder grain, not the visible ridges used for FDM/SLA surfaces.
-    if (isPowderBedProcess(processCode)) return 0;
-    if (isFdmProcess(processCode)) return 0.022;
-    return 0.016;
+    return getAdditiveLayerProfile(processCode)?.layerLineStrength ?? 0;
 }
 
 function shouldApplyFdmLayerLines(canvasId, materialType) {
@@ -3754,6 +3807,9 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
     const layerLineStrength = getAdditiveLayerLineStrength(canvasId, materialType);
     const processCode = perCanvasProcessCodes[canvasId];
+    const layerProfile = layerLineStrength > 0
+        ? getAdditiveLayerProfile(processCode)
+        : null;
     const profile = {
         surfaceEffectKey: surfaceEffect.kind > 0 ? surfaceEffect.key : null,
         normalStrength: 0,
@@ -3763,15 +3819,10 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
         stripeStrength: 0,
         stripeWaveform: 'sine',
         layerAxis: 'z',
-        layerHeightMm: layerLineStrength > 0
-            ? isFdmProcess(processCode)
-                ? 0.9
-                : isPowderBedProcess(processCode)
-                    ? 1.35
-                    : 1.1
-            : 0,
+        layerHeightMm: layerProfile?.layerHeightMm ?? 0,
         layerLineStrength,
-        layerWaveform: 'sine',
+        layerBump: layerProfile?.layerBump ?? 0,
+        layerWaveform: layerProfile?.layerWaveform ?? 'none',
     };
 
     if (surfaceEffect.key === 'bead-blast') {
