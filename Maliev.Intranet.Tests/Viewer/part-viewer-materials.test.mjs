@@ -701,6 +701,74 @@ test('realistic configurator applies CNC machining surface effect when no finish
     assert.equal(result.effectKind, 4);
 });
 
+test('realistic configurator renders raw steel and stainless as bright machined metal', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshot = (materialKey, finishCode) => {
+            configureMaterialFromConfigurator('viewer', materialKey, null, finishCode, 'RA_1_6', 'CNC_MILL');
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            const surfacePlugin = material?._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+            const customCode = surfacePlugin?.getCustomCode('fragment') ?? {};
+            return {
+                materialName: material?.name ?? null,
+                albedoR: material?.albedoColor?.r ?? null,
+                albedoG: material?.albedoColor?.g ?? null,
+                albedoB: material?.albedoColor?.b ?? null,
+                metallic: material?.metallic ?? null,
+                roughness: material?.roughness ?? null,
+                anisotropyEnabled: material?.anisotropy?.isEnabled ?? false,
+                effectKey: material?._malievSurfaceEffect?.key ?? null,
+                effectKind: material?._malievSurfaceEffect?.kind ?? null,
+                effectStripeStrength: material?._malievSurfaceEffect?.stripeStrength ?? null,
+                effectBump: material?._malievSurfaceEffect?.bump ?? null,
+                profile: material?._malievNodeMaterialProfile ?? null,
+                beforeLights: customCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? ''
+            };
+        };
+        ({
+            steelRaw: snapshot('steel', 'RAW'),
+            stainlessRaw: snapshot('stainless-steel', 'RAW'),
+            stainlessMachined: snapshot('stainless-steel', 'AS_MACHINED')
+        });
+    `, context);
+
+    for (const [name, material] of Object.entries(result)) {
+        assert.equal(material.effectKey, 'machining', `${name} should show raw CNC machining marks`);
+        assert.equal(material.effectKind, 4, `${name} should use the machining surface effect`);
+        assert.ok(material.metallic >= 0.97, `${name} should stay highly metallic, got ${material.metallic}`);
+        assert.ok(material.roughness >= 0.20 && material.roughness <= 0.30, `${name} should be smooth raw metal, got ${material.roughness}`);
+        assert.equal(material.anisotropyEnabled, false, `${name} should not enable tangent-dependent anisotropy on CAD meshes`);
+        assert.ok(material.effectStripeStrength <= 0.025, `${name} machining marks should be subtle, got ${material.effectStripeStrength}`);
+        assert.ok(material.effectBump <= 0.016, `${name} machining bump should avoid scanline banding, got ${material.effectBump}`);
+        assert.equal(material.profile?.surfaceEffectKey, 'machining', `${name} profile should carry machining`);
+        assert.ok(material.profile?.stripeStrength >= 0.012, `${name} should keep visible directional tool marks`);
+        assert.match(material.beforeLights, /_isMachined/);
+        assert.match(material.beforeLights, /malievHeightGradient/);
+        assert.match(material.beforeLights, /normalW\s*=\s*normalize/);
+    }
+
+    assert.ok(result.steelRaw.albedoR >= 0.55, `expected raw steel to be bright silver-grey, got ${result.steelRaw.albedoR}`);
+    assert.ok(result.steelRaw.albedoB >= 0.52, `expected raw steel to avoid charcoal rendering, got ${result.steelRaw.albedoB}`);
+    assert.ok(result.stainlessRaw.albedoR >= 0.68, `expected raw stainless to be bright, got ${result.stainlessRaw.albedoR}`);
+    assert.ok(result.stainlessRaw.albedoB >= 0.66, `expected raw stainless to be bright neutral metal, got ${result.stainlessRaw.albedoB}`);
+    assert.equal(result.stainlessMachined.materialName, '__realistic_stainless-steel__');
+});
+
 test('realistic configurator applies powder-grain effect for MJF and SLS nylon powder', () => {
     const context = loadViewerContext();
     const mesh = {

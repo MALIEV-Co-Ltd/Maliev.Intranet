@@ -144,14 +144,14 @@ const CONFIG = {
             roughness: 0.34,
         },
         'steel': {
-            albedoColor: { r: 0.42, g: 0.42, b: 0.40 },
-            metallic: 0.95,
-            roughness: 0.45,
+            albedoColor: { r: 0.58, g: 0.59, b: 0.58 },
+            metallic: 0.98,
+            roughness: 0.27,
         },
         'stainless-steel': {
-            albedoColor: { r: 0.62, g: 0.62, b: 0.60 },
-            metallic: 0.95,
-            roughness: 0.12,
+            albedoColor: { r: 0.72, g: 0.73, b: 0.70 },
+            metallic: 0.98,
+            roughness: 0.24,
         },
         'black-pom': {
             albedoColor: { r: 0.06, g: 0.06, b: 0.06 },
@@ -3126,7 +3126,7 @@ function getFdmLayerPluginClass() {
 
 // ── Procedural manufacturing-surface MaterialPlugin ──────────────────────────
 // Adds subtle, UV-independent finish/process texture in realistic mode.
-// Effects are intentionally visual-only: they perturb the shaded colour, not geometry.
+// Effects are intentionally visual-only: they perturb the shaded colour and lighting normal, not geometry.
 
 // scale / stripeScale are world-space frequencies (approx cycles per mm): grain/mark spacing is approx
 // 1/scale mm (noise) or 2*pi/stripeScale mm (stripes). `bump` drives visible height-relief contrast; strength +
@@ -3164,10 +3164,10 @@ const SURFACE_EFFECTS = {
         key: 'machining',
         kind: 4,           // orientation-aware CNC tool marks (face vs side milling); distinct from brushed (2)
         scale: 1.0,
-        strength: 0.04,
-        stripeScale: 4.5,  // ~1.4 mm tool-mark pitch
-        stripeStrength: 0.12,
-        bump: 0.12,        // visible feed-ridge contrast
+        strength: 0.012,
+        stripeScale: 4.2,  // fine raw-machined feed marks for bright steel/stainless reflections
+        stripeStrength: 0.020,
+        bump: 0.014,       // subtle tool-mark normal bump; raw steel should be polished, not gouged
     },
     'powder-grain': {
         key: 'powder-grain',
@@ -3211,7 +3211,9 @@ function shouldApplyMachiningEffect(finishCode) {
         || lower.includes('turn')
         || lower.includes('ra')
         || lower.includes('standard')
-        || lower.includes('as_');
+        || lower.includes('as_')
+        || lower.includes('raw')
+        || lower.includes('unfinished');
 }
 
 function resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers) {
@@ -3408,6 +3410,7 @@ function getSurfaceEffectPluginClass() {
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
+                    float _isMachined = step(3.5, surfaceEffectKind);
                     if (_isBead > 0.5) {
                         vec3 _beadBaseNormal = normalize(normalW);
                         vec3 _beadCraterGradient = malievBeadCraterGradient(
@@ -3420,6 +3423,20 @@ function getSurfaceEffectPluginClass() {
                             surfaceEffectScale);
                         float _beadCraterAa = 1.0 - smoothstep(0.38, 1.05, _beadCraterFootprint);
                         normalW = normalize(_beadBaseNormal - _beadCraterGradient * surfaceEffectBump * 2.0 * _beadCraterAa);
+                    } else if (_isMachined > 0.5) {
+                        vec3 _machinedBaseNormal = normalize(normalW);
+                        float _machinedUp = abs(_machinedBaseNormal.z);
+                        vec3 _machinedGradient = malievHeightGradient(
+                            vPositionW,
+                            surfaceEffectKind,
+                            surfaceEffectScale,
+                            surfaceEffectStripeScale,
+                            _machinedUp);
+                        float _machinedFootprint = max(
+                            length(dFdx(vPositionW * surfaceEffectStripeScale)),
+                            length(dFdy(vPositionW * surfaceEffectStripeScale)));
+                        float _machinedAa = 1.0 - smoothstep(0.75, 1.65, _machinedFootprint);
+                        normalW = normalize(_machinedBaseNormal - _machinedGradient * surfaceEffectBump * 0.16 * _machinedAa);
                     }
                 }
                 #endif
@@ -3880,7 +3897,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     const customAlbedo = resolveConfiguratorCustomAlbedo(materialKey, colorHex);
 
     // Determine roughness/metallic modifiers from finish type
-    const finishModifiers = getFinishModifiers(finishCode);
+    const finishModifiers = getFinishModifiers(finishCode, materialKey);
     // Ra roughness code overrides the finish-derived roughness with an absolute value
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
     const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
@@ -3937,7 +3954,23 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
  * Returns roughness and metallic offsets for a given surface finish code.
  * These are added to the material preset's base values.
  */
-function getFinishModifiers(finishCode) {
+function isSteelLikeMaterial(materialKey) {
+    return materialKey === 'steel' || materialKey === 'stainless-steel';
+}
+
+function isRawMachinedFinish(lowerFinishCode) {
+    return !lowerFinishCode
+        || lowerFinishCode.includes('raw')
+        || lowerFinishCode.includes('unfinished')
+        || lowerFinishCode.includes('as_machined')
+        || lowerFinishCode.includes('as-machined')
+        || lowerFinishCode.includes('machined')
+        || lowerFinishCode.includes('machine')
+        || lowerFinishCode.includes('standard')
+        || lowerFinishCode.includes('ra_');
+}
+
+function getFinishModifiers(finishCode, materialKey = '') {
     const lower = (finishCode || '').toLowerCase();
     if (lower.includes('mirror') || lower.includes('electropolish') || lower.includes('polish')) {
         return { roughnessOffset: -0.22, metallicOffset: 0.03, surfaceEffectKey: null, absoluteRoughness: 0.045 };
@@ -3950,6 +3983,9 @@ function getFinishModifiers(finishCode) {
     if (lower.includes('blast'))  return { roughnessOffset: 0.21, metallicOffset: -0.02, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.56 };  // satin micro-etched aluminum
     if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
     if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
+    if (isSteelLikeMaterial(materialKey) && isRawMachinedFinish(lower)) {
+        return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null, absoluteRoughness: 0.26 };
+    }
     return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null };
 }
 
