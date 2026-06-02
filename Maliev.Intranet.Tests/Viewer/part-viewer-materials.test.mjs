@@ -1342,7 +1342,7 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
     assert.ok(result.powder.layerBump >= 0.10 && result.powder.layerBump <= 0.14, `expected visible powder-bed layer bump, got ${result.powder.layerBump}`);
 });
 
-test('realistic configurator replaces visible material without temporary color mutation', () => {
+test('realistic configurator updates visible material without temporary color mutation', () => {
     const context = loadViewerContext();
     const mesh = {
         name: 'part',
@@ -1376,7 +1376,7 @@ test('realistic configurator replaces visible material without temporary color m
         ({
             oldMaterialColorWriteCount: oldMaterialColorWrites.length,
             oldMaterialColorWrites,
-            materialWasReplaced: currentMaterial !== previousMaterial,
+            materialReferenceStable: currentMaterial === previousMaterial,
             currentR: Number(currentMaterial.albedoColor.r.toFixed(3)),
             currentG: Number(currentMaterial.albedoColor.g.toFixed(3)),
             currentB: Number(currentMaterial.albedoColor.b.toFixed(3)),
@@ -1384,12 +1384,63 @@ test('realistic configurator replaces visible material without temporary color m
         });
     `, context);
 
-    assert.equal(result.oldMaterialColorWriteCount, 0);
-    assert.equal(result.materialWasReplaced, true);
+    assert.equal(result.oldMaterialColorWriteCount, 1);
+    const roundedColorWrites = JSON.parse(JSON.stringify(result.oldMaterialColorWrites.map(write => ({
+        r: Number(write.r.toFixed(3)),
+        g: Number(write.g.toFixed(3)),
+        b: Number(write.b.toFixed(3)),
+    }))));
+    assert.deepEqual(roundedColorWrites, [{ r: 0.4, g: 0.6, b: 0.2 }]);
+    assert.equal(result.materialReferenceStable, true);
     assert.equal(result.currentR, 0.4);
     assert.equal(result.currentG, 0.6);
     assert.equal(result.currentB, 0.2);
     assert.equal(result.currentEffectKey, 'bead-blast');
+});
+
+test('realistic configurator reuses material for CNC finish switches to avoid shader recompilation stalls', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const asMachinedMaterial = scene.meshes[0].material;
+        const materialCountAfterMachined = scene.materials.length;
+
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL');
+        const beadBlastMaterial = scene.meshes[0].material;
+
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BRUSHED', 'RA_1_6', 'CNC_MILL');
+        const brushedMaterial = scene.meshes[0].material;
+
+        ({
+            materialReferenceStable: asMachinedMaterial === beadBlastMaterial && beadBlastMaterial === brushedMaterial,
+            materialCountAfterMachined,
+            materialCountAfterSwitches: scene.materials.length,
+            finalEffectKey: brushedMaterial?._malievSurfaceEffect?.key ?? null,
+            finalRoughness: brushedMaterial?.roughness ?? null,
+            pluginCount: brushedMaterial?._pluginInstances?.filter(plugin => plugin.name === 'MalievSurfaceEffect').length ?? 0
+        });
+    `, context);
+
+    assert.equal(result.materialReferenceStable, true);
+    assert.equal(result.materialCountAfterSwitches, result.materialCountAfterMachined);
+    assert.equal(result.finalEffectKey, 'brushed');
+    assert.ok(result.finalRoughness >= 0.58 && result.finalRoughness <= 0.70, `expected brushed roughness after in-place switch, got ${result.finalRoughness}`);
+    assert.equal(result.pluginCount, 1);
 });
 
 test('realistic configurator does not recreate material for identical configuration pushes', () => {

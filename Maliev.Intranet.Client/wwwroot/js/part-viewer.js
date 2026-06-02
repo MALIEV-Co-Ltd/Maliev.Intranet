@@ -3395,13 +3395,20 @@ function getSurfaceEffectPluginClass() {
     SurfaceEffectPluginClass = class SurfaceEffectPlugin extends BABYLON.MaterialPluginBase {
         constructor(material, effect) {
             super(material, 'MalievSurfaceEffect', 210, { MALIEV_SURFACE_EFFECT: false });
-            this._effect = getSurfaceEffect(effect?.key);
-            material._malievSurfaceEffect = this._effect;
-            this._isEnabled = this._effect.kind > 0;
-            this._enable(this._isEnabled);
+            this._targetMaterial = material;
+            // Keep the plugin enabled even for "none" so CNC finish switches only
+            // update uniforms instead of forcing a new shader variant compile.
+            this._isEnabled = true;
+            this.setEffect(effect);
+            this._enable(true);
         }
 
         getClassName() { return 'SurfaceEffectPlugin'; }
+
+        setEffect(effect) {
+            this._effect = getSurfaceEffect(effect?.key);
+            this._targetMaterial._malievSurfaceEffect = this._effect.kind > 0 ? this._effect : null;
+        }
 
         prepareDefines(defines) {
             defines.MALIEV_SURFACE_EFFECT = this._isEnabled;
@@ -3421,7 +3428,6 @@ function getSurfaceEffectPluginClass() {
         }
 
         bindForSubMesh(uniformBuffer) {
-            if (!this._isEnabled) return;
             uniformBuffer.updateFloat('surfaceEffectKind', this._effect.kind);
             uniformBuffer.updateFloat('surfaceEffectScale', this._effect.scale);
             uniformBuffer.updateFloat('surfaceEffectStrength', this._effect.strength);
@@ -3980,6 +3986,11 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
         material._malievNodeInputs.alpha.value = preset.alpha ?? 1;
     }
 
+    const surfaceEffect = getSurfaceEffect(profile?.surfaceEffectKey);
+    const surfacePlugin = material._pluginInstances
+        ?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+    surfacePlugin?.setEffect?.(surfaceEffect);
+
     if (preset.alpha != null && preset.alpha < 1.0) {
         material.alpha = preset.alpha;
         material.transparencyMode = 2; // BABYLON.Material.MATERIAL_ALPHABLEND
@@ -4011,13 +4022,14 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
     if (shouldApplyFdmLayerLines(canvasId, materialType)) {
         const FdmLayerPlugin = getFdmLayerPluginClass();
         new FdmLayerPlugin(pbr, profile);
+        pbr._malievHasFdmLayerPlugin = true;
+    } else {
+        pbr._malievHasFdmLayerPlugin = false;
     }
 
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
-    if (surfaceEffect.kind > 0) {
-        const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
-        new SurfaceEffectPlugin(pbr, surfaceEffect);
-    }
+    const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
+    new SurfaceEffectPlugin(pbr, surfaceEffect);
 
     pbr._malievMaterialPipeline = 'pbr-plugin-fallback';
     pbr._malievNodeMaterialProfile = profile;
@@ -4110,6 +4122,14 @@ function isCachedRealisticMaterialAssigned(canvasId, materialType) {
     if (!scene || !material) return false;
 
     return scene.meshes.some(mesh => !isSystemMesh(mesh) && mesh.material === material);
+}
+
+function shouldRecreateRealisticMaterialForCurrentState(canvasId, materialType) {
+    const material = realisticMaterialCache[canvasId]?.[materialType];
+    if (!material) return false;
+
+    const needsFdmPlugin = shouldApplyFdmLayerLines(canvasId, materialType);
+    return Boolean(material._malievHasFdmLayerPlugin) !== needsFdmPlugin;
 }
 
 /**
@@ -4271,11 +4291,12 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     perCanvasSurfaceEffects[canvasId] = surfaceEffect;
     realisticConfiguratorStateKeys[canvasId] = nextStateKey;
 
-    // Invalidate the cached material so getRealisticMaterial creates a fresh
-    // instance directly from the final colour/finish state. Do not mutate the
-    // currently visible material through a preset colour first; that produces a
-    // frame-visible flash in realistic mode.
-    const detachedMaterial = detachCachedRealisticMaterial(canvasId, materialKey);
+    // Surface finishes are uniform-driven and should not recreate the material:
+    // recreating PBR plugin materials forces expensive shader compilation. Only
+    // rebuild when the additive layer-line plugin topology actually changes.
+    const detachedMaterial = shouldRecreateRealisticMaterialForCurrentState(canvasId, materialKey)
+        ? detachCachedRealisticMaterial(canvasId, materialKey)
+        : null;
 
     // Only apply immediately if we are already in realistic mode.
     if (currentRenderModes[canvasId] === 'realistic') {
