@@ -321,6 +321,21 @@ test('viewer registers engines before asynchronous model loading can be supersed
     assert.ok(sceneRegistration < modelPrefetch, 'Scene must be registered before awaited GLB prefetch/load work.');
 });
 
+test('viewer reveals a fitted model before expensive render-mode startup work', () => {
+    const source = viewerSource();
+    const revealHelper = source.indexOf('function revealCanvasAfterInitialFit');
+    const revealCall = source.indexOf('revealCanvasAfterInitialFit(canvasId, _scene, canvas, currentGen);');
+    const renderModeStartup = source.indexOf('setRenderMode(canvasId, viewerSettings.renderMode);');
+    const localAdvisoryStartup = source.indexOf('runLocalAdvisoryGeometry(canvasId');
+
+    assert.notEqual(revealHelper, -1, 'Expected a first-paint helper for canvas reveal.');
+    assert.notEqual(revealCall, -1, 'Expected initialize to reveal after initial camera fit.');
+    assert.notEqual(renderModeStartup, -1, 'Expected render-mode startup work to still run.');
+    assert.notEqual(localAdvisoryStartup, -1, 'Expected advisory startup work to still run.');
+    assert.ok(revealCall < renderModeStartup, 'Canvas reveal must happen before realistic material startup.');
+    assert.ok(revealCall < localAdvisoryStartup, 'Canvas reveal must happen before advisory startup.');
+});
+
 test('viewer avoids WebGL uniform-buffer reuse across Babylon engine swaps', () => {
     const source = viewerSource();
 

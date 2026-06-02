@@ -705,6 +705,36 @@ function loadScript(url) {
     });
 }
 
+function isCurrentViewerGeneration(canvasId, scene, currentGen) {
+    return loadGenerations[canvasId] === currentGen && scenes[canvasId] === scene;
+}
+
+function revealCanvasAfterInitialFit(canvasId, scene, canvas, currentGen) {
+    if (!isCurrentViewerGeneration(canvasId, scene, currentGen)) return false;
+
+    canvas.style.opacity = '1';
+    try {
+        scene.render();
+    } catch (_) {
+        // Rendering will continue through the normal render loop.
+    }
+
+    return true;
+}
+
+function scheduleAfterFirstPaint(canvasId, scene, currentGen, work) {
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            if (!isCurrentViewerGeneration(canvasId, scene, currentGen)) return;
+            try {
+                work();
+            } catch (err) {
+                console.error('[BabylonViewer] Deferred viewer startup failed:', err);
+            }
+        }, 0);
+    });
+}
+
 /**
  * World bounding box of all non-system meshes (excludes __grid__, __axis*).
  */
@@ -2066,7 +2096,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     return;
                 }
                 modelLoadState[canvasId] = 'loaded';
-                requestAnimationFrame(() => { canvas.style.opacity = '1'; });
 
 
                 // ── Re-affirm transparent background (append:true keeps existing scene) ──
@@ -2422,19 +2451,22 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 ro.observe(canvas);
                 resizeObservers[canvasId] = ro;
 
-                setRenderMode(canvasId, viewerSettings.renderMode);
-                toggleEdges(canvasId, !!viewerSettings.edgesEnabled);
-                toggleBoundingBox(canvasId, !!viewerSettings.boundingBoxEnabled);
-                viewerSettings.gridEnabled ? showGrid(canvasId) : hideGrid(canvasId);
-                setSectionPlane(
-                    canvasId,
-                    !!viewerSettings.sectionEnabled,
-                    viewerSettings.sectionAxis,
-                    viewerSettings.sectionOffsetMm,
-                    !!viewerSettings.sectionInverted
-                );
-                runLocalAdvisoryGeometry(canvasId, {
-                    processCode: viewerSettings.processCode,
+                revealCanvasAfterInitialFit(canvasId, _scene, canvas, currentGen);
+                scheduleAfterFirstPaint(canvasId, _scene, currentGen, () => {
+                    setRenderMode(canvasId, viewerSettings.renderMode);
+                    toggleEdges(canvasId, !!viewerSettings.edgesEnabled);
+                    toggleBoundingBox(canvasId, !!viewerSettings.boundingBoxEnabled);
+                    viewerSettings.gridEnabled ? showGrid(canvasId) : hideGrid(canvasId);
+                    setSectionPlane(
+                        canvasId,
+                        !!viewerSettings.sectionEnabled,
+                        viewerSettings.sectionAxis,
+                        viewerSettings.sectionOffsetMm,
+                        !!viewerSettings.sectionInverted
+                    );
+                    runLocalAdvisoryGeometry(canvasId, {
+                        processCode: viewerSettings.processCode,
+                    });
                 });
             },
             null,
