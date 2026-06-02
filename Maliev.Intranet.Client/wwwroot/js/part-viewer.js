@@ -3086,7 +3086,7 @@ function getFdmLayerPluginClass() {
                 : profileOrLayerHeightMm;
             this._layerHeightMm = clamp(Number(layerHeightMm) || 0.9, 0.05, 4.0);
             this._layerStrength = clamp(Number(profile?.layerLineStrength ?? layerStrength) || 0.016, 0.0, 0.05);
-            this._layerBump = clamp(Math.max(0.045, this._layerStrength * 3.0), 0.0, 0.085);
+            this._layerBump = clamp(Math.max(0.14, this._layerStrength * 6.4), 0.0, 0.18);
             // Activate through Babylon's plugin API so shader defines are compiled.
             this._isEnabled = true;
             this._enable(this._isEnabled);
@@ -3128,9 +3128,12 @@ function getFdmLayerPluginClass() {
                 float malievFdmLayerWave(float phase) {
                     return sin(phase * 6.28318530718);
                 }
-                float malievFdmLayerGroove(float phase) {
+                float malievFdmLayerRidge(float phase) {
                     float ridge = cos(phase * 6.28318530718) * 0.5 + 0.5;
-                    return pow(1.0 - ridge, 1.7);
+                    return pow(ridge, 0.58);
+                }
+                float malievFdmLayerGroove(float phase) {
+                    return pow(1.0 - malievFdmLayerRidge(phase), 1.25);
                 }
                 vec3 malievFdmDerivativeNormal(vec3 p) {
                     vec3 n = normalize(cross(dFdx(p), dFdy(p)) + vec3(0.0, 0.0, 0.0001));
@@ -3186,14 +3189,24 @@ function getFdmLayerPluginClass() {
             `,
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef FDMLAYER
-                #ifndef NORMAL
                 {
                     float _fdmFinalPhase = vPositionW.z / max(fdmLayerH, 0.001);
                     float _fdmFinalAa = malievFdmLayerAa(_fdmFinalPhase);
+                    vec3 _fdmFinalNormal = malievFdmDerivativeNormal(vPositionW);
+                    float _fdmFinalSideMask = malievFdmLayerSideMask(_fdmFinalNormal);
                     float _fdmRelief = malievFdmLayerRelief(vPositionW, _fdmFinalPhase, fdmLayerBump);
-                    finalColor.rgb *= clamp(1.0 + _fdmRelief * _fdmFinalAa * 0.32, 0.94, 1.06);
+                    float _fdmRidge = malievFdmLayerRidge(_fdmFinalPhase);
+                    float _fdmGroove = malievFdmLayerGroove(_fdmFinalPhase);
+                    float _fdmRidgeHighlight = smoothstep(0.48, 0.94, _fdmRidge) * 0.16;
+                    float _fdmGrooveShadow = smoothstep(0.28, 0.90, _fdmGroove) * 0.23;
+                    float _fdmLayerLight = (
+                        _fdmRelief * 1.35
+                        + _fdmRidgeHighlight
+                        - _fdmGrooveShadow)
+                        * _fdmFinalSideMask
+                        * _fdmFinalAa;
+                    finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.76, 1.28);
                 }
-                #endif
                 #endif
             `,
             };

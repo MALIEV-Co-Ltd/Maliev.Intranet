@@ -923,6 +923,7 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
             fdmLayerHeight: fdmPlugin?._layerHeightMm ?? null,
             fdmProfileLayerHeight: fdmProfile.layerHeightMm ?? null,
             fdmLayerStrength: fdmPlugin?._layerStrength ?? null,
+            fdmLayerBump: fdmPlugin?._layerBump ?? null,
             fdmProfileLayerStrength: fdmProfile.layerLineStrength ?? null,
             fdmDefinitions: fdmCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
             fdmBeforeLights: fdmCustomCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
@@ -939,16 +940,20 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
     assert.equal(result.fdmDefine, true);
     assert.equal(result.fdmLayerHeight, result.fdmProfileLayerHeight);
     assert.equal(result.fdmLayerStrength, result.fdmProfileLayerStrength);
+    assert.ok(result.fdmLayerBump >= 0.13 && result.fdmLayerBump <= 0.18, `expected pronounced FDM extrusion-ridge bump, got ${result.fdmLayerBump}`);
     assert.match(result.fdmDefinitions, /malievFdmLayerAa/);
     assert.match(result.fdmDefinitions, /malievFdmLayerRelief/);
+    assert.match(result.fdmDefinitions, /malievFdmLayerRidge/);
     assert.match(result.fdmDefinitions, /dFdx/);
     assert.match(result.fdmDefinitions, /dFdy/);
     assert.match(result.fdmBeforeLights, /#ifdef NORMAL/);
     assert.match(result.fdmBeforeLights, /normalW\s*=\s*normalize/);
     assert.doesNotMatch(result.fdmUpdateMetallicRoughness, /\bnormalW\b/);
     assert.match(result.fdmUpdateMetallicRoughness, /metallicRoughness\.g/);
-    assert.match(result.fdmBeforeFragColor, /#ifndef NORMAL/);
+    assert.doesNotMatch(result.fdmBeforeFragColor, /#ifndef NORMAL/);
     assert.match(result.fdmBeforeFragColor, /malievFdmLayerRelief/);
+    assert.match(result.fdmBeforeFragColor, /_fdmRidgeHighlight/);
+    assert.match(result.fdmBeforeFragColor, /_fdmGrooveShadow/);
     assert.match(result.fdmBeforeFragColor, /finalColor\.rgb\s*\*=/);
     assert.doesNotMatch(result.fdmBeforeFragColor, /1\.0\s*-\s*_groove/);
     assert.doesNotMatch(result.fdmBeforeFragColor, /\bcolor\.rgb\b/);
