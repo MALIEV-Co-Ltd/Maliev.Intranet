@@ -651,9 +651,9 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     assert.ok(result.metallic >= 0.72 && result.metallic <= 0.82, `expected bead-blasted aluminum to keep muted metal response without zoom-out reflections, got ${result.metallic}`);
     assert.equal(result.effectKey, 'bead-blast');
     assert.equal(result.effectKind, 1);
-    assert.ok(result.effectScale >= 16.0, `expected fine bead-blast micrograin scale, got ${result.effectScale}`);
-    assert.ok(result.effectStrength <= 0.045, `expected low-amplitude bead-blast roughness variation, got ${result.effectStrength}`);
-    assert.ok(result.effectBump <= 0.035, `expected fine particle bead-blast relief amplitude, got ${result.effectBump}`);
+    assert.ok(result.effectScale >= 8.8 && result.effectScale <= 10.5, `expected larger visible fine bead-blast grain scale, got ${result.effectScale}`);
+    assert.ok(result.effectStrength >= 0.058 && result.effectStrength <= 0.070, `expected readable bead-blast roughness variation, got ${result.effectStrength}`);
+    assert.ok(result.effectBump >= 0.055 && result.effectBump <= 0.070, `expected visible but realistic bead-blast relief amplitude, got ${result.effectBump}`);
 });
 
 test('realistic configurator keeps intrinsic blue POM darker than the UI swatch override', () => {
@@ -1105,7 +1105,7 @@ test('realistic smoothing does not synthesize normals for no-normal meshes', () 
     assert.equal(result.savedNormalCount, 0);
 });
 
-test('bead blasted surface shader renders fine satin aluminum micrograin without coarse relief', () => {
+test('bead blasted surface shader renders visible satin aluminum micrograin without coarse relief', () => {
     const context = loadViewerContext();
     const mesh = {
         name: 'part',
@@ -1143,9 +1143,9 @@ test('bead blasted surface shader renders fine satin aluminum micrograin without
 
     assert.ok(result.roughness >= 0.86 && result.roughness <= 0.94, `expected zoom-stable matte bead-blast roughness, got ${result.roughness}`);
     assert.ok(result.metallic >= 0.72 && result.metallic <= 0.82, `expected bead-blasted aluminum to keep muted metal response without zoom-out reflections, got ${result.metallic}`);
-    assert.ok(result.scale >= 16.0, `expected fine bead-blast grain scale, got ${result.scale}`);
-    assert.ok(result.strength <= 0.045, `expected subtle bead-blast roughness variation, got ${result.strength}`);
-    assert.ok(result.bump <= 0.035, `expected fine particle bead-blast relief amplitude, got ${result.bump}`);
+    assert.ok(result.scale >= 8.8 && result.scale <= 10.5, `expected larger visible fine bead-blast grain scale, got ${result.scale}`);
+    assert.ok(result.strength >= 0.058 && result.strength <= 0.070, `expected readable bead-blast roughness variation, got ${result.strength}`);
+    assert.ok(result.bump >= 0.055 && result.bump <= 0.070, `expected visible but realistic bead-blast relief amplitude, got ${result.bump}`);
     assert.match(result.definitions, /malievHeightGradient/);
     assert.match(result.definitions, /malievSurfaceSpeckle/);
     assert.match(result.definitions, /malievBeadCraterHeight/);
@@ -1162,6 +1162,7 @@ test('bead blasted surface shader renders fine satin aluminum micrograin without
     assert.match(result.beforeFragColor, /_isBead/);
     assert.match(result.beforeFragColor, /malievSurfaceSpeckle/);
     assert.match(result.beforeFragColor, /malievSurfaceRelief/);
+    assert.match(result.beforeFragColor, /mix\(0\.18,\s*0\.05,\s*_isBead\)/);
     assert.match(result.beforeFragColor, /finalColor\.rgb/);
     assert.doesNotMatch(result.beforeFragColor, /\bcolor\.rgb\b/);
 });
@@ -1205,8 +1206,8 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
     assert.ok(result.machining.stripeScale <= 0.5);
     assert.ok(result.machining.stripeStrength <= 0.014);
 
-    assert.ok(result.beadBlast.noiseScale >= 16.0, `expected fine bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
-    assert.ok(result.beadBlast.normalStrength <= 0.004, `expected low bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
+    assert.ok(result.beadBlast.noiseScale >= 8.8 && result.beadBlast.noiseScale <= 10.5, `expected larger visible bead-blast profile scale, got ${result.beadBlast.noiseScale}`);
+    assert.ok(result.beadBlast.normalStrength >= 0.006 && result.beadBlast.normalStrength <= 0.008, `expected readable bead-blast profile relief, got ${result.beadBlast.normalStrength}`);
 
     assert.equal(result.fdm.layerWaveform, 'sine');
     assert.ok(result.fdm.layerHeightMm >= 0.8);

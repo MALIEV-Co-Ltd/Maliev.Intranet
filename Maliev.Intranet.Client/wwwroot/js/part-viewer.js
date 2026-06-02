@@ -3245,11 +3245,11 @@ const SURFACE_EFFECTS = {
     'bead-blast': {
         key: 'bead-blast',
         kind: 1,
-        scale: 18.0,       // ~0.055 mm isotropic micrograin; matches fine bead-blast media on mm-scale parts
-        strength: 0.035,
+        scale: 9.4,        // ~0.106 mm isotropic grain; visible while staying in fine bead-blast media range
+        strength: 0.062,
         stripeScale: 0.0,
         stripeStrength: 0.0,
-        bump: 0.028,       // fine crater normal bump; bead blasting should not look like large sand impacts
+        bump: 0.064,       // visible fine crater normal bump without large sand-impact pits
     },
     brushed: {
         key: 'brushed',
@@ -3613,7 +3613,7 @@ function getSurfaceEffectPluginClass() {
                         * surfaceEffectStrength * _powderAa;
                     float _grain = mix(_standardGrain, _powderGrain, _isPowder);
                     surfaceAlbedo *= clamp(
-                        1.0 + _grain + _relief * mix(mix(0.22, 0.0, _isBead), 0.18, _isPowder),
+                        1.0 + _grain + _relief * mix(mix(0.22, 0.035, _isBead), 0.18, _isPowder),
                         mix(mix(0.75, 0.97, _isBead), 0.58, _isPowder),
                         mix(mix(1.20, 1.03, _isBead), 1.24, _isPowder));
                 }
@@ -3683,7 +3683,7 @@ function getSurfaceEffectPluginClass() {
                     float _standardLight =
                         (_finalSurfaceH - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.55, 0.02, _isBead)
                         + (_finalSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.24, 0.015, _isBead)
-                        + _finalRelief * mix(0.18, 0.0, _isBead);
+                        + _finalRelief * mix(0.18, 0.05, _isBead);
                     float _powderLight =
                         (_powderFine - 0.5) * surfaceEffectStrength * 0.85 * _powderAa
                         - _powderPoreShadow
@@ -3775,8 +3775,8 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     };
 
     if (surfaceEffect.key === 'bead-blast') {
-        profile.normalStrength = 0.003;
-        profile.noiseScale = 18.0;
+        profile.normalStrength = 0.007;
+        profile.noiseScale = 9.4;
     } else if (surfaceEffect.key === 'brushed') {
         profile.normalStrength = 0.010;
         profile.noiseScale = 0.035;
