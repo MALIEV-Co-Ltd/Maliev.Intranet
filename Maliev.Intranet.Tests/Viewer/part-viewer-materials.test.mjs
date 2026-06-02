@@ -94,7 +94,26 @@ function loadViewerContext() {
                 MATERIAL_OPAQUE: 0,
                 MATERIAL_ALPHABLEND: 2,
             },
-            MaterialPluginBase: class MaterialPluginBase {},
+            MaterialPluginBase: class MaterialPluginBase {
+                constructor(material, name, priority, defines) {
+                    this.material = material;
+                    this.name = name;
+                    this.priority = priority;
+                    this.defines = defines;
+                    this._isEnabled = false;
+                    material._pluginInstances ??= [];
+                    material._pluginInstances.push(this);
+                }
+
+                _enable(enabled) {
+                    if (enabled === true) {
+                        this.material._activatedPlugins ??= [];
+                        this.material._activatedPlugins.push(this.name);
+                    }
+
+                    this._enableCalls = (this._enableCalls ?? 0) + 1;
+                }
+            },
             Matrix: {
                 Identity: () => ({}),
                 RotationX: () => ({}),
@@ -266,6 +285,48 @@ test('solid CAD render mode prepares PBR environment lighting on first material 
     assert.equal(result.rawCubeTextureCount, 1);
     assert.equal(result.environmentIntensity, 1);
     assert.equal(result.toneMappingEnabled, true);
+});
+
+test('realistic render mode assigns a PBRMaterial that uses the scene environment (regression: metals rendered black via broken NodeMaterial reflection)', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        setMaterialType('viewer', 'aluminum');
+        setRenderMode('viewer', 'realistic');
+        const m = scene.meshes[0].material;
+        ({
+            isPbr: m instanceof BABYLON.PBRMaterial,
+            isNodeMaterial: m instanceof BABYLON.NodeMaterial,
+            metallic: m?.metallic ?? null,
+            materialName: m?.name ?? null,
+            environmentCreated: !!scene.environmentTexture,
+            realTimeFiltering: m?.realTimeFiltering ?? null,
+        });
+    `, context);
+
+    // Metallic aluminum (metallic 0.95) derives its whole appearance from the environment
+    // reflection. The old hand-wired NodeMaterial left its ReflectionBlock untextured, so
+    // metals rendered pure black. A PBRMaterial + a prepared scene environment fixes it.
+    assert.equal(result.isPbr, true);
+    assert.equal(result.isNodeMaterial, false);
+    assert.equal(result.materialName, '__realistic_aluminum__');
+    assert.ok(result.metallic > 0.5, 'aluminum realistic preset should stay metallic');
+    assert.equal(result.environmentCreated, true);
+    // realTimeFiltering must NOT be enabled (expensive + driver-dependent flicker risk).
+    assert.notEqual(result.realTimeFiltering, true);
 });
 
 test('viewer module imports before Babylon globals are loaded', async () => {
@@ -630,7 +691,8 @@ test('realistic configurator applies CNC machining surface effect when no finish
 
     assert.equal(result.roughness, 0.34);
     assert.equal(result.effectKey, 'machining');
-    assert.equal(result.effectKind, 2);
+    // kind 4 = orientation-aware CNC tool marks (face vs side milling), distinct from brushed (kind 2).
+    assert.equal(result.effectKind, 4);
 });
 
 test('realistic configurator applies powder-grain effect for MJF and SLS nylon powder', () => {
@@ -678,7 +740,7 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.equal(result.slsEffect, 'powder-grain');
 });
 
-test('realistic configurator uses NodeMaterial PBR profiles with procedural normal detail for textured finishes', () => {
+test('realistic configurator uses PBRMaterial + plugins carrying procedural surface profiles for textured finishes', () => {
     const context = loadViewerContext();
     const mesh = {
         name: 'part',
@@ -700,9 +762,9 @@ test('realistic configurator uses NodeMaterial PBR profiles with procedural norm
             setRenderMode('viewer', 'realistic');
             const material = scene.meshes[0].material;
             return {
+                isPbr: material instanceof BABYLON.PBRMaterial,
                 isNodeMaterial: material instanceof BABYLON.NodeMaterial,
                 pipeline: material?._malievMaterialPipeline ?? null,
-                wasBuilt: material?.wasBuilt === true,
                 effectKey: material?._malievSurfaceEffect?.key ?? null,
                 nodeEffectKey: material?._malievNodeMaterialProfile?.surfaceEffectKey ?? null,
                 normalStrength: material?._malievNodeMaterialProfile?.normalStrength ?? 0,
@@ -718,27 +780,128 @@ test('realistic configurator uses NodeMaterial PBR profiles with procedural norm
         });
     `, context);
 
-    assert.equal(result.beadBlast.isNodeMaterial, true);
-    assert.equal(result.beadBlast.pipeline, 'node-pbr-procedural');
-    assert.equal(result.beadBlast.wasBuilt, true);
+    // Materials are now PBRMaterial (render metals correctly) carrying the
+    // procedural surface profile + plugins, not the old broken NodeMaterial graph.
+    assert.equal(result.beadBlast.isPbr, true);
+    assert.equal(result.beadBlast.isNodeMaterial, false);
+    assert.equal(result.beadBlast.pipeline, 'pbr-plugin-fallback');
     assert.equal(result.beadBlast.effectKey, 'bead-blast');
     assert.equal(result.beadBlast.nodeEffectKey, 'bead-blast');
-    assert.ok(result.beadBlast.normalStrength > 0, 'bead blast should perturb normals with grain');
+    assert.ok(result.beadBlast.normalStrength > 0, 'bead blast should carry a grain profile');
 
-    assert.equal(result.brushed.isNodeMaterial, true);
+    assert.equal(result.brushed.isPbr, true);
     assert.equal(result.brushed.nodeEffectKey, 'brushed');
-    assert.ok(result.brushed.stripeStrength > 0, 'brushed finish should include directional stripe normals');
+    assert.ok(result.brushed.stripeStrength > 0, 'brushed finish should include directional stripe detail');
 
-    assert.equal(result.fdm.isNodeMaterial, true);
+    assert.equal(result.fdm.isPbr, true);
     assert.equal(result.fdm.nodeEffectKey, 'fdm-layer-lines');
-    assert.ok(result.fdm.layerLineStrength > 0, 'FDM printing should include visible layer-line normals');
+    assert.ok(result.fdm.layerLineStrength > 0, 'FDM printing should include visible layer-line detail');
 
-    assert.equal(result.sla.isNodeMaterial, true);
+    assert.equal(result.sla.isPbr, true);
     assert.equal(result.sla.nodeEffectKey, 'fdm-layer-lines');
-    assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line normals');
+    assert.ok(result.sla.layerLineStrength > 0, 'SLA printing should include visible layer-line detail');
 });
 
-test('realistic NodeMaterial profiles use smooth low-amplitude finish detail to avoid temporal flicker', () => {
+test('realistic material plugins enable Babylon shader defines through plugin API', () => {
+    const context = loadViewerContext();
+    const makeMesh = () => ({
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    });
+
+    const scene = makeScene(makeMesh());
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const beadBlastMaterial = scene.meshes[0].material;
+        const surfacePlugin = beadBlastMaterial._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+        const surfaceDefines = {};
+        surfacePlugin?.prepareDefines(surfaceDefines);
+
+        scene.meshes = [${makeMesh.toString()}()];
+        realisticMaterialCache.viewer = {};
+        configureMaterialFromConfigurator('viewer', 'pla', null, 'AS_PRINTED', null, 'FDM');
+        setRenderMode('viewer', 'realistic');
+        const fdmMaterial = scene.meshes[0].material;
+        const fdmPlugin = fdmMaterial._pluginInstances?.find(plugin => plugin.name === 'FdmLayer');
+        const fdmDefines = {};
+        fdmPlugin?.prepareDefines(fdmDefines);
+        const fdmCustomCode = fdmPlugin?.getCustomCode('fragment') ?? {};
+
+        ({
+            surfaceEnabled: surfacePlugin?._isEnabled ?? null,
+            surfaceEnableCalls: surfacePlugin?._enableCalls ?? 0,
+            surfaceDefine: surfaceDefines.MALIEV_SURFACE_EFFECT ?? null,
+            fdmEnabled: fdmPlugin?._isEnabled ?? null,
+            fdmEnableCalls: fdmPlugin?._enableCalls ?? 0,
+            fdmDefine: fdmDefines.FDMLAYER ?? null,
+            fdmBeforeFragColor: fdmCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
+        });
+    `, context);
+
+    assert.equal(result.surfaceEnabled, true);
+    assert.equal(result.surfaceEnableCalls, 1);
+    assert.equal(result.surfaceDefine, true);
+    assert.equal(result.fdmEnabled, true);
+    assert.equal(result.fdmEnableCalls, 1);
+    assert.equal(result.fdmDefine, true);
+    assert.match(result.fdmBeforeFragColor, /finalColor\.rgb/);
+    assert.doesNotMatch(result.fdmBeforeFragColor, /\bcolor\.rgb\b/);
+});
+
+test('bead blasted surface shader includes visible height-gradient relief', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BEAD_BLAST', 'RA_3_2', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        const surfacePlugin = material._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+        const customCode = surfacePlugin?.getCustomCode('fragment') ?? {};
+        ({
+            bump: material?._malievSurfaceEffect?.bump ?? 0,
+            definitions: customCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+            updateAlbedo: customCode.CUSTOM_FRAGMENT_UPDATE_ALBEDO ?? '',
+            updateMetallicRoughness: customCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
+            beforeFragColor: customCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
+        });
+    `, context);
+
+    assert.ok(result.bump >= 0.25, `expected visible bead-blast relief amplitude, got ${result.bump}`);
+    assert.match(result.definitions, /malievHeightGradient/);
+    assert.match(result.definitions, /malievSurfaceSpeckle/);
+    assert.match(result.updateAlbedo, /malievSurfaceRelief/);
+    assert.match(result.updateMetallicRoughness, /surfaceEffectBump/);
+    assert.match(result.beforeFragColor, /malievSurfaceSpeckle/);
+    assert.match(result.beforeFragColor, /malievSurfaceRelief/);
+    assert.match(result.beforeFragColor, /finalColor\.rgb/);
+    assert.doesNotMatch(result.beforeFragColor, /\bcolor\.rgb\b/);
+});
+
+test('realistic material profiles use smooth low-amplitude finish detail to avoid temporal flicker', () => {
     const context = loadViewerContext();
     const mesh = {
         name: 'part',

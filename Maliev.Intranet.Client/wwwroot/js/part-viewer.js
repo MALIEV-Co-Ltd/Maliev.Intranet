@@ -3079,8 +3079,9 @@ function getFdmLayerPluginClass() {
         constructor(material, layerHeightMm) {
             super(material, 'FdmLayer', 200, { FDMLAYER: false });
             this._layerHeightMm = layerHeightMm || 0.2;
-            // Activate immediately — markAllSubMeshesAsMiscDirty forces shader recompile
-            this.isEnabled = true;
+            // Activate through Babylon's plugin API so shader defines are compiled.
+            this._isEnabled = true;
+            this._enable(this._isEnabled);
         }
 
         getClassName() { return 'FdmLayerPlugin'; }
@@ -3102,7 +3103,7 @@ function getFdmLayerPluginClass() {
             if (shaderType !== 'fragment') return null;
             return {
                 // Inject after all PBR lighting is resolved, before the final gl_FragColor write.
-                // 'color' is the vec4 final fragment colour available at this injection point.
+                // 'finalColor' is the vec4 final fragment colour available at this injection point.
                 // 'vPositionW' is the world-space position (in mm after model scaling).
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef FDMLAYER
@@ -3112,7 +3113,7 @@ function getFdmLayerPluginClass() {
                     float _ridge  = sin(_lPhase * 6.28318) * 0.5 + 0.5; // 1 = layer centre, 0 = boundary
                     // Narrow dark groove at boundaries; transparent preset skips (alpha already < 1)
                     float _groove = smoothstep(0.70, 1.0, 1.0 - _ridge) * 0.18;
-                    color.rgb *= (1.0 - _groove);
+                    finalColor.rgb *= (1.0 - _groove);
                 }
                 #endif
             `,
@@ -3127,6 +3128,10 @@ function getFdmLayerPluginClass() {
 // Adds subtle, UV-independent finish/process texture in realistic mode.
 // Effects are intentionally visual-only: they perturb the shaded colour, not geometry.
 
+// scale / stripeScale are world-space frequencies (approx cycles per mm): grain/mark spacing is approx
+// 1/scale mm (noise) or 2*pi/stripeScale mm (stripes). `bump` drives visible height-relief contrast; strength +
+// stripeStrength drive the roughness wobble. The noise is band-limited so the surface stays stable
+// under the idle camera orbit.
 const SURFACE_EFFECTS = {
     none: {
         key: 'none',
@@ -3135,38 +3140,43 @@ const SURFACE_EFFECTS = {
         strength: 0.0,
         stripeScale: 0.0,
         stripeStrength: 0.0,
+        bump: 0.0,
     },
     'bead-blast': {
         key: 'bead-blast',
         kind: 1,
-        scale: 0.42,
-        strength: 0.10,
+        scale: 1.4,        // ~0.71 mm isotropic grain; large enough to read in the viewer
+        strength: 0.18,
         stripeScale: 0.0,
         stripeStrength: 0.0,
+        bump: 0.32,        // visible bead-blast relief contrast
     },
     brushed: {
         key: 'brushed',
         kind: 2,
-        scale: 0.05,
-        strength: 0.018,
-        stripeScale: 0.72,
-        stripeStrength: 0.045,
+        scale: 1.5,
+        strength: 0.03,
+        stripeScale: 6.0,  // ~1.0 mm unidirectional brush lines
+        stripeStrength: 0.09,
+        bump: 0.09,
     },
     machining: {
         key: 'machining',
-        kind: 2,
-        scale: 0.04,
-        strength: 0.016,
-        stripeScale: 0.34,
-        stripeStrength: 0.028,
+        kind: 4,           // orientation-aware CNC tool marks (face vs side milling); distinct from brushed (2)
+        scale: 1.0,
+        strength: 0.04,
+        stripeScale: 4.5,  // ~1.4 mm tool-mark pitch
+        stripeStrength: 0.12,
+        bump: 0.12,        // visible feed-ridge contrast
     },
     'powder-grain': {
         key: 'powder-grain',
         kind: 3,
-        scale: 0.48,
-        strength: 0.080,
+        scale: 1.2,        // ~0.83 mm sintered grain
+        strength: 0.13,
         stripeScale: 0.0,
         stripeStrength: 0.0,
+        bump: 0.15,
     },
 };
 
@@ -3228,7 +3238,8 @@ function getSurfaceEffectPluginClass() {
             super(material, 'MalievSurfaceEffect', 210, { MALIEV_SURFACE_EFFECT: false });
             this._effect = getSurfaceEffect(effect?.key);
             material._malievSurfaceEffect = this._effect;
-            this.isEnabled = this._effect.kind > 0;
+            this._isEnabled = this._effect.kind > 0;
+            this._enable(this._isEnabled);
         }
 
         getClassName() { return 'SurfaceEffectPlugin'; }
@@ -3245,6 +3256,7 @@ function getSurfaceEffectPluginClass() {
                     { name: 'surfaceEffectStrength', size: 1, type: 'float' },
                     { name: 'surfaceEffectStripeScale', size: 1, type: 'float' },
                     { name: 'surfaceEffectStripeStrength', size: 1, type: 'float' },
+                    { name: 'surfaceEffectBump', size: 1, type: 'float' },
                 ],
             };
         }
@@ -3256,6 +3268,7 @@ function getSurfaceEffectPluginClass() {
             uniformBuffer.updateFloat('surfaceEffectStrength', this._effect.strength);
             uniformBuffer.updateFloat('surfaceEffectStripeScale', this._effect.stripeScale);
             uniformBuffer.updateFloat('surfaceEffectStripeStrength', this._effect.stripeStrength);
+            uniformBuffer.updateFloat('surfaceEffectBump', this._effect.bump || 0.0);
         }
 
         getCustomCode(shaderType) {
@@ -3263,36 +3276,146 @@ function getSurfaceEffectPluginClass() {
             return {
                 CUSTOM_FRAGMENT_DEFINITIONS: `
                 #ifdef MALIEV_SURFACE_EFFECT
-                float malievSurfaceNoise3(vec3 p) {
+                float malievHash3(vec3 p) {
                     return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453123);
+                }
+                // Smooth, band-limited value noise in world space, stable under camera motion
+                // (no high-frequency aliasing, no screen-space derivatives) so it stays flicker-free.
+                float malievVNoise(vec3 x) {
+                    vec3 i = floor(x);
+                    vec3 f = fract(x);
+                    f = f * f * (3.0 - 2.0 * f);
+                    float n000 = malievHash3(i + vec3(0.0, 0.0, 0.0));
+                    float n100 = malievHash3(i + vec3(1.0, 0.0, 0.0));
+                    float n010 = malievHash3(i + vec3(0.0, 1.0, 0.0));
+                    float n110 = malievHash3(i + vec3(1.0, 1.0, 0.0));
+                    float n001 = malievHash3(i + vec3(0.0, 0.0, 1.0));
+                    float n101 = malievHash3(i + vec3(1.0, 0.0, 1.0));
+                    float n011 = malievHash3(i + vec3(0.0, 1.0, 1.0));
+                    float n111 = malievHash3(i + vec3(1.0, 1.0, 1.0));
+                    float nx00 = mix(n000, n100, f.x);
+                    float nx10 = mix(n010, n110, f.x);
+                    float nx01 = mix(n001, n101, f.x);
+                    float nx11 = mix(n011, n111, f.x);
+                    return mix(mix(nx00, nx10, f.y), mix(nx01, nx11, f.y), f.z);
+                }
+                float malievSurfaceSpeckle(vec3 p, float kind, float scl) {
+                    float cellScale = kind < 1.5 ? max(scl * 2.2, 2.0) : max(scl * 1.35, 1.0);
+                    return malievVNoise(p * cellScale) * 0.68
+                        + malievVNoise(p * cellScale * 2.35 + vec3(17.0, 31.0, 11.0)) * 0.32;
+                }
+                // Procedural micro-surface HEIGHT in [0,1] for the selected finish (world-space, UV-free).
+                // Its value drives albedo grain and roughness wobble.
+                // 'up' = |geometric normal . Z| so CNC marks switch between face- and side-milling.
+                float malievHeight(vec3 p, float kind, float scl, float sScl, float up) {
+                    scl = max(scl, 0.0001);
+                    if (kind < 1.5) {
+                        // Bead blasted: 2-octave isotropic grain.
+                        float smoothGrain = malievVNoise(p * scl) * 0.65 + malievVNoise(p * scl * 2.7) * 0.35;
+                        return smoothGrain * 0.58 + malievSurfaceSpeckle(p, kind, scl) * 0.42;
+                    } else if (kind < 2.5) {
+                        // Brushed: unidirectional fine lines (along world X) + faint noise.
+                        float lines = sin(p.y * sScl) * 0.5 + 0.5;
+                        return lines * 0.78 + malievVNoise(vec3(p.x * scl * 3.0, p.y * scl, p.z * scl)) * 0.22;
+                    } else if (kind < 3.5) {
+                        // Powder (MJF/SLS): coarse 2-octave sintered grain.
+                        return malievVNoise(p * scl) * 0.6 + malievVNoise(p * scl * 2.3) * 0.4;
+                    }
+                    // CNC as-machined: face milling (top/bottom) vs side milling (walls).
+                    float fa = sin(p.x * sScl) * 0.5 + 0.5;        // feed cross-hatch in XY
+                    float fb = sin(p.y * sScl * 0.92 + 1.7) * 0.5 + 0.5;
+                    float faceMark = fa * 0.6 + fb * 0.4;
+                    float sideMark = sin(p.z * sScl * 1.7) * 0.5 + 0.5; // scallop lines stacked along wall height
+                    return mix(sideMark, faceMark, up);
+                }
+                vec3 malievHeightGradient(vec3 p, float kind, float scl, float sScl, float up) {
+                    float e = max(0.12, 0.35 / max(scl, 0.0001));
+                    float hx = malievHeight(p + vec3(e, 0.0, 0.0), kind, scl, sScl, up)
+                        - malievHeight(p - vec3(e, 0.0, 0.0), kind, scl, sScl, up);
+                    float hy = malievHeight(p + vec3(0.0, e, 0.0), kind, scl, sScl, up)
+                        - malievHeight(p - vec3(0.0, e, 0.0), kind, scl, sScl, up);
+                    float hz = malievHeight(p + vec3(0.0, 0.0, e), kind, scl, sScl, up)
+                        - malievHeight(p - vec3(0.0, 0.0, e), kind, scl, sScl, up);
+                    return vec3(hx, hy, hz) / (2.0 * e);
+                }
+                float malievSurfaceRelief(vec3 p, float kind, float scl, float sScl, float bump, float up) {
+                    vec3 baseNormal = normalize(cross(dFdx(p), dFdy(p)));
+                    baseNormal *= gl_FrontFacing ? 1.0 : -1.0;
+                    vec3 gradient = malievHeightGradient(p, kind, scl, sScl, up);
+                    vec3 reliefNormal = normalize(baseNormal - gradient * bump * 3.2);
+                    vec3 keyLight = normalize(vec3(-0.38, -0.58, 0.72));
+                    return clamp(dot(reliefNormal, keyLight) - dot(baseNormal, keyLight), -0.35, 0.35);
+                }
+                #endif
+            `,
+                CUSTOM_FRAGMENT_UPDATE_ALBEDO: `
+                #ifdef MALIEV_SURFACE_EFFECT
+                {
+                    // Visible grain as albedo micro-variation (UV-free "noise map"). The PBR plugin hooks
+                    // do not expose the lighting normal, so geometry-true bump is not reachable here; this
+                    // albedo + roughness grain is the metal-safe, flicker-free way to render the texture.
+                    float _up = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
+                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _up);
+                    float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
+                    float _relief = malievSurfaceRelief(
+                        vPositionW,
+                        surfaceEffectKind,
+                        surfaceEffectScale,
+                        surfaceEffectStripeScale,
+                        surfaceEffectBump,
+                        _up);
+                    float _grain = (_h - 0.5) * surfaceEffectBump * 0.72
+                        + (_speckle - 0.5) * surfaceEffectBump * 0.24;
+                    surfaceAlbedo *= clamp(1.0 + _grain + _relief * 0.22, 0.75, 1.20);
+                }
+                #endif
+            `,
+                CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS: `
+                #ifdef MALIEV_SURFACE_EFFECT
+                {
+                    // Roughness grain: view-dependent light/dark micro-scatter that reads like relief and
+                    // (because it feeds reflection blur) shows on metals too.
+                    float _up = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
+                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _up);
+                    float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
+                    float _ra = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
+                    metallicRoughness.g = clamp(
+                        metallicRoughness.g + ((_h - 0.5) * 0.72 + (_speckle - 0.5) * 0.45) * _ra * 1.6,
+                        0.06,
+                        1.0);
                 }
                 #endif
             `,
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
-                    float _kind = surfaceEffectKind;
-                    float _scale = max(surfaceEffectScale, 0.0001);
-                    float _strength = clamp(surfaceEffectStrength, 0.0, 0.35);
-                    vec3 _p = vPositionW * _scale;
-                    float _n = malievSurfaceNoise3(floor(_p));
-
-                    if (_kind < 1.5) {
-                        float _fine = malievSurfaceNoise3(floor(_p * 1.7 + vec3(11.0, 17.0, 23.0)));
-                        float _grain = mix(_n, _fine, 0.5);
-                        color.rgb *= 1.0 - _strength * (0.22 + _grain * 0.70);
-                        color.rgb += vec3(_strength * 0.06 * (1.0 - _grain));
-                    } else if (_kind < 2.5) {
-                        float _jitter = malievSurfaceNoise3(floor(vPositionW * 0.035)) * 1.15;
-                        float _band = sin(vPositionW.x * surfaceEffectStripeScale + _jitter) * 0.5 + 0.5;
-                        float _line = smoothstep(0.72, 1.0, _band);
-                        color.rgb *= 1.0 - clamp(surfaceEffectStripeStrength, 0.0, 0.20) * _line;
-                    } else {
-                        float _fine = malievSurfaceNoise3(floor(_p * 2.1 + vec3(19.0, 3.0, 41.0)));
-                        float _grain = mix(_n, _fine, 0.55);
-                        float _powder = mix(1.0 - _strength, 1.0 + _strength * 0.28, _grain);
-                        color.rgb *= _powder;
-                    }
+                    // Final lit-color relief makes bead blasting read as surface texture instead of only
+                    // as a flatter roughness preset.
+                    float _finalUp = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
+                    float _finalH = malievHeight(
+                        vPositionW,
+                        surfaceEffectKind,
+                        surfaceEffectScale,
+                        surfaceEffectStripeScale,
+                        _finalUp);
+                    float _finalSpeckle = malievSurfaceSpeckle(
+                        vPositionW,
+                        surfaceEffectKind,
+                        surfaceEffectScale);
+                    float _finalRelief = malievSurfaceRelief(
+                        vPositionW,
+                        surfaceEffectKind,
+                        surfaceEffectScale,
+                        surfaceEffectStripeScale,
+                        surfaceEffectBump,
+                        _finalUp);
+                    finalColor.rgb *= clamp(
+                        1.0
+                            + (_finalH - 0.5) * surfaceEffectBump * 0.55
+                            + (_finalSpeckle - 0.5) * surfaceEffectBump * 0.24
+                            + _finalRelief * 0.18,
+                        0.78,
+                        1.18);
                 }
                 #endif
             `,
@@ -3308,33 +3431,12 @@ function getSurfaceEffectPluginClass() {
 function configureRealisticPbrQuality(pbr) {
     if (!pbr) return;
 
+    // Geometric specular anti-aliasing tames metallic shimmer cheaply.
+    // NOTE: realTimeFiltering was intentionally removed; it ran per-pixel IBL
+    // prefiltering (64 samples) on a *static* studio cube that is already mip +
+    // SH prefiltered. It was expensive (mobile-hostile) and a driver-dependent
+    // instability source; the prefiltered environment gives stable specular IBL.
     pbr.enableSpecularAntiAliasing = true;
-    pbr.realTimeFiltering = true;
-    pbr.realTimeFilteringQuality = BABYLON.Constants.TEXTURE_FILTERING_QUALITY_HIGH;
-}
-
-const REALISTIC_NODE_MATERIAL_BLOCKS = [
-    'NodeMaterial',
-    'InputBlock',
-    'TransformBlock',
-    'VertexOutputBlock',
-    'FragmentOutputBlock',
-    'PBRMetallicRoughnessBlock',
-    'ReflectionBlock',
-    'HeightToNormalBlock',
-    'SimplexPerlin3DBlock',
-    'ScaleBlock',
-    'AddBlock',
-    'TrigonometryBlock',
-    'VectorSplitterBlock',
-];
-
-const REALISTIC_TEXTURE_TAU = Math.PI * 2;
-
-function canUseRealisticNodeMaterial() {
-    return REALISTIC_NODE_MATERIAL_BLOCKS.every(name => typeof BABYLON?.[name] === 'function')
-        && BABYLON.NodeMaterialModes
-        && BABYLON.NodeMaterialSystemValues;
 }
 
 function isFdmProcess(processCode) {
@@ -3420,120 +3522,6 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     return profile;
 }
 
-function createNodeInputBlock(name, value) {
-    const input = new BABYLON.InputBlock(name);
-    input.value = value;
-    input.isConstant = false;
-    return input;
-}
-
-function createNodeAttributeBlock(name) {
-    const input = new BABYLON.InputBlock(name);
-    input.setAsAttribute(name);
-    return input;
-}
-
-function createNodeSystemBlock(name, systemValue) {
-    const input = new BABYLON.InputBlock(name);
-    input.setAsSystemValue(systemValue);
-    return input;
-}
-
-function connectNodeBlocks(output, input) {
-    if (!output || !input || typeof output.connectTo !== 'function') return;
-    output.connectTo(input);
-}
-
-function addHeightOutput(left, right, name) {
-    if (!left) return right;
-    if (!right) return left;
-
-    const add = new BABYLON.AddBlock(name);
-    connectNodeBlocks(left, add.left);
-    connectNodeBlocks(right, add.right);
-    return add.output;
-}
-
-function getWorldAxisOutput(worldPosition, axis, name) {
-    const splitter = new BABYLON.VectorSplitterBlock(name);
-    connectNodeBlocks(worldPosition.xyz, splitter.xyzIn || splitter.xyz);
-
-    return axis === 'z'
-        ? splitter.z
-        : axis === 'y'
-            ? splitter.y
-            : splitter.x;
-}
-
-function createNoiseHeightOutput(worldPosition, strength, scale, name) {
-    if (strength <= 0 || scale <= 0) return null;
-
-    const positionScale = new BABYLON.ScaleBlock(`${name} position scale`);
-    const scaleInput = createNodeInputBlock(`${name} scale`, scale);
-    const noise = new BABYLON.SimplexPerlin3DBlock(`${name} noise`);
-    const heightScale = new BABYLON.ScaleBlock(`${name} height scale`);
-    const strengthInput = createNodeInputBlock(`${name} strength`, strength);
-
-    connectNodeBlocks(worldPosition.xyz, positionScale.input);
-    connectNodeBlocks(scaleInput.output, positionScale.factor);
-    connectNodeBlocks(positionScale.output, noise.seed);
-    connectNodeBlocks(noise.output, heightScale.input);
-    connectNodeBlocks(strengthInput.output, heightScale.factor);
-
-    return heightScale.output;
-}
-
-function createStripeHeightOutput(worldPosition, axis, strength, scale, name) {
-    if (strength <= 0 || scale <= 0 || !BABYLON.TrigonometryBlock || !BABYLON.TrigonometryBlockOperations) return null;
-
-    const axisOutput = getWorldAxisOutput(worldPosition, axis, `${name} axis`);
-    const coordinateScale = new BABYLON.ScaleBlock(`${name} coordinate scale`);
-    const scaleInput = createNodeInputBlock(`${name} stripe scale`, scale);
-    const wave = new BABYLON.TrigonometryBlock(`${name} sine wave`);
-    const heightScale = new BABYLON.ScaleBlock(`${name} stripe height`);
-    const strengthInput = createNodeInputBlock(`${name} stripe strength`, strength);
-
-    wave.operation = BABYLON.TrigonometryBlockOperations.Sin;
-
-    connectNodeBlocks(axisOutput, coordinateScale.input);
-    connectNodeBlocks(scaleInput.output, coordinateScale.factor);
-    connectNodeBlocks(coordinateScale.output, wave.input);
-    connectNodeBlocks(wave.output, heightScale.input);
-    connectNodeBlocks(strengthInput.output, heightScale.factor);
-
-    return heightScale.output;
-}
-
-function createRealisticNodeHeightOutput(worldPosition, profile) {
-    let heightOutput = createNoiseHeightOutput(
-        worldPosition,
-        profile.normalStrength,
-        profile.noiseScale,
-        'finish');
-
-    heightOutput = addHeightOutput(
-        heightOutput,
-        createStripeHeightOutput(
-            worldPosition,
-            profile.stripeAxis,
-            profile.stripeStrength,
-            profile.stripeScale,
-            'finish stripes'),
-        'finish height');
-
-    heightOutput = addHeightOutput(
-        heightOutput,
-        createStripeHeightOutput(
-            worldPosition,
-            profile.layerAxis,
-            profile.layerLineStrength,
-            profile.layerHeightMm > 0 ? REALISTIC_TEXTURE_TAU / profile.layerHeightMm : 0,
-            'fdm layer lines'),
-        'layered finish height');
-
-    return heightOutput;
-}
-
 function syncRealisticMaterialProperties(material, preset, custom, finishMod, profile) {
     if (!material || !preset) return;
 
@@ -3571,124 +3559,7 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
     }
 }
 
-function createRealisticNodeMaterial(scene, canvasId, materialType, preset) {
-    if (!canUseRealisticNodeMaterial()) return null;
-
-    const profile = resolveRealisticNodeMaterialProfile(canvasId, materialType);
-    const custom = customAlbedoColors[canvasId];
-    const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
-    const albedo = custom ? toColor3(custom) : toColor3(preset.albedoColor);
-    const metallic = clamp(preset.metallic + (finishMod.metallicOffset || 0), 0, 1);
-    const roughness = finishMod.absoluteRoughness != null
-        ? finishMod.absoluteRoughness
-        : clamp(preset.roughness + (finishMod.roughnessOffset || 0), 0, 1);
-    const alpha = preset.alpha ?? 1;
-
-    let nodeMaterial = null;
-    try {
-        nodeMaterial = new BABYLON.NodeMaterial(`__realistic_${materialType}__`, scene);
-        nodeMaterial.mode = BABYLON.NodeMaterialModes.Material;
-        nodeMaterial.maxSimultaneousLights = 4;
-
-        const position = createNodeAttributeBlock('position');
-        const normal = createNodeAttributeBlock('normal');
-        const world = createNodeSystemBlock('World', BABYLON.NodeMaterialSystemValues.World);
-        const view = createNodeSystemBlock('View', BABYLON.NodeMaterialSystemValues.View);
-        const viewProjection = createNodeSystemBlock('ViewProjection', BABYLON.NodeMaterialSystemValues.ViewProjection);
-        const cameraPosition = createNodeSystemBlock('cameraPosition', BABYLON.NodeMaterialSystemValues.CameraPosition);
-
-        const worldPosition = new BABYLON.TransformBlock('World position');
-        worldPosition.complementZ = 0;
-        worldPosition.complementW = 1;
-        connectNodeBlocks(position.output, worldPosition.vector);
-        connectNodeBlocks(world.output, worldPosition.transform);
-
-        const worldViewProjection = new BABYLON.TransformBlock('World position view projection');
-        worldViewProjection.complementZ = 0;
-        worldViewProjection.complementW = 1;
-        connectNodeBlocks(worldPosition.output, worldViewProjection.vector);
-        connectNodeBlocks(viewProjection.output, worldViewProjection.transform);
-
-        const vertexOutput = new BABYLON.VertexOutputBlock('Vertex output');
-        connectNodeBlocks(worldViewProjection.output, vertexOutput.vector);
-
-        const worldNormal = new BABYLON.TransformBlock('World normal');
-        worldNormal.complementZ = 0;
-        worldNormal.complementW = 0;
-        connectNodeBlocks(normal.output, worldNormal.vector);
-        connectNodeBlocks(world.output, worldNormal.transform);
-
-        const pbr = new BABYLON.PBRMetallicRoughnessBlock('Manufacturing PBR');
-        configureRealisticPbrQuality(pbr);
-        pbr.environmentIntensity = CONFIG.REALISTIC.environmentIntensity;
-        pbr.useEnergyConservation = true;
-        pbr.useRadianceOcclusion = true;
-        pbr.useHorizonOcclusion = true;
-        pbr.useAlphaBlending = alpha < 1;
-
-        const baseColorInput = createNodeInputBlock('base color', albedo);
-        const metallicInput = createNodeInputBlock('metallic', metallic);
-        const roughnessInput = createNodeInputBlock('roughness', roughness);
-        const alphaInput = createNodeInputBlock('alpha', alpha);
-
-        connectNodeBlocks(worldPosition.output, pbr.worldPosition);
-        connectNodeBlocks(worldNormal.output, pbr.worldNormal);
-        connectNodeBlocks(view.output, pbr.view);
-        connectNodeBlocks(cameraPosition.output, pbr.cameraPosition);
-        connectNodeBlocks(baseColorInput.output, pbr.baseColor);
-        connectNodeBlocks(metallicInput.output, pbr.metallic);
-        connectNodeBlocks(roughnessInput.output, pbr.roughness);
-        if (pbr.opacity) connectNodeBlocks(alphaInput.output, pbr.opacity);
-
-        const reflection = new BABYLON.ReflectionBlock('Studio reflection');
-        reflection.useSphericalHarmonics = true;
-        reflection.forceIrradianceInFragment = false;
-        connectNodeBlocks(position.output, reflection.position);
-        connectNodeBlocks(world.output, reflection.world);
-        connectNodeBlocks(reflection.reflection, pbr.reflection);
-
-        const heightOutput = createRealisticNodeHeightOutput(worldPosition, profile);
-        if (heightOutput) {
-            const heightToNormal = new BABYLON.HeightToNormalBlock('Manufacturing height to normal');
-            heightToNormal.generateInWorldSpace = true;
-            connectNodeBlocks(heightOutput, heightToNormal.input);
-            connectNodeBlocks(worldPosition.xyz, heightToNormal.worldPosition);
-            connectNodeBlocks(worldNormal.xyz, heightToNormal.worldNormal);
-            connectNodeBlocks(heightToNormal.output, pbr.perturbedNormal);
-        }
-
-        const fragmentOutput = new BABYLON.FragmentOutputBlock('Fragment output');
-        connectNodeBlocks(pbr.lighting, fragmentOutput.rgb);
-        if (pbr.alpha && fragmentOutput.a) connectNodeBlocks(pbr.alpha, fragmentOutput.a);
-
-        nodeMaterial.addOutputNode(vertexOutput);
-        nodeMaterial.addOutputNode(fragmentOutput);
-        nodeMaterial.build(false);
-
-        nodeMaterial._malievNodeInputs = {
-            baseColor: baseColorInput,
-            metallic: metallicInput,
-            roughness: roughnessInput,
-            alpha: alphaInput,
-        };
-        nodeMaterial._malievMaterialPipeline = 'node-pbr-procedural';
-        const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
-        nodeMaterial._malievSurfaceEffect = surfaceEffect.kind > 0 ? surfaceEffect : null;
-        nodeMaterial.metadata = {
-            ...(nodeMaterial.metadata || {}),
-            malievMaterialPipeline: 'node-pbr-procedural',
-        };
-        syncRealisticMaterialProperties(nodeMaterial, preset, custom, finishMod, profile);
-
-        return nodeMaterial;
-    } catch (error) {
-        console.warn('[BabylonViewer] NodeMaterial realistic pipeline failed; falling back to PBRMaterial.', error);
-        try { nodeMaterial?.dispose(); } catch (_) {}
-        return null;
-    }
-}
-
-function createFallbackPbrMaterial(scene, canvasId, materialType, preset) {
+function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
     const custom = customAlbedoColors[canvasId];
     const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
     const profile = resolveRealisticNodeMaterialProfile(canvasId, materialType);
@@ -3738,8 +3609,10 @@ function getRealisticMaterial(scene, canvasId, materialType) {
     const preset = CONFIG.MATERIAL_REALISTIC[materialType]
                 || CONFIG.MATERIAL_REALISTIC['aluminum'];
 
-    const pbr = createRealisticNodeMaterial(scene, canvasId, materialType, preset)
-        || createFallbackPbrMaterial(scene, canvasId, materialType, preset);
+    // Realistic materials are PBRMaterial + MaterialPlugins. The previous
+    // hand-wired NodeMaterial graph rendered metals black (its ReflectionBlock
+    // was never given a texture) and was the realistic-only flicker source.
+    const pbr = createRealisticPbrMaterial(scene, canvasId, materialType, preset);
 
     cache[materialType] = pbr;
     return pbr;
