@@ -911,6 +911,7 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
         const fdmDefines = {};
         fdmPlugin?.prepareDefines(fdmDefines);
         const fdmCustomCode = fdmPlugin?.getCustomCode('fragment') ?? {};
+        const fdmProfile = fdmMaterial?._malievNodeMaterialProfile ?? {};
 
         ({
             surfaceEnabled: surfacePlugin?._isEnabled ?? null,
@@ -919,6 +920,13 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
             fdmEnabled: fdmPlugin?._isEnabled ?? null,
             fdmEnableCalls: fdmPlugin?._enableCalls ?? 0,
             fdmDefine: fdmDefines.FDMLAYER ?? null,
+            fdmLayerHeight: fdmPlugin?._layerHeightMm ?? null,
+            fdmProfileLayerHeight: fdmProfile.layerHeightMm ?? null,
+            fdmLayerStrength: fdmPlugin?._layerStrength ?? null,
+            fdmProfileLayerStrength: fdmProfile.layerLineStrength ?? null,
+            fdmDefinitions: fdmCustomCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+            fdmBeforeLights: fdmCustomCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
+            fdmUpdateMetallicRoughness: fdmCustomCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
             fdmBeforeFragColor: fdmCustomCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
         });
     `, context);
@@ -929,7 +937,20 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
     assert.equal(result.fdmEnabled, true);
     assert.equal(result.fdmEnableCalls, 1);
     assert.equal(result.fdmDefine, true);
-    assert.match(result.fdmBeforeFragColor, /finalColor\.rgb/);
+    assert.equal(result.fdmLayerHeight, result.fdmProfileLayerHeight);
+    assert.equal(result.fdmLayerStrength, result.fdmProfileLayerStrength);
+    assert.match(result.fdmDefinitions, /malievFdmLayerAa/);
+    assert.match(result.fdmDefinitions, /malievFdmLayerRelief/);
+    assert.match(result.fdmDefinitions, /dFdx/);
+    assert.match(result.fdmDefinitions, /dFdy/);
+    assert.match(result.fdmBeforeLights, /#ifdef NORMAL/);
+    assert.match(result.fdmBeforeLights, /normalW\s*=\s*normalize/);
+    assert.doesNotMatch(result.fdmUpdateMetallicRoughness, /\bnormalW\b/);
+    assert.match(result.fdmUpdateMetallicRoughness, /metallicRoughness\.g/);
+    assert.match(result.fdmBeforeFragColor, /#ifndef NORMAL/);
+    assert.match(result.fdmBeforeFragColor, /malievFdmLayerRelief/);
+    assert.match(result.fdmBeforeFragColor, /finalColor\.rgb\s*\*=/);
+    assert.doesNotMatch(result.fdmBeforeFragColor, /1\.0\s*-\s*_groove/);
     assert.doesNotMatch(result.fdmBeforeFragColor, /\bcolor\.rgb\b/);
 });
 

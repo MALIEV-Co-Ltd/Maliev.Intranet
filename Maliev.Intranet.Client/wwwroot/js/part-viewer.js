@@ -3056,7 +3056,7 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
 }
 
 // ── FDM layer-line MaterialPlugin ─────────────────────────────────────────────
-// Simulates FDM printing layer lines as a world-space Y-periodic surface darkening.
+// Simulates FDM printing layer lines as filtered world-space normal relief.
 // UV-independent: works on any GLB regardless of UV quality.
 // Applied only to FDM plastic presets in realistic mode.
 
@@ -3076,9 +3076,17 @@ function getFdmLayerPluginClass() {
     if (FdmLayerPluginClass) return FdmLayerPluginClass;
 
     FdmLayerPluginClass = class FdmLayerPlugin extends BABYLON.MaterialPluginBase {
-        constructor(material, layerHeightMm) {
+        constructor(material, profileOrLayerHeightMm, layerStrength = 0.016) {
             super(material, 'FdmLayer', 200, { FDMLAYER: false });
-            this._layerHeightMm = layerHeightMm || 0.2;
+            const profile = typeof profileOrLayerHeightMm === 'object' && profileOrLayerHeightMm
+                ? profileOrLayerHeightMm
+                : null;
+            const layerHeightMm = profile
+                ? profile.layerHeightMm
+                : profileOrLayerHeightMm;
+            this._layerHeightMm = clamp(Number(layerHeightMm) || 0.9, 0.05, 4.0);
+            this._layerStrength = clamp(Number(profile?.layerLineStrength ?? layerStrength) || 0.016, 0.0, 0.05);
+            this._layerBump = clamp(Math.max(0.045, this._layerStrength * 3.0), 0.0, 0.085);
             // Activate through Babylon's plugin API so shader defines are compiled.
             this._isEnabled = true;
             this._enable(this._isEnabled);
@@ -3092,29 +3100,100 @@ function getFdmLayerPluginClass() {
 
         getUniforms() {
             // Declare the uniform via the UBO path; BabylonJS injects it into the shader automatically
-            return { ubo: [{ name: 'fdmLayerH', size: 1, type: 'float' }] };
+            return {
+                ubo: [
+                    { name: 'fdmLayerH', size: 1, type: 'float' },
+                    { name: 'fdmLayerStrength', size: 1, type: 'float' },
+                    { name: 'fdmLayerBump', size: 1, type: 'float' },
+                ],
+            };
         }
 
         bindForSubMesh(uniformBuffer) {
-            if (this._isEnabled) uniformBuffer.updateFloat('fdmLayerH', this._layerHeightMm);
+            if (!this._isEnabled) return;
+            uniformBuffer.updateFloat('fdmLayerH', this._layerHeightMm);
+            uniformBuffer.updateFloat('fdmLayerStrength', this._layerStrength);
+            uniformBuffer.updateFloat('fdmLayerBump', this._layerBump);
         }
 
         getCustomCode(shaderType) {
             if (shaderType !== 'fragment') return null;
             return {
-                // Inject after all PBR lighting is resolved, before the final gl_FragColor write.
-                // 'finalColor' is the vec4 final fragment colour available at this injection point.
-                // 'vPositionW' is the world-space position (in mm after model scaling).
-                CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+                CUSTOM_FRAGMENT_DEFINITIONS: `
+                #ifdef FDMLAYER
+                float malievFdmLayerAa(float phase) {
+                    float footprint = max(abs(dFdx(phase)), abs(dFdy(phase)));
+                    return 1.0 - smoothstep(0.40, 1.10, footprint);
+                }
+                float malievFdmLayerWave(float phase) {
+                    return sin(phase * 6.28318530718);
+                }
+                float malievFdmLayerGroove(float phase) {
+                    float ridge = cos(phase * 6.28318530718) * 0.5 + 0.5;
+                    return pow(1.0 - ridge, 1.7);
+                }
+                vec3 malievFdmDerivativeNormal(vec3 p) {
+                    vec3 n = normalize(cross(dFdx(p), dFdy(p)) + vec3(0.0, 0.0, 0.0001));
+                    return gl_FrontFacing ? n : -n;
+                }
+                float malievFdmLayerSideMask(vec3 n) {
+                    return 1.0 - smoothstep(0.72, 0.96, abs(dot(normalize(n), vec3(0.0, 0.0, 1.0))));
+                }
+                float malievFdmLayerRelief(vec3 p, float phase, float bump) {
+                    vec3 baseNormal = malievFdmDerivativeNormal(p);
+                    vec3 axis = vec3(0.0, 0.0, 1.0);
+                    vec3 tangent = axis - baseNormal * dot(axis, baseNormal);
+                    float sideMask = smoothstep(0.10, 0.42, length(tangent));
+                    tangent = normalize(tangent + vec3(0.0001, 0.0, 0.0));
+                    float slope = malievFdmLayerWave(phase);
+                    vec3 reliefNormal = normalize(baseNormal - tangent * slope * bump * sideMask);
+                    vec3 keyLight = normalize(vec3(-0.38, -0.58, 0.72));
+                    return clamp(dot(reliefNormal, keyLight) - dot(baseNormal, keyLight), -0.22, 0.22) * sideMask;
+                }
+                #endif
+            `,
+                CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
+                #ifdef FDMLAYER
+                #ifdef NORMAL
+                {
+                    vec3 _fdmBaseNormal = normalize(normalW);
+                    vec3 _fdmAxis = vec3(0.0, 0.0, 1.0);
+                    vec3 _fdmTangent = _fdmAxis - _fdmBaseNormal * dot(_fdmAxis, _fdmBaseNormal);
+                    float _fdmSideMask = smoothstep(0.10, 0.42, length(_fdmTangent));
+                    _fdmTangent = normalize(_fdmTangent + vec3(0.0001, 0.0, 0.0));
+                    float _fdmPhase = vPositionW.z / max(fdmLayerH, 0.001);
+                    float _fdmAa = malievFdmLayerAa(_fdmPhase);
+                    float _fdmSlope = malievFdmLayerWave(_fdmPhase);
+                    normalW = normalize(_fdmBaseNormal - _fdmTangent * _fdmSlope * fdmLayerBump * _fdmSideMask * _fdmAa);
+                }
+                #endif
+                #endif
+            `,
+                CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS: `
                 #ifdef FDMLAYER
                 {
-                    // Periodic groove at each layer boundary (Z = viewer vertical / stacking axis)
-                    float _lPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _ridge  = sin(_lPhase * 6.28318) * 0.5 + 0.5; // 1 = layer centre, 0 = boundary
-                    // Narrow dark groove at boundaries; transparent preset skips (alpha already < 1)
-                    float _groove = smoothstep(0.70, 1.0, 1.0 - _ridge) * 0.18;
-                    finalColor.rgb *= (1.0 - _groove);
+                    vec3 _fdmRoughNormal = malievFdmDerivativeNormal(vPositionW);
+                    float _fdmRoughSideMask = malievFdmLayerSideMask(_fdmRoughNormal);
+                    float _fdmRoughPhase = vPositionW.z / max(fdmLayerH, 0.001);
+                    float _fdmRoughAa = malievFdmLayerAa(_fdmRoughPhase);
+                    float _fdmGroove = malievFdmLayerGroove(_fdmRoughPhase);
+                    metallicRoughness.g = clamp(
+                        metallicRoughness.g + (_fdmGroove - 0.5) * fdmLayerStrength * _fdmRoughSideMask * _fdmRoughAa * 0.55,
+                        0.05,
+                        1.0);
                 }
+                #endif
+            `,
+                CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+                #ifdef FDMLAYER
+                #ifndef NORMAL
+                {
+                    float _fdmFinalPhase = vPositionW.z / max(fdmLayerH, 0.001);
+                    float _fdmFinalAa = malievFdmLayerAa(_fdmFinalPhase);
+                    float _fdmRelief = malievFdmLayerRelief(vPositionW, _fdmFinalPhase, fdmLayerBump);
+                    finalColor.rgb *= clamp(1.0 + _fdmRelief * _fdmFinalAa * 0.32, 0.94, 1.06);
+                }
+                #endif
                 #endif
             `,
             };
@@ -3681,7 +3760,7 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
     // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
     if (shouldApplyFdmLayerLines(canvasId, materialType)) {
         const FdmLayerPlugin = getFdmLayerPluginClass();
-        new FdmLayerPlugin(pbr, 0.2); // 0.2 mm default layer height
+        new FdmLayerPlugin(pbr, profile);
     }
 
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
@@ -4072,8 +4151,19 @@ function applySmoothNormals(canvasId) {
 
         const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
         const indices   = mesh.getIndices();
-        const origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
-        if (!positions || !indices || !origNorms) return;
+        let origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        if (!positions || !indices) return;
+
+        if (!origNorms) {
+            const generatedNormals = [];
+            BABYLON.VertexData.ComputeNormals(positions, indices, generatedNormals);
+            if (generatedNormals.length > 0) {
+                mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, generatedNormals);
+                origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind) || generatedNormals;
+            }
+        }
+
+        if (!origNorms) return;
 
         // Save original (hard) normals for restoration
         saved.set(mesh.uniqueId, new Float32Array(origNorms));
