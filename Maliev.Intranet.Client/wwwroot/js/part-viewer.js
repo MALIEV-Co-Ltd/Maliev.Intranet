@@ -3883,6 +3883,13 @@ function getSurfaceEffectPluginClass() {
     return SurfaceEffectPluginClass;
 }
 
+function findMaterialPlugin(material, pluginName) {
+    return material?._pluginInstances?.find?.(plugin => plugin.name === pluginName)
+        || material?.pluginManager?.getPlugin?.(pluginName)
+        || material?.pluginManager?._plugins?.find?.(plugin => plugin.name === pluginName)
+        || null;
+}
+
 // ── Realistic material ─────────────────────────────────────────────────────────
 
 function configureRealisticPbrQuality(pbr) {
@@ -4035,8 +4042,7 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
     }
 
     const surfaceEffect = getSurfaceEffect(profile?.surfaceEffectKey);
-    const surfacePlugin = material._pluginInstances
-        ?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+    const surfacePlugin = findMaterialPlugin(material, 'MalievSurfaceEffect');
     surfacePlugin?.setEffect?.(surfaceEffect);
 
     if (preset.alpha != null && preset.alpha < 1.0) {

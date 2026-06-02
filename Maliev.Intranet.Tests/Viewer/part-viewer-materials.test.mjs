@@ -767,6 +767,43 @@ test('realistic configurator applies bead blasted procedural surface effect', ()
     assert.ok(result.effectBump >= 0.055 && result.effectBump <= 0.070, `expected visible but realistic bead-blast relief amplitude, got ${result.effectBump}`);
 });
 
+test('realistic material sync updates surface plugin stored on Babylon plugin manager', () => {
+    const context = loadViewerContext();
+
+    const result = vm.runInContext(`
+        const surfacePlugin = {
+            name: 'MalievSurfaceEffect',
+            setEffect(effect) {
+                this.lastEffect = effect;
+                material._malievSurfaceEffect = effect?.kind > 0 ? effect : null;
+            }
+        };
+        const material = {
+            albedoColor: new BABYLON.Color3(),
+            pluginManager: { _plugins: [surfacePlugin] }
+        };
+
+        syncRealisticMaterialProperties(
+            material,
+            CONFIG.MATERIAL_REALISTIC.aluminum,
+            null,
+            { roughnessOffset: 0.48, metallicOffset: -0.18, absoluteRoughness: 0.90 },
+            { surfaceEffectKey: 'bead-blast' });
+
+        ({
+            effectKey: surfacePlugin.lastEffect?.key ?? null,
+            materialEffectKey: material._malievSurfaceEffect?.key ?? null,
+            roughness: material.roughness,
+            metallic: material.metallic
+        });
+    `, context);
+
+    assert.equal(result.effectKey, 'bead-blast');
+    assert.equal(result.materialEffectKey, 'bead-blast');
+    assert.ok(result.roughness >= 0.86 && result.roughness <= 0.94);
+    assert.ok(result.metallic >= 0.72 && result.metallic <= 0.82);
+});
+
 test('realistic configurator keeps intrinsic blue POM darker than the UI swatch override', () => {
     const context = loadViewerContext();
     const mesh = {
