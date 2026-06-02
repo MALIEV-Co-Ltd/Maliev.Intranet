@@ -3468,6 +3468,33 @@ function getSurfaceEffectPluginClass() {
                     return malievVNoise(p * cellScale) * 0.68
                         + malievVNoise(p * cellScale * 2.35 + vec3(17.0, 31.0, 11.0)) * 0.32;
                 }
+                vec3 malievBrushedLayAxis(vec3 n) {
+                    vec3 an = abs(normalize(n));
+                    if (an.x >= an.y && an.x >= an.z) {
+                        return vec3(0.0, 1.0, 0.0);
+                    }
+                    return vec3(1.0, 0.0, 0.0);
+                }
+                vec2 malievBrushedSurfaceUv(vec3 p, vec3 n) {
+                    vec3 an = abs(normalize(n));
+                    vec3 lay = malievBrushedLayAxis(n);
+                    if (abs(lay.y) > 0.5) {
+                        return vec2(p.z, p.y);
+                    }
+                    if (an.z >= an.y) {
+                        return vec2(p.y, p.x);
+                    }
+                    return vec2(p.z, p.x);
+                }
+                float malievBrushedHeight(vec3 p, float scl, float sScl, vec3 n) {
+                    vec2 uv = malievBrushedSurfaceUv(p, n);
+                    float waviness = malievVNoise(vec3(uv.y * scl * 0.11, uv.x * scl * 0.035, 9.0));
+                    float broad = sin(uv.x * sScl * 2.1 + waviness * 0.65) * 0.5 + 0.5;
+                    float fine = malievVNoise(vec3(uv.x * scl * 4.8, uv.y * scl * 0.18, 17.0));
+                    float hairline = malievVNoise(vec3(uv.x * scl * 11.0, uv.y * scl * 0.10, 31.0));
+                    float longStreak = malievVNoise(vec3(uv.x * scl * 0.65, uv.y * scl * 0.05, 53.0));
+                    return clamp(broad * 0.30 + fine * 0.34 + hairline * 0.24 + longStreak * 0.12, 0.0, 1.0);
+                }
                 vec2 malievBeadSurfaceUv(vec3 p, vec3 n, float scl) {
                     vec3 an = abs(n);
                     if (an.z >= an.x && an.z >= an.y) {
@@ -3521,17 +3548,18 @@ function getSurfaceEffectPluginClass() {
                 }
                 // Procedural micro-surface HEIGHT in [0,1] for the selected finish (world-space, UV-free).
                 // Its value drives albedo grain and roughness wobble.
-                // 'up' = |geometric normal . Z| so CNC marks switch between face- and side-milling.
-                float malievHeight(vec3 p, float kind, float scl, float sScl, float up) {
+                // 'n' is the local geometric/shading normal used to choose a face-oriented projection.
+                float malievHeight(vec3 p, float kind, float scl, float sScl, vec3 n) {
                     scl = max(scl, 0.0001);
+                    n = normalize(n);
+                    float up = abs(n.z);
                     if (kind < 1.5) {
                         // Bead blasted: 2-octave isotropic grain.
                         float smoothGrain = malievVNoise(p * scl) * 0.65 + malievVNoise(p * scl * 2.7) * 0.35;
                         return smoothGrain * 0.58 + malievSurfaceSpeckle(p, kind, scl) * 0.42;
                     } else if (kind < 2.5) {
-                        // Brushed: unidirectional fine lines (along world X) + faint noise.
-                        float lines = sin(p.y * sScl) * 0.5 + 0.5;
-                        return lines * 0.78 + malievVNoise(vec3(p.x * scl * 3.0, p.y * scl, p.z * scl)) * 0.22;
+                        // Brushed: long directional scratches projected in the local face tangent plane.
+                        return malievBrushedHeight(p, scl, sScl, n);
                     } else if (kind < 3.5) {
                         // Powder (MJF/SLS): sintered nylon aggregate, fine powder, and darker pores.
                         return malievPowderBedHeight(p, scl);
@@ -3543,20 +3571,20 @@ function getSurfaceEffectPluginClass() {
                     float sideMark = sin(p.z * sScl * 1.7) * 0.5 + 0.5; // scallop lines stacked along wall height
                     return mix(sideMark, faceMark, up);
                 }
-                vec3 malievHeightGradient(vec3 p, float kind, float scl, float sScl, float up) {
+                vec3 malievHeightGradient(vec3 p, float kind, float scl, float sScl, vec3 n) {
                     float e = max(0.12, 0.35 / max(scl, 0.0001));
-                    float hx = malievHeight(p + vec3(e, 0.0, 0.0), kind, scl, sScl, up)
-                        - malievHeight(p - vec3(e, 0.0, 0.0), kind, scl, sScl, up);
-                    float hy = malievHeight(p + vec3(0.0, e, 0.0), kind, scl, sScl, up)
-                        - malievHeight(p - vec3(0.0, e, 0.0), kind, scl, sScl, up);
-                    float hz = malievHeight(p + vec3(0.0, 0.0, e), kind, scl, sScl, up)
-                        - malievHeight(p - vec3(0.0, 0.0, e), kind, scl, sScl, up);
+                    float hx = malievHeight(p + vec3(e, 0.0, 0.0), kind, scl, sScl, n)
+                        - malievHeight(p - vec3(e, 0.0, 0.0), kind, scl, sScl, n);
+                    float hy = malievHeight(p + vec3(0.0, e, 0.0), kind, scl, sScl, n)
+                        - malievHeight(p - vec3(0.0, e, 0.0), kind, scl, sScl, n);
+                    float hz = malievHeight(p + vec3(0.0, 0.0, e), kind, scl, sScl, n)
+                        - malievHeight(p - vec3(0.0, 0.0, e), kind, scl, sScl, n);
                     return vec3(hx, hy, hz) / (2.0 * e);
                 }
-                float malievSurfaceRelief(vec3 p, float kind, float scl, float sScl, float bump, float up) {
+                float malievSurfaceRelief(vec3 p, float kind, float scl, float sScl, float bump, vec3 n) {
                     vec3 baseNormal = normalize(cross(dFdx(p), dFdy(p)));
                     baseNormal *= gl_FrontFacing ? 1.0 : -1.0;
-                    vec3 gradient = malievHeightGradient(p, kind, scl, sScl, up);
+                    vec3 gradient = malievHeightGradient(p, kind, scl, sScl, n);
                     vec3 reliefNormal = normalize(baseNormal - gradient * bump * 3.2);
                     vec3 keyLight = normalize(vec3(-0.38, -0.58, 0.72));
                     return clamp(dot(reliefNormal, keyLight) - dot(baseNormal, keyLight), -0.35, 0.35);
@@ -3583,24 +3611,22 @@ function getSurfaceEffectPluginClass() {
                         normalW = normalize(_beadBaseNormal - _beadCraterGradient * surfaceEffectBump * 2.0 * _beadCraterAa);
                     } else if (_isPowder > 0.5) {
                         vec3 _powderBaseNormal = normalize(normalW);
-                        float _powderUp = abs(_powderBaseNormal.z);
                         vec3 _powderGradient = malievHeightGradient(
                             vPositionW,
                             surfaceEffectKind,
                             surfaceEffectScale,
                             surfaceEffectStripeScale,
-                            _powderUp);
+                            _powderBaseNormal);
                         float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
                         normalW = normalize(_powderBaseNormal - _powderGradient * surfaceEffectBump * 0.72 * _powderAa);
                     } else if (_isMachined > 0.5) {
                         vec3 _machinedBaseNormal = normalize(normalW);
-                        float _machinedUp = abs(_machinedBaseNormal.z);
                         vec3 _machinedGradient = malievHeightGradient(
                             vPositionW,
                             surfaceEffectKind,
                             surfaceEffectScale,
                             surfaceEffectStripeScale,
-                            _machinedUp);
+                            _machinedBaseNormal);
                         float _machinedFootprint = max(
                             length(dFdx(vPositionW * surfaceEffectStripeScale)),
                             length(dFdy(vPositionW * surfaceEffectStripeScale)));
@@ -3614,8 +3640,9 @@ function getSurfaceEffectPluginClass() {
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
                     // Subtle albedo variation supports the bump map without making bead blast look painted on.
-                    float _up = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
-                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _up);
+                    vec3 _surfaceNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
+                    _surfaceNormal *= gl_FrontFacing ? 1.0 : -1.0;
+                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _surfaceNormal);
                     float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
                     float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
@@ -3628,7 +3655,7 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectScale,
                         surfaceEffectStripeScale,
                         surfaceEffectBump,
-                        _up);
+                        _surfaceNormal);
                     float _grainAmplitude = mix(surfaceEffectBump, surfaceEffectStrength, _isBead);
                     float _standardGrain = (_h - 0.5) * _grainAmplitude * mix(0.72, 0.04, _isBead)
                         + (_speckle - 0.5) * _grainAmplitude * mix(0.24, 0.03, _isBead);
@@ -3649,8 +3676,9 @@ function getSurfaceEffectPluginClass() {
                 {
                     // Roughness grain: view-dependent light/dark micro-scatter that reads like relief and
                     // (because it feeds reflection blur) shows on metals too.
-                    float _up = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
-                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _up);
+                    vec3 _surfaceNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
+                    _surfaceNormal *= gl_FrontFacing ? 1.0 : -1.0;
+                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _surfaceNormal);
                     float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
                     float _ra = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
@@ -3679,13 +3707,14 @@ function getSurfaceEffectPluginClass() {
                 {
                     // Final lit-color relief makes bead blasting read as surface texture instead of only
                     // as a flatter roughness preset.
-                    float _finalUp = abs(normalize(cross(dFdx(vPositionW), dFdy(vPositionW))).z);
+                    vec3 _finalNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
+                    _finalNormal *= gl_FrontFacing ? 1.0 : -1.0;
                     float _finalH = malievHeight(
                         vPositionW,
                         surfaceEffectKind,
                         surfaceEffectScale,
                         surfaceEffectStripeScale,
-                        _finalUp);
+                        _finalNormal);
                     float _finalSpeckle = malievSurfaceSpeckle(
                         vPositionW,
                         surfaceEffectKind,
@@ -3704,7 +3733,7 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectScale,
                         surfaceEffectStripeScale,
                         surfaceEffectBump,
-                        _finalUp);
+                        _finalNormal);
                     float _standardLight =
                         (_finalSurfaceH - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.55, 0.02, _isBead)
                         + (_finalSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.24, 0.015, _isBead)
@@ -4216,7 +4245,7 @@ function getFinishModifiers(finishCode, materialKey = '') {
         };
     }
     if (lower.includes('brush')) {
-        return { roughnessOffset: 0.14, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.44 };
+        return { roughnessOffset: 0.28, metallicOffset: -0.05, surfaceEffectKey: 'brushed', absoluteRoughness: 0.62 };
     }
     if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
     if (lower.includes('bead'))   return { roughnessOffset: 0.48, metallicOffset: -0.18, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.90 };  // matte fine-particle micro-etched aluminum

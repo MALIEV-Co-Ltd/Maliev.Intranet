@@ -733,11 +733,60 @@ test('realistic configurator makes CNC surface finishes visibly distinct even wh
         result.brushed.roughness > result.mirrorPolish.roughness,
         `expected brushed to be rougher than mirror polish, got ${result.brushed.roughness} <= ${result.mirrorPolish.roughness}`
     );
+    assert.ok(
+        result.brushed.roughness >= 0.58 && result.brushed.roughness <= 0.70,
+        `expected brushed finish to be satin-matte rather than glossy, got ${result.brushed.roughness}`
+    );
     assert.equal(result.beadBlast.effectKey, 'bead-blast');
     assert.equal(result.brushed.effectKey, 'brushed');
     assert.equal(result.brushed.effectKind, 2);
     assert.equal(result.mirrorPolish.effectKey, null);
     assert.ok(result.mirrorPolish.metallic >= result.brushed.metallic);
+});
+
+test('brushed surface shader projects strokes along each face tangent instead of stacking on side faces', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BRUSHED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        const surfacePlugin = material?._pluginInstances?.find(plugin => plugin.name === 'MalievSurfaceEffect');
+        const customCode = surfacePlugin?.getCustomCode('fragment') ?? {};
+        ({
+            effectKey: material?._malievSurfaceEffect?.key ?? null,
+            effectKind: material?._malievSurfaceEffect?.kind ?? null,
+            profile: material?._malievNodeMaterialProfile ?? null,
+            definitions: customCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+            beforeLights: customCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
+            updateAlbedo: customCode.CUSTOM_FRAGMENT_UPDATE_ALBEDO ?? '',
+            beforeFragColor: customCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
+        });
+    `, context);
+
+    assert.equal(result.effectKey, 'brushed');
+    assert.equal(result.effectKind, 2);
+    assert.equal(result.profile?.surfaceEffectKey, 'brushed');
+    assert.equal(result.profile?.stripeAxis, 'x');
+    assert.match(result.definitions, /malievBrushedLayAxis/);
+    assert.match(result.definitions, /malievBrushedSurfaceUv/);
+    assert.match(result.definitions, /malievBrushedHeight/);
+    assert.doesNotMatch(result.definitions, /float\s+lines\s*=\s*sin\(p\.y\s*\*\s*sScl\)/);
+    assert.match(result.updateAlbedo, /malievHeight\(/);
+    assert.match(result.beforeFragColor, /malievSurfaceRelief/);
 });
 
 test('realistic configurator applies CNC machining surface effect when no finish hides tool marks', () => {
