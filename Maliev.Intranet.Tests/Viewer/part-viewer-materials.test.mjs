@@ -313,6 +313,7 @@ test('realistic render mode assigns a PBRMaterial that uses the scene environmen
             metallic: m?.metallic ?? null,
             materialName: m?.name ?? null,
             environmentCreated: !!scene.environmentTexture,
+            forceIrradianceInFragment: m?.forceIrradianceInFragment ?? null,
             realTimeFiltering: m?.realTimeFiltering ?? null,
         });
     `, context);
@@ -325,6 +326,7 @@ test('realistic render mode assigns a PBRMaterial that uses the scene environmen
     assert.equal(result.materialName, '__realistic_aluminum__');
     assert.ok(result.metallic > 0.5, 'aluminum realistic preset should stay metallic');
     assert.equal(result.environmentCreated, true);
+    assert.equal(result.forceIrradianceInFragment, true);
     // realTimeFiltering must NOT be enabled (expensive + driver-dependent flicker risk).
     assert.notEqual(result.realTimeFiltering, true);
 });
@@ -542,6 +544,75 @@ test('realistic render mode smooths near-coincident CAD vertices across conversi
     assert.ok(result.firstNormalY < 1, `expected seam normal Y to change from hard face normal, got ${result.firstNormalY}`);
     assert.ok(Math.abs(result.firstNormalX - result.fourthNormalX) < 0.001);
     assert.ok(Math.abs(result.firstNormalY - result.fourthNormalY) < 0.001);
+});
+
+test('polished finish refreshes glossy normal smoothing for low-tessellation reflections', () => {
+    const context = loadViewerContext();
+    const positions = new Float32Array([
+        0, 0, 0,
+        -1, 0, 0,
+        0, 0, 1,
+        0.024, 0, 0,
+        0.024, 0, 1,
+        1, 5.6, 0,
+    ]);
+    const indices = [0, 1, 2, 3, 4, 5];
+    const normals = new Float32Array([
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        -0.985, 0.172, 0,
+        -0.985, 0.172, 0,
+        -0.985, 0.172, 0,
+    ]);
+    let currentNormals = normals;
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: kind => {
+            if (kind === 'position') return positions;
+            if (kind === 'normal') return currentNormals;
+            return null;
+        },
+        getIndices: () => indices,
+        setVerticesData: (kind, data) => {
+            if (kind === 'normal') {
+                currentNormals = data;
+            }
+        },
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', null, 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const defaultNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        const defaultX = defaultNormals[0];
+        const defaultY = defaultNormals[1];
+        configureMaterialFromConfigurator('viewer', 'aluminum', null, 'POLISHED', 'RA_1_6', 'CNC_MILL');
+        const material = scene.meshes[0].material;
+        const polishedNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        ({
+            defaultX,
+            defaultY,
+            polishedX: polishedNormals[0],
+            polishedY: polishedNormals[1],
+            roughness: material?.roughness ?? null,
+            smoothingEnabled: perCanvasFinishModifiers.viewer?.polishedReflectionSmoothing ?? false
+        });
+    `, context);
+
+    assert.ok(Math.abs(result.defaultX) < 0.01, `expected default smoothing to preserve the coarse bevel normal, got ${result.defaultX}`);
+    assert.ok(result.defaultY > 0.99, `expected default smoothing to preserve the coarse bevel normal, got ${result.defaultY}`);
+    assert.ok(result.polishedX < -0.6, `expected polished smoothing to blend low-poly bevel normals, got ${result.polishedX}`);
+    assert.ok(result.polishedY < 0.6, `expected polished smoothing to soften polygonal reflection bands, got ${result.polishedY}`);
+    assert.ok(result.roughness >= 0.16 && result.roughness <= 0.20, `expected polished roughness floor to blur jagged reflections, got ${result.roughness}`);
+    assert.equal(result.smoothingEnabled, true);
 });
 
 test('realistic configurator applies bead blasted procedural surface effect', () => {

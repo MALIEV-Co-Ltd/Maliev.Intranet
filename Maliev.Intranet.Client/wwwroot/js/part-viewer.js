@@ -249,11 +249,16 @@ const CONFIG = {
          *  180 = fully smooth all edges. Raised from 55 to 75 to handle coarse
          *  STL/CAD tesselation while preserving true 90-degree edges. */
         smoothAngleDeg: 75,
+        // Polished/mirror finishes need extra-normal smoothing because sharp
+        // reflections make low-tessellation bevels look polygonal.
+        polishedSmoothAngleDeg: 88,
         normalPositionTolerance: 0.001,
         // STEP-to-GLB tessellation can split visually shared curve vertices by
         // a few hundredths of a millimeter, which leaves metallic reflections striped.
         normalPositionToleranceMin: 0.05,
         normalPositionToleranceRatio: 0.00012,
+        polishedNormalPositionToleranceMin: 0.12,
+        polishedNormalPositionToleranceRatio: 0.00024,
     },
 
     // =========================================================================
@@ -481,6 +486,9 @@ const realisticConfiguratorStateKeys = {};
 
 /** Per-canvas original vertex normals saved before smoothing (Map<uniqueId, Float32Array>) */
 const originalNormalData = {};
+
+/** Per-canvas active normal-smoothing profile keys (Map<uniqueId, string>) */
+const normalSmoothingProfiles = {};
 
 /** Per-canvas custom albedo color override for realistic mode (null = use preset) */
 const customAlbedoColors = {};
@@ -3705,6 +3713,7 @@ function configureRealisticPbrQuality(pbr) {
     // SH prefiltered. It was expensive (mobile-hostile) and a driver-dependent
     // instability source; the prefiltered environment gives stable specular IBL.
     pbr.enableSpecularAntiAliasing = true;
+    pbr.forceIrradianceInFragment = true;
 }
 
 function isFdmProcess(processCode) {
@@ -3980,6 +3989,11 @@ function applyRealisticMaterial(canvasId, materialType) {
     });
 }
 
+function refreshRealisticNormalSmoothing(canvasId) {
+    if (currentRenderModes[canvasId] !== 'realistic') return;
+    applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
+}
+
 /**
  * Sets the material type for realistic rendering mode and applies it immediately.
  * Callable from Blazor via JS interop.
@@ -4003,6 +4017,7 @@ export function setMaterialType(canvasId, materialType) {
     const detachedMaterials = detachAllCachedRealisticMaterials(canvasId);
     materialTypes[canvasId] = materialType;
     applyRealisticMaterial(canvasId, materialType);
+    refreshRealisticNormalSmoothing(canvasId);
     detachedMaterials.forEach(disposeDetachedMaterial);
 }
 
@@ -4112,6 +4127,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     // Only apply immediately if we are already in realistic mode.
     if (currentRenderModes[canvasId] === 'realistic') {
         applyRealisticMaterial(canvasId, materialKey);
+        refreshRealisticNormalSmoothing(canvasId);
     }
 
     disposeDetachedMaterial(detachedMaterial);
@@ -4140,7 +4156,13 @@ function isRawMachinedFinish(lowerFinishCode) {
 function getFinishModifiers(finishCode, materialKey = '') {
     const lower = (finishCode || '').toLowerCase();
     if (lower.includes('mirror') || lower.includes('electropolish') || lower.includes('polish')) {
-        return { roughnessOffset: -0.22, metallicOffset: 0.03, surfaceEffectKey: null, absoluteRoughness: 0.045 };
+        return {
+            roughnessOffset: -0.22,
+            metallicOffset: 0.03,
+            surfaceEffectKey: null,
+            absoluteRoughness: 0.18,
+            polishedReflectionSmoothing: true,
+        };
     }
     if (lower.includes('brush')) {
         return { roughnessOffset: 0.14, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.44 };
@@ -4171,11 +4193,12 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function getSmoothNormalPositionTolerance(positions) {
-    const minTolerance = CONFIG.REALISTIC.normalPositionToleranceMin
+function getSmoothNormalPositionTolerance(positions, options = {}) {
+    const minTolerance = options.positionToleranceMin
+        || CONFIG.REALISTIC.normalPositionToleranceMin
         || CONFIG.REALISTIC.normalPositionTolerance
         || 0.001;
-    const ratio = CONFIG.REALISTIC.normalPositionToleranceRatio || 0;
+    const ratio = options.positionToleranceRatio ?? CONFIG.REALISTIC.normalPositionToleranceRatio ?? 0;
     if (!positions || positions.length < 6 || ratio <= 0) return minTolerance;
 
     let minX = Infinity, minY = Infinity, minZ = Infinity;
@@ -4189,6 +4212,33 @@ function getSmoothNormalPositionTolerance(positions) {
     const dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
     const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
     return Math.max(minTolerance, diagonal * ratio);
+}
+
+function getRealisticNormalSmoothingOptions(canvasId) {
+    const finishMod = perCanvasFinishModifiers[canvasId];
+    if (finishMod?.polishedReflectionSmoothing) {
+        return {
+            angleDeg: CONFIG.REALISTIC.polishedSmoothAngleDeg || CONFIG.REALISTIC.smoothAngleDeg,
+            positionToleranceMin: CONFIG.REALISTIC.polishedNormalPositionToleranceMin
+                || CONFIG.REALISTIC.normalPositionToleranceMin,
+            positionToleranceRatio: CONFIG.REALISTIC.polishedNormalPositionToleranceRatio
+                ?? CONFIG.REALISTIC.normalPositionToleranceRatio,
+        };
+    }
+
+    return {
+        angleDeg: CONFIG.REALISTIC.smoothAngleDeg,
+        positionToleranceMin: CONFIG.REALISTIC.normalPositionToleranceMin,
+        positionToleranceRatio: CONFIG.REALISTIC.normalPositionToleranceRatio,
+    };
+}
+
+function getNormalSmoothingProfileKey(options) {
+    return [
+        options?.angleDeg ?? CONFIG.REALISTIC.smoothAngleDeg,
+        options?.positionToleranceMin ?? CONFIG.REALISTIC.normalPositionToleranceMin,
+        options?.positionToleranceRatio ?? CONFIG.REALISTIC.normalPositionToleranceRatio,
+    ].join('|');
 }
 
 function getSmoothNormalPositionKey(positions, offset, tolerance = CONFIG.REALISTIC.normalPositionTolerance || 0.001) {
@@ -4223,36 +4273,49 @@ function normalizeNormalVector(normals, offset, fallback) {
  * Original hard normals are saved so they can be restored on mode switch.
  * @param {string} canvasId
  */
-function applySmoothNormals(canvasId) {
+function applySmoothNormals(canvasId, options = getRealisticNormalSmoothingOptions(canvasId)) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    const thresholdRad = (CONFIG.REALISTIC.smoothAngleDeg * Math.PI) / 180;
+    const angleDeg = clamp(options?.angleDeg ?? CONFIG.REALISTIC.smoothAngleDeg, 0, 180);
+    const thresholdRad = (angleDeg * Math.PI) / 180;
     const cosThreshold = Math.cos(thresholdRad);
+    const profileKey = getNormalSmoothingProfileKey(options);
 
     if (!originalNormalData[canvasId]) originalNormalData[canvasId] = new Map();
+    if (!normalSmoothingProfiles[canvasId]) normalSmoothingProfiles[canvasId] = new Map();
     const saved = originalNormalData[canvasId];
+    const profiles = normalSmoothingProfiles[canvasId];
 
     scene.meshes.forEach(mesh => {
         if (isSystemMesh(mesh)) return;
-        if (saved.has(mesh.uniqueId)) return;  // already smoothed
+        if (typeof mesh.getVerticesData !== 'function'
+            || typeof mesh.getIndices !== 'function'
+            || typeof mesh.setVerticesData !== 'function') {
+            return;
+        }
 
         const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
         const indices   = mesh.getIndices();
-        const origNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+        const currentNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
         // Do not synthesize normals here. Some GLBs intentionally render from
         // position/color only; feeding generated face normals into this smoothing
         // pass can average unrelated triangles and create broken black facets.
-        if (!positions || !indices || !origNorms) return;
+        if (!positions || !indices || !currentNorms) return;
 
-        // Save original (hard) normals for restoration
-        saved.set(mesh.uniqueId, new Float32Array(origNorms));
+        let origNorms = saved.get(mesh.uniqueId);
+        if (!origNorms) {
+            origNorms = new Float32Array(currentNorms);
+            saved.set(mesh.uniqueId, origNorms);
+        } else if (profiles.get(mesh.uniqueId) === profileKey) {
+            return;
+        }
 
         const vertCount = positions.length / 3;
         const faceNormals = [];
         const positionFaceMap = new Map();
         const smoothNormals = new Float32Array(vertCount * 3);
-        const positionTolerance = getSmoothNormalPositionTolerance(positions);
+        const positionTolerance = getSmoothNormalPositionTolerance(positions, options);
 
         // Pass 1 — compute face normals
         for (let i = 0; i < indices.length; i += 3) {
@@ -4303,6 +4366,7 @@ function applySmoothNormals(canvasId) {
         }
 
         mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, smoothNormals);
+        profiles.set(mesh.uniqueId, profileKey);
     });
 }
 
@@ -4322,6 +4386,7 @@ function restoreOriginalNormals(canvasId) {
     });
 
     delete originalNormalData[canvasId];
+    delete normalSmoothingProfiles[canvasId];
 }
 
 // ── CAD material ──────────────────────────────────────────────────────────────
@@ -5096,10 +5161,11 @@ export function setRenderMode(canvasId, mode) {
         toggleEdges(canvasId, true);
     }
 
-    // Smooth normals transition — apply on enter, restore on leave
-    if (mode === 'realistic' && prevMode !== 'realistic') {
-        applySmoothNormals(canvasId);
-    } else if (mode !== 'realistic' && prevMode === 'realistic') {
+    // Smooth normals transition — use the active finish profile so polished
+    // metals do not expose coarse tessellation in sharp reflections.
+    if (mode === 'realistic') {
+        applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
+    } else if (prevMode === 'realistic') {
         restoreOriginalNormals(canvasId);
     }
     currentRenderModes[canvasId] = mode;

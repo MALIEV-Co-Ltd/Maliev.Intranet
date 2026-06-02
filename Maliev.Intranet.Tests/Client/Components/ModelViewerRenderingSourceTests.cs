@@ -37,7 +37,7 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("normalPositionToleranceMin", source, StringComparison.Ordinal);
         Assert.Contains("normalPositionToleranceRatio", source, StringComparison.Ordinal);
         Assert.Contains("function getSmoothNormalPositionTolerance", source, StringComparison.Ordinal);
-        Assert.Contains("const positionTolerance = getSmoothNormalPositionTolerance(positions);", source, StringComparison.Ordinal);
+        Assert.Contains("const positionTolerance = getSmoothNormalPositionTolerance(positions, options);", source, StringComparison.Ordinal);
         Assert.Contains("weight: area", source, StringComparison.Ordinal);
         Assert.Contains("sx += f.x * weight", source, StringComparison.Ordinal);
     }
