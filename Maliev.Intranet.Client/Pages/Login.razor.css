@@ -12,7 +12,7 @@
     position: relative;
     z-index: 50;
     padding: 14px 20px;
-    background: var(--maliev-panel);
+    background: transparent;
     box-shadow: none;
 }
 
@@ -155,23 +155,6 @@
     display: none;
 }
 
-.password-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 6px;
-}
-
-.password-hint {
-    color: var(--maliev-muted);
-    font-size: var(--mud-typography-caption-size);
-    font-weight: 400;
-    line-height: 1.3;
-    letter-spacing: 0;
-    white-space: nowrap;
-}
-
 .btn-primary,
 .btn-google {
     width: 100%;
@@ -193,13 +176,13 @@
 }
 
 .btn-primary {
-    margin-top: 8px;
-    background: var(--mud-palette-primary);
-    color: var(--mud-palette-primary-text);
+    background: var(--maliev-panel);
+    color: var(--mud-palette-text-primary);
     box-shadow: var(--maliev-shadow-ring);
 }
 
 .btn-primary:hover {
+    background: var(--maliev-panel-3);
     transform: translateY(-1px);
     box-shadow: var(--maliev-shadow-md);
 }
@@ -207,6 +190,7 @@
 .btn-primary:focus-visible,
 .btn-google:focus-visible,
 .footer-note-link:focus-visible,
+.email-back-button:focus-visible,
 .theme-toggle-btn:focus-visible {
     outline: none;
     box-shadow: var(--maliev-focus-ring);
@@ -245,14 +229,15 @@
 }
 
 .btn-google {
-    background: var(--maliev-panel);
-    color: var(--mud-palette-text-primary);
-    box-shadow: var(--maliev-shadow-ring);
+    background: var(--maliev-ink);
+    color: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-md);
 }
 
 .btn-google:hover {
-    background: var(--maliev-panel-3);
-    color: var(--mud-palette-text-primary);
+    background: var(--maliev-ink);
+    color: var(--maliev-panel);
+    box-shadow: var(--maliev-shadow-card);
     text-decoration: none;
 }
 
@@ -260,6 +245,98 @@
     width: 18px;
     height: 18px;
     flex: 0 0 auto;
+}
+
+.email-entry-form,
+.credential-step {
+    display: grid;
+    gap: 12px;
+}
+
+.email-entry-form .input-group,
+.credential-step .input-group {
+    margin-bottom: 0;
+}
+
+.auth-requirement-list {
+    display: grid;
+    gap: 7px;
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+}
+
+.auth-requirement-item {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    color: var(--maliev-muted);
+    font-size: var(--mud-typography-caption-size);
+    line-height: 1.35;
+    letter-spacing: 0;
+}
+
+.auth-requirement-item::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--maliev-radius-pill);
+    background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-shadow-ring);
+    font-size: var(--mud-typography-overline-size);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.auth-requirement-item.is-met {
+    color: var(--maliev-ink);
+}
+
+.auth-requirement-item.is-met::before {
+    content: "\2713";
+    background: var(--maliev-ink);
+    color: var(--maliev-panel);
+}
+
+.credential-email-summary {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 10px;
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-3);
+    box-shadow: var(--maliev-shadow-ring);
+    color: var(--maliev-ink);
+    font-size: var(--mud-typography-body2-size);
+    line-height: 1.3;
+}
+
+.credential-email-summary span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.email-back-button {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: var(--maliev-radius-xs);
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--mud-typography-caption-size);
+    font-weight: 600;
+}
+
+.email-back-button:hover {
+    color: var(--maliev-ink);
+    text-decoration: underline;
 }
 
 .footer-note {
@@ -284,8 +361,8 @@
 
 .login-footer {
     padding: 14px 20px;
-    background: var(--maliev-panel);
-    box-shadow: var(--maliev-shadow-ring);
+    background: transparent;
+    box-shadow: none;
 }
 
 .footer-content {

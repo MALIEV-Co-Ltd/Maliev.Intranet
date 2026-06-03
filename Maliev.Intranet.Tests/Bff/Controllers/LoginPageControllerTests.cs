@@ -47,7 +47,12 @@ public class LoginPageControllerTests
         Assert.Contains("alt=\"MALIEV Logo\"", content.Content);
         Assert.Contains("class=\"btn-google\"", content.Content);
         Assert.Contains("class=\"google-logo\"", content.Content);
-        Assert.Contains("Sign in with Google", content.Content);
+        Assert.Contains("Continue with Google", content.Content);
+        Assert.Contains("class=\"email-entry-form\"", content.Content);
+        Assert.Contains("data-email-continue", content.Content);
+        Assert.Contains("Use your @maliev.com email.", content.Content);
+        Assert.DoesNotContain(">Email address<", content.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Workspace password", content.Content, StringComparison.Ordinal);
         Assert.Contains("data-theme-icon=\"dark\"", content.Content);
         Assert.Contains("data-theme-icon=\"light\"", content.Content);
         Assert.DoesNotContain("data-theme-icon=\"system\"", content.Content);

@@ -9,10 +9,14 @@ public class ThemeToggleSourceTests
         var navMenu = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor");
         var navMenuStyles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor.css");
         var login = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor.cs");
+        var themeIcons = ReadRepoFile("Maliev.Intranet.Client", "ThemeIcons.cs");
         var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
 
         Assert.Contains("LayoutService.IsDarkMode", topBar, StringComparison.Ordinal);
-        Assert.Contains("Icons.Material.Outlined.DarkMode", topBar, StringComparison.Ordinal);
+        Assert.Contains("ThemeIcons.Dark", topBar, StringComparison.Ordinal);
+        Assert.Contains("ThemeIcons.Dark", login, StringComparison.Ordinal);
+        Assert.Contains("M21 14.5A8.5 8.5 0 0 1 9.5 3", themeIcons, StringComparison.Ordinal);
+        Assert.DoesNotContain("Icons.Material.Outlined.DarkMode", topBar, StringComparison.Ordinal);
         Assert.Contains("Icons.Material.Outlined.LightMode", topBar, StringComparison.Ordinal);
         Assert.Contains("? \"Dark Theme\"", topBar, StringComparison.Ordinal);
         Assert.Contains(": \"Light Theme\"", topBar, StringComparison.Ordinal);

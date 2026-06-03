@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using MudBlazor;
-using Microsoft.Extensions.Logging;
 
 namespace Maliev.Intranet.Client.Pages;
 
@@ -52,6 +52,9 @@ public partial class Login : ComponentBase
     private string _usernameInput = string.Empty;
     private bool _isCheckingAuth = true;
     private bool _isDarkMode;
+    private LoginStep _loginStep = LoginStep.Email;
+
+    private static readonly EmailAddressAttribute EmailValidator = new();
 
     // Theme-aware logo URLs
     private string LogoUrl => _isDarkMode
@@ -99,12 +102,49 @@ public partial class Login : ComponentBase
     }
 
     private string GetThemeIcon() => LayoutService.IsDarkMode
-        ? Icons.Material.Outlined.DarkMode
+        ? ThemeIcons.Dark
         : Icons.Material.Outlined.LightMode;
 
     private string GetThemeTooltip() => LayoutService.IsDarkMode
         ? "Switch to Light Mode"
         : "Switch to Dark Mode";
+
+    private bool IsEmailStep => _loginStep == LoginStep.Email;
+
+    private bool EmailLooksValid
+    {
+        get
+        {
+            var email = _usernameInput.Trim();
+            return EmailValidator.IsValid(email) &&
+                email.EndsWith("@maliev.com", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool CredentialsReady => EmailLooksValid && !string.IsNullOrWhiteSpace(_loginModel.Password);
+
+    private string EmailRequirementClass => EmailLooksValid
+        ? "auth-requirement-item is-met"
+        : "auth-requirement-item is-pending";
+
+    private void ContinueWithEmail()
+    {
+        if (!EmailLooksValid)
+        {
+            _errorMessage = "Use your @maliev.com email.";
+            return;
+        }
+
+        _errorMessage = null;
+        _loginModel.Username = _usernameInput.Trim();
+        _loginStep = LoginStep.Credentials;
+    }
+
+    private void BackToEmailStep()
+    {
+        _loginStep = LoginStep.Email;
+        _loginModel.Password = string.Empty;
+    }
 
     private async Task HandleLogin()
     {
@@ -116,7 +156,7 @@ public partial class Login : ComponentBase
         {
             if (string.IsNullOrWhiteSpace(_usernameInput))
             {
-                _errorMessage = "Email address is required.";
+                _errorMessage = "Email is required.";
                 _isProcessing = false;
                 StateHasChanged();
                 return;
@@ -130,9 +170,7 @@ public partial class Login : ComponentBase
                 return;
             }
 
-            var fullUsername = _usernameInput.Contains("@")
-                ? _usernameInput
-                : $"{_usernameInput}@maliev.com";
+            var fullUsername = _usernameInput.Trim();
 
             var response = await Http.PostAsJsonAsync("api/v1/auth/login", new
             {
@@ -183,6 +221,12 @@ public partial class Login : ComponentBase
     {
         // No async resources to dispose
         await Task.CompletedTask;
+    }
+
+    private enum LoginStep
+    {
+        Email,
+        Credentials
     }
 
 }

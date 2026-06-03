@@ -136,9 +136,11 @@ public sealed class LoginPageController : Controller
             justify-content: space-between;
             gap: 16px;
             padding: 14px 20px;
-            background: var(--maliev-panel);
+            background: transparent;
+            box-shadow: none;
         }
         .login-header {
+            background: transparent;
             box-shadow: none;
         }
         .login-header-content {
@@ -244,19 +246,6 @@ public sealed class LoginPageController : Controller
         .field {
             margin-bottom: 16px;
         }
-        .password-label-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 6px;
-        }
-        .password-hint {
-            color: var(--maliev-muted);
-            font-size: var(--maliev-type-caption);
-            line-height: 1.3;
-            white-space: nowrap;
-        }
         input[type="email"],
         input[type="password"] {
             width: 100%;
@@ -305,27 +294,30 @@ public sealed class LoginPageController : Controller
             transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         }
         .submit {
-            margin-top: 8px;
-            background: var(--maliev-ink);
-            color: var(--maliev-panel);
-            box-shadow: var(--maliev-shadow-ring);
-        }
-        .submit:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--maliev-shadow-md);
-        }
-        .btn-google {
             background: var(--maliev-panel);
             color: var(--maliev-ink);
             box-shadow: var(--maliev-shadow-ring);
         }
-        .btn-google:hover {
+        .submit:hover {
             background: var(--maliev-panel-3);
+            transform: translateY(-1px);
+            box-shadow: var(--maliev-shadow-md);
+        }
+        .btn-google {
+            background: var(--maliev-ink);
+            color: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-md);
+        }
+        .btn-google:hover {
+            background: var(--maliev-ink);
+            color: var(--maliev-panel);
+            box-shadow: var(--maliev-shadow-card);
             text-decoration: none;
         }
         .submit:focus-visible,
         .btn-google:focus-visible,
         .footer-link:focus-visible,
+        .email-back-button:focus-visible,
         .theme-toggle-btn:focus-visible {
             outline: none;
             box-shadow: var(--maliev-focus-ring);
@@ -338,6 +330,95 @@ public sealed class LoginPageController : Controller
             width: 18px;
             height: 18px;
             flex: 0 0 auto;
+        }
+        .email-entry-form,
+        .credential-step {
+            display: grid;
+            gap: 12px;
+        }
+        .email-step {
+            display: grid;
+            gap: 12px;
+        }
+        .email-entry-form .field,
+        .credential-step .field {
+            margin-bottom: 0;
+        }
+        .credential-step[hidden],
+        .email-step[hidden] {
+            display: none;
+        }
+        .auth-requirement-list {
+            display: grid;
+            gap: 7px;
+            margin: 0 0 4px;
+            padding: 0;
+            list-style: none;
+        }
+        .auth-requirement-item {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            color: var(--maliev-muted);
+            font-size: var(--maliev-type-caption);
+            line-height: 1.35;
+            letter-spacing: 0;
+        }
+        .auth-requirement-item::before {
+            content: "";
+            width: 16px;
+            height: 16px;
+            display: grid;
+            place-items: center;
+            border-radius: 999px;
+            background: var(--maliev-panel-3);
+            box-shadow: var(--maliev-shadow-ring);
+            font-size: var(--maliev-type-micro);
+            font-weight: 700;
+            line-height: 1;
+        }
+        .auth-requirement-item.is-met {
+            color: var(--maliev-ink);
+        }
+        .auth-requirement-item.is-met::before {
+            content: "\2713";
+            background: var(--maliev-ink);
+            color: var(--maliev-panel);
+        }
+        .credential-email-summary {
+            min-height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 10px;
+            border-radius: var(--maliev-radius-sm);
+            background: var(--maliev-panel-3);
+            box-shadow: var(--maliev-shadow-ring);
+            color: var(--maliev-ink);
+            font-size: var(--maliev-type-body);
+            line-height: 1.3;
+        }
+        .credential-email-summary span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .email-back-button {
+            flex: 0 0 auto;
+            border: 0;
+            border-radius: var(--maliev-radius-xs);
+            background: transparent;
+            color: var(--maliev-muted);
+            cursor: pointer;
+            font: inherit;
+            font-size: var(--maliev-type-caption);
+            font-weight: 600;
+        }
+        .email-back-button:hover {
+            color: var(--maliev-ink);
+            text-decoration: underline;
         }
         .divider {
             display: flex;
@@ -377,10 +458,11 @@ public sealed class LoginPageController : Controller
             text-decoration: underline;
         }
         .login-footer {
+            background: transparent;
             color: var(--maliev-muted);
             font-size: var(--maliev-type-caption);
             line-height: 1.3;
-            box-shadow: var(--maliev-shadow-ring);
+            box-shadow: none;
         }
         .login-footer-content {
             width: min(100%, 1080px);
@@ -481,6 +563,107 @@ public sealed class LoginPageController : Controller
                 document.documentElement.setAttribute('data-maliev-theme', effectiveTheme(pref));
                 setButtonLabel(pref);
             }
+            function isWorkspaceEmail(value) {
+                return /^[^@\s]+@maliev\.com$/i.test((value || '').trim());
+            }
+            function setupEmailStep() {
+                const form = document.querySelector('[data-email-login-form]');
+                if (!form) {
+                    return;
+                }
+
+                const emailStep = form.querySelector('[data-email-step]');
+                const credentialStep = form.querySelector('[data-credential-step]');
+                const emailInput = form.querySelector('[name="Username"]');
+                const passwordInput = form.querySelector('[name="Password"]');
+                const emailSummary = form.querySelector('[data-email-summary]');
+                const requirement = form.querySelector('[data-email-requirement]');
+                const continueButton = form.querySelector('[data-email-continue]');
+                const backButton = form.querySelector('[data-email-back]');
+
+                if (!emailStep || !credentialStep || !emailInput || !passwordInput || !continueButton) {
+                    return;
+                }
+
+                try {
+                    const storedEmail = sessionStorage.getItem('maliev_login_email');
+                    if (storedEmail && !emailInput.value) {
+                        emailInput.value = storedEmail;
+                    }
+                } catch {
+                    // Email preservation is a convenience only.
+                }
+
+                function updateRequirement() {
+                    const valid = isWorkspaceEmail(emailInput.value);
+                    if (requirement) {
+                        requirement.classList.toggle('is-met', valid);
+                        requirement.classList.toggle('is-pending', !valid);
+                    }
+                    continueButton.disabled = !valid;
+                    emailInput.setCustomValidity(valid || emailInput.value.length === 0 ? '' : 'Use your @maliev.com email.');
+                }
+
+                function showEmailStep() {
+                    credentialStep.hidden = true;
+                    emailStep.hidden = false;
+                    passwordInput.value = '';
+                    updateRequirement();
+                    emailInput.focus();
+                }
+
+                function showCredentialStep() {
+                    updateRequirement();
+                    if (!isWorkspaceEmail(emailInput.value)) {
+                        emailInput.reportValidity();
+                        return;
+                    }
+
+                    const email = emailInput.value.trim();
+                    if (emailSummary) {
+                        emailSummary.textContent = email;
+                    }
+                    try {
+                        sessionStorage.setItem('maliev_login_email', email);
+                    } catch {
+                        // Cookie/session storage may be unavailable in strict browser settings.
+                    }
+                    emailStep.hidden = true;
+                    credentialStep.hidden = false;
+                    passwordInput.focus();
+                }
+
+                emailInput.addEventListener('input', updateRequirement);
+                continueButton.addEventListener('click', showCredentialStep);
+                if (backButton) {
+                    backButton.addEventListener('click', showEmailStep);
+                }
+                form.addEventListener('submit', function(event) {
+                    if (!emailStep.hidden) {
+                        event.preventDefault();
+                        showCredentialStep();
+                        return;
+                    }
+
+                    if (!isWorkspaceEmail(emailInput.value)) {
+                        event.preventDefault();
+                        showEmailStep();
+                        emailInput.reportValidity();
+                        return;
+                    }
+
+                    try {
+                        sessionStorage.setItem('maliev_login_email', emailInput.value.trim());
+                    } catch {
+                        // Best effort only.
+                    }
+                });
+
+                updateRequirement();
+                if (document.querySelector('.error-alert') && isWorkspaceEmail(emailInput.value)) {
+                    showCredentialStep();
+                }
+            }
             window.toggleTheme = function() {
                 const pref = themePreference();
                 const next = effectiveTheme(pref) === 'dark' ? 'light' : 'dark';
@@ -495,6 +678,7 @@ public sealed class LoginPageController : Controller
             if (typeof matchMedia === 'function') {
                 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
             }
+            document.addEventListener('DOMContentLoaded', setupEmailStep);
             applyTheme();
         })();
     </script>
@@ -527,25 +711,9 @@ public sealed class LoginPageController : Controller
                         <img src="/images/logo.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--light" />
                         <img src="/images/logo-white.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--dark" />
                     </h1>
-                    <p class="subtitle">Use your employee account to continue to the intranet workspace.</p>
+                    <p class="subtitle">Use your @maliev.com Google Workspace account to continue to the intranet workspace.</p>
                 </div>
                 {{errorHtml}}
-                <form method="post" action="/api/v1/auth/login-form">
-                    <input type="hidden" name="ReturnUrl" value="{{encodedReturnUrl}}" />
-                    <div class="field">
-                        <label for="Username">Email address</label>
-                        <input id="Username" name="Username" type="email" autocomplete="username" placeholder="name@maliev.com" required />
-                    </div>
-                    <div class="field">
-                        <div class="password-label-row">
-                            <label for="Password">Password</label>
-                            <span class="password-hint">Workspace password</span>
-                        </div>
-                        <input id="Password" name="Password" type="password" autocomplete="current-password" required />
-                    </div>
-                    <button class="submit" type="submit">Sign in</button>
-                </form>
-                <div class="divider">or</div>
                 <a class="btn-google" href="/api/v1/auth/login?returnUrl={{encodedGoogleReturnUrl}}">
                     <svg class="google-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -553,8 +721,33 @@ public sealed class LoginPageController : Controller
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
-                    <span>Sign in with Google</span>
+                    <span>Continue with Google</span>
                 </a>
+                <div class="divider">or continue with email</div>
+                <form class="email-entry-form" method="post" action="/api/v1/auth/login-form" data-email-login-form>
+                    <input type="hidden" name="ReturnUrl" value="{{encodedReturnUrl}}" />
+                    <div class="email-step" data-email-step>
+                        <div class="field">
+                            <label for="Username">Email</label>
+                            <input id="Username" name="Username" type="email" autocomplete="username" inputmode="email" placeholder="name@maliev.com" pattern="^[^@\s]+@maliev\.com$" title="Use your @maliev.com email." aria-describedby="login-email-requirements" required />
+                        </div>
+                        <ul id="login-email-requirements" class="auth-requirement-list" aria-live="polite">
+                            <li class="auth-requirement-item is-pending" data-email-requirement>Use your @maliev.com email.</li>
+                        </ul>
+                        <button class="submit" type="button" data-email-continue disabled>Continue with email</button>
+                    </div>
+                    <div class="credential-step" data-credential-step hidden>
+                        <div class="credential-email-summary">
+                            <span data-email-summary></span>
+                            <button type="button" class="email-back-button" data-email-back>Change</button>
+                        </div>
+                        <div class="field">
+                            <label for="Password">Password</label>
+                            <input id="Password" name="Password" type="password" autocomplete="current-password" placeholder="Password" required />
+                        </div>
+                        <button class="submit" type="submit">Sign in with email</button>
+                    </div>
+                </form>
                 <p class="footer-note">
                     Not an employee? Visit our main page at
                     <a href="https://www.maliev.com" target="_blank">www.maliev.com</a>

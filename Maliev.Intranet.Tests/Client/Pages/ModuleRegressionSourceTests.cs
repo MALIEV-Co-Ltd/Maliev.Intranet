@@ -321,7 +321,7 @@ public class ModuleRegressionSourceTests
     public void CustomerList_RendersLoadingTableInsideResultsPanel()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
-        var panelBlock = ExtractRazorBlock(source, "<PanelCard Class=\"mlv-data-results-panel\"");
+        var panelBlock = ExtractRazorBlock(source, "<PanelCard Class=\"mlv-data-results-panel customer-list-results-panel\"");
 
         Assert.Contains("@if (_loading)", panelBlock, StringComparison.Ordinal);
         Assert.Contains("<ProgressiveSkeleton Layout=\"table\"", panelBlock, StringComparison.Ordinal);
@@ -336,7 +336,7 @@ public class ModuleRegressionSourceTests
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
         var moduleStyles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
         var resultsPanelBlock = ExtractCssBlock(moduleStyles, ".mlv-data-results-panel");
-        var rowScrollTableBlock = ExtractCssBlock(moduleStyles, ".mlv-row-scroll-table {");
+        var rowScrollTableBlock = ExtractCssBlock(moduleStyles, "\n.mlv-row-scroll-table {");
         var rowScrollBodyBlock = ExtractCssBlock(moduleStyles, ".mlv-row-scroll-table tbody {");
         var customerTableBlock = ExtractCssBlock(moduleStyles, ".customer-list-table {");
 
@@ -1879,7 +1879,12 @@ public class ModuleRegressionSourceTests
         var bffLogin = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "LoginPageController.cs");
 
         Assert.Contains("/api/v1/auth/login", source, StringComparison.Ordinal);
-        Assert.Contains("Sign in with Google", source, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", source, StringComparison.Ordinal);
+        Assert.Contains("class=\"email-entry-form\"", source, StringComparison.Ordinal);
+        Assert.Contains("EmailLooksValid", source, StringComparison.Ordinal);
+        Assert.Contains("ContinueWithEmail", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Email address<", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Workspace password", source, StringComparison.Ordinal);
         Assert.Contains("class=\"login-gateway-card\"", source, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Sign in to MALIEV\"", source, StringComparison.Ordinal);
         Assert.Contains("class=\"form-title login-title\"", source, StringComparison.Ordinal);
@@ -1892,16 +1897,31 @@ public class ModuleRegressionSourceTests
         var loginHeaderBlock = ExtractCssBlock(styles, ".login-header {");
         var loginMainBlock = ExtractCssBlock(styles, ".login-main {");
         var themeToggleBlock = ExtractCssBlock(styles, ".theme-toggle-btn {");
+        var loginFooterBlock = ExtractCssBlock(styles, ".login-footer {");
+        var requirementListBlock = ExtractCssBlock(styles, ".auth-requirement-list {");
         var bffThemeToggleRootIndex = bffLogin.LastIndexOf(".theme-toggle-btn {", StringComparison.Ordinal);
         Assert.True(bffThemeToggleRootIndex >= 0, "Expected the BFF login page to have a root theme-toggle block.");
         var bffThemeToggleBlock = ExtractCssBlock(bffLogin[bffThemeToggleRootIndex..], ".theme-toggle-btn {");
         var bffLoginMainBlock = ExtractCssBlock(bffLogin, ".login-main {");
+        var bffLoginFooterBlock = ExtractCssBlock(bffLogin, ".login-footer {");
+        var bffRequirementListBlock = ExtractCssBlock(bffLogin, ".auth-requirement-list {");
+        var bffEmailStepBlock = ExtractCssBlock(bffLogin, ".email-step {");
+        var googleIndex = source.IndexOf("Continue with Google", StringComparison.Ordinal);
+        var emailFormIndex = source.IndexOf("class=\"email-entry-form\"", StringComparison.Ordinal);
+        Assert.True(googleIndex >= 0 && emailFormIndex > googleIndex, "Expected Google to be the primary login action before the email fallback.");
+        var bffGoogleIndex = bffLogin.IndexOf("Continue with Google", StringComparison.Ordinal);
+        var bffEmailFormIndex = bffLogin.IndexOf("class=\"email-entry-form\"", StringComparison.Ordinal);
+        Assert.True(bffGoogleIndex >= 0 && bffEmailFormIndex > bffGoogleIndex, "Expected BFF login to prioritize Google before email fallback.");
         Assert.Contains("background: var(--maliev-bg);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
         Assert.Contains("border-radius: var(--maliev-radius-md);", styles, StringComparison.Ordinal);
-        Assert.Contains("background: var(--mud-palette-primary);", styles, StringComparison.Ordinal);
+        Assert.Contains("background: var(--maliev-ink);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
+        Assert.Contains("background: transparent;", loginHeaderBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", loginHeaderBlock, StringComparison.Ordinal);
+        Assert.Contains("background: transparent;", loginFooterBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: none;", loginFooterBlock, StringComparison.Ordinal);
+        Assert.Contains("margin: 0 0 4px;", requirementListBlock, StringComparison.Ordinal);
         Assert.Contains("place-items: center;", loginMainBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("align-items: start;", styles, StringComparison.Ordinal);
         Assert.Contains("display: flex;", ExtractCssBlock(styles, ".login-title"), StringComparison.Ordinal);
@@ -1917,6 +1937,12 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("/api/v1/auth/login-form", bffLogin, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/login?returnUrl", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("class=\"email-entry-form\"", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("data-email-continue", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("Use your @maliev.com email.", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Email address<", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("Workspace password", bffLogin, StringComparison.Ordinal);
         Assert.Contains("family=Geist:wght@400..700", bffLogin, StringComparison.Ordinal);
         Assert.Contains("family=Geist+Mono:wght@400..600", bffLogin, StringComparison.Ordinal);
         Assert.Contains("Noto+Sans+Thai", bffLogin, StringComparison.Ordinal);
@@ -1932,7 +1958,13 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-template-rows: auto minmax(0, 1fr) auto;", bffLogin, StringComparison.Ordinal);
         Assert.Contains("--maliev-shadow-card", bffLogin, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("background: transparent;", ExtractCssBlock(bffLogin, ".login-header {"), StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", ExtractCssBlock(bffLogin, ".login-header {"), StringComparison.Ordinal);
+        Assert.Contains("background: transparent;", bffLoginFooterBlock, StringComparison.Ordinal);
+        Assert.Contains("box-shadow: none;", bffLoginFooterBlock, StringComparison.Ordinal);
+        Assert.Contains("display: grid;", bffEmailStepBlock, StringComparison.Ordinal);
+        Assert.Contains("gap: 12px;", bffEmailStepBlock, StringComparison.Ordinal);
+        Assert.Contains("margin: 0 0 4px;", bffRequirementListBlock, StringComparison.Ordinal);
         Assert.Contains("place-items: center;", bffLoginMainBlock, StringComparison.Ordinal);
         Assert.DoesNotContain("align-items: start;", bffLogin, StringComparison.Ordinal);
         Assert.Contains("display: flex;", ExtractCssBlock(bffLogin, ".login-title"), StringComparison.Ordinal);
