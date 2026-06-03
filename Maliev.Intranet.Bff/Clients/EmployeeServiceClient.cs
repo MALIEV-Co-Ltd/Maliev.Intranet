@@ -230,6 +230,7 @@ public class EmployeeServiceClient(HttpClient httpClient)
             LastName = profile.LastName,
             Email = profile.WorkEmail,
             Phone = profile.MobilePhone,
+            ProfileImageUrl = profile.ProfileImageUrl,
             Department = profile.DepartmentName ?? string.Empty,
             Title = profile.JobTitle ?? string.Empty,
             Status = profile.EmploymentStatus,

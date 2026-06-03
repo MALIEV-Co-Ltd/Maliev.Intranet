@@ -246,6 +246,7 @@ public class EmployeeServiceClientTests
         var principalId = Guid.Parse("88888888-8888-8888-8888-888888888888");
         var employeeId = Guid.Parse("99999999-9999-9999-9999-999999999999");
         var startDate = new DateTime(2026, 5, 4, 0, 0, 0, DateTimeKind.Utc);
+        const string profileImageUrl = "https://lh3.googleusercontent.com/a/sarah";
         var handler = new Mock<HttpMessageHandler>();
         handler.Protected()
             .Setup<Task<HttpResponseMessage>>(
@@ -267,7 +268,8 @@ public class EmployeeServiceClientTests
                     jobTitle = "",
                     employmentType = "FullTime",
                     employmentStatus = "Active",
-                    startDate
+                    startDate,
+                    profile_image_url = profileImageUrl
                 })
             });
 
@@ -284,5 +286,6 @@ public class EmployeeServiceClientTests
         Assert.Equal("Active", result.Status);
         Assert.Equal("FullTime", result.EmployeeType);
         Assert.Equal(startDate, result.HireDate);
+        Assert.Equal(profileImageUrl, result.ProfileImageUrl);
     }
 }

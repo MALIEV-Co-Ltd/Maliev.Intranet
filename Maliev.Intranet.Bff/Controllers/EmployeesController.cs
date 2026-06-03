@@ -193,6 +193,7 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
         }
 
         profile.Email = FirstNonBlank(profile.Email, User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)?.Value, User.FindFirst("email")?.Value);
+        profile.ProfileImageUrl = FirstNonBlank(profile.ProfileImageUrl, User.GetProfileImageUrl());
         profile.Status = FirstNonBlank(profile.Status, "Active");
         profile.EmployeeType = FirstNonBlank(profile.EmployeeType, "FullTime");
         profile.HireDate ??= profile.CreatedAt == DateTime.MinValue ? null : profile.CreatedAt;

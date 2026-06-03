@@ -221,7 +221,7 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             UserId = userId,
             DisplayName = User.Identity.Name ?? User.FindFirst("name")?.Value ?? "Unknown",
             Email = User.FindFirst("email")?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "No email",
-            ProfileImageUrl = User.FindFirst("picture")?.Value,
+            ProfileImageUrl = User.GetProfileImageUrl(),
             Roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).Concat(User.FindAll("roles").Select(c => c.Value)).Distinct().ToList(),
                 Permissions = User.FindAll("permission").Select(c => c.Value)
                     .Concat(User.FindAll("permissions").Select(c => c.Value))

@@ -147,8 +147,8 @@ public class JwtClaimsEnrichmentMiddleware
         {
             var email = context.User.FindFirst("email")?.Value ?? context.User.FindFirst(ClaimTypes.Email)?.Value;
             var fullName = context.User.FindFirst("name")?.Value ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
-            var googleUserId = context.User.FindFirst("google_user_id")?.Value;
-            var picture = context.User.FindFirst("picture")?.Value;
+            var googleUserId = context.User.GetGoogleUserId();
+            var picture = context.User.GetProfileImageUrl();
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(googleUserId))
             {

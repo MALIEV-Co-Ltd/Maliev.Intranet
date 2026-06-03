@@ -68,6 +68,7 @@ public class AuthControllerTests
             new("user_id", "user-123"),
             new(ClaimTypes.Name, "Test User"),
             new(ClaimTypes.Email, "test@maliev.com"),
+            new("urn:google:picture", "https://lh3.googleusercontent.com/a/test-user"),
             new(ClaimTypes.Role, "Admin"),
             new("permissions", "read:all")
         };
@@ -81,6 +82,7 @@ public class AuthControllerTests
         var userContext = Assert.IsType<Maliev.Intranet.Shared.UserContextDto>(okResult.Value);
         Assert.Equal("user-123", userContext.UserId);
         Assert.Equal("Test User", userContext.DisplayName);
+        Assert.Equal("https://lh3.googleusercontent.com/a/test-user", userContext.ProfileImageUrl);
         Assert.Contains("Admin", userContext.Roles);
         Assert.Contains("read:all", userContext.Permissions);
     }

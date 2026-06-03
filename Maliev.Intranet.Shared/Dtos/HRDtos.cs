@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Shared;
 
@@ -28,6 +29,7 @@ public class EmployeeSummaryDto
     /// <summary>The display name of the employee's direct manager.</summary>
     public string? Manager { get; set; }
     /// <summary>The employee's profile image URL from the identity provider.</summary>
+    [JsonPropertyName("profile_image_url")]
     public string? ProfileImageUrl { get; set; }
 }
 
@@ -128,6 +130,7 @@ public sealed class EmployeeSelfProfileDto
     /// <summary>The employee's emergency contact list.</summary>
     public List<EmergencyContactDto> EmergencyContacts { get; set; } = [];
     /// <summary>The employee's profile image URL from the identity provider.</summary>
+    [JsonPropertyName("profile_image_url")]
     public string? ProfileImageUrl { get; set; }
 }
 

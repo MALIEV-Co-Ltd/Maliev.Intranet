@@ -30,12 +30,31 @@ public class BffAuthenticationStateProvider : AuthenticationStateProvider
 
             if (userContext != null)
             {
+                var profileImageUrl = userContext.ProfileImageUrl;
+                if (string.IsNullOrWhiteSpace(profileImageUrl))
+                {
+                    try
+                    {
+                        var employeeProfile = await _httpClient.GetFromJsonAsync<EmployeeDetailDto>("api/v1/employees/me");
+                        profileImageUrl = employeeProfile?.ProfileImageUrl;
+                    }
+                    catch
+                    {
+                        // Ignore profile lookup failures in auth state; callers can continue without avatar data.
+                    }
+                }
+
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.Name, userContext.DisplayName),
                     new Claim(ClaimTypes.NameIdentifier, userContext.UserId),
                     new Claim("email", userContext.Email)
                 };
+
+                if (!string.IsNullOrWhiteSpace(profileImageUrl))
+                {
+                    claims.Add(new Claim("picture", profileImageUrl));
+                }
 
                 claims.AddRange(userContext.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
                 // Also add "roles" for compatibility with pages looking for the literal string

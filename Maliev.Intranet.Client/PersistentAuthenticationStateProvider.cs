@@ -37,8 +37,13 @@ public class PersistentAuthenticationStateProvider : AuthenticationStateProvider
                 {
                     new Claim(ClaimTypes.Name, userContext.DisplayName),
                     new Claim(ClaimTypes.NameIdentifier, userContext.UserId),
-                    new Claim("email", userContext.Email)
+                    new Claim("email", userContext.Email),
                 };
+
+                if (!string.IsNullOrWhiteSpace(userContext.ProfileImageUrl))
+                {
+                    claims.Add(new Claim("picture", userContext.ProfileImageUrl));
+                }
 
                 claims.AddRange(userContext.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
                 claims.AddRange(userContext.Roles.Select(r => new Claim("roles", r)));

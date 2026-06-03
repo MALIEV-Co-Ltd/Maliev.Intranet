@@ -205,6 +205,7 @@ try
         options.Scope.Add("profile");
         options.Scope.Add("email");
         options.SaveTokens = true; // Required so UserContextHandler can retrieve access_token for downstream service calls
+        options.ClaimActions.MapJsonKey("picture", "picture");
 
         options.Events.OnRedirectToAuthorizationEndpoint = context =>
         {
@@ -217,7 +218,7 @@ try
             var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
             var fullName = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
             var googleUserId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var picture = context.Principal?.FindFirst("picture")?.Value;
+            var picture = context.Principal.GetProfileImageUrl();
             var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
 
             if (!string.IsNullOrEmpty(email) && identity != null && !identity.HasClaim(c => c.Type == "email"))
