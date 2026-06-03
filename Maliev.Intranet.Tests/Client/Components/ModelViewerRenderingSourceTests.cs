@@ -248,6 +248,19 @@ public sealed class ModelViewerRenderingSourceTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BrowserLocalDfmRuntime_HonorsManifestDeviceInputLimits()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function isLocalAdvisoryInputWithinDeviceProfile(manifest, input)", source, StringComparison.Ordinal);
+        Assert.Contains("profile?.maxInputBytes", source, StringComparison.Ordinal);
+        Assert.Contains("profile?.maxTriangles", source, StringComparison.Ordinal);
+        Assert.Contains("countLocalAdvisoryInputTriangles(input)", source, StringComparison.Ordinal);
+        Assert.Contains("if (!isLocalAdvisoryInputWithinDeviceProfile(manifest, runtimeInput))", source, StringComparison.Ordinal);
+        Assert.Contains("clearLocalAdvisoryPanel(canvasId);", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);
