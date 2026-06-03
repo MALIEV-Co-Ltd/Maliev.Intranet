@@ -94,6 +94,25 @@ public class GeometryControllerTests
     }
 
     [Fact]
+    public void RecordRuntimeTelemetry_AcceptsTerminalUnavailableAttempt()
+    {
+        var controller = MakeController(
+            MakeUploadClient(),
+            MakeGeometryClient(new DfmAnalysisResponse { Status = "analysis_complete" }));
+
+        var result = controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
+        {
+            ProcessCode = "CNC_MILL",
+            Status = "unavailable",
+            Reason = "input_too_large",
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive"
+        });
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
     public async Task AnalyzeForProcess_Returns410_WhenFileNotInUploadService()
     {
         var controller = MakeController(

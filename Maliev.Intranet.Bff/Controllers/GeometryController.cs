@@ -71,6 +71,22 @@ public class GeometryController(
     [HttpPost("runtime/telemetry")]
     public IActionResult RecordRuntimeTelemetry([FromBody] BrowserGeometryRuntimeTelemetryRequest request)
     {
+        if (request.IsTerminalUnavailable)
+        {
+            bffMetrics.RecordBrowserDfmRuntimeTerminalAttempt(
+                request.ProcessCode,
+                request.Reason,
+                request.Authority,
+                request.ExecutionMode);
+
+            logger.LogInformation(
+                "Browser-first intranet DFM local runtime ended before report for process {ProcessCode}; reason={Reason}",
+                request.ProcessCode,
+                request.Reason);
+
+            return NoContent();
+        }
+
         bffMetrics.RecordBrowserDfmRuntimeCompletion(
             request.ProcessCode,
             request.Accepted,
@@ -337,6 +353,12 @@ public sealed class BrowserGeometryRuntimeTelemetryRequest
     /// <summary>The runtime execution mode marker.</summary>
     public string? ExecutionMode { get; set; }
 
+    /// <summary>Telemetry event status, for example <c>complete</c> or <c>unavailable</c>.</summary>
+    public string? Status { get; set; }
+
+    /// <summary>Low-cardinality reason why a local attempt ended before producing a report.</summary>
+    public string? Reason { get; set; }
+
     /// <summary>Whether Blazor accepted and applied the local DFM result.</summary>
     public bool Accepted { get; set; }
 
@@ -351,4 +373,9 @@ public sealed class BrowserGeometryRuntimeTelemetryRequest
 
     /// <summary>The browser runtime input hash, logged only for correlation and never used as a metric tag.</summary>
     public string? InputHash { get; set; }
+
+    /// <summary>Whether this payload represents a terminal local runtime attempt.</summary>
+    public bool IsTerminalUnavailable =>
+        string.Equals(Status, "unavailable", StringComparison.OrdinalIgnoreCase)
+        || !string.IsNullOrWhiteSpace(Reason);
 }

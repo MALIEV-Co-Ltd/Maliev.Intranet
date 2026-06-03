@@ -234,6 +234,17 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void BrowserLocalDfmTelemetry_PostsTerminalUnavailableToSameOriginBff()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function dispatchLocalAdvisoryUnavailableTelemetry(payload)", source, StringComparison.Ordinal);
+        Assert.Contains("status: 'unavailable'", source, StringComparison.Ordinal);
+        Assert.Contains("reason: payload?.reason ?? 'local_runtime_unavailable'", source, StringComparison.Ordinal);
+        Assert.Contains("dispatchLocalAdvisoryUnavailableTelemetry(payload);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BrowserLocalDfmRuntime_UsesManifestDeviceProfileTimeout()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");

@@ -10,6 +10,7 @@ public class BffMetrics
 {
     private readonly UpDownCounter<long> _activeSessionsCounter;
     private readonly Counter<long> _browserDfmRuntimeCompletions;
+    private readonly Counter<long> _browserDfmRuntimeTerminalAttempts;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BffMetrics"/> class.
@@ -23,6 +24,10 @@ public class BffMetrics
             "intranet_browser_dfm_runtime_completions",
             unit: "{completion}",
             description: "Counts browser-first local DFM runtime completions observed by Intranet.");
+        _browserDfmRuntimeTerminalAttempts = meter.CreateCounter<long>(
+            "intranet_browser_dfm_runtime_terminal_attempts",
+            unit: "{attempt}",
+            description: "Counts browser-first local DFM runtime attempts that ended before producing a local report.");
     }
 
     /// <summary>
@@ -52,6 +57,28 @@ public class BffMetrics
         {
             { "process_family", NormalizeProcessFamily(processCode) },
             { "accepted", accepted },
+            { "authority", NormalizeMarker(authority, "other") },
+            { "execution_mode", NormalizeMarker(executionMode, "other") },
+        });
+    }
+
+    /// <summary>
+    /// Records a browser-first local DFM runtime attempt that ended before producing a report.
+    /// </summary>
+    /// <param name="processCode">The process code requested for the browser runtime.</param>
+    /// <param name="reason">The low-cardinality terminal reason reported by the viewer.</param>
+    /// <param name="authority">The runtime authority marker.</param>
+    /// <param name="executionMode">The runtime execution mode marker.</param>
+    public void RecordBrowserDfmRuntimeTerminalAttempt(
+        string? processCode,
+        string? reason,
+        string? authority,
+        string? executionMode)
+    {
+        _browserDfmRuntimeTerminalAttempts.Add(1, new TagList
+        {
+            { "process_family", NormalizeProcessFamily(processCode) },
+            { "reason", NormalizeMarker(reason, "local_runtime_unavailable") },
             { "authority", NormalizeMarker(authority, "other") },
             { "execution_mode", NormalizeMarker(executionMode, "other") },
         });

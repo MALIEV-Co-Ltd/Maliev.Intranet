@@ -5228,6 +5228,25 @@ function dispatchLocalAdvisoryTelemetry(canvasId, result, accepted) {
     }
 }
 
+function dispatchLocalAdvisoryUnavailableTelemetry(payload) {
+    try {
+        const detail = {
+            processCode: payload?.processCode ?? null,
+            status: 'unavailable',
+            reason: payload?.reason ?? 'local_runtime_unavailable',
+            authority: 'local_primary',
+            executionMode: 'primary_interactive',
+        };
+        if (typeof window?.dispatchEvent === 'function' &&
+            typeof CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('maliev:geometry-local-runtime-unavailable', { detail }));
+        }
+        postLocalAdvisoryTelemetry(LOCAL_ADVISORY_TELEMETRY_URL, detail);
+    } catch (_) {
+        // Local telemetry must never interrupt viewer interaction.
+    }
+}
+
 async function notifyLocalAdvisoryDotNet(dotNetRef, result) {
     if (!dotNetRef || typeof dotNetRef.invokeMethodAsync !== 'function') return false;
 
@@ -5240,6 +5259,8 @@ async function notifyLocalAdvisoryDotNet(dotNetRef, result) {
 }
 
 async function notifyLocalAdvisoryUnavailableDotNet(dotNetRef, payload) {
+    dispatchLocalAdvisoryUnavailableTelemetry(payload);
+
     if (!dotNetRef || typeof dotNetRef.invokeMethodAsync !== 'function') return;
 
     try {
