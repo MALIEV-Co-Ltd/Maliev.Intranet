@@ -136,6 +136,12 @@ window.projectNewUploads = (function () {
                 filesByClientId.set(mapping.clientUploadId, file);
             }
         }
+
+        try {
+            input.value = '';
+        } catch (_) {
+            // Some browser file inputs can refuse programmatic clearing.
+        }
     }
 
     function sendXhr(url, file, contentType, includeCredentials, dotNetHelper) {

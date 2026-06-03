@@ -73,6 +73,21 @@ public class AppWasmRenderModeTests
     }
 
     [Fact]
+    public void AppRoot_PatchesBabylonBackbufferHandle_BeforeLoadingBabylon()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+
+        var patchIndex = source.IndexOf("backbufferColorTextureHandle", StringComparison.Ordinal);
+        var babylonIndex = source.IndexOf("lib/babylonjs/babylon.js", StringComparison.Ordinal);
+
+        Assert.True(patchIndex >= 0, "BFF host must install the Babylon WebGL backbuffer shim.");
+        Assert.True(babylonIndex >= 0, "BFF host must load Babylon.");
+        Assert.True(patchIndex < babylonIndex, "Babylon WebGL backbuffer shim must run before babylon.js loads.");
+        Assert.Contains("Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle')", source);
+        Assert.Contains("Object.defineProperty(proto, 'backbufferColorTextureHandle'", source);
+    }
+
+    [Fact]
     public void AppRoot_FadesRenderedWasmAppInAfterLoaderCompletes()
     {
         var source = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");

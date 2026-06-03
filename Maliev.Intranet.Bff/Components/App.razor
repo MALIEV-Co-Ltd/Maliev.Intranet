@@ -328,6 +328,29 @@
     <script src="js/uploadWithProgress.js"></script>
     <script src="js/google-address-picker.js"></script>
     <script src="js/address-map.js"></script>
+    <script>
+        (function () {
+            var patchWebGL = function (proto) {
+                try {
+                    if (Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle')) return;
+                    var internal = null;
+                    Object.defineProperty(proto, 'backbufferColorTextureHandle', {
+                        get: function () { return internal; },
+                        set: function (v) { internal = v; },
+                        enumerable: false,
+                        configurable: true,
+                    });
+                } catch (_) { /* proto may be frozen in some browsers */ }
+            };
+            if (typeof WebGLRenderingContext !== 'undefined')
+                patchWebGL(WebGLRenderingContext.prototype);
+            if (typeof WebGL2RenderingContext !== 'undefined')
+                patchWebGL(WebGL2RenderingContext.prototype);
+        })();
+    </script>
+    <script src="lib/babylonjs/babylon.js"></script>
+    <script src="lib/babylonjs/babylonjs.materials.min.js"></script>
+    <script src="lib/babylonjs/babylonjs.loaders.min.js"></script>
     <script src="js/material-labels.js"></script>
     <script src="js/production-schedule-board.js"></script>
 </body>
