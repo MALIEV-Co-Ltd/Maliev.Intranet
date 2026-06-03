@@ -1039,6 +1039,46 @@ test('realistic configurator keeps intrinsic blue POM darker than the UI swatch 
     assert.equal(result.b, 0.62);
 });
 
+test('realistic configurator renders natural PEEK as a warmer brown tan', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'peek', '#B3AA9E', 'AS_MACHINED', 'RA_1_6', 'CNC_MILL');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        const luma = material.albedoColor.r * 0.2126
+            + material.albedoColor.g * 0.7152
+            + material.albedoColor.b * 0.0722;
+        ({
+            r: material?.albedoColor?.r ?? null,
+            g: material?.albedoColor?.g ?? null,
+            b: material?.albedoColor?.b ?? null,
+            luma,
+            materialName: material?.name ?? null
+        });
+    `, context);
+
+    assert.equal(result.materialName, '__realistic_peek__');
+    assert.ok(result.r > result.g, `expected natural PEEK to have a warm red bias, got r=${result.r} g=${result.g}`);
+    assert.ok(result.g > result.b, `expected natural PEEK to suppress blue for a brown tan, got g=${result.g} b=${result.b}`);
+    assert.ok(result.r - result.b >= 0.20, `expected a stronger brown tan than the UI swatch, got r=${result.r} b=${result.b}`);
+    assert.ok(result.b <= 0.42, `expected natural PEEK to be less pale/grey, got blue channel ${result.b}`);
+    assert.ok(result.luma <= 0.58, `expected natural PEEK to render darker than the old pale beige, got luma ${result.luma}`);
+});
+
 test('realistic configurator makes CNC surface finishes visibly distinct even when Ra is present', () => {
     const context = loadViewerContext();
     const mesh = {

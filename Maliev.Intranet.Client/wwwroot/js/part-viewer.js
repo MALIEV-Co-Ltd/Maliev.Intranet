@@ -214,7 +214,7 @@ const CONFIG = {
             roughness: 0.84,
         },
         'peek': {
-            albedoColor: { r: 0.70, g: 0.67, b: 0.62 },
+            albedoColor: { r: 0.64, g: 0.53, b: 0.38 },
             metallic: 0.0,
             roughness: 0.48,
         },
@@ -3193,7 +3193,7 @@ const ADDITIVE_LAYER_PRESET_KEYS = new Set([
     'resin-clear',
     'nylon-powder',
 ]);
-const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'petg-clear', 'acrylic-clear', 'resin-clear']);
+const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'peek', 'petg-clear', 'acrylic-clear', 'resin-clear']);
 const FDM_LAYER_EFFECT_KEY = 'fdm-layer-lines';
 const FDM_LAYER_HEIGHT_MM = 0.2;
 const POWDER_BED_LAYER_HEIGHT_MM = 0.3;
