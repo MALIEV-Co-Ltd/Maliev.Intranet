@@ -30,7 +30,20 @@ public class UploadAnalysisStatusTests
 
         var fileTypesSettings = new FileTypesSettings
         {
-            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".stl",
+                ".step",
+                ".stp",
+                ".3mf",
+                ".obj",
+                ".igs",
+                ".iges",
+                ".blend",
+                ".fbx",
+                ".gltf",
+                ".glb"
+            },
             DocumentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             DrawingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
@@ -102,6 +115,49 @@ public class UploadAnalysisStatusTests
 
         // Assert
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetAnalysisStatus_WhenCacheMissForSourceStl_RecoversConventionalGlbArtifact()
+    {
+        var storagePath = "projects/test/model.stl";
+        var glbStoragePath = "projects/test/model.stl_viewer.glb";
+        var signedUrl = "https://storage.example/model.stl_viewer.glb?signature=fresh";
+
+        var uploadClient = new UploadServiceClient(new HttpClient(new MockHttpMessageHandler(async (request, _) =>
+        {
+            var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync();
+            using var requestJson = JsonDocument.Parse(body);
+            var requestedPath = requestJson.RootElement.GetProperty("storagePath").GetString();
+
+            return string.Equals(requestedPath, glbStoragePath, StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { signedUrl })
+                }
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        {
+            BaseAddress = new Uri("http://upload-service")
+        });
+
+        _statusServiceMock
+            .Setup(x => x.GetStatusAsync(storagePath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FileAnalysisStatusDto?)null);
+
+        var controller = CreateController(uploadClient);
+
+        var result = await controller.GetAnalysisStatusAsync(storagePath, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var status = Assert.IsType<FileAnalysisStatusDto>(okResult.Value);
+        Assert.Equal(storagePath, status.UploadId);
+        Assert.Equal(FileAnalysisStatus.Completed, status.Status);
+        Assert.Equal(glbStoragePath, status.GlbStoragePath);
+        Assert.Equal(glbStoragePath, status.ViewerStoragePath);
+        Assert.Equal(".glb", status.ViewerFileExtension);
+        Assert.Equal(signedUrl, status.GlbSignedUrl);
+        Assert.Equal(PreviewProcessingStatus.Completed, status.PreviewProcessingStatus);
     }
 
     /// <summary>
@@ -234,6 +290,52 @@ public class UploadAnalysisStatusTests
         var signedUrlRequestBody = Assert.Single(signedUrlRequestBodies);
         using var signedUrlRequestJson = JsonDocument.Parse(signedUrlRequestBody);
         Assert.Equal(storagePath, signedUrlRequestJson.RootElement.GetProperty("storagePath").GetString());
+    }
+
+    [Fact]
+    public async Task GetViewerUrl_WhenCacheMissForSourceStl_RecoversConventionalGlbArtifact()
+    {
+        var storagePath = "projects/test/model.stl";
+        var glbStoragePath = "projects/test/model.stl_viewer.glb";
+        var signedUrl = "https://storage.example/model.stl_viewer.glb?signature=fresh";
+        var signedUrlRequestBodies = new List<string>();
+
+        var uploadClient = new UploadServiceClient(new HttpClient(new MockHttpMessageHandler(async (request, _) =>
+        {
+            var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync();
+            lock (signedUrlRequestBodies) { signedUrlRequestBodies.Add(body); }
+
+            using var requestJson = JsonDocument.Parse(body);
+            var requestedPath = requestJson.RootElement.GetProperty("storagePath").GetString();
+
+            return string.Equals(requestedPath, glbStoragePath, StringComparison.Ordinal)
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { signedUrl })
+                }
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        {
+            BaseAddress = new Uri("http://upload-service")
+        });
+
+        _statusServiceMock
+            .Setup(x => x.GetStatusAsync(storagePath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FileAnalysisStatusDto?)null);
+
+        var controller = CreateController(uploadClient);
+
+        var result = await controller.GetViewerUrlAsync(storagePath, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var json = JsonSerializer.Serialize(okResult.Value);
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(signedUrl, document.RootElement.GetProperty("Url").GetString());
+        Assert.Equal(glbStoragePath, document.RootElement.GetProperty("ViewerStoragePath").GetString());
+        Assert.Equal(".glb", document.RootElement.GetProperty("ViewerFileExtension").GetString());
+        var signedUrlRequestBody = Assert.Single(signedUrlRequestBodies);
+        using var signedUrlRequestJson = JsonDocument.Parse(signedUrlRequestBody);
+        Assert.Equal(glbStoragePath, signedUrlRequestJson.RootElement.GetProperty("storagePath").GetString());
     }
 
     /// <summary>

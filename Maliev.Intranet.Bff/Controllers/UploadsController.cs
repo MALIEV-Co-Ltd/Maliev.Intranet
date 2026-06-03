@@ -239,7 +239,23 @@ public class UploadsController(
         CancellationToken ct)
     {
         var status = await analysisStatusService.GetStatusAsync(storagePath, ct);
-        return status != null ? Ok(status) : NotFound();
+        if (status != null)
+            return Ok(status);
+
+        var recoveredViewerArtifact = await TryRecoverConventionalViewerGlbAsync(storagePath, ct);
+        return recoveredViewerArtifact != null
+            ? Ok(new FileAnalysisStatusDto
+            {
+                UploadId = storagePath,
+                Status = FileAnalysisStatus.Completed,
+                GlbStoragePath = recoveredViewerArtifact.StoragePath,
+                ViewerStoragePath = recoveredViewerArtifact.StoragePath,
+                ViewerFileExtension = recoveredViewerArtifact.FileExtension,
+                GlbSignedUrl = recoveredViewerArtifact.SignedUrl,
+                PreviewProcessingStatus = PreviewProcessingStatus.Completed,
+                ProcessedAt = DateTimeOffset.UtcNow
+            })
+            : NotFound();
     }
 
     /// <summary>
@@ -298,8 +314,50 @@ public class UploadsController(
             return NotFound("Viewer artifact not found in storage.");
         }
 
+        var recoveredViewerArtifact = await TryRecoverConventionalViewerGlbAsync(storagePath, ct);
+        if (recoveredViewerArtifact != null)
+        {
+            return Ok(new
+            {
+                Url = recoveredViewerArtifact.SignedUrl,
+                ViewerStoragePath = recoveredViewerArtifact.StoragePath,
+                ViewerFileExtension = recoveredViewerArtifact.FileExtension
+            });
+        }
+
         // Not a GLB path and no cache entry — the file is still processing.
         return NotFound("Viewer artifact not available. The file may still be processing.");
+    }
+
+    private async Task<RecoveredViewerArtifact?> TryRecoverConventionalViewerGlbAsync(
+        string storagePath,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath)
+            || storagePath.EndsWith(".glb", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var extension = Path.GetExtension(storagePath);
+        if (string.IsNullOrWhiteSpace(extension) || !fileTypes.ThreeDExtensions.Contains(extension))
+            return null;
+
+        var glbStoragePath = storagePath + "_viewer.glb";
+        string? signedUrl;
+        try
+        {
+            signedUrl = await uploadClient.GetDownloadUrlByPathAsync(glbStoragePath, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Could not probe conventional GLB viewer artifact for {StoragePath}.", storagePath);
+            return null;
+        }
+
+        return string.IsNullOrEmpty(signedUrl)
+            ? null
+            : new RecoveredViewerArtifact(glbStoragePath, signedUrl, ".glb");
     }
 
     private static string? NormalizeViewerFileExtension(string? fileExtension, string? storagePath)
@@ -613,6 +671,11 @@ public class UploadsController(
     }
 
     private readonly record struct MigratedArtifact(string? StoragePath, string? SignedUrl);
+
+    private sealed record RecoveredViewerArtifact(
+        string StoragePath,
+        string SignedUrl,
+        string FileExtension);
 
     private static string GetMimeTypeFromExtension(string? extension)
     {
