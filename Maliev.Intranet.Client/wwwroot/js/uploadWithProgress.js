@@ -101,10 +101,29 @@ window.uploadBatchWithProgress = function (url, files, dotNetHelper) {
 window.projectNewUploads = (function () {
     const filesByClientId = new Map();
 
-    function findUploadInput(containerId) {
+    function findUploadInput(containerId, mappings) {
         const container = document.getElementById(containerId);
         if (!container) return null;
-        return container.querySelector('input[type=file]');
+        const inputs = Array.from(container.querySelectorAll('input[type=file]'));
+        if (inputs.length === 0) return null;
+
+        const expectedMappings = mappings || [];
+        const inputWithExpectedFile = inputs.find(function (input) {
+            if (!input.files || input.files.length === 0) return false;
+
+            return expectedMappings.some(function (mapping) {
+                const expectedName = mapping.fileName || '';
+                const expectedSize = Number(mapping.fileSize || 0);
+                const indexedFile = input.files[mapping.index];
+
+                return (indexedFile && indexedFile.name === expectedName && indexedFile.size === expectedSize)
+                    || Boolean(findMatchingFile(input.files, expectedName, expectedSize));
+            });
+        });
+
+        return inputWithExpectedFile
+            || inputs.find(input => input.files && input.files.length > 0)
+            || inputs[inputs.length - 1];
     }
 
     function findMatchingFile(files, expectedName, expectedSize) {
@@ -120,7 +139,7 @@ window.projectNewUploads = (function () {
     }
 
     function captureFiles(containerId, mappings) {
-        const input = findUploadInput(containerId);
+        const input = findUploadInput(containerId, mappings);
         if (!input || !input.files) return;
 
         for (const mapping of mappings || []) {
