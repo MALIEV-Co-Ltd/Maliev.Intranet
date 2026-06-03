@@ -2,9 +2,9 @@ namespace Maliev.Intranet.Client.Components.Project;
 
 internal static class BrowserDfmReportSync
 {
-    // Match the viewer worker's default 15s timeout plus a small callback margin before
+    // Cover the manifest's desktop worker timeout plus callback/render margin before
     // falling back to the server DFM endpoint. This keeps browser DFM primary.
-    private const int BrowserDfmGracePeriodMs = 16_000;
+    private const int BrowserDfmGracePeriodMs = 30_000;
     private const int BrowserDfmPollIntervalMs = 100;
 
     internal static bool HasCurrentReport(PartViewModel part, string processCode) =>

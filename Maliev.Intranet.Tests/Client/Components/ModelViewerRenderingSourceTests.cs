@@ -233,6 +233,21 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("accepted,", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BrowserLocalDfmRuntime_UsesManifestDeviceProfileTimeout()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function resolveLocalAdvisoryDeviceProfileName()", source, StringComparison.Ordinal);
+        Assert.Contains("function resolveLocalAdvisoryTimeoutMs(manifest, options = {})", source, StringComparison.Ordinal);
+        Assert.Contains("manifest?.deviceProfiles", source, StringComparison.Ordinal);
+        Assert.Contains("resolveLocalAdvisoryTimeoutMs(manifest, options));", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000",
+            source,
+            StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

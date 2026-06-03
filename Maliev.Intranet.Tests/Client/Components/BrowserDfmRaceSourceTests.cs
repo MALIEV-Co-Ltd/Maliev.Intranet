@@ -20,8 +20,8 @@ public sealed class BrowserDfmRaceSourceTests
             match.Groups["value"].Value.Replace("_", string.Empty, StringComparison.Ordinal),
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.True(
-            gracePeriodMs >= 15_000,
-            "Browser DFM should get at least the viewer worker's 15s budget before starting the server DFM fallback.");
+            gracePeriodMs >= 25_000,
+            "Browser DFM should cover the manifest's 20s desktop worker budget plus callback margin before starting the server DFM fallback.");
     }
 
     [Fact]
