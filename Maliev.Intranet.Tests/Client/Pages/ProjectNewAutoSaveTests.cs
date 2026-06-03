@@ -71,6 +71,8 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var client = new HttpClient(_httpHandler) { BaseAddress = new Uri("http://test/") };
         Services.AddSingleton(client);
         Services.AddScoped<CurrencyService>();
+        Services.AddScoped<ShippingService>();
+        Services.AddScoped<AlertService>();
         Render<MudPopoverProvider>();
     }
 

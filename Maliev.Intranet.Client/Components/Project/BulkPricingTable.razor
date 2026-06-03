@@ -51,12 +51,12 @@
 <style>
     .bpt-container {
         border: 1px dashed var(--mud-palette-primary);
-        border-radius: var(--mud-default-borderradius);
+        border-radius: var(--maliev-radius-sm);
         overflow: hidden;
     }
     .bpt-saved-chip {
-        background: var(--mud-palette-primary);
-        color: white;
+        background: var(--maliev-action-primary);
+        color: var(--maliev-action-primary-text);
         padding: 2px 6px;
         border-radius: 4px;
         font-weight: 600;
@@ -68,10 +68,10 @@
         align-items: center;
         padding: 8px 10px;
         cursor: pointer;
-        background: var(--mud-palette-surface);
+        background: var(--maliev-panel);
         user-select: none;
     }
-    .bpt-header:hover { background: var(--mud-palette-background); }
+    .bpt-header:hover { background: var(--maliev-panel-3); }
     .bpt-expand-icon {
         transition: transform 0.2s ease;
     }
@@ -88,9 +88,10 @@
         justify-content: space-between;
         padding: 5px 10px;
         transition: background 0.1s;
+        color: var(--maliev-ink);
     }
     .bpt-tier-row--active {
-        background: var(--mud-palette-success-lighten);
+        background: color-mix(in oklch, var(--mud-palette-success) 8%, var(--maliev-panel));
     }
 </style>
 

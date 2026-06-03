@@ -27,6 +27,8 @@ public class EmployeeSummaryDto
     public DateTime? HireDate { get; set; }
     /// <summary>The display name of the employee's direct manager.</summary>
     public string? Manager { get; set; }
+    /// <summary>The employee's profile image URL from the identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
 }
 
 /// <summary>
@@ -68,6 +70,8 @@ public class EmployeeDetailDto
     public string? EmployeeType { get; set; }
     /// <summary>List of internal notes and feedback related to the employee.</summary>
     public List<EmployeeNoteDto> Notes { get; set; } = [];
+    /// <summary>The employee's profile image URL from the identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>List of teams the employee is currently a member of.</summary>
     public List<EmployeeTeamDto> Teams { get; set; } = [];
     /// <summary>Emergency contact details for the employee.</summary>
@@ -123,6 +127,8 @@ public sealed class EmployeeSelfProfileDto
     public string? ManagerName { get; set; }
     /// <summary>The employee's emergency contact list.</summary>
     public List<EmergencyContactDto> EmergencyContacts { get; set; } = [];
+    /// <summary>The employee's profile image URL from the identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
 }
 
 /// <summary>
@@ -203,6 +209,8 @@ public class OrgNodeDto
     public string Department { get; set; } = string.Empty;
     /// <summary>The name initials used for avatars and compact views.</summary>
     public string Initials { get; set; } = string.Empty;
+    /// <summary>The profile image URL from the identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>The number of direct reports or team members under this node.</summary>
     public int TeamCount { get; set; }
     /// <summary>List of organizational nodes representing direct reports.</summary>

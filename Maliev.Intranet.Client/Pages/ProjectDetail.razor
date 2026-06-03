@@ -2183,7 +2183,8 @@
             ProductionTimeMinutes = productionMinutes,
             Quantity = Math.Max(1, plan.Quantity),
             Notes = $"Planned from project {ProjectTitle} / {plan.FileName}",
-            ExpiresAt = ResolveClientHoldExpiration()
+            ExpiresAt = ResolveClientHoldExpiration(),
+            AutoSnapToNextAvailable = true
         };
     }
 

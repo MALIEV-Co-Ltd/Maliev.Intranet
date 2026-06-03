@@ -4,6 +4,8 @@
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Shared.Dtos
 @inject CurrencyService CurrencyService
+@inject ShippingService ShippingService
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <div class="qsb-root">
@@ -163,17 +165,45 @@
                             </span>
                         </div>
                         <div class="qsb-money-entry">
-                            <span class="qsb-money-prefix" aria-hidden="true">@CurrencyService.Symbol</span>
-                            <MudNumericField T="decimal"
-                                             Label="Shipping"
-                                             Value="@ShippingCost"
-                                             ValueChanged="OnShippingCostChanged"
-                                             Min="0m"
-                                             Immediate="true"
-                                             Variant="Variant.Outlined"
-                                             Margin="Margin.Dense"
-                                             HideSpinButtons="true" />
+                            <CurrencyInput Label="Shipping"
+                                           HelperText="Freight, courier, or delivery charge"
+                                           @bind-ThbValue="ShippingCost"
+                                           Min="0m" />
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(ShippingDestinationCountry) && TotalWeightKg > 0)
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       StartIcon="@Icons.Material.Outlined.LocalShipping"
+                                       OnClick="FetchDhlRatesAsync"
+                                       Disabled="_fetchingRates"
+                                       FullWidth="true">
+                                @if (_fetchingRates)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                }
+                                Get DHL Rate
+                            </MudButton>
+                            @if (_rateOptions.Count > 0 && !_fetchingRates)
+                            {
+                                <div class="qsb-rate-options">
+                                    @foreach (var rate in _rateOptions)
+                                    {
+                                        <button type="button"
+                                                class="qsb-rate-option"
+                                                @onclick="@(() => SelectDhlRate(rate))">
+                                            <span class="qsb-rate-name">@rate.ProductName</span>
+                                            <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                            @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
+                                            {
+                                                <span class="qsb-rate-edd">Est: @DateTime.TryParse(rate.EstimatedDeliveryDate, out var d) ? d.ToString("MMM d") : rate.EstimatedDeliveryDate</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        }
                     </section>
                     <section class="qsb-adjustment-card qsb-adjustment-card--discount" aria-label="Discount adjustment">
                         <div class="qsb-adjustment-top">
@@ -186,16 +216,10 @@
                             </span>
                         </div>
                         <div class="qsb-money-entry">
-                            <span class="qsb-money-prefix" aria-hidden="true">@CurrencyService.Symbol</span>
-                            <MudNumericField T="decimal"
-                                             Label="Discount"
-                                             Value="@ManualDiscountAmount"
-                                             ValueChanged="OnManualDiscountAmountChanged"
-                                             Min="0m"
-                                             Immediate="true"
-                                             Variant="Variant.Outlined"
-                                             Margin="Margin.Dense"
-                                             HideSpinButtons="true" />
+                            <CurrencyInput Label="Discount"
+                                           HelperText="Manual reduction before VAT"
+                                           @bind-ThbValue="ManualDiscountAmount"
+                                           Min="0m" />
                         </div>
                     </section>
                 </div>
@@ -847,6 +871,52 @@
             font-size: 13px;
         }
     }
+
+    .qsb-rate-options {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .qsb-rate-option {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
+        border-radius: 6px;
+        background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+        cursor: pointer;
+        font-family: inherit;
+        text-align: left;
+        transition: background 0.15s;
+        min-width: 0;
+    }
+
+    .qsb-rate-option:hover {
+        background: color-mix(in oklch, var(--mud-palette-info) 10%, var(--maliev-panel));
+    }
+
+    .qsb-rate-name {
+        flex: 0 0 auto;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--maliev-ink);
+    }
+
+    .qsb-rate-price {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--mud-palette-primary);
+    }
+
+    .qsb-rate-edd {
+        font-size: 10px;
+        color: var(--maliev-muted);
+        margin-left: auto;
+    }
 </style>
 
 @code {
@@ -869,8 +939,14 @@
     [Parameter] public EventCallback OnQuote { get; set; }
     [Parameter] public EventCallback OnGeneratePdf { get; set; }
 
+    [Parameter] public string? ShippingDestinationCountry { get; set; }
+    [Parameter] public string? ShippingDestinationPostalCode { get; set; }
+    [Parameter] public decimal TotalWeightKg { get; set; }
+
     private bool _generatingPdf;
     private bool _detailsOpen;
+    private bool _fetchingRates;
+    private List<ShippingRateOptionDto> _rateOptions = [];
     private bool IsLeadTimeLoading => LeadTimeOptions.Count == 0 && Parts.Any(p => p.PricingLoading);
     private string LeadTimeEmptyText => Parts.Count == 0
         ? "Configure a part to calculate lead time."
@@ -901,14 +977,52 @@
 
     private void CloseDetails() => _detailsOpen = false;
 
-    private async Task OnShippingCostChanged(decimal value) =>
-        await ShippingCostChanged.InvokeAsync(Math.Max(0m, value));
-
-    private async Task OnManualDiscountAmountChanged(decimal value) =>
-        await ManualDiscountAmountChanged.InvokeAsync(Math.Max(0m, value));
-
     private async Task OnQuotationTermsChanged(string? value) =>
         await QuotationTermsChanged.InvokeAsync(value);
+
+    private async Task FetchDhlRatesAsync()
+    {
+        _fetchingRates = true;
+        _rateOptions = [];
+        StateHasChanged();
+
+        try
+        {
+            var request = new ShippingRateRequestDto
+            {
+                OriginCountryCode = "TH",
+                DestinationCountryCode = ShippingDestinationCountry ?? "US",
+                DestinationPostalCode = ShippingDestinationPostalCode,
+                WeightKg = TotalWeightKg
+            };
+
+            var result = await ShippingService.GetRatesAsync(request);
+            if (result?.Rates is { Count: > 0 })
+            {
+                _rateOptions = result.Rates;
+            }
+            else
+            {
+                Snackbar.Add("No shipping rates available for this destination.", Severity.Warning);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to fetch shipping rates. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _fetchingRates = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectDhlRate(ShippingRateOptionDto rate)
+    {
+        await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
+        _rateOptions = [];
+        StateHasChanged();
+    }
 
     private decimal ComputeQuoteTotal()
     {

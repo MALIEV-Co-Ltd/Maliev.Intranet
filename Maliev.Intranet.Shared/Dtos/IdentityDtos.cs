@@ -13,6 +13,8 @@ public class UserContextDto
     public string Username { get; set; } = string.Empty;
     /// <summary>The primary email address associated with the user account.</summary>
     public string Email { get; set; } = string.Empty;
+    /// <summary>The user's profile image URL from the identity provider.</summary>
+    public string? ProfileImageUrl { get; set; }
     /// <summary>List of security roles assigned to the user.</summary>
     public List<string> Roles { get; set; } = new();
     /// <summary>List of granular permissions granted to the user, either directly or via roles.</summary>

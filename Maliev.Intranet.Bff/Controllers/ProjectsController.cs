@@ -1078,7 +1078,8 @@ public class ProjectsController(
             ProductionTimeMinutes = request.ProductionTimeMinutes <= 0 ? 30 : request.ProductionTimeMinutes,
             Quantity = Math.Max(1, part.Quantity),
             Notes = request.Notes,
-            ExpiresAt = expiresAt
+            ExpiresAt = expiresAt,
+            AutoSnapToNextAvailable = request.AutoSnapToNextAvailable,
         };
     }
 

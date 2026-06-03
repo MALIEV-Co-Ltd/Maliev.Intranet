@@ -16,9 +16,9 @@ jobs:
       - id: set-version
         run: |
           BASE_BRANCH="${{ github.base_ref }}"
-          if ["$BASE_BRANCH" == "main"]; then
+          if [ "$BASE_BRANCH" == "main" ]; then
             VERSION_FORMAT="1.0.*"
-          elif ["$BASE_BRANCH" == "staging"]; then
+          elif [ "$BASE_BRANCH" == "staging" ]; then
             VERSION_FORMAT="1.0.*-beta*"
           else
             VERSION_FORMAT="1.0.*-alpha*"
@@ -42,7 +42,7 @@ jobs:
         run: |
           # Determine version format based on target branch
           BASE_BRANCH="${{ github.base_ref }}"
-          if ["$BASE_BRANCH" == "main"]; then
+          if [ "$BASE_BRANCH" == "main" ]; then
             VERSION_FORMAT="1.0.*"
           else
             VERSION_FORMAT="1.0.*-alpha*"

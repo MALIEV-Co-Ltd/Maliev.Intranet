@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using StackExchange.Redis;
+using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
 
 // Initialize bootstrap logging
@@ -62,7 +63,8 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.CookieProvider>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
-    builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
+        builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
+        builder.Services.AddScoped<Maliev.Intranet.Client.Services.AlertService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.IProjectDraftService, Maliev.Intranet.Client.Services.ProjectDraftService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();
@@ -215,6 +217,7 @@ try
             var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
             var fullName = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
             var googleUserId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var picture = context.Principal?.FindFirst("picture")?.Value;
             var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
 
             if (!string.IsNullOrEmpty(email) && identity != null && !identity.HasClaim(c => c.Type == "email"))
@@ -231,7 +234,7 @@ try
 
             try
             {
-                var response = await authClient.PostAsJsonAsync("/auth/v1/exchange/google", new { email, full_name = fullName, google_user_id = googleUserId });
+                var response = await authClient.PostAsJsonAsync("/auth/v1/exchange/google", new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture });
                 if (response.IsSuccessStatusCode)
                 {
                     var authResult = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -258,6 +261,12 @@ try
                         if (!string.IsNullOrEmpty(googleUserId) && identity != null)
                         {
                             identity.AddClaim(new System.Security.Claims.Claim("google_user_id", googleUserId));
+                        }
+
+                        // Store profile picture URL from Google BEFORE removing the old NameIdentifier
+                        if (!string.IsNullOrEmpty(picture) && identity != null)
+                        {
+                            identity.AddClaim(new System.Security.Claims.Claim("picture", picture));
                         }
 
                         // Remove the old Google NameIdentifier (numeric sub) before adding platform claims
@@ -311,7 +320,7 @@ try
                                 {
                                     // Re-exchange to get a JWT that reflects the new role
                                     var refreshResp = await authClient.PostAsJsonAsync("/auth/v1/exchange/google",
-                                        new { email, full_name = fullName, google_user_id = googleUserId });
+                                        new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture });
                                     if (refreshResp.IsSuccessStatusCode)
                                     {
                                         var refreshResult = await refreshResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -436,6 +445,17 @@ try
     builder.AddBffServiceClient<JobServiceClient>("JobService");
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
     builder.AddBffServiceClient<SearchServiceClient>("SearchService");
+
+    // DHL Express API client (external service - no service discovery, explicit base URL)
+    builder.Services.AddHttpClient<DhlExpressClient>(client =>
+    {
+        var baseUrl = builder.Configuration["DhlExpress:BaseUrl"] ?? "https://express.api.dhl.com/mydhlapi/test";
+        client.BaseAddress = new Uri(baseUrl);
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.DefaultRequestHeaders.Accept.Clear();
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    });
+
     builder.Services.AddScoped<GlobalSearchResultEnricher>();
     // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.
     builder.AddBffLongRunningServiceClient<GeometryServiceClient>("GeometryService",
@@ -560,6 +580,7 @@ try
             mt.AddConsumer<DfmAnalysisReadyConsumer>();
             mt.AddConsumer<PriceCalculatedConsumer>();
             mt.AddConsumer<FileAnalysisFailedConsumer>();
+            mt.AddConsumer<ProjectQuotationAcceptedConsumer>();
         },
         configureRabbitMq: (ctx, cfg) =>
         {
@@ -621,6 +642,11 @@ try
                     b.ExchangeType = "topic";
                     b.RoutingKey = "maliev.pricingservice.v1.price.calculated";
                 });
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-project-quotation-accepted", ep =>
+            {
+                ep.ConfigureConsumer<ProjectQuotationAcceptedConsumer>(ctx);
             });
         });
 

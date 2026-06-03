@@ -695,4 +695,13 @@ public static class MalievPermissions
         /// <summary>Update job status, assign machines, and modify job details.</summary>
         public const string Write = "job.jobs.write";
     }
+
+    /// <summary>
+    /// Permissions for shipping rate calculation and carrier integration.
+    /// </summary>
+    public static class Shipping
+    {
+        /// <summary>Permission to retrieve shipping rates from carrier APIs.</summary>
+        public const string RatesRead = "shipping.rates.read";
+    }
 }

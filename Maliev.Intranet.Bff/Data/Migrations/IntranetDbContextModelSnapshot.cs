@@ -22,6 +22,80 @@ namespace Maliev.Intranet.Bff.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Maliev.Intranet.Bff.Data.AlertNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<int>("PartCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_count");
+
+                    b.Property<string>("ProcessTypes")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("process_types");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("ProjectNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("project_number");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.ToTable("alert_notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Maliev.Intranet.Bff.Data.AlertReadReceipt", b =>
+                {
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<string>("EmployeeId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateTime>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at_utc");
+
+                    b.HasKey("NotificationId", "EmployeeId");
+
+                    b.ToTable("alert_read_receipts", (string)null);
+                });
+
             modelBuilder.Entity("Maliev.Intranet.Bff.Data.HealthCheckSample", b =>
                 {
                     b.Property<Guid>("Id")
@@ -100,6 +174,17 @@ namespace Maliev.Intranet.Bff.Data.Migrations
                     b.HasIndex("ServiceName", "SampledAtUtc");
 
                     b.ToTable("health_check_samples", (string)null);
+                });
+
+            modelBuilder.Entity("Maliev.Intranet.Bff.Data.AlertReadReceipt", b =>
+                {
+                    b.HasOne("Maliev.Intranet.Bff.Data.AlertNotification", "Notification")
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Notification");
                 });
 #pragma warning restore 612, 618
         }

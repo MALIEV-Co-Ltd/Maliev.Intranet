@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Realistic finish harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #20242b; color: #e6e6e6; font: 12px/1.4 monospace; }
+  #wrap { display: flex; height: 100%; }
+  #left { flex: 1; position: relative; }
+  #c1 { width: 100%; height: 100%; display: block; background: #20242b; }
+  #right { width: 360px; padding: 8px; overflow: auto; background: #14171c; }
+  pre { white-space: pre-wrap; word-break: break-word; }
+  button { font: inherit; margin: 1px; padding: 3px 6px; background:#2d333b; color:#e6e6e6; border:1px solid #444; cursor:pointer; }
+  .grp { margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  #log.err { color:#ff6b6b; } #log.ok { color:#6bd66b; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="left"><canvas id="c1" touch-action="none"></canvas></div>
+  <div id="right">
+    <div class="grp">
+      <button onclick="__mode('realistic')">realistic</button>
+      <button onclick="__mode('solid')">solid</button>
+      <button onclick="__v().stopAutoRotation('c1')">stop rot</button>
+      <button onclick="__reset()">reset</button>
+    </div>
+    <div class="grp">
+      <div>CNC aluminum:</div>
+      <button onclick="__cfg('aluminum',null,'as_machined','RA_1_6','CNC_MILL')">as-machined</button>
+      <button onclick="__cfg('aluminum',null,'bead_blasted','RA_3_2','CNC_MILL')">bead-blast</button>
+      <button onclick="__cfg('aluminum',null,'brushed','RA_1_6','CNC_MILL')">brushed</button>
+      <button onclick="__cfg('aluminum',null,'mirror_polished','RA_0_8','CNC_MILL')">polished</button>
+      <button onclick="__cfg('aluminum',null,'anodized','RA_1_6','CNC_MILL')">anodized</button>
+    </div>
+    <div class="grp">
+      <button onclick="__cfg('steel',null,'RAW','RA_1_6','CNC_MILL')">steel raw</button>
+      <button onclick="__cfg('stainless-steel',null,'RAW','RA_1_6','CNC_MILL')">SS raw</button>
+      <button onclick="__cfg('stainless-steel',null,'as_machined','RA_1_6','CNC_MILL')">SS machined</button>
+      <button onclick="__cfg('stainless-steel',null,'bead_blasted','RA_3_2','CNC_MILL')">SS bead</button>
+      <button onclick="__cfg('nylon-powder',null,'','','MJF')">MJF nylon</button>
+      <button onclick="__cfg('pla','#cc3333','as_printed',null,'FDM')">FDM PLA</button>
+      <button onclick="__cfg('black-pom','#111111','as_machined','RA_1_6','CNC_MILL')">POM</button>
+    </div>
+    <pre id="diag">starting…</pre>
+    <pre id="log"></pre>
+  </div>
+</div>
+<script type="module">
+import * as viewer from './js/part-viewer.js';
+window.__viewer = viewer; window.__v = () => viewer;
+const logEl = document.getElementById('log'), diagEl = document.getElementById('diag');
+const errs = [];
+const oe = console.error.bind(console), ow = console.warn.bind(console);
+console.error = (...a)=>{errs.push('ERR '+a.map(String).join(' '));oe(...a);};
+console.warn = (...a)=>{errs.push('WARN '+a.map(String).join(' '));ow(...a);};
+window.addEventListener('error', e=>errs.push('WINERR '+(e.message||e.error)));
+const st = { frames:0, blinkFrames:0, maxOpaque:0, lastOpaque:0, lumaJumpFrames:0, lumaHist:[], attached:false, startedAt:performance.now() };
+window.__state = st;
+function attach(scene, engine){
+  scene.onAfterRenderObservable.add(()=>{
+    st.frames++;
+  });
+  st.attached=true;
+}
+setInterval(()=>{const b=window.BABYLON,e=b?.EngineStore?.Instances?.[0]||b?.EngineStore?.LastCreatedEngine,s=b?.EngineStore?.LastCreatedScene;if(e&&s&&!st.attached){window.__scene=s;window.__engine=e;try{attach(s,e);}catch(x){errs.push('probe '+x.message);}}},120);
+window.__reset=()=>{st.frames=0;st.blinkFrames=0;st.maxOpaque=0;st.lumaJumpFrames=0;st.lumaHist.length=0;st.startedAt=performance.now();errs.length=0;};
+window.__mode=(m)=>{try{viewer.setRenderMode('c1',m);}catch(e){errs.push(e.message);}};
+window.__cfg=(mat,col,fin,ra,proc)=>{try{viewer.configureMaterialFromConfigurator('c1',mat,col,fin,ra,proc);viewer.setRenderMode('c1','realistic');}catch(e){errs.push(e.message);}};
+function fmt(){
+  const sc=window.__scene,e=window.__engine;
+  const m=sc?(sc.meshes.find(x=>x.material?.name&&x.material.name.indexOf('__realistic_')===0)?.material||sc.materials.find(x=>x.name&&x.name.indexOf('__realistic_')===0)):null;
+  const mesh=sc?.meshes?.find?.(x=>x.material===m)||null;
+  const sub=mesh?.subMeshes?.find?.(x=>x?._drawWrapper||x?._drawWrappers||x?.effect)||null;
+  const subDraw=sub?._drawWrapper||sub?._drawWrappers?.[0]||null;
+  const subEffect=sub?.effect||sub?.getEffect?.()||subDraw?.effect||subDraw?._effect||null;
+  const surf=m?._malievSurfaceEffect;
+  const plug=m?._pluginInstances?.find?.(p=>p.name==='MalievSurfaceEffect')||m?.pluginManager?._plugins?.find?.(p=>p.name==='MalievSurfaceEffect');
+  const defines={}; try{plug?.prepareDefines?.(defines);}catch{}
+  const shader=subEffect?._fragmentSource||subEffect?._fragmentSourceCode||(m?.getEffect?.()?._fragmentSource)||m?._drawWrapper?._effect?._fragmentSource||'';
+  return [
+    `probe:${st.attached?'on':'…'} fps=${e?e.getFps().toFixed(0):'?'} frames=${st.frames}`,
+    `mat: ${m?m.getClassName()+' '+m.name:'(none)'}`,
+    `metallic=${m?.metallic?.toFixed?.(2)} rough=${m?.roughness?.toFixed?.(2)} rtf=${m?.realTimeFiltering}`,
+    `plugins=${m&&m.pluginManager?m.pluginManager._plugins.map(p=>p.name).join(','):'?'}`,
+    `surface=${surf?`${surf.key} kind=${surf.kind} scale=${surf.scale} bump=${surf.bump}`:'(none)'} plug=${plug?`${plug._effect?.key}/${plug._effect?.kind} enabled=${plug._isEnabled}`:'(none)'} define=${defines.MALIEV_SURFACE_EFFECT}`,
+    `shader surface=${shader.includes('MALIEV_SURFACE_EFFECT')} bead=${shader.includes('_beadCraterAa')} mach=${shader.includes('_machinedAa')}`,
+    `BLINK ${st.blinkFrames}/${st.frames} (${st.frames?(100*st.blinkFrames/st.frames).toFixed(1):0}%) maxOpaque=${st.maxOpaque}`,
+    `LUMAjump ${(st.frames?(100*st.lumaJumpFrames/st.frames).toFixed(1):0)}%`,
+    `--- console ---`, errs.slice(-8).join('\n')||'(none)'
+  ].join('\n');
+}
+setInterval(()=>{diagEl.textContent=fmt();},400);
+(async()=>{try{await viewer.initialize('c1','./__fliktest/sample.glb','.glb',false,null,null,{renderMode:'realistic'});logEl.className='ok';logEl.textContent='init ok';}catch(e){logEl.className='err';logEl.textContent='init threw: '+(e&&e.message);errs.push('init '+(e&&(e.stack||e)));}})();
+</script>
+</body>
+</html>

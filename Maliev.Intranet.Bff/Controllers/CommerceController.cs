@@ -24,7 +24,9 @@ public sealed class CommerceController(
     IHttpClientFactory? httpClientFactory = null) : ControllerBase
 {
     private const long MaxProductMediaBytes = 10 * 1024 * 1024;
+    private const long MaxProductDocumentBytes = 20 * 1024 * 1024;
     private static readonly HashSet<string> ProductMediaExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+    private static readonly HashSet<string> ProductDocumentExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp", ".pdf" };
 
     /// <summary>
     /// Lists products, including drafts and archived listings.
@@ -178,6 +180,43 @@ public sealed class CommerceController(
         }
 
         return Ok(results);
+    }
+
+    /// <summary>
+    /// Uploads a BOM item document (image or PDF) and returns a stable media reference.
+    /// </summary>
+    [HttpPost("products/documents")]
+    [RequirePermission(MalievPermissions.Commerce.ProductsUpdate, AuthenticationSchemes = "Bearer,Cookies")]
+    public async Task<ActionResult<BffUploadResponse>> UploadProductDocument(
+        IFormFile file,
+        [FromQuery] string? handle,
+        CancellationToken cancellationToken)
+    {
+        if (file.Length is <= 0 or > MaxProductDocumentBytes)
+        {
+            return BadRequest($"{file.FileName} must be between 1 byte and 20 MB.");
+        }
+
+        var extension = Path.GetExtension(file.FileName);
+        if (!ProductDocumentExtensions.Contains(extension))
+        {
+            return BadRequest($"{file.FileName} must be a PDF, JPG, PNG, or WEBP file.");
+        }
+
+        var safeHandle = BuildSafeMediaHandle(handle);
+        var safeFileName = BuildSafeMediaFileName(file.FileName);
+        var storagePath = $"commerce/products/{safeHandle}/documents/{Guid.NewGuid():N}_{safeFileName}";
+        var contentType = GetProductDocumentContentType(file, extension);
+
+        await using var stream = file.OpenReadStream();
+        var upload = await uploadClient.UploadFileAsync(safeFileName, stream, contentType, storagePath, true, cancellationToken);
+        if (upload is null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, $"Upload failed for {file.FileName}.");
+        }
+
+        upload.FileReference = BuildProductMediaReference(upload.UploadId);
+        return Ok(upload);
     }
 
     /// <summary>
@@ -393,6 +432,25 @@ public sealed class CommerceController(
 
         return extension.ToLowerInvariant() switch
         {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private static string GetProductDocumentContentType(IFormFile file, string extension)
+    {
+        if (!string.IsNullOrWhiteSpace(file.ContentType) &&
+            (file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+             file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)))
+        {
+            return file.ContentType;
+        }
+
+        return extension.ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
             ".jpg" or ".jpeg" => "image/jpeg",
             ".png" => "image/png",
             ".webp" => "image/webp",

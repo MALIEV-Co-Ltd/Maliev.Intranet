@@ -52,6 +52,7 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
         Services.AddScoped<BreadcrumbService>();
         Services.AddLogging();
         Services.AddScoped<CurrencyService>();
+        Services.AddScoped<AlertService>();
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(

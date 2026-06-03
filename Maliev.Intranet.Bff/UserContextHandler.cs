@@ -148,6 +148,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             var user = context.User;
             var email = user.FindFirst("email")?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value;
             var fullName = user.FindFirst("name")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value;
+            var picture = user.FindFirst("picture")?.Value;
 
             // Extract google_user_id (Google's numeric sub) from the stored platform JWT.
             // OnTicketReceived stores the platform JWT as "access_token" in auth properties.
@@ -184,7 +185,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
 
             var exchangeResponse = await authClient.PostAsJsonAsync(
                 "/auth/v1/exchange/google",
-                new { email, full_name = fullName, google_user_id = googleUserId },
+                new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture },
                 ct);
 
             if (!exchangeResponse.IsSuccessStatusCode)

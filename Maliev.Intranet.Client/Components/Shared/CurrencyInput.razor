@@ -1,0 +1,52 @@
+@namespace Maliev.Intranet.Client.Components.Shared
+
+<div class="currency-input-root">
+    <MudNumericField T="decimal"
+                     Label="@Label"
+                     Value="@_displayValue"
+                     ValueChanged="OnInputChanged"
+                     Min="@(Min ?? 0m)"
+                     Max="@(Max ?? decimal.MaxValue)"
+                     Immediate="true"
+                     Variant="Variant.Outlined"
+                     Margin="Margin.Dense"
+                     HideSpinButtons="true" />
+    @if (!string.IsNullOrWhiteSpace(HelperText))
+    {
+        <div class="currency-input-helper">
+            <span>@HelperText</span>
+            <span class="currency-input-thb">= @ThbValue.ToString("N2")</span>
+        </div>
+    }
+</div>
+
+<style>
+    .currency-input-root {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .currency-input-root ::deep .mud-input-control {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .currency-input-helper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: var(--mud-typography-caption-size);
+        color: var(--maliev-muted);
+    }
+
+    .currency-input-thb {
+        color: var(--mud-palette-primary);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
+</style>

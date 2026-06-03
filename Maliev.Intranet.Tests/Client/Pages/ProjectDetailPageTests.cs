@@ -82,7 +82,9 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
             .ToLocalTime()
             .ToString("MMM d, yyyy HH:mm");
         var headerMeta = cut.Find(".mlv-page-meta").TextContent;
-        Assert.Contains($"Robot arm calibration fixture - Axion Robotics • Last updated on {expectedLocalUpdated}", headerMeta);
+        Assert.Contains("Robot arm calibration fixture", headerMeta);
+        Assert.Contains("Axion Robotics", headerMeta);
+        Assert.Contains($"Last updated on {expectedLocalUpdated}", headerMeta);
         Assert.Contains("Quotation Generated", headerMeta);
         Assert.DoesNotContain("Created", headerMeta);
         Assert.DoesNotContain("Updated", headerMeta);

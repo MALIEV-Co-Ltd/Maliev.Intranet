@@ -53,6 +53,8 @@ public class MainLayoutTests : BunitContext, IAsyncLifetime
         Services.AddScoped<BreadcrumbService>();
         Services.AddLogging();
         Services.AddScoped<CurrencyService>();
+        Services.AddScoped<AlertService>();
+        Services.AddScoped<ShippingService>();
 
         _authMock.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "test-user")], "Test"))));

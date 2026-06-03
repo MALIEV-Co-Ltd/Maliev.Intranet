@@ -76,22 +76,28 @@ public sealed class ModelViewerRenderingSourceTests
         var source = ViewerScript.ReplaceLineEndings("\n");
 
         Assert.Contains("environmentTextureSize: 256", source, StringComparison.Ordinal);
-        Assert.Contains("const size = CONFIG.REALISTIC.environmentTextureSize || 256;", source, StringComparison.Ordinal);
+        Assert.Contains("fastEnvironmentTextureSize", source, StringComparison.Ordinal);
+        Assert.Contains("const highSize = CONFIG.REALISTIC.environmentTextureSize || 256;", source, StringComparison.Ordinal);
+        Assert.Contains("const size = quality === 'high' ? highSize : fastSize;", source, StringComparison.Ordinal);
         Assert.Contains("function studioColor(direction)", source, StringComparison.Ordinal);
         Assert.Contains("cube._malievEnvironmentKind = 'procedural-studio';", source, StringComparison.Ordinal);
         Assert.DoesNotContain("environmentTextureSize: 512", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void RealisticPbrMaterials_EnableSpecularFilteringForSmoothMetalReflections()
+    public void RealisticPbrMaterials_EnableSpecularAntiAliasingWithoutExpensiveRealtimeFiltering()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
 
         Assert.Contains("function configureRealisticPbrQuality(pbr)", source, StringComparison.Ordinal);
         Assert.Contains("pbr.enableSpecularAntiAliasing = true;", source, StringComparison.Ordinal);
-        Assert.Contains("pbr.realTimeFiltering = true;", source, StringComparison.Ordinal);
-        Assert.Contains("pbr.realTimeFilteringQuality = BABYLON.Constants.TEXTURE_FILTERING_QUALITY_HIGH;", source, StringComparison.Ordinal);
         Assert.Contains("configureRealisticPbrQuality(pbr);", source, StringComparison.Ordinal);
+
+        // realTimeFiltering was removed: it ran 64-sample per-pixel IBL prefiltering on a
+        // static, already-prefiltered studio cube — expensive on mobile and a driver-dependent
+        // instability source (the realistic-mode flicker). Lock the regression out.
+        Assert.DoesNotContain("pbr.realTimeFiltering", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("realTimeFilteringQuality", source, StringComparison.Ordinal);
     }
 
     [Fact]

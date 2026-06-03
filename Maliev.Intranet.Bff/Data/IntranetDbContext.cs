@@ -12,11 +12,22 @@ public class IntranetDbContext(DbContextOptions<IntranetDbContext> options) : Db
     /// </summary>
     public DbSet<HealthCheckSample> HealthCheckSamples => Set<HealthCheckSample>();
 
+    /// <summary>
+    /// Quote-accepted alert notifications broadcast to all employees.
+    /// </summary>
+    public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
+
+    /// <summary>
+    /// Per-employee read receipts for alert notifications.
+    /// </summary>
+    public DbSet<AlertReadReceipt> AlertReadReceipts => Set<AlertReadReceipt>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // ── HealthCheckSample ─────────────────────────────────────────────────
         var sample = modelBuilder.Entity<HealthCheckSample>();
         sample.ToTable("health_check_samples");
         sample.HasKey(x => x.Id);
@@ -33,9 +44,35 @@ public class IntranetDbContext(DbContextOptions<IntranetDbContext> options) : Db
         sample.Property(x => x.ReadinessResponseTimeMs).HasColumnName("readiness_response_time_ms").IsRequired();
         sample.Property(x => x.ErrorMessage).HasColumnName("error_message").HasMaxLength(1000);
         sample.Property(x => x.ErrorBody).HasColumnName("error_body").HasMaxLength(2000);
-
         sample.HasIndex(x => x.SampledAtUtc);
         sample.HasIndex(x => new { x.ServiceName, x.SampledAtUtc });
         sample.HasIndex(x => new { x.DomainGroup, x.SampledAtUtc });
+
+        // ── AlertNotification ────────────────────────────────────────────────
+        var alert = modelBuilder.Entity<AlertNotification>();
+        alert.ToTable("alert_notifications");
+        alert.HasKey(x => x.Id);
+        alert.Property(x => x.Id).HasColumnName("id");
+        alert.Property(x => x.Type).HasColumnName("type").HasMaxLength(64).IsRequired();
+        alert.Property(x => x.ProjectId).HasColumnName("project_id").IsRequired();
+        alert.Property(x => x.ProjectNumber).HasColumnName("project_number").HasMaxLength(32).IsRequired();
+        alert.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(256).IsRequired();
+        alert.Property(x => x.PartCount).HasColumnName("part_count").IsRequired();
+        alert.Property(x => x.ProcessTypes).HasColumnName("process_types").HasMaxLength(256).IsRequired();
+        alert.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc").IsRequired();
+        alert.Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc").IsRequired();
+        alert.HasIndex(x => x.ExpiresAtUtc);
+
+        // ── AlertReadReceipt ─────────────────────────────────────────────────
+        var receipt = modelBuilder.Entity<AlertReadReceipt>();
+        receipt.ToTable("alert_read_receipts");
+        receipt.HasKey(x => new { x.NotificationId, x.EmployeeId });
+        receipt.Property(x => x.NotificationId).HasColumnName("notification_id");
+        receipt.Property(x => x.EmployeeId).HasColumnName("employee_id").HasMaxLength(128);
+        receipt.Property(x => x.ReadAtUtc).HasColumnName("read_at_utc").IsRequired();
+        receipt.HasOne(x => x.Notification)
+            .WithMany()
+            .HasForeignKey(x => x.NotificationId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

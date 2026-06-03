@@ -14,6 +14,8 @@
 @inject ChatService ChatService
 @inject BreadcrumbService BreadcrumbService
 @inject CookieProvider CookieProvider
+@using Maliev.Intranet.Shared.Dtos
+@inject AlertService AlertService
 @inject IJSRuntime JSRuntime
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
@@ -98,7 +100,14 @@
                         InvokeAsync(StateHasChanged);
                     });
 
+                    _hubConnection.On<AlertSummaryDto>("ReceiveAlert", alert =>
+                    {
+                        AlertService.AddAlert(alert);
+                        InvokeAsync(StateHasChanged);
+                    });
+
                     await _hubConnection.StartAsync();
+                    await AlertService.InitializeAsync();
                 }
                 catch (Exception ex)
                 {

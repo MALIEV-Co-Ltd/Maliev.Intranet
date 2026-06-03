@@ -92,53 +92,18 @@
         </div>
     }
 
-    @if (_renderMode == "realistic")
-    {
-        <div class="vp-realistic-panel" @onclick:stopPropagation>
-            <MudPaper Elevation="16" Class="pa-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2 d-block">Realistic Material</MudText>
-
-                <MudSelect T="string" @bind-Value="_materialType"
-                           Label="Material" Variant="Variant.Outlined" Margin="Margin.Dense"
-                           Class="mb-2">
-                    @foreach (var mat in _materialOptions)
-                    {
-                        <MudSelectItem Value="@mat.Key">@mat.Label</MudSelectItem>
-                    }
-                </MudSelect>
-
-                <MudTextField T="string" Label="Color" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              Value="@_customColorHex" ValueChanged="OnColorHexChanged"
-                              Immediate="true" Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Colorize" />
-                <input type="color" value="@_customColorHex"
-                       @oninput="OnColorPickerInput" class="vp-color-picker-input"
-                       style="width:100%;height:36px;border:none;cursor:pointer;margin-top:4px;" />
-                @if (_hasCustomColor)
-                {
-                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Secondary"
-                               OnClick="ResetColorAsync" Class="mt-1" FullWidth="true">
-                        Reset to preset
-                    </MudButton>
-                }
-            </MudPaper>
-        </div>
-    }
-
     @* ── Sphere render mode toggle — bottom-left, outside toolbar ── *@
     <div class="vp-sphere-toggle" @onclick:stopPropagation>
-        <MudTooltip Text="Realistic render" Placement="Placement.Right" Arrow="false">
+        @{
+            var isRealistic = _renderMode == "realistic";
+            var sphereImg = isRealistic ? "/images/sphere-realistic.png" : "/images/sphere-cad.png";
+            var sphereTooltip = isRealistic ? "Switch to CAD render" : "Switch to realistic render";
+        }
+        <MudTooltip Text="@sphereTooltip" Placement="Placement.Right" Arrow="false">
             <button type="button"
-                    class="@($"vp-sphere-btn {(_renderMode == "realistic" ? "vp-sphere-active" : "")}")"
-                    @onclick='@(() => SetRenderModeAsync("realistic"))'>
-                <img src="/images/sphere-realistic.png" alt="Realistic render mode" />
-            </button>
-        </MudTooltip>
-        <MudTooltip Text="CAD render" Placement="Placement.Right" Arrow="false">
-            <button type="button"
-                    class="@($"vp-sphere-btn {(_renderMode == "solid" ? "vp-sphere-active" : "")}")"
-                    @onclick='@(() => SetRenderModeAsync("solid"))'>
-                <img src="/images/sphere-cad.png" alt="CAD render mode" />
+                    class="@($"vp-sphere-btn {(_renderMode == "realistic" || _renderMode == "solid" ? "vp-sphere-active" : "")}")"
+                    @onclick='@(() => SetRenderModeAsync(isRealistic ? "solid" : "realistic"))'>
+                <img src="@sphereImg" alt="@sphereTooltip" />
             </button>
         </MudTooltip>
     </div>
@@ -285,8 +250,6 @@
     private DotNetObjectReference<ModelViewer>? _dotNetRef;
     private string _renderMode        = "realistic";
     private string _materialType      = "aluminum";
-    private string _customColorHex    = "#D0D0D0";
-    private bool   _hasCustomColor;
     private string _cameraPreset      = "iso";
     private string _cameraProjection  = "orthographic";
     private bool   _edgesEnabled;
@@ -300,7 +263,6 @@
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
     private string? _lastMeasurement;     // Display last measurement result in overlay
     private string? _lastViewerSettingsKey;
-    private string _previousMaterialType = "aluminum";
 
     // ── Section view ─────────────────────────────────────────────────────────
     private bool   _sectionEnabled;
@@ -335,24 +297,27 @@
         new("thickness", "Thickness Analysis", Icons.Material.Filled.Fullscreen),
     ];
 
-    private record MaterialOption(string Key, string Label);
-
-    private static readonly MaterialOption[] _materialOptions =
-    [
-        new("aluminum", "Aluminum"),
-        new("steel", "Steel"),
-        new("stainless-steel", "Stainless Steel"),
-        new("black-pom", "Black POM"),
-        new("white-pom", "White POM"),
-        new("blue-pom", "Blue POM"),
-    ];
-
     private bool ShouldShowGrid => _gridEnabled || _temporaryGridOwners.Count > 0;
 
     /// <inheritdoc />
     protected override void OnInitialized()
     {
         _dotNetRef = DotNetObjectReference.Create(this);
+        LayoutService.MajorUpdateOccurred += OnLayoutMajorUpdate;
+    }
+
+    private void OnLayoutMajorUpdate(object? sender, EventArgs e)
+    {
+        // Fire-and-forget: update scene lights to match the new dark/light mode.
+        // This runs on the Blazor synchronisation context so InvokeAsync is safe.
+        _ = InvokeAsync(async () =>
+        {
+            if (_module != null)
+            {
+                try { await _module.InvokeVoidAsync("applyStudioLighting", _canvasId, LayoutService.IsDarkMode); }
+                catch (Exception ex) { Logger.LogWarning(ex, "[ModelViewer] applyStudioLighting failed"); }
+            }
+        });
     }
 
     /// <inheritdoc />
@@ -606,6 +571,19 @@
                 <path d="M16 72H84M24 60H76M32 48H68M40 36H60" stroke="{backC}" stroke-width="1.5" stroke-linecap="round"/>
                 """,
 
+            "ortho" => $"""
+                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            "perspective" => $"""
+                <path d="M50,58 L20,69 M50,58 L80,69 M50,58 L50,31" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon points="50,90 80,69 80,34 50,31 20,34 20,69" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M50,40 L50,90 M50,40 L20,34 M50,40 L80,34" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                """,
+
+            // Cutting mat: top-down view — green rectangle with white grid + dark slab edge
             "cuttingmat" => $"""
                 <rect x="9" y="22" width="82" height="56" rx="2"
                       fill="{(isActive ? "rgba(27,110,60,0.90)" : "rgba(27,94,56,0.72)")}"
@@ -618,18 +596,6 @@
                 <line x1="71" y1="22" x2="71" y2="78" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
                 <rect x="9"  y="75" width="82" height="5" rx="0"
                       fill="rgba(8,52,22,0.85)" stroke="none"/>
-                """,
-
-            "ortho" => $"""
-                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                """,
-
-            "perspective" => $"""
-                <path d="M50,58 L20,69 M50,58 L80,69 M50,58 L50,31" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <polygon points="50,90 80,69 80,34 50,31 20,34 20,69" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M50,40 L50,90 M50,40 L20,34 M50,40 L80,34" fill="none" stroke="{edgeC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                 """,
 
             _ => ""
@@ -697,8 +663,6 @@
         {
             await _module.InvokeVoidAsync("enableSectionPanelDrag", _sectionPanelId);
         }
-
-        await PushMaterialTypeIfChangedAsync();
     }
 
     private string GetTurningAxisKey()
@@ -777,52 +741,6 @@
         await NotifyViewerSettingsChangedAsync();
     }
 
-    /// <summary>Changes the realistic material type and applies it immediately.</summary>
-    private async Task SetMaterialTypeAsync(string materialType)
-    {
-        _materialType = NormalizeMaterialType(materialType);
-        if (_module != null && _renderMode == "realistic")
-            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
-        await NotifyViewerSettingsChangedAsync();
-    }
-
-    /// <summary>Pushes a material-type change to the JS viewer when the MudSelect binding updates _materialType.</summary>
-    private async Task PushMaterialTypeIfChangedAsync()
-    {
-        if (_materialType == _previousMaterialType) return;
-        _previousMaterialType = _materialType;
-        _hasCustomColor = false;
-        if (_module != null && _renderMode == "realistic")
-            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
-        await NotifyViewerSettingsChangedAsync();
-    }
-
-    /// <summary>Handles real-time colour-picker input changes.</summary>
-    private async Task OnColorPickerInput(ChangeEventArgs e)
-    {
-        var hex = e.Value?.ToString() ?? "#808080";
-        _customColorHex = hex;
-        _hasCustomColor = true;
-        if (_module != null && _renderMode == "realistic")
-            await _module.InvokeVoidAsync("setMaterialColor", _canvasId, hex);
-    }
-
-    /// <summary>Handles hex text-field changes (debounced via Immediate).</summary>
-    private async Task OnColorHexChanged(string hex)
-    {
-        _customColorHex = hex ?? "#808080";
-        _hasCustomColor = true;
-        if (_module != null && _renderMode == "realistic" && hex?.Length >= 4 && hex.StartsWith('#'))
-            await _module.InvokeVoidAsync("setMaterialColor", _canvasId, hex);
-    }
-
-    /// <summary>Resets the albedo colour to the selected material preset.</summary>
-    private async Task ResetColorAsync()
-    {
-        _hasCustomColor = false;
-        if (_module != null && _renderMode == "realistic")
-            await _module.InvokeVoidAsync("setMaterialType", _canvasId, _materialType);
-    }
     /// <summary>
     /// Applies a material configuration from the part configurator sidebar.
     /// Maps catalog material codes and process-specific colours to the 3D viewer.
@@ -986,7 +904,7 @@
     private async Task ToggleGridAsync()
     {
         _gridEnabled = !_gridEnabled;
-        // Cutting mat and grid are mutually exclusive floor modes.
+        // Cutting mat and grid are mutually exclusive floor modes
         if (_gridEnabled && _cuttingMatEnabled)
             await ApplyCuttingMatAsync(enabled: false);
         await ApplyGridVisibilityAsync(notifySettingsChanged: true);
@@ -995,7 +913,7 @@
     private async Task ToggleCuttingMatAsync()
     {
         _cuttingMatEnabled = !_cuttingMatEnabled;
-        // Cutting mat and grid are mutually exclusive floor modes.
+        // Cutting mat and grid are mutually exclusive floor modes
         if (_cuttingMatEnabled && _gridEnabled)
         {
             _gridEnabled = false;
@@ -1017,7 +935,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error toggling cutting mat visibility");
-            _cuttingMatEnabled = !enabled;
+            _cuttingMatEnabled = !enabled; // revert on JS error
         }
     }
 
@@ -1312,6 +1230,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        LayoutService.MajorUpdateOccurred -= OnLayoutMajorUpdate;
         _dotNetRef?.Dispose();
         if (_module != null)
         {

@@ -47,6 +47,26 @@
             document.documentElement.classList.add('maliev-wasm-ready');
         };
     </script>
+    <script>
+        (function () {
+            var patchWebGL = function (proto) {
+                try {
+                    if (Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle')) return;
+                    var internal = null;
+                    Object.defineProperty(proto, 'backbufferColorTextureHandle', {
+                        get: function () { return internal; },
+                        set: function (v) { internal = v; },
+                        enumerable: false,
+                        configurable: true,
+                    });
+                } catch (_) { /* proto may be frozen in some browsers */ }
+            };
+            if (typeof WebGLRenderingContext !== 'undefined')
+                patchWebGL(WebGLRenderingContext.prototype);
+            if (typeof WebGL2RenderingContext !== 'undefined')
+                patchWebGL(WebGL2RenderingContext.prototype);
+        })();
+    </script>
 </head>
 
 <body>
@@ -63,6 +83,9 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script src="lib/babylonjs/babylon.js"></script>
+    <script src="lib/babylonjs/babylonjs.materials.min.js"></script>
+    <script src="lib/babylonjs/babylonjs.loaders.min.js"></script>
     <script src="js/material-labels.js"></script>
     <script src="js/production-schedule-board.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>

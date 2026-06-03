@@ -22,10 +22,12 @@
 
         :root[data-maliev-theme="dark"] {
             color-scheme: dark;
-            --wasm-loader-bg: #ffffff;
+            --wasm-loader-bg: #0d1117;
+            --wasm-logo-empty: #1e2430;
+            --wasm-logo-fill: #c9d1d9;
             --maliev-logo-loader-shadow:
-                drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))
-                drop-shadow(0 0 42px rgba(10, 20, 40, 0.18));
+                drop-shadow(0 20px 40px rgba(0, 0, 0, 0.55))
+                drop-shadow(0 0 48px rgba(0, 0, 0, 0.30));
         }
         :root[data-maliev-theme="dark"] body {
             background-color: #0d1117 !important;
@@ -34,6 +36,8 @@
         :root[data-maliev-theme="light"] {
             color-scheme: light;
             --wasm-loader-bg: #ffffff;
+            --wasm-logo-empty: #d7dde6;
+            --wasm-logo-fill: #1a1d23;
             --maliev-logo-loader-shadow:
                 drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))
                 drop-shadow(0 0 42px rgba(10, 20, 40, 0.18));
@@ -318,6 +322,12 @@
             }
         }).then(function () {
             window.malievWasmLoader.markRuntimeReady();
+            // Safety fallback: Routes.razor signals ready via malievMarkWasmReady on first render.
+            // If that signal never arrives (e.g. auth exception, render failure), dismiss after 3s
+            // so the user is not permanently stuck on the loading screen.
+            window.setTimeout(function () {
+                window.malievWasmLoader.markReady();
+            }, 3000);
         }).catch(function (error) {
             window.malievWasmLoader.markFailed(error);
         });

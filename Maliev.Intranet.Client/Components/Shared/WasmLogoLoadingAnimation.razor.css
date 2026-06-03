@@ -27,8 +27,10 @@
 
 @media (prefers-color-scheme: dark) {
     .loader {
+        --logo-empty: var(--wasm-logo-empty, #1e2430);
+        --logo-fill: var(--wasm-logo-fill, #c9d1d9);
         --logo-shadow: var(--maliev-logo-loader-shadow,
-            drop-shadow(0 20px 32px rgba(10, 20, 40, 0.34))
-            drop-shadow(0 0 42px rgba(10, 20, 40, 0.18)));
+            drop-shadow(0 20px 40px rgba(0, 0, 0, 0.55))
+            drop-shadow(0 0 48px rgba(0, 0, 0, 0.30)));
     }
 }

@@ -148,6 +148,7 @@ public class JwtClaimsEnrichmentMiddleware
             var email = context.User.FindFirst("email")?.Value ?? context.User.FindFirst(ClaimTypes.Email)?.Value;
             var fullName = context.User.FindFirst("name")?.Value ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
             var googleUserId = context.User.FindFirst("google_user_id")?.Value;
+            var picture = context.User.FindFirst("picture")?.Value;
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(googleUserId))
             {
@@ -159,7 +160,7 @@ public class JwtClaimsEnrichmentMiddleware
             using var authClient = factory.CreateClient("AuthService");
             var exchangeResponse = await authClient.PostAsJsonAsync(
                 "/auth/v1/exchange/google",
-                new { email, full_name = fullName, google_user_id = googleUserId },
+                new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture },
                 context.RequestAborted);
 
             if (!exchangeResponse.IsSuccessStatusCode)

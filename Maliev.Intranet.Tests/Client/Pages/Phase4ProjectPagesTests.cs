@@ -95,6 +95,8 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<ChatService>();
         Services.AddSingleton(new UploadSettings());
         Services.AddScoped<CurrencyService>();
+        Services.AddScoped<ShippingService>();
+        Services.AddScoped<AlertService>();
 
         Render<MudPopoverProvider>();
     }

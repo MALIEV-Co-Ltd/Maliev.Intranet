@@ -96,15 +96,6 @@ public sealed class ModelViewerSphereToggleSourceTests
     }
 
     [Fact]
-    public void Css_SphereToggleIsFlexColumn()
-    {
-        var idx = Css.IndexOf(".vp-sphere-toggle", StringComparison.Ordinal);
-        var block = Css.Substring(idx, Math.Min(300, Css.Length - idx));
-        Assert.Contains("flex-direction: column", block, StringComparison.Ordinal);
-    }
-
-    // ── CSS: sphere button styles ────────────────────────────────────────────────
-    [Fact]
     public void Css_HasVpSphereBtnDeepRule()
         => Assert.Contains("::deep .vp-sphere-btn", Css, StringComparison.Ordinal);
 

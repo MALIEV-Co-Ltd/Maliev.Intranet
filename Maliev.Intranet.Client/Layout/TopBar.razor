@@ -1,8 +1,10 @@
 @using MudBlazor
 @using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Client.Components
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Microsoft.AspNetCore.Components.Authorization
+@inject AlertService AlertService
 @inject NavigationManager Navigation
 @inject LayoutService LayoutService
 @inject CurrencyService CurrencyService
@@ -217,6 +219,9 @@
                            OnClick="@ToggleChat"
                            Color="@(ChatDrawerOpen ? Color.Primary : Color.Default)" />
         </MudTooltip>
+
+        @* Notification Bell *@
+        <NotificationBell />
 
         <div class="topbar-divider" />
 

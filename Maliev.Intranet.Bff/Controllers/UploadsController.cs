@@ -259,23 +259,35 @@ public class UploadsController(
 
         var status = await analysisStatusService.GetStatusAsync(storagePath, ct);
 
-        // Only return a signed URL when we know the GLB actually exists in GCS.
-        // Deriving the path by convention and signing a speculative URL causes the Babylon
-        // viewer to get a well-signed but 404-ing URL while analysis is still in progress.
-        // The client must wait for the GlbReady SignalR event or a completed status before
-        // opening the viewer.
+        // Primary path: resolve the main viewer GLB via the analysis status cache.
+        // The cache is keyed by the original uploaded file's StoragePath and contains
+        // the derived GlbStoragePath once geometry analysis completes.
         var glbPath = status?.GlbStoragePath;
-        if (string.IsNullOrEmpty(glbPath))
-            return NotFound("Viewer artifact not available. The file may still be processing.");
+        if (!string.IsNullOrEmpty(glbPath))
+        {
+            var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(glbPath, ct);
+            if (!string.IsNullOrEmpty(signedUrl))
+                return Ok(new { Url = signedUrl });
 
-        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(glbPath, ct);
-        // Note: GetDownloadUrlByPathAsync returns null when UploadService returns 401/403
-        // (e.g. user lacks FilesDownload permission). The BFF's UserContextHandler logs
-        // these as structured errors. Here we surface it as a 404 to avoid leaking
-        // permission state to the client.
-        if (string.IsNullOrEmpty(signedUrl))
             return NotFound("Viewer artifact not available. The file may still be processing or geometry analysis failed.");
-        return Ok(new { Url = signedUrl });
+        }
+
+        // Fallback: for overlay GLB files (e.g. "_FDM__thin_wall_overlay.glb") and other
+        // artifacts that are stored directly in GCS but never tracked in the analysis cache,
+        // try signing the requested storagePath directly. This is safe because
+        // GetDownloadUrlByPathAsync returns null when the object doesn't exist in GCS,
+        // preventing speculative signed URLs for non-existent files.
+        if (storagePath.EndsWith(".glb", StringComparison.OrdinalIgnoreCase))
+        {
+            var directUrl = await uploadClient.GetDownloadUrlByPathAsync(storagePath, ct);
+            if (!string.IsNullOrEmpty(directUrl))
+                return Ok(new { Url = directUrl });
+
+            return NotFound("Viewer artifact not found in storage.");
+        }
+
+        // Not a GLB path and no cache entry — the file is still processing.
+        return NotFound("Viewer artifact not available. The file may still be processing.");
     }
 
     /// <summary>

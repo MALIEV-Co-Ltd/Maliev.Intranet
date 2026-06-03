@@ -1,0 +1,156 @@
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared.Dtos
+@inject AlertService AlertService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="notif-bell-wrapper">
+    <MudTooltip Text="Notifications" Placement="Placement.Bottom">
+        <button type="button"
+                class="@BellButtonClass"
+                aria-label="@AriaLabel"
+                aria-haspopup="listbox"
+                aria-expanded="@_panelOpen.ToString().ToLowerInvariant()"
+                @onclick="TogglePanel">
+            <MudIcon Icon="@Icons.Material.Outlined.Notifications" Size="Size.Small" />
+            @if (AlertService.UnreadCount > 0)
+            {
+                <span class="notif-badge" aria-label="@AlertService.UnreadCount unread notifications">
+                    @(AlertService.UnreadCount > 99 ? "99+" : AlertService.UnreadCount.ToString())
+                </span>
+            }
+        </button>
+    </MudTooltip>
+
+    @if (_panelOpen)
+    {
+        <div class="notif-panel" role="listbox" aria-label="Notifications">
+            <div class="notif-panel-header">
+                <span class="notif-panel-title">
+                    Notifications
+                    @if (AlertService.UnreadCount > 0)
+                    {
+                        <span class="notif-panel-count">@AlertService.UnreadCount unread</span>
+                    }
+                </span>
+                @if (AlertService.UnreadCount > 0)
+                {
+                    <button type="button" class="notif-mark-all" @onclick="MarkAllReadAsync">
+                        Mark all as read
+                    </button>
+                }
+            </div>
+
+            <div class="notif-list">
+                @if (AlertService.Alerts.Count == 0)
+                {
+                    <div class="notif-empty">
+                        <MudIcon Icon="@Icons.Material.Outlined.NotificationsNone" Size="Size.Large" />
+                        <p>All caught up</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var alert in AlertService.Alerts)
+                    {
+                        <div class="notif-item unread"
+                             role="option"
+                             tabindex="0"
+                             @onclick="() => OpenAlertAsync(alert)"
+                             @onkeydown="e => OnItemKeyDown(e, alert)">
+                            <div class="notif-icon-wrap">
+                                <MudIcon Icon="@Icons.Material.Outlined.AssignmentTurnedIn" Size="Size.Small" Color="Color.Primary" />
+                            </div>
+                            <div class="notif-body">
+                                <div class="notif-headline">
+                                    Quote accepted — <strong>@alert.ProjectNumber</strong>
+                                </div>
+                                <div class="notif-detail">
+                                    @alert.PartCount part@(alert.PartCount == 1 ? "" : "s")
+                                    @if (!string.IsNullOrWhiteSpace(alert.ProcessTypes))
+                                    {
+                                        <> · @alert.ProcessTypes</>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(alert.CustomerName))
+                                    {
+                                        <> · @alert.CustomerName</>
+                                    }
+                                </div>
+                                <div class="notif-time">
+                                    @FormatAge(alert.OccurredAtUtc) · Production planning required
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="notif-footer">
+                <a href="/projects">View all projects</a>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _panelOpen;
+
+    private string BellButtonClass => AlertService.UnreadCount > 0
+        ? "notif-bell-btn notif-bell-active mud-button-root mud-icon-button"
+        : "notif-bell-btn mud-button-root mud-icon-button";
+
+    private string AriaLabel => AlertService.UnreadCount > 0
+        ? $"Notifications — {AlertService.UnreadCount} unread"
+        : "Notifications";
+
+    protected override void OnInitialized()
+    {
+        AlertService.Changed += OnAlertsChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    public void Dispose()
+    {
+        AlertService.Changed -= OnAlertsChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    private void OnAlertsChanged(object? sender, EventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _panelOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void TogglePanel() => _panelOpen = !_panelOpen;
+
+    private async Task OpenAlertAsync(AlertSummaryDto alert)
+    {
+        _panelOpen = false;
+        await AlertService.MarkReadAsync(alert.Id);
+        Navigation.NavigateTo($"/projects/{alert.ProjectId}?tab=production-plan");
+    }
+
+    private void OnItemKeyDown(KeyboardEventArgs e, AlertSummaryDto alert)
+    {
+        if (e.Key is "Enter" or " ")
+            _ = OpenAlertAsync(alert);
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        _panelOpen = false;
+        await AlertService.MarkAllReadAsync();
+    }
+
+    private static string FormatAge(DateTime occurredAtUtc)
+    {
+        var age = DateTime.UtcNow - occurredAtUtc;
+        return age.TotalMinutes < 1 ? "Just now"
+            : age.TotalMinutes < 60 ? $"{(int)age.TotalMinutes} minute{((int)age.TotalMinutes == 1 ? "" : "s")} ago"
+            : age.TotalHours < 24 ? $"{(int)age.TotalHours} hour{((int)age.TotalHours == 1 ? "" : "s")} ago"
+            : $"{(int)age.TotalDays} day{((int)age.TotalDays == 1 ? "" : "s")} ago";
+    }
+}

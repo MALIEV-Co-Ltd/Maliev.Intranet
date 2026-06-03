@@ -124,7 +124,7 @@
 
     @* ── Tab: 3D Viewer + Body Selection ───────────────────────────────────────────────── *@
     @* Retain-and-hide: keep the Babylon engine alive across tab switches so GLB isn't reloaded. *@
-    <div class="pdc-viewer-wrap pdc-polkadot" style="@(_activeTab == 0 ? "" : "display:none")"
+    <div class="pdc-viewer-wrap" style="@(_activeTab == 0 ? "" : "display:none")"
          aria-hidden="@(_activeTab != 0 ? "true" : null)">
 
         @* Thumbnail area *@
@@ -740,7 +740,6 @@
                 await OnRequestFreshViewerUrl.InvokeAsync(storagePath);
                 _viewerLoadFailed = false;
                 _viewerErrorMessage = null;
-                _hasPushedInitialMaterialConfig = false;
             }
         }
         else

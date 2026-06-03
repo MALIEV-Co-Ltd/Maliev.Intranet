@@ -22,6 +22,8 @@ builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHand
 builder.Services.AddScoped<AuthenticationStateProvider, PersistentAuthenticationStateProvider>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<CurrencyService>();
+builder.Services.AddScoped<ShippingService>();
+builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<IProjectDraftService, ProjectDraftService>();
 builder.Services.AddScoped<CookieProvider>();
 builder.Services.AddScoped<ChatService>();

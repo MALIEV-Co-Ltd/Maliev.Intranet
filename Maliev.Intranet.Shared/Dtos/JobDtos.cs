@@ -305,8 +305,8 @@ public sealed class ProductionPlanningHoldDto
     /// <summary>Gets or sets the automatic expiration timestamp in UTC.</summary>
     public DateTime ExpiresAt { get; set; }
 
-    /// <summary>Gets or sets the converted job identifier, if any.</summary>
-    public Guid? ConvertedJobId { get; set; }
+    /// <summary>Gets or sets a value indicating whether the hold should auto-snap to the next available slot when the requested time conflicts.</summary>
+    public bool AutoSnapToNextAvailable { get; set; }
 }
 
 /// <summary>Request DTO for creating a tentative production planning hold.</summary>
@@ -350,6 +350,9 @@ public sealed class CreateProductionPlanningHoldRequest
 
     /// <summary>Gets or sets the automatic expiration timestamp in UTC.</summary>
     public DateTime ExpiresAt { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether the hold should auto-snap to the next available slot when the requested time conflicts.</summary>
+    public bool AutoSnapToNextAvailable { get; set; }
 }
 
 /// <summary>Request DTO for updating a tentative production planning hold.</summary>
