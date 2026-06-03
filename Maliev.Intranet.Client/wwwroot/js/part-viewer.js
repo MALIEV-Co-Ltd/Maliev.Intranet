@@ -3173,6 +3173,7 @@ function getOrCreateEnvironmentTexture(scene, canvasId, quality = 'fast') {
         BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
 
     environmentTextures[canvasId] = cube;
+    refreshRealisticRefractionTextures(canvasId, scene);
     if (existing && existing !== cube) {
         try { existing.dispose?.(); } catch (_) {}
     }
@@ -4135,9 +4136,13 @@ function applyRealisticTransparencySettings(material, preset) {
             material.indexOfRefraction = preset.indexOfRefraction;
         }
         if (material.subSurface) {
-            material.subSurface.isRefractionEnabled = true;
+            const refractionTexture = getRealisticRefractionTexture(material);
+            material.subSurface.refractionTexture = refractionTexture;
+            material.subSurface.isRefractionEnabled = !!refractionTexture;
             material.subSurface.isTranslucencyEnabled = true;
-            material.subSurface.refractionIntensity = clamp(1 - preset.alpha, 0.05, 1);
+            material.subSurface.refractionIntensity = refractionTexture
+                ? clamp(1 - preset.alpha, 0.05, 1)
+                : 0;
             material.subSurface.translucencyIntensity = clamp(1 - (preset.roughness ?? 0.1), 0.2, 1);
         }
     } else {
@@ -4152,10 +4157,36 @@ function applyRealisticTransparencySettings(material, preset) {
         if (material.subSurface) {
             material.subSurface.isRefractionEnabled = false;
             material.subSurface.isTranslucencyEnabled = false;
+            material.subSurface.refractionTexture = null;
             material.subSurface.refractionIntensity = 0;
             material.subSurface.translucencyIntensity = 0;
         }
     }
+}
+
+function getRealisticRefractionTexture(material) {
+    try {
+        return material?.getScene?.()?.environmentTexture ?? material?._scene?.environmentTexture ?? null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function refreshRealisticRefractionTextures(canvasId, scene) {
+    const cache = realisticMaterialCache[canvasId];
+    const refractionTexture = scene?.environmentTexture ?? null;
+    if (!cache) return;
+
+    Object.entries(cache).forEach(([materialType, material]) => {
+        const preset = CONFIG.MATERIAL_REALISTIC[materialType];
+        if (!material?.subSurface || preset?.alpha == null || preset.alpha >= 1.0) return;
+
+        material.subSurface.refractionTexture = refractionTexture;
+        material.subSurface.isRefractionEnabled = !!refractionTexture;
+        material.subSurface.refractionIntensity = refractionTexture
+            ? clamp(1 - preset.alpha, 0.05, 1)
+            : 0;
+    });
 }
 
 function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {

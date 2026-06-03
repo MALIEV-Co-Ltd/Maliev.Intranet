@@ -135,11 +135,16 @@ function loadViewerContext() {
             PBRMaterial: class PBRMaterial {
                 constructor(name, scene) {
                     this.name = name;
+                    this._scene = scene;
                     this.albedoColor = new Color3();
                     this.metallic = 0;
                     this.roughness = 0;
                     this.subSurface = {};
                     scene?.materials?.push(this);
+                }
+
+                getScene() {
+                    return this._scene;
                 }
             },
             NodeMaterial: class NodeMaterial {
@@ -433,6 +438,7 @@ test('transparent manufacturing presets use alpha-blended PBR material depth han
                 linkRefractionWithTransparency: material?.linkRefractionWithTransparency ?? null,
                 useRadianceOverAlpha: material?.useRadianceOverAlpha ?? null,
                 useSpecularOverAlpha: material?.useSpecularOverAlpha ?? null,
+                refractionTextureUsesEnvironment: material?.subSurface?.refractionTexture === scene.environmentTexture,
                 refractionEnabled: material?.subSurface?.isRefractionEnabled ?? null,
                 translucencyEnabled: material?.subSurface?.isTranslucencyEnabled ?? null,
                 refractionIntensity: material?.subSurface?.refractionIntensity ?? null,
@@ -460,6 +466,7 @@ test('transparent manufacturing presets use alpha-blended PBR material depth han
         assert.equal(material.linkRefractionWithTransparency, true, `${name} should link alpha to PBR refraction instead of rendering as a dark alpha shell`);
         assert.equal(material.useRadianceOverAlpha, true, `${name} should keep environment radiance visible through transparent pixels`);
         assert.equal(material.useSpecularOverAlpha, true, `${name} should keep clear-material highlights visible through transparent pixels`);
+        assert.equal(material.refractionTextureUsesEnvironment, true, `${name} should refract the studio environment instead of sampling an empty black refraction texture`);
         assert.equal(material.refractionEnabled, true, `${name} should enable PBR refraction`);
         assert.equal(material.translucencyEnabled, true, `${name} should enable PBR translucency`);
         assert.ok(material.refractionIntensity > 0 && material.refractionIntensity <= 1, `${name} should carry bounded refraction intensity`);
@@ -469,6 +476,62 @@ test('transparent manufacturing presets use alpha-blended PBR material depth han
     assert.equal(result.petg.materialName, '__realistic_petg-clear__');
     assert.equal(result.resin.materialName, '__realistic_resin-clear__');
     assert.equal(result.acrylic.materialName, '__realistic_acrylic-clear__');
+});
+
+test('transparent realistic material refraction tracks the promoted studio environment texture', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const firstPaint = vm.runInContext(`
+        (() => {
+            scenes.viewer = scene;
+            configureMaterialFromConfigurator('viewer', 'acrylic-clear', null, 'AS_MACHINED', null, 'CNC_MILL');
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            const fastTexture = scene.environmentTexture;
+            return {
+                refractionTextureUsesFastEnvironment: material?.subSurface?.refractionTexture === fastTexture,
+                environmentQuality: fastTexture?._malievEnvironmentQuality ?? null
+            };
+        })();
+    `, context);
+
+    assert.equal(firstPaint.environmentQuality, 'fast');
+    assert.equal(
+        firstPaint.refractionTextureUsesFastEnvironment,
+        true,
+        'transparent first paint should refract the fast studio environment instead of an empty texture');
+
+    flushScheduledIdleCallbacks(context);
+
+    const promoted = vm.runInContext(`
+        (() => {
+            const material = scene.meshes[0].material;
+            return {
+                refractionTextureUsesPromotedEnvironment: material?.subSurface?.refractionTexture === scene.environmentTexture,
+                environmentQuality: scene.environmentTexture?._malievEnvironmentQuality ?? null,
+                refractionQuality: material?.subSurface?.refractionTexture?._malievEnvironmentQuality ?? null
+            };
+        })();
+    `, context);
+
+    assert.equal(promoted.environmentQuality, 'high');
+    assert.equal(promoted.refractionQuality, 'high');
+    assert.equal(
+        promoted.refractionTextureUsesPromotedEnvironment,
+        true,
+        'transparent material refraction should follow the promoted high-quality studio environment');
 });
 
 test('viewer module imports before Babylon globals are loaded', async () => {
