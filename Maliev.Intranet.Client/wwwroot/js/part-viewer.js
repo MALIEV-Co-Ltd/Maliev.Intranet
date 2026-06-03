@@ -355,6 +355,7 @@ const CONFIG = {
         RA_3_2: 0.52,
         RA_1_6: 0.34,
         RA_0_8: 0.18,
+        RA_0_4: 0.11,
     },
 
     // =========================================================================
@@ -3418,11 +3419,11 @@ const SURFACE_EFFECTS = {
     brushed: {
         key: 'brushed',
         kind: 2,
-        scale: 1.5,
-        strength: 0.03,
-        stripeScale: 6.0,  // ~1.0 mm unidirectional brush lines
-        stripeStrength: 0.09,
-        bump: 0.09,
+        scale: 2.0,
+        strength: 0.012,
+        stripeScale: 22.0, // ~0.29 mm unidirectional brush lines
+        stripeStrength: 0.026,
+        bump: 0.032,
     },
     machining: {
         key: 'machining',
@@ -3441,6 +3442,15 @@ const SURFACE_EFFECTS = {
         stripeScale: 0.0,
         stripeStrength: 0.0,
         bump: 0.24,
+    },
+    'powder-coat': {
+        key: 'powder-coat',
+        kind: 3,
+        scale: 15.0,       // fine orange-peel coating texture, not sintered powder grain
+        strength: 0.045,
+        stripeScale: 0.0,
+        stripeStrength: 0.0,
+        bump: 0.035,
     },
 };
 
@@ -3465,7 +3475,8 @@ function shouldApplyMachiningEffect(finishCode) {
     const lower = String(finishCode || '').toLowerCase();
     if (!lower) return true;
     if (lower.includes('bead') || lower.includes('blast') || lower.includes('polish')
-        || lower.includes('brush') || lower.includes('paint') || lower.includes('plate')) {
+        || lower.includes('brush') || lower.includes('paint') || lower.includes('powder')
+        || lower.includes('plate')) {
         return false;
     }
 
@@ -4065,11 +4076,11 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
         profile.normalStrength = 0.007;
         profile.noiseScale = 9.4;
     } else if (surfaceEffect.key === 'brushed') {
-        profile.normalStrength = 0.010;
-        profile.noiseScale = 0.035;
+        profile.normalStrength = 0.006;
+        profile.noiseScale = 0.025;
         profile.stripeAxis = 'x';
-        profile.stripeScale = 0.90;
-        profile.stripeStrength = 0.020;
+        profile.stripeScale = 0.55;
+        profile.stripeStrength = 0.012;
     } else if (surfaceEffect.key === 'machining') {
         profile.normalStrength = 0.007;
         profile.noiseScale = 0.025;
@@ -4079,6 +4090,9 @@ function resolveRealisticNodeMaterialProfile(canvasId, materialType) {
     } else if (surfaceEffect.key === 'powder-grain') {
         profile.normalStrength = 0.026;
         profile.noiseScale = 0.22;
+    } else if (surfaceEffect.key === 'powder-coat') {
+        profile.normalStrength = 0.012;
+        profile.noiseScale = 0.08;
     }
 
     if (layerLineStrength > 0 && !profile.surfaceEffectKey) {
@@ -4460,14 +4474,12 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
 
     // Determine roughness/metallic modifiers from finish type
     const finishModifiers = getFinishModifiers(finishCode, materialKey);
-    // Ra roughness code overrides the finish-derived roughness with an absolute value
+    const preset = CONFIG.MATERIAL_REALISTIC[materialKey] || CONFIG.MATERIAL_REALISTIC['aluminum'];
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
     const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
     const nextFinishModifiers = {
         ...finishModifiers,
-        // Specific finishes own the visual roughness; Ra applies only when
-        // there is no finish-specific target.
-        absoluteRoughness: finishModifiers.absoluteRoughness ?? raRoughness,
+        absoluteRoughness: resolveFinishRoughness(preset, finishModifiers, raRoughness),
     };
     const nextStateKey = getConfiguratorStateKey(
         materialKey,
@@ -4536,22 +4548,56 @@ function isRawMachinedFinish(lowerFinishCode) {
 
 function getFinishModifiers(finishCode, materialKey = '') {
     const lower = (finishCode || '').toLowerCase();
-    if (lower.includes('mirror') || lower.includes('electropolish') || lower.includes('polish')) {
+    const normalized = lower.replace(/[^a-z0-9]/g, '');
+
+    if (lower.includes('mirror')) {
+        return {
+            roughnessOffset: -0.26,
+            metallicOffset: 0.04,
+            surfaceEffectKey: null,
+            absoluteRoughness: 0.055,
+            raInfluence: 0.10,
+            polishedReflectionSmoothing: true,
+        };
+    }
+
+    if (lower.includes('electropolish') || normalized.includes('electropolish')) {
+        return {
+            roughnessOffset: -0.20,
+            metallicOffset: 0.02,
+            surfaceEffectKey: null,
+            absoluteRoughness: 0.12,
+            raInfluence: 0.08,
+            polishedReflectionSmoothing: true,
+        };
+    }
+
+    if (lower.includes('polish')) {
         return {
             roughnessOffset: -0.22,
             metallicOffset: 0.03,
             surfaceEffectKey: null,
             absoluteRoughness: 0.18,
+            raInfluence: 0.08,
             polishedReflectionSmoothing: true,
         };
     }
     if (lower.includes('brush')) {
-        return { roughnessOffset: 0.28, metallicOffset: -0.05, surfaceEffectKey: 'brushed', absoluteRoughness: 0.62 };
+        return { roughnessOffset: 0.16, metallicOffset: -0.03, surfaceEffectKey: 'brushed', absoluteRoughness: 0.49, raInfluence: 0.24 };
     }
-    if (lower.includes('anod'))   return { roughnessOffset: -0.10, metallicOffset: 0.05, surfaceEffectKey: null };  // shinier, more metallic
+    if (lower.includes('powder')) {
+        return { roughnessOffset: 0.18, metallicOffset: -1.0, surfaceEffectKey: 'powder-coat', absoluteRoughness: 0.58, raInfluence: 0.0 };
+    }
+    if (lower.includes('anod')) {
+        if (normalized.includes('typeiii') || normalized.includes('type3') || lower.includes('hard')) {
+            return { roughnessOffset: 0.08, metallicOffset: -0.35, surfaceEffectKey: null, absoluteRoughness: 0.44, raInfluence: 0.12 };
+        }
+
+        return { roughnessOffset: -0.02, metallicOffset: -0.22, surfaceEffectKey: null, absoluteRoughness: 0.31, raInfluence: 0.12 };
+    }
     if (lower.includes('bead'))   return { roughnessOffset: 0.48, metallicOffset: -0.18, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.90 };  // matte fine-particle micro-etched aluminum
     if (lower.includes('blast'))  return { roughnessOffset: 0.46, metallicOffset: -0.16, surfaceEffectKey: 'bead-blast', absoluteRoughness: 0.88 };  // matte fine-particle micro-etched aluminum
-    if (lower.includes('paint'))  return { roughnessOffset: 0.0, metallicOffset: -0.10, surfaceEffectKey: null };    // less metallic
+    if (lower.includes('paint'))  return { roughnessOffset: 0.12, metallicOffset: -1.0, surfaceEffectKey: null, absoluteRoughness: 0.54, raInfluence: 0.0 };
     if (lower.includes('plate'))  return { roughnessOffset: -0.05, metallicOffset: 0.0, surfaceEffectKey: null };   // slightly smoother
     if (isSteelLikeMaterial(materialKey) && isRawMachinedFinish(lower)) {
         return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null, absoluteRoughness: 0.26 };
@@ -4561,6 +4607,12 @@ function getFinishModifiers(finishCode, materialKey = '') {
 
 function resolveFinishRoughness(preset, finishModifiers, raRoughness) {
     if (finishModifiers.absoluteRoughness != null) {
+        const raInfluence = finishModifiers.raInfluence ?? 0;
+        if (raRoughness !== null && raInfluence > 0) {
+            const baselineRa = CONFIG.CNC_ROUGHNESS_MAP.RA_1_6 ?? preset.roughness;
+            return clamp(finishModifiers.absoluteRoughness + ((raRoughness - baselineRa) * raInfluence), 0, 1);
+        }
+
         return clamp(finishModifiers.absoluteRoughness, 0, 1);
     }
 

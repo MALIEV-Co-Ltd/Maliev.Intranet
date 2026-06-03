@@ -214,6 +214,119 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void FinishColorOptions_WhenAnodizeIsSelected_RenderAfterSurfaceFinishBeforeTolerance()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var toleranceId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            FinishId = finishId,
+            FinishCode = "ANODIZE_TYPE_II",
+            ToleranceId = toleranceId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "Aluminum 6061", "AL6061", "Metal", null, "CNC aluminum", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Anodized Type II", "ANODIZE_TYPE_II", 1.6m, 12m, "Decorative colored anodize", 10),
+            ],
+            AvailableTolerances =
+            [
+                new CatalogToleranceDto(toleranceId, "Medium (ISO 2768-m)", "ISO2768_M", "ISO 2768", "m", "+-0.1mm", 0m, 20),
+            ],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "anodize_color",
+                    "Anodize color",
+                    "dropdown",
+                    "Black",
+                    "[\"Clear\",\"Black\",\"Blue\"]",
+                    null,
+                    null,
+                    false,
+                    10),
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "deburr_edges",
+                    "Deburr edges",
+                    "boolean",
+                    null,
+                    null,
+                    null,
+                    "Break sharp edges before shipment.",
+                    false,
+                    20),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var surfaceIndex = cut.Markup.IndexOf("data-config-section=\"surface-finish\"", StringComparison.Ordinal);
+        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"finish-options\"", StringComparison.Ordinal);
+        var toleranceIndex = cut.Markup.IndexOf("data-config-section=\"tolerance\"", StringComparison.Ordinal);
+
+        Assert.True(surfaceIndex >= 0);
+        Assert.True(finishOptionsIndex > surfaceIndex);
+        Assert.True(toleranceIndex > finishOptionsIndex);
+        Assert.Contains("Anodize color", cut.Find("[data-config-section='finish-options']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("Anodize color", cut.Find("[data-config-section='process-options']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FinishColorOptions_WhenPowderCoatHasNoCatalogColorOption_RenderStandardColorChoicesBeforeTolerance()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var toleranceId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            FinishId = finishId,
+            FinishCode = "POWDER_COATED",
+            ToleranceId = toleranceId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "Aluminum 6061", "AL6061", "Metal", null, "CNC aluminum", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Powder Coated", "POWDER_COATED", 3.2m, 8m, "Durable colored coating", 10),
+            ],
+            AvailableTolerances =
+            [
+                new CatalogToleranceDto(toleranceId, "Medium (ISO 2768-m)", "ISO2768_M", "ISO 2768", "m", "+-0.1mm", 0m, 20),
+            ],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var finishOptions = cut.Find("[data-config-section='finish-options']");
+        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"finish-options\"", StringComparison.Ordinal);
+        var toleranceIndex = cut.Markup.IndexOf("data-config-section=\"tolerance\"", StringComparison.Ordinal);
+
+        Assert.True(toleranceIndex > finishOptionsIndex);
+        Assert.Contains("Powder coat color", finishOptions.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Black", finishOptions.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Traffic Blue", finishOptions.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Custom", finishOptions.TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MaterialColorOption_WhenMijfNaturalGreyIsAvailable_UsesNaturalGreyThumbnail()
     {
         var materialId = Guid.NewGuid();

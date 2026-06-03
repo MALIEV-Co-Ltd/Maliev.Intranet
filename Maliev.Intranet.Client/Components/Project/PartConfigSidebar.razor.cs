@@ -83,10 +83,23 @@ public partial class PartConfigSidebar : ComponentBase
     private const string PaintColorHexKey = "paint_color_hex";
     private const string PaintColorReferenceKey = "paint_color_reference";
     private const string MaterialColorKey = "material_color";
+    private const string PowderCoatColorKey = "powder_coat_color";
     private const string PowderFusionNaturalGreyColor = "Natural Grey";
     private const string MaterialImageBasePath = "/images/materials/";
     private const string PowderFusionRawImage = "natural-grey-plastic-part-material.png";
     private const string PowderFusionDyedBlackImage = "dyed-black-powder-fusion-part-material.png";
+
+    private static readonly ProcessConfigOptionDto PowderCoatSyntheticColorOption = new(
+        Guid.Empty,
+        PowderCoatColorKey,
+        "Powder coat color",
+        "color",
+        "Black",
+        null,
+        null,
+        "Select the powder coating color.",
+        false,
+        0);
 
     private static readonly Dictionary<string, string> PowderFusionColorImages = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -389,13 +402,33 @@ public partial class PartConfigSidebar : ComponentBase
     private IEnumerable<CatalogToleranceDto> VisibleTolerances =>
         Part?.AvailableTolerances.Where(IsVisibleTolerance) ?? [];
 
-    private IEnumerable<ProcessConfigOptionDto> VisibleProcessOptions =>
+    private IEnumerable<ProcessConfigOptionDto> CatalogVisibleProcessOptions =>
         (Part?.AvailableProcessOptions ?? [])
             .Where(IsVisibleProcessOption)
             .OrderBy(opt => opt.SortOrder);
 
-    private bool HasPaintSpecificColorOption =>
-        (Part?.AvailableProcessOptions ?? []).Any(IsPaintSpecificColorOption);
+    private IReadOnlyList<ProcessConfigOptionDto> VisibleFinishColorOptions
+    {
+        get
+        {
+            var catalogOptions = CatalogVisibleProcessOptions
+                .Where(IsFinishColorOption)
+                .OrderBy(opt => opt.SortOrder)
+                .ToList();
+
+            if (IsPowderCoatFinish() && catalogOptions.Count == 0)
+                catalogOptions.Add(PowderCoatSyntheticColorOption);
+
+            return catalogOptions;
+        }
+    }
+
+    private IEnumerable<ProcessConfigOptionDto> VisibleProcessOptions =>
+        CatalogVisibleProcessOptions.Where(option => !IsFinishColorOption(option));
+
+    private bool HasCoatingSpecificColorOption =>
+        (Part?.AvailableProcessOptions ?? [])
+            .Any(option => IsPaintSpecificColorOption(option) || IsPowderCoatSpecificColorOption(option));
 
     private bool RequiresDedicatedMaterialColorSelection =>
         SelectedMaterial != null
@@ -984,13 +1017,13 @@ public partial class PartConfigSidebar : ComponentBase
             return IsAnodizeFinish();
 
         if (IsPaintColorOption(option))
-            return IsPaintedFinish();
+            return IsCoatedColorFinish();
 
         if (IsDedicatedPanelOption(option))
             return false;
 
         if (IsMaterialColorOption(option) || IsGenericColorOption(option))
-            return !RequiresDedicatedMaterialColorSelection && !IsPaintedFinish();
+            return !RequiresDedicatedMaterialColorSelection && !IsCoatedColorFinish();
 
         return true;
     }
@@ -1056,14 +1089,30 @@ public partial class PartConfigSidebar : ComponentBase
         && !IsAnodizeColorOption(option)
         && (IsMaterialColorOption(option) || IsGenericColorOption(option));
 
+    private bool IsFinishColorOption(ProcessConfigOptionDto option) =>
+        IsAnodizeColorOption(option)
+        || (IsCoatedColorFinish() && IsPaintColorOption(option));
+
     private bool IsPaintColorOption(ProcessConfigOptionDto option) =>
         IsPaintSpecificColorOption(option)
-        || (IsPaintedFinish() && !HasPaintSpecificColorOption && IsGenericColorOption(option));
+        || IsPowderCoatSpecificColorOption(option)
+        || (IsCoatedColorFinish() && !HasCoatingSpecificColorOption && IsGenericColorOption(option));
 
     private static bool IsPaintSpecificColorOption(ProcessConfigOptionDto option) =>
         option.ConfigKey.Equals("paint_color", StringComparison.OrdinalIgnoreCase)
         || option.ConfigKey.Equals("paint_colour", StringComparison.OrdinalIgnoreCase)
         || option.Label.Contains("paint", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPowderCoatSpecificColorOption(ProcessConfigOptionDto option)
+    {
+        var normalized = NormalizeOptionText($"{option.ConfigKey} {option.Label}");
+        return normalized.Contains("powdercoatcolor", StringComparison.Ordinal)
+            || normalized.Contains("powdercoatcolour", StringComparison.Ordinal)
+            || normalized.Contains("powdercoatingcolor", StringComparison.Ordinal)
+            || normalized.Contains("powdercoatingcolour", StringComparison.Ordinal)
+            || normalized.Contains("powdercolor", StringComparison.Ordinal)
+            || normalized.Contains("powdercolour", StringComparison.Ordinal);
+    }
 
     private static bool IsDedicatedPanelOption(ProcessConfigOptionDto option)
     {
@@ -1176,6 +1225,13 @@ public partial class PartConfigSidebar : ComponentBase
 
     private bool IsPaintedFinish() =>
         FinishContains("paint") && !FinishContains("unpaint");
+
+    private bool IsPowderCoatFinish() =>
+        FinishContains("powder")
+        && (FinishContains("coat") || FinishContains("coated") || FinishContains("coating"));
+
+    private bool IsCoatedColorFinish() =>
+        IsPaintedFinish() || IsPowderCoatFinish();
 
     private bool IsDyeFinish() =>
         FinishContains("dye") || FinishContains("dyed");
@@ -1376,6 +1432,11 @@ public partial class PartConfigSidebar : ComponentBase
         value.Replace("_", " ", StringComparison.Ordinal)
             .Replace("-", " ", StringComparison.Ordinal)
             .Trim();
+
+    private string GetFinishColorOptionLabel(ProcessConfigOptionDto option) =>
+        IsPowderCoatFinish() && IsPaintColorOption(option)
+            ? "Powder coat color"
+            : option.Label;
 
     private string GetMaterialImageUrl(CatalogMaterialDto material)
     {
@@ -1616,18 +1677,22 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null)
             return;
 
-        if (!IsPaintedFinish())
+        if (!IsCoatedColorFinish())
         {
             Part.ProcessOptionValues.Remove("paint_color");
             Part.ProcessOptionValues.Remove("paint_colour");
             Part.ProcessOptionValues.Remove(PaintColorHexKey);
             Part.ProcessOptionValues.Remove(PaintColorReferenceKey);
+            Part.ProcessOptionValues.Remove(PowderCoatColorKey);
         }
         else
         {
             foreach (var key in Part.ProcessOptionValues.Keys.Where(IsMaterialColorOptionKey).ToList())
                 Part.ProcessOptionValues.Remove(key);
         }
+
+        if (!IsPowderCoatFinish())
+            Part.ProcessOptionValues.Remove(PowderCoatColorKey);
 
         if (IsRawPowderFusionFinish)
         {

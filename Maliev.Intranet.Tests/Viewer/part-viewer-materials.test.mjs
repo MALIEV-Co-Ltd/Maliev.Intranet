@@ -1104,7 +1104,10 @@ test('realistic configurator makes CNC surface finishes visibly distinct even wh
                 roughness: material?.roughness ?? null,
                 metallic: material?.metallic ?? null,
                 effectKey: material?._malievSurfaceEffect?.key ?? null,
-                effectKind: material?._malievSurfaceEffect?.kind ?? null
+                effectKind: material?._malievSurfaceEffect?.kind ?? null,
+                stripeScale: material?._malievSurfaceEffect?.stripeScale ?? 0,
+                stripeStrength: material?._malievSurfaceEffect?.stripeStrength ?? 0,
+                bump: material?._malievSurfaceEffect?.bump ?? 0
             };
         };
         ({
@@ -1123,14 +1126,127 @@ test('realistic configurator makes CNC surface finishes visibly distinct even wh
         `expected brushed to be rougher than mirror polish, got ${result.brushed.roughness} <= ${result.mirrorPolish.roughness}`
     );
     assert.ok(
-        result.brushed.roughness >= 0.58 && result.brushed.roughness <= 0.70,
-        `expected brushed finish to be satin-matte rather than glossy, got ${result.brushed.roughness}`
+        result.brushed.roughness >= 0.42 && result.brushed.roughness <= 0.56,
+        `expected brushed finish to be a restrained satin rather than dark matte, got ${result.brushed.roughness}`
     );
     assert.equal(result.beadBlast.effectKey, 'bead-blast');
     assert.equal(result.brushed.effectKey, 'brushed');
     assert.equal(result.brushed.effectKind, 2);
+    assert.ok(result.brushed.stripeScale >= 18, `expected fine brushed strokes, got stripe scale ${result.brushed.stripeScale}`);
+    assert.ok(result.brushed.stripeStrength <= 0.04, `expected subtle brushed strokes, got stripe strength ${result.brushed.stripeStrength}`);
+    assert.ok(result.brushed.bump <= 0.04, `expected low brushed relief, got bump ${result.brushed.bump}`);
     assert.equal(result.mirrorPolish.effectKey, null);
     assert.ok(result.mirrorPolish.metallic >= result.brushed.metallic);
+});
+
+test('realistic configurator maps coating anodize and polishing finishes to distinct PBR semantics', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshot = (materialKey, finishCode, roughnessCode, colorHex) => {
+            configureMaterialFromConfigurator('viewer', materialKey, colorHex, finishCode, roughnessCode, 'CNC_MILL');
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                roughness: material?.roughness ?? null,
+                metallic: material?.metallic ?? null,
+                albedoR: material?.albedoColor?.r ?? null,
+                albedoG: material?.albedoColor?.g ?? null,
+                albedoB: material?.albedoColor?.b ?? null,
+                effectKey: material?._malievSurfaceEffect?.key ?? null,
+                polishedReflectionSmoothing: perCanvasFinishModifiers.viewer?.polishedReflectionSmoothing ?? false
+            };
+        };
+        ({
+            mirror: snapshot('aluminum', 'MIRROR_POLISH', 'RA_0_4', null),
+            electropolished: snapshot('stainless-steel', 'ELECTROPOLISHED', 'RA_0_8', null),
+            anodizeTypeII: snapshot('aluminum', 'ANODIZE_TYPE_II', 'RA_1_6', '#2f6fd6'),
+            anodizeTypeIII: snapshot('aluminum', 'ANODIZE_TYPE_III', 'RA_3_2', '#111111'),
+            powderCoated: snapshot('aluminum', 'POWDER_COATED', 'RA_3_2', '#2f6fd6')
+        });
+    `, context);
+
+    assert.ok(result.mirror.roughness <= 0.08, `expected mirror polish to render glossy, got ${result.mirror.roughness}`);
+    assert.equal(result.mirror.effectKey, null);
+    assert.equal(result.mirror.polishedReflectionSmoothing, true);
+
+    assert.ok(
+        result.electropolished.roughness >= 0.09 && result.electropolished.roughness <= 0.14,
+        `expected electropolished finish to stay bright and glossy without color selection, got ${result.electropolished.roughness}`
+    );
+    assert.equal(result.electropolished.effectKey, null);
+    assert.equal(result.electropolished.polishedReflectionSmoothing, true);
+    assert.ok(result.electropolished.albedoR >= 0.68, `expected bright stainless albedo, got ${result.electropolished.albedoR}`);
+
+    assert.ok(result.anodizeTypeII.albedoB > result.anodizeTypeII.albedoR, 'expected anodize Type II color to tint the oxide layer');
+    assert.ok(result.anodizeTypeII.metallic < 0.85, `expected anodize Type II to reduce bare-metal metallic response, got ${result.anodizeTypeII.metallic}`);
+    assert.ok(result.anodizeTypeII.roughness >= 0.26 && result.anodizeTypeII.roughness <= 0.36);
+
+    assert.ok(result.anodizeTypeIII.roughness > result.anodizeTypeII.roughness);
+    assert.ok(result.anodizeTypeIII.metallic <= result.anodizeTypeII.metallic);
+    assert.ok(result.anodizeTypeIII.albedoR < 0.08, `expected black hard anodize to render dark, got ${result.anodizeTypeIII.albedoR}`);
+
+    assert.equal(result.powderCoated.metallic, 0);
+    assert.equal(result.powderCoated.effectKey, 'powder-coat');
+    assert.ok(result.powderCoated.albedoB > result.powderCoated.albedoR, 'expected powder coat color to drive coating albedo');
+    assert.ok(
+        result.powderCoated.roughness >= 0.50 && result.powderCoated.roughness <= 0.68,
+        `expected powder coat to render as satin textured coating, got ${result.powderCoated.roughness}`
+    );
+});
+
+test('Ra selection modulates brushed finish without removing directional surface effect', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshotRa = (roughnessCode) => {
+            configureMaterialFromConfigurator('viewer', 'aluminum', null, 'BRUSHED', roughnessCode, 'CNC_MILL');
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                roughness: material?.roughness ?? null,
+                effectKey: material?._malievSurfaceEffect?.key ?? null
+            };
+        };
+        ({
+            fine: snapshotRa('RA_0_4'),
+            coarse: snapshotRa('RA_3_2')
+        });
+    `, context);
+
+    assert.equal(result.fine.effectKey, 'brushed');
+    assert.equal(result.coarse.effectKey, 'brushed');
+    assert.ok(
+        result.coarse.roughness > result.fine.roughness + 0.05,
+        `expected Ra to visibly modulate brushed roughness, got fine=${result.fine.roughness} coarse=${result.coarse.roughness}`
+    );
+    assert.ok(result.fine.roughness < 0.50, `expected fine Ra brushed finish to stay below heavy matte, got ${result.fine.roughness}`);
 });
 
 test('brushed surface shader projects strokes along each face tangent instead of stacking on side faces', () => {
@@ -1883,7 +1999,7 @@ test('realistic configurator reuses material for CNC finish switches to avoid sh
     assert.equal(result.materialReferenceStable, true);
     assert.equal(result.materialCountAfterSwitches, result.materialCountAfterMachined);
     assert.equal(result.finalEffectKey, 'brushed');
-    assert.ok(result.finalRoughness >= 0.58 && result.finalRoughness <= 0.70, `expected brushed roughness after in-place switch, got ${result.finalRoughness}`);
+    assert.ok(result.finalRoughness >= 0.42 && result.finalRoughness <= 0.56, `expected brushed roughness after in-place switch, got ${result.finalRoughness}`);
     assert.equal(result.pluginCount, 1);
 });
 

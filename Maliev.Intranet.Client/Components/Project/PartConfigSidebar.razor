@@ -177,6 +177,102 @@
                 </div>
             </section>
 
+            var finishColorOptions = VisibleFinishColorOptions;
+            if (finishColorOptions.Count > 0)
+            {
+                <section class="pcs-section" data-config-section="finish-options">
+                    <div class="pcs-section-header">
+                        <span class="pcs-section-title">Finish Options</span>
+                        <span class="pcs-section-count">@FormatOptionCount(finishColorOptions.Count)</span>
+                    </div>
+                    <div class="pcs-options-stack">
+                        @foreach (var opt in finishColorOptions)
+                        {
+                            <div class="pcs-option-row">
+                                @if (IsPaintColorOption(opt))
+                                {
+                                    var paintHex = GetProcessOptionValue(PaintColorHexKey, string.Empty);
+                                    var paintReference = GetProcessOptionValue(PaintColorReferenceKey, string.Empty);
+                                    var customPaintSelected = IsCustomPaintColorSelected(paintHex, paintReference);
+                                    <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
+                                    <div class="pcs-color-choice-grid">
+                                        @foreach (var paint in StandardPaintColors)
+                                        {
+                                            var active = IsPaintColorSelected(paint, paintHex, paintReference);
+                                            <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                                    @onclick="@(() => OnStandardPaintColorChanged(opt.ConfigKey, paint))">
+                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                                  ImageUrl="@GetPaintColorImageUrl(paint)"
+                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                                <span>@paint.Name</span>
+                                                @if (active)
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                                }
+                                            </button>
+                                        }
+                                        <button class="pcs-color-choice @(customPaintSelected ? "pcs-color-choice--active" : "")"
+                                                @onclick="@(() => OnCustomPaintColorSelected(opt.ConfigKey))">
+                                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                              ImageUrl="@GetCustomPaintImageUrl()"
+                                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                            <span>Custom</span>
+                                            @if (customPaintSelected)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                            }
+                                        </button>
+                                    </div>
+                                    @if (customPaintSelected)
+                                    {
+                                        <div class="pcs-color-picker-row">
+                                            <label class="pcs-native-color">
+                                                <span>Custom color</span>
+                                                <input type="color"
+                                                       value="@GetProcessOptionValue(PaintColorHexKey, "#111111")"
+                                                       @onchange="@(e => OnPaintColorHexChanged(opt.ConfigKey, e.Value?.ToString()))" />
+                                            </label>
+                                            <MudTextField T="string"
+                                                          Label="Custom color name/code"
+                                                          Value="@paintReference"
+                                                          ValueChanged="@(val => OnPaintColorReferenceChanged(opt.ConfigKey, val))"
+                                                          Placeholder="RAL 9005, Pantone Black C..."
+                                                          Variant="Variant.Outlined"
+                                                          Margin="Margin.Dense"
+                                                          Immediate="true"
+                                                          FullWidth="true" />
+                                        </div>
+                                    }
+                                }
+                                else if (IsColorChoiceOption(opt))
+                                {
+                                    var options = GetOptionChoices(opt).ToList();
+                                    var currentValue = GetCurrentOptionChoiceValue(opt, options);
+                                    <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
+                                    <div class="pcs-color-choice-grid">
+                                        @foreach (var o in options)
+                                        {
+                                            var active = string.Equals(currentValue, o, StringComparison.OrdinalIgnoreCase);
+                                            <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                                    @onclick="@(() => OnProcessOptionValueChanged(opt.ConfigKey, o))">
+                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                                  ImageUrl="@GetColorChoiceImageUrl(opt, o)"
+                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                                <span>@FormatOptionLabel(o)</span>
+                                                @if (active)
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                                }
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+
             @* ── Tolerance ─────────────────────────────────────────────────── *@
             <section class="pcs-section" data-config-section="tolerance">
                 @{
@@ -324,7 +420,7 @@
             var visibleOptions = VisibleProcessOptions.ToList();
             if (visibleOptions.Count > 0)
             {
-                <section class="pcs-section">
+                <section class="pcs-section" data-config-section="process-options">
                     <div class="pcs-section-header">
                         <span class="pcs-section-title">Options</span>
                         <span class="pcs-section-count">@visibleOptions.Count options</span>
