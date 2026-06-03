@@ -1850,6 +1850,14 @@ public partial class PartConfigSidebar : ComponentBase
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Gone)
             {
+                if (BrowserDfmReportSync.HasCurrentReport(part, process.Code))
+                {
+                    Logger?.LogInformation(
+                        "Ignoring missing-file DFM failure because browser-first local results are current for process {ProcessCode}",
+                        process.Code);
+                    return;
+                }
+
                 Logger?.LogWarning("DFM analysis failed — file no longer in storage for upload {UploadId}", part.FileId);
                 part.DfmAnalysisTimedOut = false;
                 part.AnalysisErrorCode = "FILE_MISSING";
