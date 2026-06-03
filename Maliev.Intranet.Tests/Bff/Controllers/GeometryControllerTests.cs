@@ -256,9 +256,12 @@ public class GeometryControllerTests
         var geometryClient = MakeGeometryClient((req, _) =>
         {
             requestedPath = req.RequestUri!.PathAndQuery;
+            var content = new ByteArrayContent([0x00, 0x61, 0xFF, 0x7F]);
+            content.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue("application/wasm");
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("self.__runtime=true;", System.Text.Encoding.UTF8, "text/javascript")
+                Content = content
             };
             response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue
             {
@@ -273,10 +276,9 @@ public class GeometryControllerTests
 
         var result = await controller.GetRuntimeAsset("client-geometry-runtime.abc.worker.js", default);
 
-        var content = Assert.IsType<ContentResult>(result);
-        Assert.Equal(200, content.StatusCode);
-        Assert.Equal("text/javascript; charset=utf-8", content.ContentType);
-        Assert.Equal("self.__runtime=true;", content.Content);
+        var content = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/wasm", content.ContentType);
+        Assert.Equal([0x00, 0x61, 0xFF, 0x7F], content.FileContents);
         Assert.Equal("/geometry/client-runtime/assets/client-geometry-runtime.abc.worker.js", requestedPath);
         Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
     }

@@ -54,7 +54,7 @@ public class GeometryController(
         }
 
         using var response = await geometryServiceClient.GetRuntimeAssetAsync(assetName, ct);
-        return await ProxyRuntimeResponseAsync(
+        return await ProxyRuntimeAssetResponseAsync(
             response,
             "text/javascript; charset=utf-8",
             ct);
@@ -247,5 +247,33 @@ public class GeometryController(
             ContentType = response.Content.Headers.ContentType?.ToString()
                 ?? fallbackContentType
         };
+    }
+
+    private async Task<IActionResult> ProxyRuntimeAssetResponseAsync(
+        HttpResponseMessage response,
+        string fallbackContentType,
+        CancellationToken ct)
+    {
+        var cacheControl = response.Headers.CacheControl?.ToString();
+        if (!string.IsNullOrWhiteSpace(cacheControl))
+        {
+            Response.Headers.CacheControl = cacheControl;
+        }
+
+        var contentType = response.Content.Headers.ContentType?.ToString()
+            ?? fallbackContentType;
+        if (!response.IsSuccessStatusCode)
+        {
+            return new ContentResult
+            {
+                StatusCode = (int)response.StatusCode,
+                Content = await response.Content.ReadAsStringAsync(ct),
+                ContentType = contentType
+            };
+        }
+
+        return new FileContentResult(
+            await response.Content.ReadAsByteArrayAsync(ct),
+            contentType);
     }
 }
