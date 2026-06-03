@@ -1691,6 +1691,12 @@ public partial class PartConfigSidebar : ComponentBase
             Logger?.LogInformation("Starting DFM analysis for upload {UploadId}, process {ProcessCode}",
                 part.FileId, process.Code);
 
+            if (await BrowserDfmReportSync.WaitForCurrentReportAsync(part, process.Code, token))
+            {
+                Logger?.LogInformation("Using browser-first local DFM results for process {ProcessCode}", process.Code);
+                return;
+            }
+
             var response = await Http.PostAsJsonAsync(
                 $"api/v1/geometry/{part.FileId}/dfm/{process.Code}",
                 new GeometryAnalysisRequest { StoragePath = part.StoragePath },

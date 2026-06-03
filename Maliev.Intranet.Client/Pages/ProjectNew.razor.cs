@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Maliev.Intranet.Client.Components;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Helpers;
 using Maliev.Intranet.Client.Services;
@@ -1068,6 +1069,9 @@ public partial class ProjectNew : IAsyncDisposable
             ResetProcessDfmStateForRetry(part, processCode);
             await InvokeAsync(StateHasChanged);
 
+            if (await BrowserDfmReportSync.WaitForCurrentReportAsync(part, processCode, CancellationToken.None))
+                return;
+
             using var response = await Http.PostAsJsonAsync(
                 $"api/v1/geometry/{part.FileId}/dfm/{Uri.EscapeDataString(processCode)}",
                 new GeometryAnalysisRequest { StoragePath = part.StoragePath });
@@ -1135,13 +1139,7 @@ public partial class ProjectNew : IAsyncDisposable
         string processCode,
         DfmAnalysisResponse result)
     {
-        var upperProcessCode = processCode.ToUpperInvariant();
-        if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
-            part.SlaDfmReport = result.DfmReport;
-        else if (upperProcessCode is "CNC" or "CNC_MILL" or "CNC_TURN")
-            part.CncDfmReport = result.DfmReport;
-        else
-            part.FdmDfmReport = result.DfmReport;
+        SetDfmReportForProcess(part, processCode, result.DfmReport);
 
         if (result.BodyCount.HasValue && !part.BodyCount.HasValue)
             part.BodyCount = result.BodyCount.Value;
@@ -1158,6 +1156,96 @@ public partial class ProjectNew : IAsyncDisposable
 
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
+    }
+
+    private async Task HandleLocalGeometryRuntimeCompletedAsync(PartLocalGeometryRuntimeResult completion)
+    {
+        if (!_parts.Contains(completion.Part))
+            return;
+
+        if (!TryApplyLocalGeometryRuntimeResult(completion.Part, completion.Result))
+            return;
+
+        await OnPartChanged(completion.Part);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static bool TryApplyLocalGeometryRuntimeResult(
+        PartViewModel part,
+        LocalGeometryRuntimeResult result)
+    {
+        if (result is not
+            {
+                Authority: "local_primary",
+                ExecutionMode: "primary_interactive",
+                IsAuthoritative: false
+            })
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(part.ProcessCode)
+            || string.IsNullOrWhiteSpace(result.ProcessCode)
+            || !string.Equals(part.ProcessCode, result.ProcessCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var report = BuildDfmReportFromLocalGeometryRuntimeResult(part.ProcessCode, result);
+        SetDfmReportForProcess(part, part.ProcessCode, report);
+        part.ResolveDfmReport();
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+        return true;
+    }
+
+    private static DfmReport BuildDfmReportFromLocalGeometryRuntimeResult(
+        string processCode,
+        LocalGeometryRuntimeResult result)
+    {
+        var issues = result.Issues
+            .Select(issue => new Maliev.Intranet.Shared.Dtos.DfmIssue
+            {
+                Category = issue.Category ?? string.Empty,
+                Severity = issue.Severity ?? "warning",
+                Title = issue.Title ?? "Local DFM issue",
+                Description = issue.Description ?? "Detected by the browser-first local DFM runtime.",
+                Value = issue.Value.GetValueOrDefault(),
+                Threshold = issue.Threshold.GetValueOrDefault(),
+                FaceIndices = issue.FaceIndices,
+                Centroid = issue.Centroid,
+            })
+            .ToList();
+
+        var thinWallCount = issues.Count(issue =>
+            string.Equals(issue.Category, "thin_wall", StringComparison.OrdinalIgnoreCase));
+        var overhangFaceCount = issues
+            .Where(issue => string.Equals(issue.Category, "overhang", StringComparison.OrdinalIgnoreCase))
+            .Sum(issue => issue.FaceIndices.Count > 0 ? issue.FaceIndices.Count : 1);
+
+        return new DfmReport
+        {
+            ReportType = processCode,
+            Issues = issues,
+            AnalysisTimeSeconds = 0,
+            ThinWallCount = thinWallCount > 0 ? thinWallCount : null,
+            OverhangFaceCount = overhangFaceCount > 0 ? overhangFaceCount : null,
+            SupportRequired = overhangFaceCount > 0 ? true : null,
+        };
+    }
+
+    private static void SetDfmReportForProcess(
+        PartViewModel part,
+        string processCode,
+        object? report)
+    {
+        var upperProcessCode = processCode.ToUpperInvariant();
+        if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
+            part.SlaDfmReport = report;
+        else if (upperProcessCode is "CNC" or "CNC_MILL" or "CNC_TURN")
+            part.CncDfmReport = report;
+        else
+            part.FdmDfmReport = report;
     }
 
     private async Task HandleBulkTableDfmActionAsync(ProjectPartDfmActionRequest request)
@@ -2671,7 +2759,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private static void ClearDfmUnavailableState(PartViewModel part)
     {
-        if (!part.DfmAnalysisTimedOut)
+        if (!part.DfmAnalysisTimedOut && part.AnalysisErrorCode == null)
         {
             return;
         }

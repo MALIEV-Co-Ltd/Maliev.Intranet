@@ -140,8 +140,10 @@
                                      ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
                                      KnownDimensions="@Part.Dimensions"
                                      TurningAxis="@BuildTurningAxis()"
+                                     ProcessCode="@Part.ProcessCode"
                                      ViewerSettings="@Part.ViewerSettings"
                                      ViewerSettingsChanged="HandleViewerSettingsChangedAsync"
+                                     OnLocalGeometryRuntimeCompleted="HandleLocalGeometryRuntimeCompletedAsync"
                                      OnLoadFailed="HandleViewerLoadFailed"
                                      OnBodyPicked="HandleBodyPickedAsync" />
                     }
@@ -244,8 +246,8 @@
                              DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@IsDfmAnalyzing"
-                             TimedOut="@Part.DfmAnalysisTimedOut"
-                             ErrorMessage="@(Part.DfmAnalysisTimedOut ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
+                             TimedOut="@DfmUnavailable"
+                             ErrorMessage="@(DfmUnavailable ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
                              AllClear="@ShouldShowAllClearOverlay()"
                              OnAcknowledged="@HandleDfmAcknowledged"
                              OnToggleOverlay="@HandleToggleOverlay"
@@ -317,6 +319,9 @@
     /// <summary>Callback invoked when any property of <see cref="Part"/> changes.</summary>
     [Parameter] public EventCallback<PartViewModel> OnPartChanged { get; set; }
 
+    /// <summary>Callback invoked when browser-first local DFM completes for this part.</summary>
+    [Parameter] public EventCallback<PartLocalGeometryRuntimeResult> OnLocalGeometryRuntimeCompleted { get; set; }
+
     /// <summary>Callback invoked when the user requests to open the 3D viewer for this part.</summary>
     [Parameter] public EventCallback<PartViewModel> OnOpenViewer { get; set; }
 
@@ -379,10 +384,15 @@
         return "Processing part preview";
     }
 
+    private bool DfmUnavailable =>
+        Part.DfmAnalysisTimedOut
+        || Part.AnalysisErrorCode == "FILE_MISSING";
+
     private bool IsDfmAnalyzing =>
         _dfmIssues.Count == 0
         && Part.ViewerUrl != null
         && Part.DfmReport == null
+        && !DfmUnavailable
         && !Part.DfmAcknowledged
         && !string.IsNullOrEmpty(Part.ProcessCode);
 
@@ -541,8 +551,12 @@
                 _lastRoughnessCode = Part.RoughnessCode;
                 _hasPushedInitialMaterialConfig = true;
                 if (_modelViewer != null)
+                {
                     await _modelViewer.ApplyConfiguratorMaterialAsync(
                         Part.ProcessCode, Part.MaterialCode, materialColor, Part.FinishCode, Part.RoughnessCode);
+                    if (processChanged)
+                        await _modelViewer.RunLocalGeometryRuntimeAsync(Part.ProcessCode);
+                }
             }
 
             // Initialize multi-body viewer when bodies are available
@@ -557,7 +571,7 @@
         // Phase 1 tessellation is slow and GlbReady never arrives within the backend budget.
         // Timer budget matches backend Phase 1 (300 s) + Phase 2 DFM (300 s) = 600 s.
         var uploadCompleted = !Part.Uploading && !string.IsNullOrEmpty(Part.StoragePath);
-        var dfmPending = Part.DfmReport == null && !Part.DfmAcknowledged && !Part.DfmAnalysisTimedOut;
+        var dfmPending = Part.DfmReport == null && !Part.DfmAcknowledged && !DfmUnavailable;
 
         if (uploadCompleted && dfmPending && _dfmTimeoutCts == null)
         {
@@ -638,6 +652,18 @@
     {
         Part.ViewerSettings = settings.Clone();
         return OnPartChanged.InvokeAsync(Part);
+    }
+
+    private async Task HandleLocalGeometryRuntimeCompletedAsync(LocalGeometryRuntimeResult result)
+    {
+        if (OnLocalGeometryRuntimeCompleted.HasDelegate)
+        {
+            await OnLocalGeometryRuntimeCompleted.InvokeAsync(new PartLocalGeometryRuntimeResult
+            {
+                Part = Part,
+                Result = result,
+            });
+        }
     }
 
     private Task HandleDfmAcknowledged()

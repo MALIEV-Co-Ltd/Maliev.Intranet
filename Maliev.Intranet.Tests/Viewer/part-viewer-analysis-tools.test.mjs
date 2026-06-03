@@ -558,15 +558,22 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     const context = loadViewerContext();
     const panels = [];
     const events = [];
+    const dotNetCalls = [];
+    let currentPanel = null;
     const host = {
-        querySelector: () => null,
-        appendChild: panel => panels.push(panel),
+        querySelector: () => currentPanel,
+        appendChild: panel => {
+            currentPanel = panel;
+            panels.push(panel);
+        },
     };
     context.document.createElement = () => ({
         setAttribute: () => {},
         style: {},
         textContent: '',
-        remove: () => {},
+        remove() {
+            if (currentPanel === this) currentPanel = null;
+        },
     });
     context.document.getElementById = () => ({ parentElement: host });
     context.setTimeout = () => 1;
@@ -577,6 +584,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
             this.detail = init.detail;
         }
     };
+    context.dotNetCalls = dotNetCalls;
     context.window.dispatchEvent = event => events.push(event);
     context.fetch = async () => ({
         ok: true,
@@ -634,17 +642,26 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     const result = await vm.runInContext(`
         scenes.viewer = scene;
         tagModelMeshesForAnalysis('viewer', scene);
-        runLocalAdvisoryGeometry('viewer');
+        runLocalAdvisoryGeometry('viewer', {
+            processCode: 'CNC_MILL',
+            dotNetRef: {
+                invokeMethodAsync: async (method, payload) => dotNetCalls.push({ method, payload })
+            }
+        });
     `, context);
 
     assert.equal(result?.authority, 'local_primary');
     assert.equal(result?.executionMode, 'primary_interactive');
     assert.equal(panels.at(-1)?.textContent, 'Local preliminary DFM: no warnings · local primary · 1 tris');
+    assert.equal(currentPanel, null);
+    assert.equal(dotNetCalls.length, 1);
+    assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeComplete');
+    assert.equal(dotNetCalls[0].payload.processCode, 'CNC_MILL');
     assert.equal(events.length, 1);
     assert.equal(events[0].type, 'maliev:geometry-local-runtime-complete');
     assert.deepEqual(JSON.parse(JSON.stringify(events[0].detail)), {
         canvasId: 'viewer',
-        processCode: 'FDM',
+        processCode: 'CNC_MILL',
         runtimeVersion: '1.0.0',
         algorithmVersion: 'browser-first-dfm-v1',
         authority: 'local_primary',
@@ -653,6 +670,8 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         issueCount: 0,
         warningCount: 0,
         faceCount: 1,
+        metrics: { faceCount: 1 },
+        issues: [],
     });
 });
 

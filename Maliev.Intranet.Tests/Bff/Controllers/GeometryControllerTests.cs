@@ -100,6 +100,46 @@ public class GeometryControllerTests
     }
 
     [Fact]
+    public async Task AnalyzeForProcess_UsesClientStoragePathFallback_WhenUploadMetadataMissing()
+    {
+        string? geometryRequestJson = null;
+        var controller = MakeController(
+            MakeUploadClient(storagePath: null, signedUrl: SignedUrl),
+            MakeGeometryClient(async (req, _) =>
+            {
+                geometryRequestJson = await req.Content!.ReadAsStringAsync();
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new DfmAnalysisResponse
+                    {
+                        UploadId = UploadId,
+                        ProcessCode = ProcessCode,
+                        Status = "analysis_complete",
+                        DfmReport = new() { ReportType = ProcessCode }
+                    }, options: new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    })
+                };
+            }));
+
+        var result = await controller.AnalyzeForProcess(
+            UploadId,
+            ProcessCode,
+            new GeometryAnalysisRequest { StoragePath = StoragePath },
+            default);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<DfmAnalysisResponse>(okResult.Value);
+        Assert.Equal("analysis_complete", body.Status);
+        Assert.NotNull(geometryRequestJson);
+
+        using var document = JsonDocument.Parse(geometryRequestJson);
+        Assert.Equal(StoragePath, document.RootElement.GetProperty("storage_path").GetString());
+        Assert.Equal(SignedUrl, document.RootElement.GetProperty("download_url").GetString());
+    }
+
+    [Fact]
     public async Task AnalyzeForProcess_Returns410_WhenSignedUrlGenerationFails()
     {
         var controller = MakeController(

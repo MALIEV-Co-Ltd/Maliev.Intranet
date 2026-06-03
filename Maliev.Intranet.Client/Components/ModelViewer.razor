@@ -227,10 +227,14 @@
     [Parameter] public EventCallback<int?>        OnBodyPicked   { get; set; }
     /// <summary>Optional CNC turning axis overlay for the loaded model.</summary>
     [Parameter] public TurningAxisViewModel?      TurningAxis    { get; set; }
+    /// <summary>Current manufacturing process code used by the browser DFM runtime.</summary>
+    [Parameter] public string?                    ProcessCode    { get; set; }
     /// <summary>Per-part persisted viewer visual settings.</summary>
     [Parameter] public PartViewerSettings         ViewerSettings { get; set; } = new();
     /// <summary>Raised when a persisted viewer setting changes.</summary>
     [Parameter] public EventCallback<PartViewerSettings> ViewerSettingsChanged { get; set; }
+    /// <summary>Raised when the browser geometry runtime completes local DFM analysis.</summary>
+    [Parameter] public EventCallback<LocalGeometryRuntimeResult> OnLocalGeometryRuntimeCompleted { get; set; }
 
     /// <summary>Body metadata for multi-body CAD files.</summary>
     public record BodyViewModel(int Index, string Name, double? VolumeCm3, string? ColorHex);
@@ -359,6 +363,25 @@
         SectionOffsetMm = _sectionOffset,
         SectionInverted = _sectionInverted,
     };
+
+    private object CaptureViewerRuntimeSettings()
+    {
+        var settings = CaptureViewerSettings();
+        return new
+        {
+            settings.RenderMode,
+            settings.MaterialType,
+            settings.CameraProjection,
+            settings.EdgesEnabled,
+            settings.GridEnabled,
+            settings.BoundingBoxEnabled,
+            settings.SectionEnabled,
+            settings.SectionAxis,
+            settings.SectionOffsetMm,
+            settings.SectionInverted,
+            ProcessCode,
+        };
+    }
 
     private async Task NotifyViewerSettingsChangedAsync()
     {
@@ -633,7 +656,7 @@
                 else if (KnownDimensions?.X > 0 && KnownDimensions.Y > 0 && KnownDimensions.Z > 0)
                     dims = new { x = KnownDimensions.X, y = KnownDimensions.Y, z = KnownDimensions.Z };
 
-                var settings = CaptureViewerSettings();
+                var settings = CaptureViewerRuntimeSettings();
                 Logger.LogDebug("Calling JS initialize with URL: {ViewerUrl}", ViewerUrl);
                 await _module.InvokeVoidAsync("initialize",
                     _canvasId,
@@ -1143,6 +1166,27 @@
         catch { /* best-effort */ }
     }
 
+    /// <summary>Runs browser-first local DFM for the current viewer mesh.</summary>
+    public async Task RunLocalGeometryRuntimeAsync(string? processCode = null)
+    {
+        if (_module == null) return;
+        try
+        {
+            var runtimeProcessCode = string.IsNullOrWhiteSpace(processCode)
+                ? ProcessCode
+                : processCode;
+            await _module.InvokeVoidAsync("runLocalAdvisoryGeometry", _canvasId, new
+            {
+                processCode = runtimeProcessCode,
+                dotNetRef = _dotNetRef,
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] local geometry runtime error: {ex.Message}");
+        }
+    }
+
     /// <summary>Removes all DFM overlay meshes for the given part from the 3D scene.</summary>
     public async Task ClearDfmOverlaysAsync(string? partKey = null)
     {
@@ -1217,6 +1261,14 @@
     {
         if (OnBodyPicked.HasDelegate)
             await OnBodyPicked.InvokeAsync(bodyIndex);
+    }
+
+    /// <summary>JSInvokable callback when browser-first local DFM completes.</summary>
+    [JSInvokable]
+    public async Task NotifyLocalGeometryRuntimeComplete(LocalGeometryRuntimeResult result)
+    {
+        if (OnLocalGeometryRuntimeCompleted.HasDelegate)
+            await OnLocalGeometryRuntimeCompleted.InvokeAsync(result);
     }
 
     /// <summary>JSInvokable callback when a measurement is completed.</summary>

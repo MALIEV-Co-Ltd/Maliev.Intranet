@@ -84,16 +84,27 @@ public class GeometryController(
 
         request ??= new();
 
+        var clientStoragePath = request.StoragePath;
+
         // Resolve the authoritative current storage path from UploadService by uploadId.
         // The client's StoragePath may be stale (temp lifecycle expiry, post-migration path change,
         // or geometry-service restart clearing the in-memory cache).
         var currentPath = await uploadServiceClient.GetStoragePathAsync(uploadId, ct);
         if (string.IsNullOrEmpty(currentPath))
         {
+            if (string.IsNullOrWhiteSpace(clientStoragePath))
+            {
+                logger.LogWarning(
+                    "Upload {UploadId} not found in UploadService and no storage path fallback was provided",
+                    uploadId);
+                return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
+            }
+
             logger.LogWarning(
-                "Upload {UploadId} not found in UploadService — file is missing or never registered",
-                uploadId);
-            return StatusCode(410, BuildFileMissingResponse(uploadId, processCode));
+                "Upload {UploadId} not found in UploadService; falling back to client storage path {StoragePath}",
+                uploadId,
+                clientStoragePath);
+            currentPath = clientStoragePath;
         }
 
         request.StoragePath = currentPath;

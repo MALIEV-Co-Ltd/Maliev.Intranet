@@ -1,4 +1,5 @@
 using Bunit;
+using Maliev.Intranet.Client.Components;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
@@ -744,6 +745,72 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.True(part.DfmAnalysisTimedOut);
         Assert.Equal("DFM_REPORT_UNAVAILABLE", part.AnalysisErrorCode);
         Assert.Equal("DFM report unavailable", part.StatusText);
+    }
+
+    [Fact]
+    public void CreatePartViewModelFromProjectPart_WhenProjectServiceReturnsEnumProcess_RestoresCatalogConfiguration()
+    {
+        var processId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        SetPrivateField(cut.Instance, "_processes", new List<ProcessDto>
+        {
+            new(processId, "CNC_MILL", "CNC Milling", null, 10),
+        });
+
+        var part = CreatePartViewModelFromProjectPart(cut, new ProjectPartDto
+        {
+            Id = Guid.NewGuid(),
+            FileId = Guid.NewGuid(),
+            FileName = "restored-cnc.stl",
+            FileReference = "customers/customer-1/projects/project-1/restored-cnc.stl",
+            ProcessType = "CNC_Milling",
+            MaterialId = materialId,
+            MaterialName = "Brass C360",
+            MaterialCode = "BRASS_C360",
+            Quantity = 25,
+            Finish = "MIRROR_POLISH",
+            Tolerance = "ISO2768_M",
+            RoughnessCode = "RA_1_6",
+            DfmAcknowledged = true,
+            HasDfmWarnings = true,
+            HasThreadedHoles = true,
+            ThreadedHoleSpec = "M4x0.7",
+            ThreadedHoleCount = 6,
+            HasInserts = true,
+            InsertType = InsertType.HeatSet,
+            InsertCount = 4,
+            BagAndTag = false,
+            InspectionLevel = InspectionLevel.Dimensional,
+            Certificates = ["MaterialCert"],
+            ProcessConfig = new Dictionary<string, string>
+            {
+                ["cnc_setup"] = "three_axis",
+            },
+            Dimensions = new ModelDimensionsDto { X = 25, Y = 25, Z = 25 },
+            IsManifold = true,
+        });
+
+        Assert.Equal("CNC_MILL", part.ProcessCode);
+        Assert.Equal(processId, part.ProcessId);
+        Assert.Equal(materialId, part.MaterialId);
+        Assert.Equal("BRASS_C360", part.MaterialCode);
+        Assert.Equal(25, part.Quantity);
+        Assert.Equal("MIRROR_POLISH", part.FinishCode);
+        Assert.Equal("ISO2768_M", part.ToleranceCode);
+        Assert.Equal("RA_1_6", part.RoughnessCode);
+        Assert.True(part.DfmAcknowledged);
+        Assert.True(part.HasThreadedHoles);
+        Assert.Equal("M4x0.7", part.ThreadedHoleSpec);
+        Assert.Equal(6, part.ThreadedHoleCount);
+        Assert.True(part.HasInserts);
+        Assert.Equal(InsertType.HeatSet, part.InsertType);
+        Assert.Equal(4, part.InsertCount);
+        Assert.False(part.BagAndTag);
+        Assert.Equal(InspectionLevel.Dimensional, part.InspectionLevel);
+        Assert.Equal(["MaterialCert"], part.Certificates);
+        Assert.Equal("three_axis", part.ProcessOptionValues["cnc_setup"]);
+        Assert.True(part.IsFullyConfigured);
     }
 
     [Fact]
@@ -1636,6 +1703,63 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.Null(part.AnalysisErrorCode);
         Assert.False(part.AwaitingPreview);
         Assert.Equal("Ready", part.StatusText);
+    }
+
+    [Fact]
+    public async Task HandleLocalGeometryRuntimeCompletedAsync_WhenResultMatchesProcess_HydratesDfmReport()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "local-cnc.stl",
+            StoragePath = "projects/local-cnc.stl",
+            ProcessCode = "CNC_MILL",
+            DfmAnalysisTimedOut = false,
+            AnalysisErrorCode = "FILE_MISSING",
+        };
+        GetParts(cut.Instance).Add(part);
+
+        var result = new LocalGeometryRuntimeResult
+        {
+            ProcessCode = "CNC_MILL",
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive",
+            IsAuthoritative = false,
+            RuntimeVersion = "1.0.0",
+            AlgorithmVersion = "browser-first-dfm-v1",
+            InputHash = "abc123",
+            Metrics = new LocalGeometryRuntimeMetrics { FaceCount = 27122 },
+            Issues =
+            [
+                new LocalGeometryRuntimeIssue
+                {
+                    Category = "mesh_integrity",
+                    Severity = "warning",
+                    Title = "Mesh may be non-manifold",
+                    Description = "Local analysis found boundary edges.",
+                    Value = 12,
+                    Threshold = 0,
+                    FaceIndices = [1, 2, 3],
+                    Centroid = [1.0, 2.0, 3.0],
+                },
+            ],
+        };
+
+        await InvokePrivateTaskWithArgsAsync(cut, "HandleLocalGeometryRuntimeCompletedAsync", new PartLocalGeometryRuntimeResult
+        {
+            Part = part,
+            Result = result,
+        });
+
+        var report = Assert.IsType<DfmReport>(part.DfmReport);
+        Assert.Same(report, part.CncDfmReport);
+        Assert.Equal("CNC_MILL", report.ReportType);
+        var issue = Assert.Single(report.Issues);
+        Assert.Equal("mesh_integrity", issue.Category);
+        Assert.Equal([1, 2, 3], issue.FaceIndices);
+        Assert.False(part.DfmAnalysisTimedOut);
+        Assert.Null(part.AnalysisErrorCode);
     }
 
     [Fact]
