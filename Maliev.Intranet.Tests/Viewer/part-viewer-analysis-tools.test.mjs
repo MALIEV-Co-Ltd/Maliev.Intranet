@@ -557,6 +557,7 @@ test('runtime asset resolver maps GeometryService manifest assets to same-origin
 test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', async () => {
     const context = loadViewerContext();
     const panels = [];
+    const events = [];
     const host = {
         querySelector: () => null,
         appendChild: panel => panels.push(panel),
@@ -570,6 +571,13 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     context.document.getElementById = () => ({ parentElement: host });
     context.setTimeout = () => 1;
     context.clearTimeout = () => {};
+    context.CustomEvent = class CustomEvent {
+        constructor(type, init = {}) {
+            this.type = type;
+            this.detail = init.detail;
+        }
+    };
+    context.window.dispatchEvent = event => events.push(event);
     context.fetch = async () => ({
         ok: true,
         json: async () => ({
@@ -599,6 +607,10 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
                         authority: 'local_primary',
                         isAuthoritative: false,
                         executionMode: 'primary_interactive',
+                        processCode: message.processCode,
+                        runtimeVersion: '1.0.0',
+                        algorithmVersion: 'browser-first-dfm-v1',
+                        inputHash: 'abc123',
                         metrics: { faceCount: 1 },
                         issues: [],
                     },
@@ -628,6 +640,20 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(result?.authority, 'local_primary');
     assert.equal(result?.executionMode, 'primary_interactive');
     assert.equal(panels.at(-1)?.textContent, 'Local preliminary DFM: no warnings · local primary · 1 tris');
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'maliev:geometry-local-runtime-complete');
+    assert.deepEqual(JSON.parse(JSON.stringify(events[0].detail)), {
+        canvasId: 'viewer',
+        processCode: 'FDM',
+        runtimeVersion: '1.0.0',
+        algorithmVersion: 'browser-first-dfm-v1',
+        authority: 'local_primary',
+        executionMode: 'primary_interactive',
+        inputHash: 'abc123',
+        issueCount: 0,
+        warningCount: 0,
+        faceCount: 1,
+    });
 });
 
 test('showGrid uses a low-contrast grid floor in light mode', () => {
