@@ -168,6 +168,26 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("materialChanged || colorChanged || finishChanged || roughnessChanged || processChanged || initialPush", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ModelViewer_ForwardsBrowserUploadFileReferenceToLocalRuntime()
+    {
+        var modelViewer = ModelViewer.ReplaceLineEndings("\n");
+        var partDetail = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+        var uploadHelper = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "uploadWithProgress.js")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("[Parameter] public string?                    BrowserFileClientId", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("[Parameter] public string?                    BrowserFileName", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("clientUploadId = BrowserFileClientId", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("fileName = BrowserFileName", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("fileBytesProvider = \"projectNewUploads\"", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("BrowserFileClientId=\"@Part.ClientUploadId\"", partDetail, StringComparison.Ordinal);
+        Assert.Contains("BrowserFileName=\"@Part.Name\"", partDetail, StringComparison.Ordinal);
+        Assert.Contains("async function getFileBytes(clientUploadId)", uploadHelper, StringComparison.Ordinal);
+        Assert.Contains("scheduleClearFile", uploadHelper, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

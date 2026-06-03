@@ -141,6 +141,8 @@
                                      KnownDimensions="@Part.Dimensions"
                                      TurningAxis="@BuildTurningAxis()"
                                      ProcessCode="@Part.ProcessCode"
+                                     BrowserFileClientId="@Part.ClientUploadId"
+                                     BrowserFileName="@Part.Name"
                                      ViewerSettings="@Part.ViewerSettings"
                                      ViewerSettingsChanged="HandleViewerSettingsChangedAsync"
                                      OnLocalGeometryRuntimeCompleted="HandleLocalGeometryRuntimeCompletedAsync"

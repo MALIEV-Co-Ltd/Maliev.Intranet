@@ -750,6 +750,80 @@ test('runLocalAdvisoryGeometry can analyze direct file bytes before viewer mesh 
     assert.equal(workerMessages[0].input.meshBuffers, undefined);
 });
 
+test('runLocalAdvisoryGeometry can resolve direct file bytes from the upload store', async () => {
+    const context = loadViewerContext();
+    const workerMessages = [];
+    context.window.projectNewUploads = {
+        getFileBytes: async clientUploadId => {
+            assert.equal(clientUploadId, 'upload-client-1');
+            return Uint8Array.from([115, 111, 108, 105, 100]);
+        },
+    };
+    context.document.createElement = () => ({
+        setAttribute: () => {},
+        style: {},
+        textContent: '',
+        remove() {},
+    });
+    context.document.getElementById = () => ({ parentElement: { querySelector: () => null, appendChild: () => {} } });
+    context.setTimeout = () => 1;
+    context.clearTimeout = () => {};
+    context.fetch = async () => ({
+        ok: true,
+        json: async () => ({
+            manifestVersion: 1,
+            runtimeVersion: '1.0.0',
+            algorithmVersion: 'browser-first-dfm-v1',
+            executionMode: 'primary_interactive',
+            authority: 'local_primary',
+            isAuthoritative: false,
+            minFrontendApiVersion: 1,
+            assets: {
+                worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+            },
+        }),
+    });
+    context.Worker = class Worker {
+        postMessage(message) {
+            workerMessages.push(message);
+            this.onmessage({
+                data: {
+                    id: message.id,
+                    ok: true,
+                    result: {
+                        authority: 'local_primary',
+                        isAuthoritative: false,
+                        executionMode: 'primary_interactive',
+                        processCode: message.processCode,
+                        runtimeVersion: '1.0.0',
+                        algorithmVersion: 'browser-first-dfm-v1',
+                        inputHash: 'upload-file-hash',
+                        metrics: { faceCount: 4 },
+                        issues: [],
+                    },
+                },
+            });
+        }
+
+        terminate() {}
+    };
+
+    const result = await vm.runInContext(`
+        runLocalAdvisoryGeometry('viewer-without-mesh', {
+            processCode: 'CNC_MILL',
+            clientUploadId: 'upload-client-1',
+            fileName: 'plate.stl',
+            fileBytesProvider: 'projectNewUploads'
+        });
+    `, context);
+
+    assert.equal(result?.authority, 'local_primary');
+    assert.equal(workerMessages.length, 1);
+    assert.equal(workerMessages[0].input.fileName, 'plate.stl');
+    assert.deepEqual(Array.from(workerMessages[0].input.fileBytes), [115, 111, 108, 105, 100]);
+    assert.equal(workerMessages[0].input.meshBuffers, undefined);
+});
+
 test('showGrid uses a low-contrast grid floor in light mode', () => {
     const context = loadViewerContext();
     context.scene = {

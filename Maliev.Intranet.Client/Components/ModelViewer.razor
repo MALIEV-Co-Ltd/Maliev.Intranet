@@ -229,6 +229,10 @@
     [Parameter] public TurningAxisViewModel?      TurningAxis    { get; set; }
     /// <summary>Current manufacturing process code used by the browser DFM runtime.</summary>
     [Parameter] public string?                    ProcessCode    { get; set; }
+    /// <summary>Client-side upload id used to resolve the original browser File for local DFM.</summary>
+    [Parameter] public string?                    BrowserFileClientId { get; set; }
+    /// <summary>Original browser file name used by the local DFM runtime when analyzing file bytes.</summary>
+    [Parameter] public string?                    BrowserFileName { get; set; }
     /// <summary>Per-part persisted viewer visual settings.</summary>
     [Parameter] public PartViewerSettings         ViewerSettings { get; set; } = new();
     /// <summary>Raised when a persisted viewer setting changes.</summary>
@@ -1178,6 +1182,9 @@
             await _module.InvokeVoidAsync("runLocalAdvisoryGeometry", _canvasId, new
             {
                 processCode = runtimeProcessCode,
+                clientUploadId = BrowserFileClientId,
+                fileName = BrowserFileName,
+                fileBytesProvider = "projectNewUploads",
                 dotNetRef = _dotNetRef,
             });
         }

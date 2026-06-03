@@ -553,7 +553,7 @@ public partial class ProjectNew : IAsyncDisposable
 
             try
             {
-                await JS.InvokeVoidAsync("window.projectNewUploads.clearFile", item.ClientUploadId);
+                await JS.InvokeVoidAsync("window.projectNewUploads.scheduleClearFile", item.ClientUploadId);
             }
             catch (JSDisconnectedException)
             {

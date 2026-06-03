@@ -100,6 +100,8 @@ window.uploadBatchWithProgress = function (url, files, dotNetHelper) {
 
 window.projectNewUploads = (function () {
     const filesByClientId = new Map();
+    const clearTimersByClientId = new Map();
+    const fileRetentionMs = 10 * 60 * 1000;
 
     function findUploadInput(containerId, mappings) {
         const container = document.getElementById(containerId);
@@ -152,6 +154,9 @@ window.projectNewUploads = (function () {
             }
 
             if (file) {
+                const existingTimer = clearTimersByClientId.get(mapping.clientUploadId);
+                if (existingTimer) clearTimeout(existingTimer);
+                clearTimersByClientId.delete(mapping.clientUploadId);
                 filesByClientId.set(mapping.clientUploadId, file);
             }
         }
@@ -216,12 +221,36 @@ window.projectNewUploads = (function () {
     }
 
     function clearFile(clientUploadId) {
+        const existingTimer = clearTimersByClientId.get(clientUploadId);
+        if (existingTimer) clearTimeout(existingTimer);
+        clearTimersByClientId.delete(clientUploadId);
         filesByClientId.delete(clientUploadId);
+    }
+
+    function scheduleClearFile(clientUploadId, delayMs) {
+        if (!filesByClientId.has(clientUploadId)) return;
+
+        const existingTimer = clearTimersByClientId.get(clientUploadId);
+        if (existingTimer) clearTimeout(existingTimer);
+
+        const timer = setTimeout(function () {
+            clearFile(clientUploadId);
+        }, Number(delayMs) > 0 ? Number(delayMs) : fileRetentionMs);
+        clearTimersByClientId.set(clientUploadId, timer);
+    }
+
+    async function getFileBytes(clientUploadId) {
+        const file = filesByClientId.get(clientUploadId);
+        if (!file || typeof file.arrayBuffer !== 'function') return null;
+
+        return new Uint8Array(await file.arrayBuffer());
     }
 
     return {
         captureFiles,
         uploadFile,
-        clearFile
+        clearFile,
+        scheduleClearFile,
+        getFileBytes
     };
 })();
