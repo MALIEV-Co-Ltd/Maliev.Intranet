@@ -1570,6 +1570,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             MaterialId = Guid.NewGuid(),
             MaterialCode = "PLA",
             Quantity = 2,
+            EstimatedBaseUnitPrice = 1250m,
             EstimatedUnitPrice = 1250m,
             EstimatedTotalAmount = 2500m,
             IsManifold = true,
