@@ -260,6 +260,7 @@ const CONFIG = {
         environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
         contrast: 1.15,
         exposure: 1.1,
+        fastEnvironmentTextureSize: 128,
         environmentTextureSize: 256,
         /** Edge angle threshold in degrees for normal smoothing. Edges sharper
          *  than this stay hard; gentler creases get blended. 0 = no smoothing,
@@ -494,6 +495,9 @@ const materialTypes = {};
 
 /** Per-canvas environment texture for PBR reflections */
 const environmentTextures = {};
+
+/** Per-canvas deferred realistic quality task token */
+const realisticQualityTaskTokens = {};
 
 /** Per-canvas realistic material cache (Map<materialType, NodeMaterial/PBRMaterial>) */
 const realisticMaterialCache = {};
@@ -750,6 +754,29 @@ function scheduleAfterFirstPaint(canvasId, scene, currentGen, work) {
             }
         }, 0);
     });
+}
+
+function scheduleIdleWork(work) {
+    const root = typeof globalThis !== 'undefined' ? globalThis : window;
+    if (typeof root?.requestIdleCallback === 'function') {
+        return root.requestIdleCallback(work, { timeout: 180 });
+    }
+
+    if (typeof root?.requestAnimationFrame === 'function') {
+        return root.requestAnimationFrame(() => {
+            if (typeof root.setTimeout === 'function') {
+                root.setTimeout(() => work({ didTimeout: true, timeRemaining: () => 0 }), 0);
+            } else {
+                work({ didTimeout: true, timeRemaining: () => 0 });
+            }
+        });
+    }
+
+    if (typeof root?.setTimeout === 'function') {
+        return root.setTimeout(() => work({ didTimeout: true, timeRemaining: () => 0 }), 0);
+    }
+
+    return work({ didTimeout: true, timeRemaining: () => 0 });
 }
 
 /**
@@ -2995,10 +3022,15 @@ function updateAxisLabels(canvasId, scene, axesCam) {
  * @param {BABYLON.Scene} scene
  * @param {string} canvasId
  */
-function getOrCreateEnvironmentTexture(scene, canvasId) {
-    if (environmentTextures[canvasId]) return environmentTextures[canvasId];
+function getOrCreateEnvironmentTexture(scene, canvasId, quality = 'fast') {
+    const existing = environmentTextures[canvasId];
+    if (existing && (quality !== 'high' || existing._malievEnvironmentQuality === 'high')) {
+        return existing;
+    }
 
-    const size = CONFIG.REALISTIC.environmentTextureSize || 256;
+    const highSize = CONFIG.REALISTIC.environmentTextureSize || 256;
+    const fastSize = Math.min(CONFIG.REALISTIC.fastEnvironmentTextureSize || 128, highSize);
+    const size = quality === 'high' ? highSize : fastSize;
 
     function clamp01(value) {
         return Math.max(0, Math.min(1, value));
@@ -3124,6 +3156,7 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
     );
     cube.name = '__maliev_studio_reflection__';
     cube._malievEnvironmentKind = 'procedural-studio';
+    cube._malievEnvironmentQuality = quality === 'high' ? 'high' : 'fast';
 
     scene.environmentTexture = cube;
     scene.environmentIntensity = CONFIG.REALISTIC.environmentIntensity;
@@ -3139,6 +3172,9 @@ function getOrCreateEnvironmentTexture(scene, canvasId) {
         BABYLON.ImageProcessingConfiguration.TONEMAPPING_STANDARD;
 
     environmentTextures[canvasId] = cube;
+    if (existing && existing !== cube) {
+        try { existing.dispose?.(); } catch (_) {}
+    }
     return cube;
 }
 
@@ -4206,29 +4242,56 @@ function applyRealisticMaterial(canvasId, materialType) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
-    // Ensure an environment texture exists for metallic reflections.
-    getOrCreateEnvironmentTexture(scene, canvasId);
+    // Use a fast first-paint environment; the high-quality cubemap is promoted
+    // during the deferred realistic quality pass.
+    getOrCreateEnvironmentTexture(scene, canvasId, 'fast');
 
     const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+    const preset = CONFIG.MATERIAL_REALISTIC[materialType]
+                || CONFIG.MATERIAL_REALISTIC['aluminum'];
+    const material = getRealisticMaterial(scene, canvasId, materialType);
+    const profile = resolveRealisticNodeMaterialProfile(canvasId, materialType);
+    syncRealisticMaterialProperties(
+        material,
+        preset,
+        customAlbedoColors[canvasId],
+        finishMod,
+        profile);
 
     scene.meshes.forEach(mesh => {
         if (isSystemMesh(mesh)) return;
 
-        mesh.material = getRealisticMaterial(scene, canvasId, materialType);
-        const preset = CONFIG.MATERIAL_REALISTIC[materialType]
-                    || CONFIG.MATERIAL_REALISTIC['aluminum'];
-        syncRealisticMaterialProperties(
-            mesh.material,
-            preset,
-            customAlbedoColors[canvasId],
-            finishMod,
-            resolveRealisticNodeMaterialProfile(canvasId, materialType));
+        mesh.material = material;
+    });
+}
+
+function scheduleRealisticQualityUpgrade(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const token = (realisticQualityTaskTokens[canvasId] || 0) + 1;
+    realisticQualityTaskTokens[canvasId] = token;
+
+    scheduleIdleWork(() => {
+        if (realisticQualityTaskTokens[canvasId] !== token
+            || scenes[canvasId] !== scene
+            || currentRenderModes[canvasId] !== 'realistic') {
+            return;
+        }
+
+        try {
+            getOrCreateEnvironmentTexture(scene, canvasId, 'high');
+            applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
+            try { scene.render?.(); } catch (_) {}
+        } catch (err) {
+            console.error('[BabylonViewer] Deferred realistic quality upgrade failed:', err);
+        }
     });
 }
 
 function refreshRealisticNormalSmoothing(canvasId) {
     if (currentRenderModes[canvasId] !== 'realistic') return;
-    applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
+    scheduleRealisticQualityUpgrade(canvasId);
 }
 
 /**
@@ -5331,6 +5394,20 @@ export function setRenderMode(canvasId, mode) {
     // lighting that realistic mode creates; otherwise the first upload render is too dark.
     if (mode === 'realistic' || mode === 'solid') getOrCreateEnvironmentTexture(scene, canvasId);
 
+    let sharedRealisticMaterial = null;
+    if (mode === 'realistic') {
+        const matType = materialTypes[canvasId] || 'aluminum';
+        const preset = CONFIG.MATERIAL_REALISTIC[matType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
+        const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+        sharedRealisticMaterial = getRealisticMaterial(scene, canvasId, matType);
+        syncRealisticMaterialProperties(
+            sharedRealisticMaterial,
+            preset,
+            customAlbedoColors[canvasId],
+            finishMod,
+            resolveRealisticNodeMaterialProfile(canvasId, matType));
+    }
+
     scene.meshes.forEach(mesh => {
         // Skip system meshes: ground grid, axis gizmo parts, bounding box lines
         if (isSystemMesh(mesh)) return;
@@ -5363,18 +5440,9 @@ export function setRenderMode(canvasId, mode) {
             safeDisableEdges(mesh);
 
         } else if (mode === 'realistic') {
-            const matType = materialTypes[canvasId] || 'aluminum';
-            const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
             // All bodies (single or multi) share the same configurator-colour realistic material.
             // Original per-body materials are never mutated — solid mode restores them intact.
-            mesh.material = getRealisticMaterial(scene, canvasId, matType);
-            const preset = CONFIG.MATERIAL_REALISTIC[matType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
-            syncRealisticMaterialProperties(
-                mesh.material,
-                preset,
-                customAlbedoColors[canvasId],
-                finishMod,
-                resolveRealisticNodeMaterialProfile(canvasId, matType));
+            mesh.material = sharedRealisticMaterial;
             safeDisableEdges(mesh);
 
         } else {
@@ -5399,14 +5467,16 @@ export function setRenderMode(canvasId, mode) {
         toggleEdges(canvasId, true);
     }
 
-    // Smooth normals transition — use the active finish profile so polished
-    // metals do not expose coarse tessellation in sharp reflections.
+    currentRenderModes[canvasId] = mode;
+
+    // Smooth normals transition — queue the realistic quality pass so first
+    // paint is not blocked by normal recomputation on large CAD/STL meshes.
     if (mode === 'realistic') {
-        applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
+        scheduleRealisticQualityUpgrade(canvasId);
     } else if (prevMode === 'realistic') {
+        delete realisticQualityTaskTokens[canvasId];
         restoreOriginalNormals(canvasId);
     }
-    currentRenderModes[canvasId] = mode;
     _syncCuttingMatRenderMode(canvasId);
 }
 
@@ -7678,6 +7748,7 @@ export function dispose(canvasId) {
     }
     delete materialTypes[canvasId];
     delete environmentTextures[canvasId];
+    delete realisticQualityTaskTokens[canvasId];
     delete originalNormalData[canvasId];
     delete currentRenderModes[canvasId];
     delete customAlbedoColors[canvasId];

@@ -27,6 +27,7 @@ class Vector3 {
 
 function loadViewerContext() {
     const rawCubeTextures = [];
+    const scheduledIdleCallbacks = [];
     class NodeMaterialConnectionPoint {
         connectTo() {}
     }
@@ -80,6 +81,12 @@ function loadViewerContext() {
         window: {},
         globalThis: {},
         rawCubeTextures,
+        scheduledIdleCallbacks,
+        requestIdleCallback: callback => {
+            scheduledIdleCallbacks.push(callback);
+            return scheduledIdleCallbacks.length;
+        },
+        cancelIdleCallback: () => {},
         BABYLON: {
             Axis: {
                 X: new Vector3(1, 0, 0),
@@ -241,6 +248,13 @@ function loadViewerContext() {
     vm.runInContext(code, context);
 
     return context;
+}
+
+function flushScheduledIdleCallbacks(context) {
+    while (context.scheduledIdleCallbacks.length > 0) {
+        const callback = context.scheduledIdleCallbacks.shift();
+        callback({ didTimeout: false, timeRemaining: () => 16 });
+    }
 }
 
 function makeScene(mesh) {
@@ -643,6 +657,9 @@ test('realistic render mode smooths near-coincident CAD vertices across conversi
         scenes.viewer = scene;
         setRenderMode('viewer', 'realistic');
     `, context);
+    assert.equal(smoothedNormals, null, 'realistic first paint should not smooth normals synchronously');
+
+    flushScheduledIdleCallbacks(context);
 
     const result = {
         firstNormalX: smoothedNormals?.[0] ?? null,
@@ -655,6 +672,110 @@ test('realistic render mode smooths near-coincident CAD vertices across conversi
     assert.ok(result.firstNormalY < 1, `expected seam normal Y to change from hard face normal, got ${result.firstNormalY}`);
     assert.ok(Math.abs(result.firstNormalX - result.fourthNormalX) < 0.001);
     assert.ok(Math.abs(result.firstNormalY - result.fourthNormalY) < 0.001);
+});
+
+test('realistic render mode uses fast first paint before queued quality upgrades', () => {
+    const context = loadViewerContext();
+    const positions = new Float32Array([
+        0, 0, 0,
+        -1, 0, 0,
+        0, 0, 1,
+        0.024, 0, 0,
+        0.024, 0, 1,
+        1, 0.2, 0,
+    ]);
+    const indices = [0, 1, 2, 3, 4, 5];
+    const normals = new Float32Array([
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        -0.2009, 0.9796, 0,
+        -0.2009, 0.9796, 0,
+        -0.2009, 0.9796, 0,
+    ]);
+    let smoothedNormals = null;
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: kind => kind === 'position' ? positions : normals,
+        getIndices: () => indices,
+        setVerticesData: (kind, data) => {
+            if (kind === 'normal') {
+                smoothedNormals = data;
+            }
+        },
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const firstPaint = vm.runInContext(`
+        scenes.viewer = scene;
+        setRenderMode('viewer', 'realistic');
+        ({
+            firstEnvironmentSize: rawCubeTextures[0]?.size ?? null,
+            rawCubeTextureCount: rawCubeTextures.length,
+            materialName: scene.meshes[0].material?.name ?? null
+        });
+    `, context);
+
+    assert.equal(firstPaint.materialName, '__realistic_aluminum__');
+    assert.equal(firstPaint.firstEnvironmentSize, 128);
+    assert.equal(firstPaint.rawCubeTextureCount, 1);
+    assert.equal(smoothedNormals, null, 'normal smoothing should be queued after first realistic paint');
+    assert.ok(context.scheduledIdleCallbacks.length > 0, 'quality upgrade work should be scheduled after first paint');
+
+    flushScheduledIdleCallbacks(context);
+
+    const upgraded = vm.runInContext(`
+        ({
+            currentEnvironmentSize: scene.environmentTexture?.size ?? null,
+            rawCubeTextureCount: rawCubeTextures.length
+        });
+    `, context);
+
+    assert.equal(upgraded.currentEnvironmentSize, 256);
+    assert.equal(upgraded.rawCubeTextureCount, 2);
+    assert.ok(smoothedNormals?.[0] < -0.05, 'queued quality pass should still apply smoothed normals');
+});
+
+test('realistic render mode syncs one shared material once for multi-body first paint', () => {
+    const context = loadViewerContext();
+    const makeMesh = uniqueId => ({
+        name: `part-${uniqueId}`,
+        uniqueId,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    });
+    const scene = makeScene(makeMesh(101));
+    scene.meshes.push(makeMesh(102), makeMesh(103));
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const originalSync = syncRealisticMaterialProperties;
+        let syncCalls = 0;
+        syncRealisticMaterialProperties = (...args) => {
+            syncCalls++;
+            return originalSync(...args);
+        };
+        setRenderMode('viewer', 'realistic');
+        ({
+            syncCalls,
+            uniqueMaterialCount: new Set(scene.meshes.map(mesh => mesh.material)).size,
+            materialName: scene.meshes[0].material?.name ?? null
+        });
+    `, context);
+
+    assert.equal(result.materialName, '__realistic_aluminum__');
+    assert.equal(result.uniqueMaterialCount, 1);
+    assert.ok(result.syncCalls <= 2, `expected one create sync plus one apply sync, got ${result.syncCalls}`);
 });
 
 test('polished finish refreshes glossy normal smoothing for low-tessellation reflections', () => {
@@ -702,10 +823,12 @@ test('polished finish refreshes glossy normal smoothing for low-tessellation ref
         scenes.viewer = scene;
         configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', null, 'CNC_MILL');
         setRenderMode('viewer', 'realistic');
+        scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 });
         const defaultNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
         const defaultX = defaultNormals[0];
         const defaultY = defaultNormals[1];
         configureMaterialFromConfigurator('viewer', 'aluminum', null, 'POLISHED', 'RA_1_6', 'CNC_MILL');
+        scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 });
         const material = scene.meshes[0].material;
         const polishedNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
         ({
