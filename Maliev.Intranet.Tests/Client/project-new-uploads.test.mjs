@@ -5,6 +5,8 @@ import vm from 'node:vm';
 
 function loadUploadContext(input) {
     const inputs = Array.isArray(input) ? input : [input];
+    const objectUrls = [];
+    const revokedObjectUrls = [];
     const container = {
         querySelector(selector) {
             return selector === 'input[type=file]' ? inputs[0] : null;
@@ -27,11 +29,25 @@ function loadUploadContext(input) {
                 this.type = type;
             }
         },
+        URL: {
+            createObjectURL(file) {
+                const url = `blob:project/${file.name}/${objectUrls.length}`;
+                objectUrls.push({ file, url });
+                return url;
+            },
+            revokeObjectURL(url) {
+                revokedObjectUrls.push(url);
+            }
+        },
+        setTimeout: () => 1,
+        clearTimeout: () => {},
         window: {}
     };
 
     const source = fs.readFileSync('Maliev.Intranet.Client/wwwroot/js/uploadWithProgress.js', 'utf8');
     vm.runInNewContext(source, context);
+    context.objectUrls = objectUrls;
+    context.revokedObjectUrls = revokedObjectUrls;
     return context;
 }
 
@@ -82,6 +98,36 @@ test('captureFiles clears the hidden input while retaining browser files for upl
 
     assert.equal(result.status, 200);
     assert.equal(sentBody, selectedFile);
+});
+
+test('getObjectUrl returns a reusable browser file object URL and revokes it on clear', () => {
+    const selectedFile = new File(['solid'], 'local-viewer.stl', { type: 'model/stl' });
+    const input = {
+        files: [selectedFile],
+        value: 'C:\\fakepath\\local-viewer.stl'
+    };
+    const context = loadUploadContext(input);
+    const uploads = context.window.projectNewUploads;
+
+    uploads.captureFiles('project-new-file-upload', [{
+        clientUploadId: 'upload-local-viewer',
+        index: 0,
+        fileName: 'local-viewer.stl',
+        fileSize: selectedFile.size
+    }]);
+
+    const firstUrl = uploads.getObjectUrl('upload-local-viewer');
+    const secondUrl = uploads.getObjectUrl('upload-local-viewer');
+
+    assert.equal(firstUrl, 'blob:project/local-viewer.stl/0');
+    assert.equal(secondUrl, firstUrl);
+    assert.equal(context.objectUrls.length, 1);
+    assert.equal(context.objectUrls[0].file, selectedFile);
+
+    uploads.clearFile('upload-local-viewer');
+
+    assert.deepEqual(context.revokedObjectUrls, [firstUrl]);
+    assert.equal(uploads.getObjectUrl('upload-local-viewer'), null);
 });
 
 test('captureFiles uses the input containing the current selection when stale file inputs remain', async () => {

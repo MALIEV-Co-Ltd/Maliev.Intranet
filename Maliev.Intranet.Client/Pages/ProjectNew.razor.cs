@@ -523,6 +523,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.ProgressPercent = 100;
             part.AwaitingPreview = true;
             part.StatusText = "Processing geometry...";
+            await TryApplyLocalViewerUrlAsync(part);
 
             await JoinPartFileGroupsAsync(part);
             StartStatusWatchdog(part, completedUpload.StoragePath);
@@ -1318,6 +1319,9 @@ public partial class ProjectNew : IAsyncDisposable
             return;
         }
 
+        if (await TryApplyLocalViewerUrlAsync(part))
+            return;
+
         // Fallback: Call viewer-url API for backward compatibility (drafts created before this fix)
         // Use StoragePath (original uploaded file path); the BFF caches status keyed by that path,
         // not by GlbStoragePath which ends in _viewer.glb.
@@ -1473,6 +1477,41 @@ public partial class ProjectNew : IAsyncDisposable
             return null;
 
         return ext.StartsWith('.') ? ext.ToLowerInvariant() : "." + ext.ToLowerInvariant();
+    }
+
+    private async Task<bool> TryApplyLocalViewerUrlAsync(PartViewModel part)
+    {
+        var viewerExtension = ResolveBrowserFileViewerExtension(part);
+        if (viewerExtension is null || string.IsNullOrWhiteSpace(part.ClientUploadId))
+            return false;
+
+        try
+        {
+            var objectUrl = await JS.InvokeAsync<string?>(
+                "window.projectNewUploads.getObjectUrl",
+                part.ClientUploadId);
+            if (string.IsNullOrWhiteSpace(objectUrl))
+                return false;
+
+            part.ViewerUrl = objectUrl;
+            part.ViewerStoragePath ??= part.StoragePath;
+            part.ViewerFileExtension = viewerExtension;
+            return true;
+        }
+        catch (JSException ex)
+        {
+            Logger.LogDebug(ex, "Browser local viewer URL was not available for part {PartName}", part.Name);
+            return false;
+        }
+    }
+
+    private static bool CanUseBrowserFileViewer(PartViewModel part)
+        => ResolveBrowserFileViewerExtension(part) is not null;
+
+    private static string? ResolveBrowserFileViewerExtension(PartViewModel part)
+    {
+        var ext = NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name);
+        return ext is ".stl" or ".obj" or ".glb" or ".gltf" ? ext : null;
     }
 
     private static void ApplyMigratedStoragePaths(PartViewModel part, string oldBasePath, string newBasePath)
@@ -3683,6 +3722,12 @@ public partial class ProjectNew : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(part.GlbSignedUrl))
         {
             part.ViewerUrl = part.GlbSignedUrl;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (await TryApplyLocalViewerUrlAsync(part))
+        {
             await InvokeAsync(StateHasChanged);
             return;
         }

@@ -484,8 +484,8 @@ public class PartViewModel
         GlbStoragePath = GlbStoragePath,
         ViewerStoragePath = ViewerStoragePath,
         ViewerFileExtension = ViewerFileExtension,
-        GlbSignedUrl = GlbSignedUrl,
-        ViewerUrl = ViewerUrl,
+        GlbSignedUrl = PersistableViewerUrl(GlbSignedUrl),
+        ViewerUrl = PersistableViewerUrl(ViewerUrl),
         DrawingFiles = DrawingFiles,
         SupplementaryFiles = SupplementaryFiles,
         RoughnessCode = RoughnessCode,
@@ -520,6 +520,11 @@ public class PartViewModel
         SelectedBodyIndex = SelectedBodyIndex,
         ViewerSettings = ViewerSettings.Clone(),
     };
+
+    private static string? PersistableViewerUrl(string? url) =>
+        !string.IsNullOrWhiteSpace(url) && !url.StartsWith("blob:", StringComparison.OrdinalIgnoreCase)
+            ? url
+            : null;
 
     /// <summary>Restores a <see cref="PartViewModel"/> from a persisted <see cref="DraftPartState"/>.</summary>
     public static PartViewModel FromDraftPartState(DraftPartState s)

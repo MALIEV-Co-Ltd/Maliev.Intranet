@@ -176,6 +176,10 @@ public sealed class ModelViewerRenderingSourceTests
             .ReplaceLineEndings("\n");
         var uploadHelper = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "uploadWithProgress.js")
             .ReplaceLineEndings("\n");
+        var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+        var partViewModel = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartViewModel.cs")
+            .ReplaceLineEndings("\n");
 
         Assert.Contains("[Parameter] public string?                    BrowserFileClientId", modelViewer, StringComparison.Ordinal);
         Assert.Contains("[Parameter] public string?                    BrowserFileName", modelViewer, StringComparison.Ordinal);
@@ -185,7 +189,14 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("BrowserFileClientId=\"@Part.ClientUploadId\"", partDetail, StringComparison.Ordinal);
         Assert.Contains("BrowserFileName=\"@Part.Name\"", partDetail, StringComparison.Ordinal);
         Assert.Contains("async function getFileBytes(clientUploadId)", uploadHelper, StringComparison.Ordinal);
+        Assert.Contains("function getObjectUrl(clientUploadId)", uploadHelper, StringComparison.Ordinal);
         Assert.Contains("scheduleClearFile", uploadHelper, StringComparison.Ordinal);
+        Assert.Contains("TryApplyLocalViewerUrlAsync(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("window.projectNewUploads.getObjectUrl", projectNew, StringComparison.Ordinal);
+        Assert.Contains("CanUseBrowserFileViewer", projectNew, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrowserFileViewerExtension(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("PersistableViewerUrl(ViewerUrl)", partViewModel, StringComparison.Ordinal);
     }
 
     private static string ExtractBlock(string source, string start)

@@ -100,6 +100,7 @@ window.uploadBatchWithProgress = function (url, files, dotNetHelper) {
 
 window.projectNewUploads = (function () {
     const filesByClientId = new Map();
+    const objectUrlsByClientId = new Map();
     const clearTimersByClientId = new Map();
     const fileRetentionMs = 10 * 60 * 1000;
 
@@ -224,6 +225,11 @@ window.projectNewUploads = (function () {
         const existingTimer = clearTimersByClientId.get(clientUploadId);
         if (existingTimer) clearTimeout(existingTimer);
         clearTimersByClientId.delete(clientUploadId);
+        const objectUrl = objectUrlsByClientId.get(clientUploadId);
+        if (objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+            URL.revokeObjectURL(objectUrl);
+        }
+        objectUrlsByClientId.delete(clientUploadId);
         filesByClientId.delete(clientUploadId);
     }
 
@@ -246,11 +252,25 @@ window.projectNewUploads = (function () {
         return new Uint8Array(await file.arrayBuffer());
     }
 
+    function getObjectUrl(clientUploadId) {
+        const file = filesByClientId.get(clientUploadId);
+        if (!file || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return null;
+
+        let objectUrl = objectUrlsByClientId.get(clientUploadId);
+        if (!objectUrl) {
+            objectUrl = URL.createObjectURL(file);
+            objectUrlsByClientId.set(clientUploadId, objectUrl);
+        }
+
+        return objectUrl;
+    }
+
     return {
         captureFiles,
         uploadFile,
         clearFile,
         scheduleClearFile,
-        getFileBytes
+        getFileBytes,
+        getObjectUrl
     };
 })();
