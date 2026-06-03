@@ -237,8 +237,8 @@
     [Parameter] public PartViewerSettings         ViewerSettings { get; set; } = new();
     /// <summary>Raised when a persisted viewer setting changes.</summary>
     [Parameter] public EventCallback<PartViewerSettings> ViewerSettingsChanged { get; set; }
-    /// <summary>Raised when the browser geometry runtime completes local DFM analysis.</summary>
-    [Parameter] public EventCallback<LocalGeometryRuntimeResult> OnLocalGeometryRuntimeCompleted { get; set; }
+    /// <summary>Raised when the browser geometry runtime completes local DFM analysis. Returns true when the result was accepted.</summary>
+    [Parameter] public Func<LocalGeometryRuntimeResult, Task<bool>>? OnLocalGeometryRuntimeCompleted { get; set; }
 
     /// <summary>Body metadata for multi-body CAD files.</summary>
     public record BodyViewModel(int Index, string Name, double? VolumeCm3, string? ColorHex);
@@ -1272,10 +1272,12 @@
 
     /// <summary>JSInvokable callback when browser-first local DFM completes.</summary>
     [JSInvokable]
-    public async Task NotifyLocalGeometryRuntimeComplete(LocalGeometryRuntimeResult result)
+    public async Task<bool> NotifyLocalGeometryRuntimeComplete(LocalGeometryRuntimeResult result)
     {
-        if (OnLocalGeometryRuntimeCompleted.HasDelegate)
-            await OnLocalGeometryRuntimeCompleted.InvokeAsync(result);
+        if (OnLocalGeometryRuntimeCompleted is null)
+            return false;
+
+        return await OnLocalGeometryRuntimeCompleted(result);
     }
 
     /// <summary>JSInvokable callback when a measurement is completed.</summary>

@@ -199,6 +199,15 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("PersistableViewerUrl(ViewerUrl)", partViewModel, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BrowserLocalDfmCallback_UsesBlazorAcceptanceBeforeClearingPanel()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("const accepted = await dotNetRef.invokeMethodAsync('NotifyLocalGeometryRuntimeComplete', result);", source, StringComparison.Ordinal);
+        Assert.Contains("return accepted === true;", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

@@ -1757,12 +1757,13 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             ],
         };
 
-        await InvokePrivateTaskWithArgsAsync(cut, "HandleLocalGeometryRuntimeCompletedAsync", new PartLocalGeometryRuntimeResult
+        var applied = await InvokePrivateTaskWithResultAsync<bool>(cut, "HandleLocalGeometryRuntimeCompletedAsync", new PartLocalGeometryRuntimeResult
         {
             Part = part,
             Result = result,
         });
 
+        Assert.True(applied);
         var report = Assert.IsType<DfmReport>(part.DfmReport);
         Assert.Same(report, part.CncDfmReport);
         Assert.Equal("CNC_MILL", report.ReportType);
@@ -1771,6 +1772,39 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.Equal([1, 2, 3], issue.FaceIndices);
         Assert.False(part.DfmAnalysisTimedOut);
         Assert.Null(part.AnalysisErrorCode);
+    }
+
+    [Fact]
+    public async Task HandleLocalGeometryRuntimeCompletedAsync_WhenResultDoesNotMatchProcess_ReturnsFalse()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "local-fdm.stl",
+            StoragePath = "projects/local-fdm.stl",
+            ProcessCode = "FDM",
+            AnalysisErrorCode = "FILE_MISSING",
+        };
+        GetParts(cut.Instance).Add(part);
+
+        var result = new LocalGeometryRuntimeResult
+        {
+            ProcessCode = "CNC_MILL",
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive",
+            IsAuthoritative = false,
+        };
+
+        var applied = await InvokePrivateTaskWithResultAsync<bool>(cut, "HandleLocalGeometryRuntimeCompletedAsync", new PartLocalGeometryRuntimeResult
+        {
+            Part = part,
+            Result = result,
+        });
+
+        Assert.False(applied);
+        Assert.Null(part.DfmReport);
+        Assert.Equal("FILE_MISSING", part.AnalysisErrorCode);
     }
 
     [Fact]
@@ -1958,6 +1992,18 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
 
         var result = cut.InvokeAsync(() => (Task)method.Invoke(cut.Instance, args)!);
         await result;
+    }
+
+    private static async Task<T> InvokePrivateTaskWithResultAsync<T>(
+        RenderedComponent<global::Maliev.Intranet.Client.Pages.ProjectNew> cut,
+        string methodName,
+        params object[] args)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        return await cut.InvokeAsync(() => (Task<T>)method.Invoke(cut.Instance, args)!);
     }
 
     private static List<PartViewModel> GetParts(global::Maliev.Intranet.Client.Pages.ProjectNew instance)

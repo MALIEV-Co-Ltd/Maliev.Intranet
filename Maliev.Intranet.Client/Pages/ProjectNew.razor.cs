@@ -1171,16 +1171,17 @@ public partial class ProjectNew : IAsyncDisposable
         part.AnalysisErrorCode = null;
     }
 
-    private async Task HandleLocalGeometryRuntimeCompletedAsync(PartLocalGeometryRuntimeResult completion)
+    private async Task<bool> HandleLocalGeometryRuntimeCompletedAsync(PartLocalGeometryRuntimeResult completion)
     {
         if (!_parts.Contains(completion.Part))
-            return;
+            return false;
 
         if (!TryApplyLocalGeometryRuntimeResult(completion.Part, completion.Result))
-            return;
+            return false;
 
         await OnPartChanged(completion.Part);
         await InvokeAsync(StateHasChanged);
+        return true;
     }
 
     private static bool TryApplyLocalGeometryRuntimeResult(
