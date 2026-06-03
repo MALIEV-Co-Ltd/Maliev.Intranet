@@ -1889,7 +1889,7 @@ public partial class PartConfigSidebar : ComponentBase
         {
             // Only update part state if this analysis is still for the current process.
             // If the user already switched, ProcessCode has changed and we must not trample it.
-            if (part.ProcessCode == process.Code)
+            if (ProcessCodeNormalizer.Equals(part.ProcessCode, process.Code))
             {
                 part.ResolveDfmReport();
                 part.AvailableMaterials = [];

@@ -6,6 +6,25 @@ namespace Maliev.Intranet.Tests.Client.Components;
 public sealed class BrowserDfmRaceSourceTests
 {
     [Fact]
+    public void BrowserDfmGracePeriodCoversLocalWorkerBudgetBeforeServerFallback()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "BrowserDfmReportSync.cs")
+            .ReplaceLineEndings("\n");
+        var match = System.Text.RegularExpressions.Regex.Match(
+            source,
+            @"BrowserDfmGracePeriodMs\s*=\s*(?<value>[\d_]+)");
+
+        Assert.True(match.Success, "BrowserDfmReportSync must define an explicit browser DFM grace period.");
+
+        var gracePeriodMs = int.Parse(
+            match.Groups["value"].Value.Replace("_", string.Empty, StringComparison.Ordinal),
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(
+            gracePeriodMs >= 15_000,
+            "Browser DFM should get at least the viewer worker's 15s budget before starting the server DFM fallback.");
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
@@ -31,6 +50,16 @@ public sealed class BrowserDfmRaceSourceTests
             goneBranch.IndexOf("BrowserDfmReportSync.HasCurrentReport(part, process.Code)", StringComparison.Ordinal)
             < goneBranch.IndexOf("part.AnalysisErrorCode = \"FILE_MISSING\";", StringComparison.Ordinal),
             "PartConfigSidebar must keep a current browser DFM report instead of stamping FILE_MISSING after a late 410.");
+    }
+
+    [Fact]
+    public void PartConfigSidebar_PublishesDfmStateForEquivalentProcessCodes()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("ProcessCodeNormalizer.Equals(part.ProcessCode, process.Code)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("part.ProcessCode == process.Code", source, StringComparison.Ordinal);
     }
 
     private static string ExtractBlock(string source, string start)
