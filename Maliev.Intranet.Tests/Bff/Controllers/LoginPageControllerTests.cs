@@ -50,7 +50,6 @@ public class LoginPageControllerTests
         Assert.Contains("Continue with Google", content.Content);
         Assert.Contains("class=\"email-entry-form\"", content.Content);
         Assert.Contains("data-email-continue", content.Content);
-        Assert.Contains("Use your @maliev.com email.", content.Content);
         Assert.DoesNotContain(">Email address<", content.Content, StringComparison.Ordinal);
         Assert.DoesNotContain("Workspace password", content.Content, StringComparison.Ordinal);
         Assert.Contains("data-theme-icon=\"dark\"", content.Content);

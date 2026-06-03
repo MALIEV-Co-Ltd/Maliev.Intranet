@@ -304,13 +304,14 @@ public sealed class LoginPageController : Controller
             box-shadow: var(--maliev-shadow-md);
         }
         .btn-google {
-            background: var(--maliev-ink);
-            color: var(--maliev-panel);
+            background: #ffffff;
+            border: 1px solid var(--maliev-border);
+            color: #171717;
             box-shadow: var(--maliev-shadow-md);
         }
         .btn-google:hover {
-            background: var(--maliev-ink);
-            color: var(--maliev-panel);
+            background: #f6f6f6;
+            color: #171717;
             box-shadow: var(--maliev-shadow-card);
             text-decoration: none;
         }
@@ -577,7 +578,6 @@ public sealed class LoginPageController : Controller
                 const emailInput = form.querySelector('[name="Username"]');
                 const passwordInput = form.querySelector('[name="Password"]');
                 const emailSummary = form.querySelector('[data-email-summary]');
-                const requirement = form.querySelector('[data-email-requirement]');
                 const continueButton = form.querySelector('[data-email-continue]');
                 const backButton = form.querySelector('[data-email-back]');
 
@@ -596,12 +596,8 @@ public sealed class LoginPageController : Controller
 
                 function updateRequirement() {
                     const valid = isWorkspaceEmail(emailInput.value);
-                    if (requirement) {
-                        requirement.classList.toggle('is-met', valid);
-                        requirement.classList.toggle('is-pending', !valid);
-                    }
                     continueButton.disabled = !valid;
-                    emailInput.setCustomValidity(valid || emailInput.value.length === 0 ? '' : 'Use your @maliev.com email.');
+                    emailInput.setCustomValidity(valid || emailInput.value.length === 0 ? '' : 'Please use your work email.');
                 }
 
                 function showEmailStep() {
@@ -704,14 +700,13 @@ public sealed class LoginPageController : Controller
         </header>
         <main class="login-main">
             <section class="login-gateway-card" aria-labelledby="login-title">
-                <div class="login-card-heading">
+                    <div class="login-card-heading">
                     <p class="gateway-kicker">Employee gateway</p>
                     <h1 id="login-title" class="login-title" aria-label="Sign in to MALIEV">
                         <span>Sign in to</span>
                         <img src="/images/logo.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--light" />
                         <img src="/images/logo-white.svg" alt="" aria-hidden="true" class="login-title-logo login-title-logo--dark" />
                     </h1>
-                    <p class="subtitle">Use your @maliev.com Google Workspace account to continue to the intranet workspace.</p>
                 </div>
                 {{errorHtml}}
                 <a class="btn-google" href="/api/v1/auth/login?returnUrl={{encodedGoogleReturnUrl}}">
@@ -726,14 +721,11 @@ public sealed class LoginPageController : Controller
                 <div class="divider">or continue with email</div>
                 <form class="email-entry-form" method="post" action="/api/v1/auth/login-form" data-email-login-form>
                     <input type="hidden" name="ReturnUrl" value="{{encodedReturnUrl}}" />
-                    <div class="email-step" data-email-step>
-                        <div class="field">
-                            <label for="Username">Email</label>
-                            <input id="Username" name="Username" type="email" autocomplete="username" inputmode="email" placeholder="name@maliev.com" pattern="^[^@\s]+@maliev\.com$" title="Use your @maliev.com email." aria-describedby="login-email-requirements" required />
-                        </div>
-                        <ul id="login-email-requirements" class="auth-requirement-list" aria-live="polite">
-                            <li class="auth-requirement-item is-pending" data-email-requirement>Use your @maliev.com email.</li>
-                        </ul>
+                        <div class="email-step" data-email-step>
+                            <div class="field">
+                                <label for="Username">Email</label>
+                                <input id="Username" name="Username" type="email" autocomplete="username" inputmode="email" placeholder="name@maliev.com" pattern="^[^@\s]+@maliev\.com$" required />
+                            </div>
                         <button class="submit" type="button" data-email-continue disabled>Continue with email</button>
                     </div>
                     <div class="credential-step" data-credential-step hidden>

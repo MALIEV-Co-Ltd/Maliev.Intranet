@@ -123,15 +123,11 @@ public partial class Login : ComponentBase
 
     private bool CredentialsReady => EmailLooksValid && !string.IsNullOrWhiteSpace(_loginModel.Password);
 
-    private string EmailRequirementClass => EmailLooksValid
-        ? "auth-requirement-item is-met"
-        : "auth-requirement-item is-pending";
-
     private void ContinueWithEmail()
     {
         if (!EmailLooksValid)
         {
-            _errorMessage = "Use your @maliev.com email.";
+            _errorMessage = "Please use your work email.";
             return;
         }
 

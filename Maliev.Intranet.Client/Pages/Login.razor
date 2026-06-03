@@ -34,7 +34,6 @@
                         <span>Sign in to</span>
                         <img src="@LogoUrl" alt="" aria-hidden="true" class="login-title-logo" />
                     </h1>
-                    <p class="form-subtitle">Use your @@maliev.com Google Workspace account to continue to the intranet workspace.</p>
                 </div>
 
                 @if (!string.IsNullOrEmpty(_errorMessage))
@@ -69,7 +68,6 @@
                                        class="input-field"
                                        placeholder="name@@maliev.com"
                                        pattern="^[^@@\s]+@@maliev\.com$"
-                                       title="Use your @@maliev.com email."
                                        aria-describedby="login-email-requirements"
                                        @bind="_usernameInput"
                                        @bind:event="oninput"
@@ -77,10 +75,6 @@
                                 <div class="input-underline"></div>
                             </div>
                         </div>
-
-                        <ul id="login-email-requirements" class="auth-requirement-list" aria-live="polite">
-                            <li class="@EmailRequirementClass">Use your @@maliev.com email.</li>
-                        </ul>
 
                         <button class="btn-primary" type="submit" disabled="@(!EmailLooksValid)">Continue with email</button>
                     </form>

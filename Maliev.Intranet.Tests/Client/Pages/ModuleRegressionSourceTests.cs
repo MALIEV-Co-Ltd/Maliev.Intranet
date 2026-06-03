@@ -1899,6 +1899,8 @@ public class ModuleRegressionSourceTests
         var themeToggleBlock = ExtractCssBlock(styles, ".theme-toggle-btn {");
         var loginFooterBlock = ExtractCssBlock(styles, ".login-footer {");
         var requirementListBlock = ExtractCssBlock(styles, ".auth-requirement-list {");
+        var googleButtonBlock = ExtractLastCssBlock(styles, ".btn-google {");
+        var googleButtonHoverBlock = ExtractCssBlock(styles, ".btn-google:hover {");
         var bffThemeToggleRootIndex = bffLogin.LastIndexOf(".theme-toggle-btn {", StringComparison.Ordinal);
         Assert.True(bffThemeToggleRootIndex >= 0, "Expected the BFF login page to have a root theme-toggle block.");
         var bffThemeToggleBlock = ExtractCssBlock(bffLogin[bffThemeToggleRootIndex..], ".theme-toggle-btn {");
@@ -1906,6 +1908,8 @@ public class ModuleRegressionSourceTests
         var bffLoginFooterBlock = ExtractCssBlock(bffLogin, ".login-footer {");
         var bffRequirementListBlock = ExtractCssBlock(bffLogin, ".auth-requirement-list {");
         var bffEmailStepBlock = ExtractCssBlock(bffLogin, ".email-step {");
+        var bffGoogleButtonBlock = ExtractLastCssBlock(bffLogin, ".btn-google {");
+        var bffGoogleButtonHoverBlock = ExtractCssBlock(bffLogin, ".btn-google:hover {");
         var googleIndex = source.IndexOf("Continue with Google", StringComparison.Ordinal);
         var emailFormIndex = source.IndexOf("class=\"email-entry-form\"", StringComparison.Ordinal);
         Assert.True(googleIndex >= 0 && emailFormIndex > googleIndex, "Expected Google to be the primary login action before the email fallback.");
@@ -1915,7 +1919,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("background: var(--maliev-bg);", styles, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-card);", styles, StringComparison.Ordinal);
         Assert.Contains("border-radius: var(--maliev-radius-md);", styles, StringComparison.Ordinal);
-        Assert.Contains("background: var(--maliev-ink);", styles, StringComparison.Ordinal);
+        Assert.Contains("background: #ffffff;", googleButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("color: #171717;", googleButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("color: #171717;", googleButtonHoverBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("color: var(--maliev-ink);", googleButtonBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("color: var(--maliev-ink);", googleButtonHoverBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: var(--maliev-shadow-ring);", styles, StringComparison.Ordinal);
         Assert.Contains("background: transparent;", loginHeaderBlock, StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", loginHeaderBlock, StringComparison.Ordinal);
@@ -1940,7 +1948,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("Continue with Google", bffLogin, StringComparison.Ordinal);
         Assert.Contains("class=\"email-entry-form\"", bffLogin, StringComparison.Ordinal);
         Assert.Contains("data-email-continue", bffLogin, StringComparison.Ordinal);
-        Assert.Contains("Use your @maliev.com email.", bffLogin, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use your @maliev.com email.", bffLogin, StringComparison.Ordinal);
         Assert.DoesNotContain(">Email address<", bffLogin, StringComparison.Ordinal);
         Assert.DoesNotContain("Workspace password", bffLogin, StringComparison.Ordinal);
         Assert.Contains("family=Geist:wght@400..700", bffLogin, StringComparison.Ordinal);
@@ -1958,6 +1966,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains("grid-template-rows: auto minmax(0, 1fr) auto;", bffLogin, StringComparison.Ordinal);
         Assert.Contains("--maliev-shadow-card", bffLogin, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-bg);", bffLogin, StringComparison.Ordinal);
+        Assert.Contains("background: #ffffff;", bffGoogleButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("color: #171717;", bffGoogleButtonBlock, StringComparison.Ordinal);
+        Assert.Contains("color: #171717;", bffGoogleButtonHoverBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("color: var(--maliev-ink);", bffGoogleButtonBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("color: var(--maliev-ink);", bffGoogleButtonHoverBlock, StringComparison.Ordinal);
         Assert.Contains("background: transparent;", ExtractCssBlock(bffLogin, ".login-header {"), StringComparison.Ordinal);
         Assert.Contains("box-shadow: none;", ExtractCssBlock(bffLogin, ".login-header {"), StringComparison.Ordinal);
         Assert.Contains("background: transparent;", bffLoginFooterBlock, StringComparison.Ordinal);
@@ -2401,6 +2414,20 @@ public class ModuleRegressionSourceTests
     private static string ExtractCssBlock(string source, string selector)
     {
         var selectorIndex = source.IndexOf(selector, StringComparison.Ordinal);
+        Assert.True(selectorIndex >= 0, $"Expected selector '{selector}' to exist.");
+
+        var blockStart = source.IndexOf('{', selectorIndex);
+        Assert.True(blockStart >= 0, $"Expected selector '{selector}' to have a declaration block.");
+
+        var blockEnd = source.IndexOf('}', blockStart);
+        Assert.True(blockEnd >= 0, $"Expected selector '{selector}' declaration block to close.");
+
+        return source.Substring(blockStart + 1, blockEnd - blockStart - 1);
+    }
+
+    private static string ExtractLastCssBlock(string source, string selector)
+    {
+        var selectorIndex = source.LastIndexOf(selector, StringComparison.Ordinal);
         Assert.True(selectorIndex >= 0, $"Expected selector '{selector}' to exist.");
 
         var blockStart = source.IndexOf('{', selectorIndex);

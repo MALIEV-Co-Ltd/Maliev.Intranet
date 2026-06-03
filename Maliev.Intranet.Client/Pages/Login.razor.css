@@ -229,14 +229,15 @@
 }
 
 .btn-google {
-    background: var(--maliev-ink);
-    color: var(--maliev-panel);
+    background: #ffffff;
+    border: 1px solid var(--maliev-border);
+    color: #171717;
     box-shadow: var(--maliev-shadow-md);
 }
 
 .btn-google:hover {
-    background: var(--maliev-ink);
-    color: var(--maliev-panel);
+    background: #f6f6f6;
+    color: #171717;
     box-shadow: var(--maliev-shadow-card);
     text-decoration: none;
 }
