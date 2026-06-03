@@ -1,0 +1,220 @@
+.notif-bell-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notif-bell-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: var(--maliev-radius);
+    background: transparent;
+    color: var(--maliev-muted);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.notif-bell-btn:hover {
+    background: var(--maliev-panel-3);
+    color: var(--maliev-text);
+}
+
+.notif-bell-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.notif-bell-active {
+    color: var(--maliev-text);
+}
+
+.notif-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    border: 1.5px solid var(--maliev-surface);
+    border-radius: 7px;
+    background: var(--mud-palette-error);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.notif-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(360px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    overflow: hidden;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-lg);
+    background: var(--maliev-panel-1);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+    z-index: 1200;
+}
+
+.notif-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--maliev-border);
+}
+
+.notif-panel-title {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+    color: var(--maliev-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.notif-panel-count {
+    color: var(--maliev-muted);
+    font-size: 11px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.notif-mark-all {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--maliev-accent);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+.notif-mark-all:hover {
+    text-decoration: underline;
+}
+
+.notif-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notif-item {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--maliev-border-subtle, rgba(255, 255, 255, 0.04));
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.notif-item:hover {
+    background: var(--maliev-panel-2);
+}
+
+.notif-item:focus-visible {
+    outline: none;
+    box-shadow: var(--maliev-focus-ring);
+}
+
+.notif-item.unread {
+    background: rgba(107, 127, 240, 0.05);
+}
+
+.notif-item.unread::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: var(--maliev-accent);
+}
+
+.notif-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--maliev-radius);
+    background: rgba(107, 127, 240, 0.12);
+}
+
+.notif-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-headline {
+    color: var(--maliev-text);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.notif-detail {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--maliev-muted);
+    font-size: 11px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.notif-time {
+    margin-top: 4px;
+    color: var(--maliev-muted-2, #6b7280);
+    font-size: 10px;
+}
+
+.notif-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 32px 16px;
+    color: var(--maliev-muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.notif-empty p {
+    margin: 0;
+}
+
+.notif-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--maliev-border);
+    text-align: center;
+}
+
+.notif-footer a {
+    color: var(--maliev-accent);
+    font-size: 11px;
+    text-decoration: none;
+}
+
+.notif-footer a:hover {
+    text-decoration: underline;
+}

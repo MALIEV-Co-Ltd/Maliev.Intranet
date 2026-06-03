@@ -132,12 +132,21 @@ public class AlertSourceTests
     }
 
     [Fact]
-    public void TopBarCss_ContainsNotificationPanelStyle()
+    public void NotificationBellCss_ContainsNotificationPanelStyle()
     {
-        var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "NotificationBell.razor.css");
         Assert.Contains(".notif-panel", source, StringComparison.Ordinal);
         Assert.Contains(".notif-item", source, StringComparison.Ordinal);
         Assert.Contains(".notif-badge", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NotificationBellCss_OwnsPanelStylesBecauseTopBarCssIsolationCannotStyleChildContent()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "NotificationBell.razor.css");
+        Assert.Contains(".notif-panel", source, StringComparison.Ordinal);
+        Assert.Contains("position: absolute;", source, StringComparison.Ordinal);
+        Assert.Contains("z-index: 1200;", source, StringComparison.Ordinal);
     }
 
     // ── Helper ───────────────────────────────────────────────────────────────
