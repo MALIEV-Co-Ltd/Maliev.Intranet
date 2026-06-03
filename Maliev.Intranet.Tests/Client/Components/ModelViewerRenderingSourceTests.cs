@@ -200,6 +200,20 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void ProjectNew_RetainsBrowserViewerFilesUntilPartLifecycleEnds()
+    {
+        var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("ShouldRetainBrowserUploadFile(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("!ShouldRetainBrowserUploadFile(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("ClearBrowserUploadFileAsync(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("window.projectNewUploads.clearFile", projectNew, StringComparison.Ordinal);
+        Assert.Contains("ClientUploadId = sourcePart.ClientUploadId", projectNew, StringComparison.Ordinal);
+        Assert.Contains("!ReferenceEquals(existing, part)", projectNew, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BrowserLocalDfmCallback_UsesBlazorAcceptanceBeforeClearingPanel()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");

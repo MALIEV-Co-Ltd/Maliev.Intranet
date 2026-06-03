@@ -146,6 +146,8 @@ public partial class ProjectNew : IAsyncDisposable
         _statusPollCts.Clear();
         foreach (var callbackRef in _uploadCallbacks.Values) { callbackRef.Dispose(); }
         _uploadCallbacks.Clear();
+        foreach (var part in _parts)
+            await ClearBrowserUploadFileAsync(part, force: true);
         _autoSaveDebounceTimer?.Dispose();
         _storageMigrationDebounceTimer?.Dispose();
         if (_searchCts != null) { await _searchCts.CancelAsync(); _searchCts.Dispose(); }
@@ -554,7 +556,8 @@ public partial class ProjectNew : IAsyncDisposable
 
             try
             {
-                await JS.InvokeVoidAsync("window.projectNewUploads.scheduleClearFile", item.ClientUploadId);
+                if (!ShouldRetainBrowserUploadFile(part))
+                    await JS.InvokeVoidAsync("window.projectNewUploads.scheduleClearFile", item.ClientUploadId);
             }
             catch (JSDisconnectedException)
             {
@@ -1509,6 +1512,38 @@ public partial class ProjectNew : IAsyncDisposable
     private static bool CanUseBrowserFileViewer(PartViewModel part)
         => ResolveBrowserFileViewerExtension(part) is not null;
 
+    private static bool ShouldRetainBrowserUploadFile(PartViewModel part) =>
+        !string.IsNullOrWhiteSpace(part.ClientUploadId)
+        && !string.IsNullOrWhiteSpace(part.StoragePath)
+        && string.IsNullOrWhiteSpace(part.Error)
+        && CanUseBrowserFileViewer(part);
+
+    private async Task ClearBrowserUploadFileAsync(PartViewModel part, bool force = false)
+    {
+        if (string.IsNullOrWhiteSpace(part.ClientUploadId))
+            return;
+
+        if (!force && _parts.Any(existing =>
+            !ReferenceEquals(existing, part)
+            && string.Equals(existing.ClientUploadId, part.ClientUploadId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("window.projectNewUploads.clearFile", part.ClientUploadId);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Page teardown can race with browser-side cleanup.
+        }
+        catch (JSException ex)
+        {
+            Logger.LogDebug(ex, "Failed to clear retained browser upload file reference.");
+        }
+    }
+
     private static string? ResolveBrowserFileViewerExtension(PartViewModel part)
     {
         var ext = NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name);
@@ -1634,6 +1669,7 @@ public partial class ProjectNew : IAsyncDisposable
         _parts.Remove(part);
         _bulkSelectedParts.Remove(part);
         PruneBulkSelection();
+        await ClearBrowserUploadFileAsync(part);
 
         if (_selectedPartIndex >= _parts.Count)
             _selectedPartIndex = Math.Max(0, _parts.Count - 1);
@@ -3429,6 +3465,7 @@ public partial class ProjectNew : IAsyncDisposable
             // Identity — reuse same physical upload
             Name = sourcePart.Name,
             FileId = sourcePart.FileId,
+            ClientUploadId = sourcePart.ClientUploadId,
             StoragePath = sourcePart.StoragePath,
             StoragePathAliases = [.. sourcePart.StoragePathAliases],
             FileSizeBytes = sourcePart.FileSizeBytes,
