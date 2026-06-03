@@ -66,6 +66,7 @@ public partial class PartConfigSidebar : ComponentBase
     private readonly Dictionary<Guid, decimal> _lastSeenPricesByPart = new();
     private readonly Dictionary<Guid, List<BulkPricingTable.BulkTier>> _bulkTiersByPart = new();
     private int _lastQuantity;
+    private ElementReference _processRowElement;
     // Finish id → absolute additional unit cost in THB.
     private Dictionary<Guid, decimal> _finishPrices = new();
 
@@ -525,6 +526,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null || p == null) return;
 
         var processChanged = ProjectPartBulkEdit.ApplyProcess(Part, p);
+        await ScrollProcessIntoStartAsync(p.Code);
         if (!processChanged)
         {
             if (_dfmReports.ContainsKey(p.Code))
@@ -560,6 +562,21 @@ public partial class PartConfigSidebar : ComponentBase
 
         // DFM runs after materials are already loading. finally block fires OnPartChanged again with DFM state.
         await AnalyzeProcessForDfm(p);
+    }
+
+    private async Task ScrollProcessIntoStartAsync(string processCode)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync(
+                "malievPartConfigSidebar.scrollProcessIntoStart",
+                _processRowElement,
+                processCode);
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or OperationCanceledException)
+        {
+            Logger?.LogDebug(ex, "Could not scroll selected process {ProcessCode} into view", processCode);
+        }
     }
 
     private void ApplyTypedReportFromCache(string processCode)

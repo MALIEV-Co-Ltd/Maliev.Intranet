@@ -41,13 +41,18 @@
             <div class="pcs-section-header">
                 <span class="pcs-section-title">Manufacturing Process</span>
             </div>
-            <div class="pcs-process-row">
+            <div class="pcs-process-row" @ref="_processRowElement">
                 @foreach (var proc in Processes)
                 {
                     var active = SelectedProcess?.Code == proc.Code;
+                    var cardClass = active
+                        ? "pcs-process-card pcs-process-card--active"
+                        : HasSelectedProcess ? "pcs-process-card pcs-process-card--dimmed" : "pcs-process-card";
                     var name = GetProcessCardName(proc);
                     var description = GetProcessDescription(proc);
-                    <button class="pcs-process-card @(active ? "pcs-process-card--active" : "")"
+                    <button class="@cardClass"
+                            data-process-code="@proc.Code"
+                            aria-pressed="@active"
                             title="@proc.Name"
                             @onclick="@(() => OnProcessChanged(proc))">
                         @if (active)
@@ -610,6 +615,7 @@
                 border-left: 1px solid var(--maliev-border);
                 position: relative;
                 z-index: 0;
+                --pcs-process-active: var(--maliev-info, #3b82f6);
             }
 
             .pcs-root:has(.pcs-option-image-frame:hover),
@@ -801,6 +807,7 @@
                 padding: 0 0 6px;
                 scrollbar-width: thin;
                 scrollbar-color: var(--maliev-border) transparent;
+                scroll-behavior: smooth;
             }
 
             .pcs-process-card {
@@ -816,7 +823,7 @@
                 font-weight: 500;
                 color: var(--maliev-muted);
                 position: relative;
-                transition: all 0.15s;
+                transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, opacity 0.18s ease, filter 0.18s ease;
                 overflow: hidden;
                 padding: 0;
                 text-align: left;
@@ -829,16 +836,29 @@
             }
 
             .pcs-process-card--active {
-                color: var(--mud-palette-primary);
+                color: var(--pcs-process-active);
                 font-weight: 600;
-                box-shadow: inset 0 0 0 1px var(--mud-palette-primary);
+                box-shadow: inset 0 0 0 1px var(--pcs-process-active);
+                opacity: 1;
+                filter: none;
+            }
+
+            .pcs-process-card--dimmed {
+                opacity: 0.58;
+                filter: grayscale(0.08) saturate(0.74);
+            }
+
+            .pcs-process-card--dimmed:hover,
+            .pcs-process-card--dimmed:focus-visible {
+                opacity: 0.84;
+                filter: saturate(0.95);
             }
 
             .pcs-process-card--active::after {
                 content: "";
                 position: absolute;
                 inset: 0;
-                border: 2px solid var(--mud-palette-primary);
+                border: 2px solid var(--pcs-process-active);
                 border-radius: inherit;
                 pointer-events: none;
                 z-index: 3;
@@ -859,13 +879,14 @@
                 width: 16px;
                 height: 16px;
                 border-radius: 50%;
-                background: var(--mud-palette-primary);
+                background: var(--pcs-process-active);
                 display: grid;
                 place-items: center;
-                color: var(--mud-palette-primary-contrast-text);
+                color: #fff;
                 font-size: 10px;
                 line-height: 1;
                 z-index: 4;
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.86), 0 6px 14px rgba(0, 0, 0, 0.32);
             }
 
             .pcs-process-check .mud-icon-root {

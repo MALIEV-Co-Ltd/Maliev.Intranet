@@ -183,7 +183,7 @@ public class PartConfigSidebarTests
         Assert.Contains(".pcs-process-row {\n                display: flex;\n                flex-flow: row nowrap;\n                gap: 7px;\n                overflow-x: auto;\n                padding: 0 0 6px;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-card {\n                flex: 0 0 128px;", source, StringComparison.Ordinal);
         Assert.Contains("box-shadow: inset 0 0 0 1px var(--maliev-border);", source, StringComparison.Ordinal);
-        Assert.Contains("border: 2px solid var(--mud-palette-primary);", source, StringComparison.Ordinal);
+        Assert.Contains("border: 2px solid var(--pcs-process-active);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("border-width: 2px;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 88px;", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3) center / cover no-repeat;", source, StringComparison.Ordinal);

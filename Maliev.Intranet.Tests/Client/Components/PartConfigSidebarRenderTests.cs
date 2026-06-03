@@ -665,6 +665,45 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ManufacturingProcessSection_ScrollsSelectedProcessToStartAndDimsInactiveCards()
+    {
+        var markup = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+        var codeBehind = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor.cs")
+            .ReplaceLineEndings("\n");
+        var script = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "wwwroot",
+                "js",
+                "part-config-sidebar.js")
+            .ReplaceLineEndings("\n");
+        var appHost = ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
+        var wasmHost = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "index.html");
+
+        Assert.Contains("@ref=\"_processRowElement\"", markup, StringComparison.Ordinal);
+        Assert.Contains("data-process-code=\"@proc.Code\"", markup, StringComparison.Ordinal);
+        Assert.Contains("pcs-process-card--dimmed", markup, StringComparison.Ordinal);
+        Assert.Contains("aria-pressed=\"@active\"", markup, StringComparison.Ordinal);
+        Assert.Contains("scroll-behavior: smooth;", markup, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card--dimmed {", markup, StringComparison.Ordinal);
+        Assert.Contains("opacity: 0.58;", markup, StringComparison.Ordinal);
+        Assert.Contains("ScrollProcessIntoStartAsync(p.Code)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("window.malievPartConfigSidebar", script, StringComparison.Ordinal);
+        Assert.Contains("scrollTo({", script, StringComparison.Ordinal);
+        Assert.Contains("behavior: prefersReducedMotion ? \"auto\" : \"smooth\"", script, StringComparison.Ordinal);
+        Assert.Contains("<script src=\"js/part-config-sidebar.js\"></script>", appHost, StringComparison.Ordinal);
+        Assert.Contains("<script src=\"js/part-config-sidebar.js\"></script>", wasmHost, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AnodizedGreenColorImage_UsesDedicatedAnodizedRepresentation()
     {
         var source = ReadRepoFile(
@@ -709,10 +748,13 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .ReplaceLineEndings("\n");
 
         Assert.Contains(".pcs-process-card--active::after", source, StringComparison.Ordinal);
-        Assert.Contains("border: 2px solid var(--mud-palette-primary);", source, StringComparison.Ordinal);
+        Assert.Contains("--pcs-process-active: var(--maliev-info, #3b82f6);", source, StringComparison.Ordinal);
+        Assert.Contains("border: 2px solid var(--pcs-process-active);", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-card--active::after {\n                content: \"\";", source, StringComparison.Ordinal);
         Assert.Contains("z-index: 3;", source, StringComparison.Ordinal);
-        Assert.Contains("color: var(--mud-palette-primary-contrast-text);", source, StringComparison.Ordinal);
+        Assert.Contains("background: var(--pcs-process-active);", source, StringComparison.Ordinal);
+        Assert.Contains("color: #fff;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("color: var(--mud-palette-primary-contrast-text);", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-check {\n                position: absolute;", source, StringComparison.Ordinal);
         Assert.Contains("z-index: 4;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-check .mud-icon-root {\n                color: currentColor;", source, StringComparison.Ordinal);
