@@ -138,6 +138,7 @@ function loadViewerContext() {
                     this.albedoColor = new Color3();
                     this.metallic = 0;
                     this.roughness = 0;
+                    this.subSurface = {};
                     scene?.materials?.push(this);
                 }
             },
@@ -428,7 +429,14 @@ test('transparent manufacturing presets use alpha-blended PBR material depth han
                 metallic: material?.metallic ?? null,
                 roughness: material?.roughness ?? null,
                 albedoB: material?.albedoColor?.b ?? null,
-                indexOfRefraction: material?.indexOfRefraction ?? null
+                indexOfRefraction: material?.indexOfRefraction ?? null,
+                linkRefractionWithTransparency: material?.linkRefractionWithTransparency ?? null,
+                useRadianceOverAlpha: material?.useRadianceOverAlpha ?? null,
+                useSpecularOverAlpha: material?.useSpecularOverAlpha ?? null,
+                refractionEnabled: material?.subSurface?.isRefractionEnabled ?? null,
+                translucencyEnabled: material?.subSurface?.isTranslucencyEnabled ?? null,
+                refractionIntensity: material?.subSurface?.refractionIntensity ?? null,
+                translucencyIntensity: material?.subSurface?.translucencyIntensity ?? null
             };
         };
         ({
@@ -449,6 +457,13 @@ test('transparent manufacturing presets use alpha-blended PBR material depth han
         assert.ok(material.roughness <= 0.16, `${name} should stay clear/glossy instead of frosted matte, got ${material.roughness}`);
         assert.ok(material.albedoB >= 0.93, `${name} should keep a bright clear-material albedo, got blue channel ${material.albedoB}`);
         assert.ok(material.indexOfRefraction >= 1.45 && material.indexOfRefraction <= 1.55, `${name} should use plastic/resin IOR, got ${material.indexOfRefraction}`);
+        assert.equal(material.linkRefractionWithTransparency, true, `${name} should link alpha to PBR refraction instead of rendering as a dark alpha shell`);
+        assert.equal(material.useRadianceOverAlpha, true, `${name} should keep environment radiance visible through transparent pixels`);
+        assert.equal(material.useSpecularOverAlpha, true, `${name} should keep clear-material highlights visible through transparent pixels`);
+        assert.equal(material.refractionEnabled, true, `${name} should enable PBR refraction`);
+        assert.equal(material.translucencyEnabled, true, `${name} should enable PBR translucency`);
+        assert.ok(material.refractionIntensity > 0 && material.refractionIntensity <= 1, `${name} should carry bounded refraction intensity`);
+        assert.ok(material.translucencyIntensity > 0 && material.translucencyIntensity <= 1, `${name} should carry bounded translucency intensity`);
     }
 
     assert.equal(result.petg.materialName, '__realistic_petg-clear__');

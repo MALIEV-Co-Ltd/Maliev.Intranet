@@ -4081,6 +4081,10 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
     const surfacePlugin = findMaterialPlugin(material, 'MalievSurfaceEffect');
     surfacePlugin?.setEffect?.(surfaceEffect);
 
+    applyRealisticTransparencySettings(material, preset);
+}
+
+function applyRealisticTransparencySettings(material, preset) {
     if (preset.alpha != null && preset.alpha < 1.0) {
         material.alpha = preset.alpha;
         material.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
@@ -4088,8 +4092,17 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
         material.separateCullingPass = true;
         material.backFaceCulling = false;
         material.useAlphaFromAlbedoTexture = false;
+        material.linkRefractionWithTransparency = true;
+        material.useRadianceOverAlpha = true;
+        material.useSpecularOverAlpha = true;
         if (preset.indexOfRefraction != null) {
             material.indexOfRefraction = preset.indexOfRefraction;
+        }
+        if (material.subSurface) {
+            material.subSurface.isRefractionEnabled = true;
+            material.subSurface.isTranslucencyEnabled = true;
+            material.subSurface.refractionIntensity = clamp(1 - preset.alpha, 0.05, 1);
+            material.subSurface.translucencyIntensity = clamp(1 - (preset.roughness ?? 0.1), 0.2, 1);
         }
     } else {
         material.alpha = 1;
@@ -4097,6 +4110,15 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
         material.needDepthPrePass = false;
         material.separateCullingPass = false;
         material.backFaceCulling = true;
+        material.linkRefractionWithTransparency = false;
+        material.useRadianceOverAlpha = false;
+        material.useSpecularOverAlpha = false;
+        if (material.subSurface) {
+            material.subSurface.isRefractionEnabled = false;
+            material.subSurface.isTranslucencyEnabled = false;
+            material.subSurface.refractionIntensity = 0;
+            material.subSurface.translucencyIntensity = 0;
+        }
     }
 }
 
@@ -4108,15 +4130,6 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
     const pbr = new BABYLON.PBRMaterial(`__realistic_${materialType}__`, scene);
     configureRealisticPbrQuality(pbr);
     syncRealisticMaterialProperties(pbr, preset, custom, finishMod, profile);
-
-    // Translucent materials (e.g. clear PETG): alpha < 1 gives a frosted/milky look
-    if (preset.alpha != null && preset.alpha < 1.0) {
-        pbr.alpha            = preset.alpha;
-        pbr.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
-        pbr.needDepthPrePass = true;
-        pbr.separateCullingPass = true;
-        pbr.backFaceCulling = false;
-    }
 
     // FDM layer-line simulation: attach plugin to FDM plastic presets (UV-independent world-space effect)
     if (shouldApplyFdmLayerLines(canvasId, materialType)) {
