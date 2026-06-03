@@ -554,6 +554,82 @@ test('runtime asset resolver maps GeometryService manifest assets to same-origin
     assert.equal(urls.rejected, null);
 });
 
+test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', async () => {
+    const context = loadViewerContext();
+    const panels = [];
+    const host = {
+        querySelector: () => null,
+        appendChild: panel => panels.push(panel),
+    };
+    context.document.createElement = () => ({
+        setAttribute: () => {},
+        style: {},
+        textContent: '',
+        remove: () => {},
+    });
+    context.document.getElementById = () => ({ parentElement: host });
+    context.setTimeout = () => 1;
+    context.clearTimeout = () => {};
+    context.fetch = async () => ({
+        ok: true,
+        json: async () => ({
+            manifestVersion: 1,
+            runtimeVersion: '1.0.0',
+            algorithmVersion: 'browser-first-dfm-v1',
+            executionMode: 'primary_interactive',
+            authority: 'local_primary',
+            isAuthoritative: false,
+            minFrontendApiVersion: 1,
+            assets: {
+                worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+            },
+        }),
+    });
+    context.Worker = class Worker {
+        constructor(url) {
+            this.url = url;
+        }
+
+        postMessage(message) {
+            this.onmessage({
+                data: {
+                    id: message.id,
+                    ok: true,
+                    result: {
+                        authority: 'local_primary',
+                        isAuthoritative: false,
+                        executionMode: 'primary_interactive',
+                        metrics: { faceCount: 1 },
+                        issues: [],
+                    },
+                },
+            });
+        }
+
+        terminate() {}
+    };
+    context.scene = {
+        meshes: [
+            makeMesh('model', {
+                uniqueId: 201,
+                positions: [0, 0, 0, 10, 0, 0, 0, 10, 0],
+                indices: [0, 1, 2],
+                totalVertices: 3,
+            }),
+        ],
+    };
+
+    const result = await vm.runInContext(`
+        scenes.viewer = scene;
+        tagModelMeshesForAnalysis('viewer', scene);
+        runLocalAdvisoryGeometry('viewer');
+    `, context);
+
+    assert.equal(result?.authority, 'local_primary');
+    assert.equal(result?.executionMode, 'primary_interactive');
+    assert.equal(panels.at(-1)?.textContent, 'Local preliminary DFM: no warnings · local primary · 1 tris');
+});
+
 test('showGrid uses a low-contrast grid floor in light mode', () => {
     const context = loadViewerContext();
     context.scene = {

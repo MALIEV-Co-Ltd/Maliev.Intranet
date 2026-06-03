@@ -5040,7 +5040,7 @@ function renderLocalAdvisoryStatus(canvasId, state, result = null) {
     const issueLabel = warnings === 0
         ? 'no warnings'
         : `${warnings} warning${warnings === 1 ? '' : 's'}`;
-    panel.textContent = `Local preliminary DFM: ${issueLabel} · advisory only · ${faceCount.toLocaleString()} tris`;
+    panel.textContent = `Local preliminary DFM: ${issueLabel} · local primary · ${faceCount.toLocaleString()} tris`;
 }
 
 function terminateLocalAdvisoryWorker(canvasId) {
@@ -5076,8 +5076,14 @@ function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, input, processCode,
     });
 }
 
+function isBrowserFirstRuntimeContract(value) {
+    return value?.isAuthoritative === false &&
+        value?.authority === 'local_primary' &&
+        value?.executionMode === 'primary_interactive';
+}
+
 /**
- * Runs the GeometryService-owned advisory browser runtime through the same-origin BFF proxy.
+ * Runs the GeometryService-owned browser-first runtime through the same-origin BFF proxy.
  * Falls back silently to the server-only path when the manifest or worker cannot be used.
  * @param {string} canvasId
  * @param {{processCode?: string, manifestUrl?: string, assetBaseUrl?: string, timeoutMs?: number}} options
@@ -5105,8 +5111,7 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
 
         const manifest = await manifestResponse.json();
         if (Number(manifest.minFrontendApiVersion ?? 1) > LOCAL_ADVISORY_FRONTEND_API_VERSION ||
-            manifest.isAuthoritative !== false ||
-            manifest.authority !== 'advisory') {
+            !isBrowserFirstRuntimeContract(manifest)) {
             clearLocalAdvisoryPanel(canvasId);
             return null;
         }
@@ -5126,8 +5131,7 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
             options.processCode ?? 'FDM',
             Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 15000);
         if (localAdvisoryRuns[canvasId] !== runId ||
-            result?.isAuthoritative !== false ||
-            result?.authority !== 'advisory') {
+            !isBrowserFirstRuntimeContract(result)) {
             clearLocalAdvisoryPanel(canvasId);
             return null;
         }
