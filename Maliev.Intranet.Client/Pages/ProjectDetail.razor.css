@@ -57,6 +57,11 @@
     padding: 20px;
 }
 
+.project-record-shell ::deep .project-record-body--quote {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
 .project-record-shell ::deep .project-record-body--parts {
     align-items: stretch;
 }

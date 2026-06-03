@@ -615,6 +615,19 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         Assert.DoesNotContain("520px", gridRule, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProjectDetailCss_AllowsQuoteTabToScrollOverflowingCommercialBreakdown()
+    {
+        var cssPath = FindProjectDetailCssPath();
+        var css = File.ReadAllText(cssPath);
+
+        var quoteBodyRule = ExtractCssRule(css, "::deep .project-record-body--quote {");
+
+        Assert.Contains("overflow-y: auto;", quoteBodyRule, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: hidden;", quoteBodyRule, StringComparison.Ordinal);
+        Assert.DoesNotContain("overflow: hidden;", quoteBodyRule, StringComparison.Ordinal);
+    }
+
     private Task<HttpResponseMessage> HandleRequestAsync(HttpRequestMessage request, CancellationToken _)
     {
         var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
@@ -1209,5 +1222,16 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         }
 
         throw new FileNotFoundException("Could not locate ProjectDetail.razor.css from the test output directory.");
+    }
+
+    private static string ExtractCssRule(string css, string selector)
+    {
+        var ruleStart = css.IndexOf(selector, StringComparison.Ordinal);
+        Assert.True(ruleStart >= 0, $"Project detail CSS should define the {selector} rule.");
+
+        var ruleEnd = css.IndexOf('}', ruleStart);
+        Assert.True(ruleEnd > ruleStart, $"Project detail CSS should close the {selector} rule.");
+
+        return css[ruleStart..ruleEnd];
     }
 }
