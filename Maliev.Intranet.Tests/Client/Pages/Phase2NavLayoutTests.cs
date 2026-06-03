@@ -213,6 +213,26 @@ public class Phase2NavLayoutTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TopBar_ProfileAvatar_FallsBackToInitialsWhenPictureFails()
+    {
+        _authMock.Setup(x => x.GetAuthenticationStateAsync())
+            .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(
+                new ClaimsIdentity([
+                    new Claim(ClaimTypes.Name, "Natthapol Vanasrivilai"),
+                    new Claim("picture", "https://localhost/avatar.png")
+                ], "Test"))));
+
+        var cut = Render<TopBar>();
+
+        Assert.NotEmpty(cut.FindAll("img.topbar-avatar-image"));
+        cut.Find("img.topbar-avatar-image").TriggerEvent("onerror", EventArgs.Empty);
+
+        Assert.Empty(cut.FindAll("img.topbar-avatar-image"));
+        Assert.Equal("NV", cut.Find(".topbar-avatar-initials").TextContent.Trim());
+        Assert.Null(cut.Find(".topbar-avatar-initials").GetAttribute("hidden"));
+    }
+
+    [Fact]
     public void TopBar_ProfileRole_FallsBackToEmployee()
     {
         var cut = Render<TopBar>();

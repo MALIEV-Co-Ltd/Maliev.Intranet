@@ -8,6 +8,7 @@ public class ThemeToggleSourceTests
         var topBar = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
         var navMenu = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor");
         var navMenuStyles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "NavMenu.razor.css");
+        var topBarStyles = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor.css");
         var login = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Login.razor.cs");
         var themeIcons = ReadRepoFile("Maliev.Intranet.Client", "ThemeIcons.cs");
         var profile = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Hr", "Profile.razor");
@@ -26,6 +27,13 @@ public class ThemeToggleSourceTests
         Assert.DoesNotContain("Auto Theme", navMenu, StringComparison.Ordinal);
         Assert.DoesNotContain("auto-mode-gradient", navMenu, StringComparison.Ordinal);
         Assert.DoesNotContain("auto-mode-icon", navMenuStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .mud-button-root.topbar-theme-toggle", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains("color: var(--mud-palette-text-secondary);", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .mud-button-root.topbar-theme-toggle:hover", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains("color: var(--mud-palette-primary);", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains("path[d^=\"M21 14.5\"]", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains("fill: none;", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains("stroke: currentColor;", topBarStyles, StringComparison.Ordinal);
         Assert.DoesNotContain("AutoMode", login, StringComparison.Ordinal);
         Assert.DoesNotContain("Toggle Theme", login, StringComparison.Ordinal);
 

@@ -228,6 +228,10 @@
         @* Profile ── *@
         <AuthorizeView Context="auth">
             <Authorized>
+                @{
+                    var profileImageUrl = GetProfileImageUrl(auth.User);
+                    var showProfileImage = !_profileImageFailed && !string.IsNullOrWhiteSpace(profileImageUrl);
+                }
                 <div class="topbar-profile-menu">
                     <button type="button"
                             class="topbar-profile"
@@ -236,14 +240,15 @@
                             aria-label="Employee menu"
                             @onclick="ToggleProfileMenu">
                         <span class="topbar-avatar">
-                            @if (!string.IsNullOrEmpty(auth.User.FindFirst("picture")?.Value))
+                            @if (showProfileImage)
                             {
-                                <MudImage Src="@auth.User.FindFirst("picture")?.Value" Alt="Avatar" />
+                                <img src="@profileImageUrl"
+                                     alt=""
+                                     aria-hidden="true"
+                                     class="topbar-avatar-image"
+                                     @onerror="HandleProfileImageError" />
                             }
-                            else
-                            {
-                                @GetInitials(auth.User.Identity?.Name)
-                            }
+                            <span class="topbar-avatar-initials" hidden="@showProfileImage">@GetInitials(auth.User.Identity?.Name)</span>
                         </span>
                         <span class="topbar-profile-info">
                             <span class="topbar-profile-name">@(auth.User.Identity?.Name ?? "User")</span>
@@ -296,6 +301,7 @@
 
     private bool _profileMenuOpen;
     private bool _mobileNavOpen;
+    private bool _profileImageFailed;
     private string? _profileJobTitle;
 
     private readonly AppNavItem _quoteNavItem = AppNavigation.Quote;
@@ -316,6 +322,11 @@
     private string GetThemeLabel() => LayoutService.IsDarkMode
         ? "Dark Theme"
         : "Light Theme";
+
+    private static string? GetProfileImageUrl(System.Security.Claims.ClaimsPrincipal user) =>
+        FirstNonBlank(user.FindFirst("picture")?.Value);
+
+    private void HandleProfileImageError() => _profileImageFailed = true;
 
     private CurrencyDto? _selectedCurrency;
 

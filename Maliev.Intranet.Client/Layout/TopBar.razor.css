@@ -425,6 +425,28 @@
     box-shadow: var(--maliev-focus-ring) !important;
 }
 
+.topbar-right ::deep .mud-button-root.topbar-theme-toggle {
+    color: var(--mud-palette-text-secondary);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.topbar-right ::deep .mud-button-root.topbar-theme-toggle:hover,
+.topbar-right ::deep .mud-button-root.topbar-theme-toggle:active {
+    color: var(--mud-palette-primary);
+}
+
+.topbar-right ::deep .mud-button-root.topbar-theme-toggle .mud-icon-root {
+    color: currentColor;
+}
+
+.topbar-right ::deep .mud-button-root.topbar-theme-toggle path[d^="M21 14.5"] {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .topbar-divider {
     display: none;
     width: 1px;
@@ -476,10 +498,20 @@
     overflow: hidden;
 }
 
-.topbar-avatar img {
+.topbar-avatar-image,
+.topbar-avatar-initials {
     width: 100%;
     height: 100%;
+}
+
+.topbar-avatar-image {
+    display: block;
     object-fit: cover;
+}
+
+.topbar-avatar-initials {
+    display: grid;
+    place-items: center;
 }
 
 .topbar-profile-info {
