@@ -365,6 +365,23 @@ public partial class PartConfigSidebar : ComponentBase
     private bool HasSelectedProcess =>
         !string.IsNullOrWhiteSpace(Part?.ProcessCode);
 
+    private bool CanConfigurePartFeaturesAndInspection
+    {
+        get
+        {
+            if (Part == null || !HasSelectedProcess || Part.CatalogLoading || SelectedMaterial == null)
+                return false;
+
+            if (GetVisibleFinishes(Part.AvailableFinishes).Count > 0 && SelectedFinish == null)
+                return false;
+
+            if (VisibleToleranceList.Count > 0 && SelectedTolerance == null)
+                return false;
+
+            return true;
+        }
+    }
+
     private static string GetDisabledAriaValue(bool disabled) =>
         disabled ? "true" : "false";
 
@@ -756,7 +773,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnFeaturesChanged(IReadOnlyCollection<string> selected)
     {
-        if (Part == null) return;
+        if (Part == null || !CanConfigurePartFeaturesAndInspection) return;
         _selectedFeatures = selected;
         Part.HasThreadedHoles = selected.Contains("ThreadedHoles");
         Part.HasInserts = selected.Contains("Inserts");
@@ -765,7 +782,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnThreadedHolesChanged(bool value)
     {
-        if (Part == null || !HasSelectedProcess) return;
+        if (Part == null || !CanConfigurePartFeaturesAndInspection) return;
         Part.HasThreadedHoles = value;
         if (!value)
         {
@@ -778,7 +795,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnInsertsChanged(bool value)
     {
-        if (Part == null || !HasSelectedProcess) return;
+        if (Part == null || !CanConfigurePartFeaturesAndInspection) return;
         Part.HasInserts = value;
         if (!value)
         {
@@ -820,7 +837,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task OnInspectionChanged(InspectionLevel level)
     {
-        if (Part == null || !HasSelectedProcess) return;
+        if (Part == null || !CanConfigurePartFeaturesAndInspection) return;
         Part.InspectionLevel = level;
         await OnPartChanged.InvokeAsync(Part);
     }

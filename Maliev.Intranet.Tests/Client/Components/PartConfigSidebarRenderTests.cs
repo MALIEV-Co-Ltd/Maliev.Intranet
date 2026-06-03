@@ -747,13 +747,50 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void PartFeaturesAndInspection_WhenProcessIsSelected_RenderEnabled()
+    public void PartFeaturesAndInspection_WhenRequiredCatalogSelectionIsMissing_RemainHidden()
     {
         var part = new PartViewModel
         {
             FileId = Guid.Empty,
             Name = "fixture.step",
             ProcessCode = "CNC_MILL",
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        Assert.Empty(cut.FindAll("[data-config-section='part-features']"));
+        Assert.Empty(cut.FindAll("[data-config-section='inspection']"));
+    }
+
+    [Fact]
+    public void PartFeaturesAndInspection_WhenPrimaryConfigurationIsComplete_RenderEnabled()
+    {
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var toleranceId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            ProcessCode = "CNC_MILL",
+            MaterialId = materialId,
+            FinishId = finishId,
+            ToleranceId = toleranceId,
+            RoughnessCode = "RA_3_2",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "Aluminum 6061-T6", "AL6061", "Metal", null, "Most common CNC aluminum alloy.", 10),
+            ],
+            AvailableFinishes =
+            [
+                new CatalogSurfaceFinishDto(finishId, "Bead blasted", "BEAD_BLAST", 1.6m, 12m, "Uniform satin texture", 10),
+            ],
+            AvailableTolerances =
+            [
+                new CatalogToleranceDto(toleranceId, "Medium (ISO 2768-m)", "ISO2768_M", "ISO 2768", "m", "+-0.1mm", 0m, 20),
+            ],
         };
 
         var cut = Render<PartConfigSidebar>(parameters => parameters

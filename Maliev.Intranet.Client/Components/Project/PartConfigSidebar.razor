@@ -257,60 +257,63 @@
                 </section>
             }
 
-            @* ── Part Features ───────────────────────────────────────────────── *@
-            <section class="pcs-section" data-config-section="part-features">
-                <div class="pcs-section-header">
-                    <span class="pcs-section-title">Part Features</span>
-                    <span class="pcs-section-count">2 options</span>
-                </div>
-                <div class="pcs-feature-toggle-grid">
-                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasThreadedHoles ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
-                            disabled="@(!HasSelectedProcess)"
-                            aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
-                            @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
-                        <OptionImageFrame Class="pcs-choice-swatch"
-                                          ImageUrl='@GetFeatureImageUrl("tapped_holes")'
-                                          FallbackIcon="@Icons.Material.Outlined.Construction" />
-                        <div class="pcs-choice-info">
-                            <div class="pcs-choice-name">Tapped holes</div>
-                            <div class="pcs-choice-sub">Internal threads cut into the part.</div>
-                        </div>
-                        @if (Part!.HasThreadedHoles)
-                        {
-                            <div class="pcs-card-check">
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+            @if (CanConfigurePartFeaturesAndInspection)
+            {
+                @* ── Part Features ───────────────────────────────────────────────── *@
+                <section class="pcs-section" data-config-section="part-features">
+                    <div class="pcs-section-header">
+                        <span class="pcs-section-title">Part Features</span>
+                        <span class="pcs-section-count">2 options</span>
+                    </div>
+                    <div class="pcs-feature-toggle-grid">
+                        <button class="pcs-choice-card pcs-feature-card @(Part!.HasThreadedHoles ? "pcs-choice-card--active" : "") @(!CanConfigurePartFeaturesAndInspection ? "pcs-choice-card--disabled" : "")"
+                                disabled="@(!CanConfigurePartFeaturesAndInspection)"
+                                aria-disabled="@GetDisabledAriaValue(!CanConfigurePartFeaturesAndInspection)"
+                                @onclick="@(() => OnThreadedHolesChanged(!Part!.HasThreadedHoles))">
+                            <OptionImageFrame Class="pcs-choice-swatch"
+                                              ImageUrl='@GetFeatureImageUrl("tapped_holes")'
+                                              FallbackIcon="@Icons.Material.Outlined.Construction" />
+                            <div class="pcs-choice-info">
+                                <div class="pcs-choice-name">Tapped holes</div>
+                                <div class="pcs-choice-sub">Internal threads cut into the part.</div>
                             </div>
-                        }
-                    </button>
-                    <button class="pcs-choice-card pcs-feature-card @(Part!.HasInserts ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
-                            disabled="@(!HasSelectedProcess)"
-                            aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
-                            @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
-                        <OptionImageFrame Class="pcs-choice-swatch"
-                                          ImageUrl='@GetFeatureImageUrl("thread_inserts")'
-                                          FallbackIcon="@Icons.Material.Outlined.Hardware" />
-                        <div class="pcs-choice-info">
-                            <div class="pcs-choice-name">Thread inserts</div>
-                            <div class="pcs-choice-sub">Installed threaded hardware such as Helicoil or heat-set inserts.</div>
-                        </div>
-                        @if (Part!.HasInserts)
-                        {
-                            <div class="pcs-card-check">
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            @if (Part!.HasThreadedHoles)
+                            {
+                                <div class="pcs-card-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                </div>
+                            }
+                        </button>
+                        <button class="pcs-choice-card pcs-feature-card @(Part!.HasInserts ? "pcs-choice-card--active" : "") @(!CanConfigurePartFeaturesAndInspection ? "pcs-choice-card--disabled" : "")"
+                                disabled="@(!CanConfigurePartFeaturesAndInspection)"
+                                aria-disabled="@GetDisabledAriaValue(!CanConfigurePartFeaturesAndInspection)"
+                                @onclick="@(() => OnInsertsChanged(!Part!.HasInserts))">
+                            <OptionImageFrame Class="pcs-choice-swatch"
+                                              ImageUrl='@GetFeatureImageUrl("thread_inserts")'
+                                              FallbackIcon="@Icons.Material.Outlined.Hardware" />
+                            <div class="pcs-choice-info">
+                                <div class="pcs-choice-name">Thread inserts</div>
+                                <div class="pcs-choice-sub">Installed threaded hardware such as Helicoil or heat-set inserts.</div>
                             </div>
-                        }
-                    </button>
-                </div>
-                @if (Part!.RequiresThreadSpecificationDrawing && !Part.HasRequiredThreadSpecificationDrawing)
-                {
-                    <MudAlert Severity="Severity.Warning"
-                              Variant="Variant.Text"
-                              Dense="true"
-                              Class="pcs-feature-warning">
-                        Upload a drawing for this part so production has the thread specification.
-                    </MudAlert>
-                }
-            </section>
+                            @if (Part!.HasInserts)
+                            {
+                                <div class="pcs-card-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                </div>
+                            }
+                        </button>
+                    </div>
+                    @if (Part!.RequiresThreadSpecificationDrawing && !Part.HasRequiredThreadSpecificationDrawing)
+                    {
+                        <MudAlert Severity="Severity.Warning"
+                                  Variant="Variant.Text"
+                                  Dense="true"
+                                  Class="pcs-feature-warning">
+                            Upload a drawing for this part so production has the thread specification.
+                        </MudAlert>
+                    }
+                </section>
+            }
 
             @* ── Process Options (anodize color, paint color, etc.) ─────────── *@
             var visibleOptions = VisibleProcessOptions.ToList();
@@ -472,37 +475,40 @@
                 </section>
             }
 
-            @* ── Quality ─────────────────────────────────────────────────────── *@
-            <section class="pcs-section" data-config-section="inspection">
-                <div class="pcs-section-header">
-                    <span class="pcs-section-title">Inspection</span>
-                    <span class="pcs-section-count">@InspectionOptions.Count options</span>
-                </div>
-                <div class="pcs-cards">
-                    @foreach (var inspection in InspectionOptions)
-                    {
-                        var active = Part!.InspectionLevel == inspection.Level;
-                        <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "") @(!HasSelectedProcess ? "pcs-choice-card--disabled" : "")"
-                                disabled="@(!HasSelectedProcess)"
-                                aria-disabled="@GetDisabledAriaValue(!HasSelectedProcess)"
-                                @onclick="@(() => OnInspectionChanged(inspection.Level))">
-                            <OptionImageFrame Class="pcs-choice-swatch"
-                                              ImageUrl="@GetInspectionImageUrl(inspection.Level)"
-                                              FallbackIcon="@inspection.Icon" />
-                            <div class="pcs-choice-info">
-                                <div class="pcs-choice-name">@inspection.Name</div>
-                                <div class="pcs-choice-sub">@inspection.Description</div>
-                            </div>
-                            @if (active)
-                            {
-                                <div class="pcs-card-check">
-                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+            @if (CanConfigurePartFeaturesAndInspection)
+            {
+                @* ── Quality ─────────────────────────────────────────────────────── *@
+                <section class="pcs-section" data-config-section="inspection">
+                    <div class="pcs-section-header">
+                        <span class="pcs-section-title">Inspection</span>
+                        <span class="pcs-section-count">@InspectionOptions.Count options</span>
+                    </div>
+                    <div class="pcs-cards">
+                        @foreach (var inspection in InspectionOptions)
+                        {
+                            var active = Part!.InspectionLevel == inspection.Level;
+                            <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "") @(!CanConfigurePartFeaturesAndInspection ? "pcs-choice-card--disabled" : "")"
+                                    disabled="@(!CanConfigurePartFeaturesAndInspection)"
+                                    aria-disabled="@GetDisabledAriaValue(!CanConfigurePartFeaturesAndInspection)"
+                                    @onclick="@(() => OnInspectionChanged(inspection.Level))">
+                                <OptionImageFrame Class="pcs-choice-swatch"
+                                                  ImageUrl="@GetInspectionImageUrl(inspection.Level)"
+                                                  FallbackIcon="@inspection.Icon" />
+                                <div class="pcs-choice-info">
+                                    <div class="pcs-choice-name">@inspection.Name</div>
+                                    <div class="pcs-choice-sub">@inspection.Description</div>
                                 </div>
-                            }
-                        </button>
-                    }
-                </div>
-            </section>
+                                @if (active)
+                                {
+                                    <div class="pcs-card-check">
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                    </div>
+                                }
+                            </button>
+                        }
+                    </div>
+                </section>
+            }
 
             @* ── Quantity ─────────────────────────────────────────────────── *@
             <section class="pcs-section" data-config-section="quantity">
