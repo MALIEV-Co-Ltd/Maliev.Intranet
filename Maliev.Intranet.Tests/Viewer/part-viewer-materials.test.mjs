@@ -1480,6 +1480,50 @@ test('realistic material plugins enable Babylon shader defines through plugin AP
     assert.doesNotMatch(result.fdmBeforeFragColor, /\bcolor\.rgb\b/);
 });
 
+test('FDM layer shader keeps close-up line contrast while dampening moire', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'pla', null, 'AS_PRINTED', null, 'FDM');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        const fdmPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'FdmLayer');
+        const customCode = fdmPlugin?.getCustomCode('fragment') ?? {};
+        ({
+            definitions: customCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
+            beforeLights: customCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? '',
+            updateMetallicRoughness: customCode.CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS ?? '',
+            beforeFragColor: customCode.CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR ?? ''
+        });
+    `, context);
+
+    assert.match(result.definitions, /malievFdmLayerFootprint/);
+    assert.match(result.definitions, /malievFdmLayerVisibility/);
+    assert.match(result.definitions, /malievFdmLayerMoireDampening/);
+    assert.match(result.definitions, /mix\(\s*0\.[4-6][0-9]*\s*,\s*1\.0\s*,\s*_fdmCloseDetail\s*\)/);
+    assert.match(result.definitions, /mix\(\s*1\.0\s*,\s*0\.[3-5][0-9]*\s*,\s*_fdmAliasRisk\s*\)/);
+    assert.match(result.definitions, /malievFdmLayerFilteredGroove/);
+    assert.match(result.beforeLights, /_fdmVisibility/);
+    assert.match(result.beforeLights, /_fdmMoireDampening/);
+    assert.match(result.updateMetallicRoughness, /_fdmVisibility/);
+    assert.match(result.beforeFragColor, /_fdmVisibility/);
+    assert.match(result.beforeFragColor, /_fdmMoireDampening/);
+    assert.doesNotMatch(result.beforeFragColor, /_fdmFinalAa/);
+});
+
 test('realistic smoothing does not synthesize normals for no-normal meshes', () => {
     const context = loadViewerContext();
     const setDataCalls = [];

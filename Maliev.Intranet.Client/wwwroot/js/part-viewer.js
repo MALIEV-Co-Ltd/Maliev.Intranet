@@ -3255,34 +3255,51 @@ function getFdmLayerPluginClass() {
             return {
                 CUSTOM_FRAGMENT_DEFINITIONS: `
                 #ifdef FDMLAYER
+                float malievFdmLayerFootprint(float phase) {
+                    return max(max(abs(dFdx(phase)), abs(dFdy(phase))), 0.0001);
+                }
+                float malievFdmLayerVisibility(float phase) {
+                    float footprint = malievFdmLayerFootprint(phase);
+                    float _fdmCloseDetail = 1.0 - smoothstep(0.36, 1.45, footprint);
+                    return mix(0.48, 1.0, _fdmCloseDetail);
+                }
+                float malievFdmLayerMoireDampening(float phase) {
+                    float footprint = malievFdmLayerFootprint(phase);
+                    float _fdmAliasRisk = smoothstep(0.16, 0.82, footprint);
+                    return mix(1.0, 0.44, _fdmAliasRisk);
+                }
                 float malievFdmLayerAa(float phase) {
-                    float footprint = max(abs(dFdx(phase)), abs(dFdy(phase)));
-                    return 1.0 - smoothstep(0.70, 2.20, footprint);
+                    return malievFdmLayerVisibility(phase) * malievFdmLayerMoireDampening(phase);
+                }
+                float malievFdmLayerFilteredGroove(float phase, float baseWidth) {
+                    float footprint = malievFdmLayerFootprint(phase);
+                    float width = baseWidth + smoothstep(0.12, 0.78, footprint) * 0.065;
+                    float f = fract(phase);
+                    float groove = max(
+                        exp(-pow(f / width, 2.0)),
+                        exp(-pow((f - 1.0) / width, 2.0)));
+                    return clamp(groove, 0.0, 1.0);
                 }
                 float malievFdmLayerStepRelief(float phase) {
+                    float footprint = malievFdmLayerFootprint(phase);
+                    float shoulderWidth = mix(0.060, 0.115, smoothstep(0.12, 0.82, footprint));
                     float f = fract(phase);
-                    float lowerShoulder = exp(-pow((f - 0.10) / 0.055, 2.0));
-                    float upperShoulder = exp(-pow((f - 0.90) / 0.055, 2.0));
-                    float roundedBeadSlope = sin(f * 6.28318530718) * 0.18;
-                    return clamp((lowerShoulder - upperShoulder) * 1.25 + roundedBeadSlope, -1.45, 1.45);
+                    float lowerShoulder = exp(-pow((f - 0.12) / shoulderWidth, 2.0));
+                    float upperShoulder = exp(-pow((f - 0.88) / shoulderWidth, 2.0));
+                    float roundedBeadSlope = sin(f * 6.28318530718) * 0.13;
+                    return clamp((lowerShoulder - upperShoulder) * 0.95 + roundedBeadSlope, -1.10, 1.10);
                 }
                 float malievFdmLayerWave(float phase) {
                     return malievFdmLayerStepRelief(phase);
                 }
                 float malievFdmLayerRidge(float phase) {
                     float f = fract(phase);
-                    float bead = pow(max(sin(f * 3.14159265359), 0.0), 0.42);
-                    float groove = max(
-                        exp(-pow(f / 0.085, 2.0)),
-                        exp(-pow((f - 1.0) / 0.085, 2.0)));
-                    return clamp(bead * 0.92 + (1.0 - groove) * 0.08, 0.0, 1.0);
+                    float bead = pow(max(sin(f * 3.14159265359), 0.0), 0.54);
+                    float groove = malievFdmLayerFilteredGroove(phase, 0.095);
+                    return clamp(bead * 0.86 + (1.0 - groove) * 0.05, 0.0, 1.0);
                 }
                 float malievFdmLayerGroove(float phase) {
-                    float f = fract(phase);
-                    float groove = max(
-                        exp(-pow(f / 0.09, 2.0)),
-                        exp(-pow((f - 1.0) / 0.09, 2.0)));
-                    return clamp(groove, 0.0, 1.0);
+                    return malievFdmLayerFilteredGroove(phase, 0.105);
                 }
                 vec3 malievFdmDerivativeNormal(vec3 p) {
                     vec3 n = normalize(cross(dFdx(p), dFdy(p)) + vec3(0.0, 0.0, 0.0001));
@@ -3314,9 +3331,10 @@ function getFdmLayerPluginClass() {
                     float _fdmSideMask = smoothstep(0.10, 0.42, length(_fdmTangent));
                     _fdmTangent = normalize(_fdmTangent + vec3(0.0001, 0.0, 0.0));
                     float _fdmPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmAa = malievFdmLayerAa(_fdmPhase);
+                    float _fdmVisibility = malievFdmLayerVisibility(_fdmPhase);
+                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmPhase);
                     float _fdmSlope = malievFdmLayerWave(_fdmPhase);
-                    normalW = normalize(_fdmBaseNormal - _fdmTangent * _fdmSlope * fdmLayerBump * _fdmSideMask * _fdmAa);
+                    normalW = normalize(_fdmBaseNormal - _fdmTangent * _fdmSlope * fdmLayerBump * _fdmSideMask * _fdmVisibility * _fdmMoireDampening);
                 }
                 #endif
                 #endif
@@ -3327,10 +3345,11 @@ function getFdmLayerPluginClass() {
                     vec3 _fdmRoughNormal = malievFdmDerivativeNormal(vPositionW);
                     float _fdmRoughSideMask = malievFdmLayerSideMask(_fdmRoughNormal);
                     float _fdmRoughPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmRoughAa = malievFdmLayerAa(_fdmRoughPhase);
+                    float _fdmVisibility = malievFdmLayerVisibility(_fdmRoughPhase);
+                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmRoughPhase);
                     float _fdmGroove = malievFdmLayerGroove(_fdmRoughPhase);
                     metallicRoughness.g = clamp(
-                        metallicRoughness.g + (_fdmGroove - 0.5) * fdmLayerStrength * _fdmRoughSideMask * _fdmRoughAa * 0.55,
+                        metallicRoughness.g + (_fdmGroove - 0.5) * fdmLayerStrength * _fdmRoughSideMask * _fdmVisibility * _fdmMoireDampening * 0.40,
                         0.05,
                         1.0);
                 }
@@ -3340,22 +3359,24 @@ function getFdmLayerPluginClass() {
                 #ifdef FDMLAYER
                 {
                     float _fdmFinalPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmFinalAa = malievFdmLayerAa(_fdmFinalPhase);
+                    float _fdmVisibility = malievFdmLayerVisibility(_fdmFinalPhase);
+                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmFinalPhase);
                     vec3 _fdmFinalNormal = malievFdmDerivativeNormal(vPositionW);
                     float _fdmFinalSideMask = malievFdmLayerSideMask(_fdmFinalNormal);
                     float _fdmRelief = malievFdmLayerRelief(vPositionW, _fdmFinalPhase, fdmLayerBump);
                     float _fdmRidge = malievFdmLayerRidge(_fdmFinalPhase);
                     float _fdmGroove = malievFdmLayerGroove(_fdmFinalPhase);
-                    float _fdmVisualGain = clamp(fdmLayerStrength / 0.034, 0.25, 1.15);
-                    float _fdmRidgeHighlight = smoothstep(0.42, 0.90, _fdmRidge) * 0.20 * _fdmVisualGain;
-                    float _fdmGrooveShadow = smoothstep(0.24, 0.86, _fdmGroove) * 0.32 * _fdmVisualGain;
+                    float _fdmVisualGain = clamp(fdmLayerStrength / 0.034, 0.20, 0.92);
+                    float _fdmRidgeHighlight = smoothstep(0.40, 0.94, _fdmRidge) * 0.12 * _fdmVisualGain;
+                    float _fdmGrooveShadow = smoothstep(0.22, 0.82, _fdmGroove) * 0.18 * _fdmVisualGain;
                     float _fdmLayerLight = (
-                        _fdmRelief * (1.45 + _fdmVisualGain * 0.35)
+                        _fdmRelief * (1.08 + _fdmVisualGain * 0.22)
                         + _fdmRidgeHighlight
                         - _fdmGrooveShadow)
                         * _fdmFinalSideMask
-                        * _fdmFinalAa;
-                    finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.66, 1.36);
+                        * _fdmVisibility
+                        * _fdmMoireDampening;
+                    finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.74, 1.24);
                 }
                 #endif
             `,
