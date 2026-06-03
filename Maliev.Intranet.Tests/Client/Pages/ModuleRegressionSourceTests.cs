@@ -331,6 +331,27 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void CustomerList_ScrollsRowsInsideTableAndKeepsHeaderVisible()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");
+        var moduleStyles = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "module-pages.css");
+        var resultsPanelBlock = ExtractCssBlock(moduleStyles, ".mlv-data-results-panel");
+        var rowScrollTableBlock = ExtractCssBlock(moduleStyles, ".mlv-row-scroll-table {");
+        var rowScrollBodyBlock = ExtractCssBlock(moduleStyles, ".mlv-row-scroll-table tbody {");
+        var customerTableBlock = ExtractCssBlock(moduleStyles, ".customer-list-table {");
+
+        Assert.Contains("<PanelCard Class=\"mlv-data-results-panel customer-list-results-panel\">", source, StringComparison.Ordinal);
+        Assert.Contains("<table class=\"mlv-table mlv-row-scroll-table customer-list-table\">", source, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("overflow-y: auto;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("grid-template-rows: auto minmax(0, 1fr);", rowScrollTableBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-y: auto;", rowScrollBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("scrollbar-gutter: stable;", rowScrollBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("scrollbar-width: thin;", rowScrollBodyBlock, StringComparison.Ordinal);
+        Assert.Contains("--mlv-row-scroll-table-columns:", customerTableBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerDetail_PaymentTermOptionsStretchToMenuWidth()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
@@ -1164,8 +1185,7 @@ public class ModuleRegressionSourceTests
         Assert.Contains("flex: 1 1 0;", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: clamp(360px, 52dvh, 760px);", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("display: flex;", resultsPanelBlock, StringComparison.Ordinal);
-        Assert.Contains("overflow-y: auto;", resultsPanelBlock, StringComparison.Ordinal);
-        Assert.Contains("scrollbar-width: thin;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow: hidden;", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 auto;", emptyBlock, StringComparison.Ordinal);
         Assert.Contains(".mlv-data-page-body > .mlv-pagination-footer", moduleStyles, StringComparison.Ordinal);
 

@@ -35,14 +35,14 @@
             <div class="mlv-error">@_error</div>
         }
 
-        <PanelCard Class="mlv-data-results-panel">
+        <PanelCard Class="mlv-data-results-panel customer-list-results-panel">
             @if (_loading)
             {
                 <ProgressiveSkeleton Layout="table" Rows="6" Columns="6" ShowFilters="false" Label="Loading customers" />
             }
             else if (_customers.Count > 0)
             {
-                <table class="mlv-table">
+                <table class="mlv-table mlv-row-scroll-table customer-list-table">
                     <thead>
                         <tr>
                             <th>Customer</th>

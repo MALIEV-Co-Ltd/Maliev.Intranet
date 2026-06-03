@@ -121,13 +121,52 @@
     min-height: clamp(360px, 52dvh, 760px);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    scrollbar-width: thin;
+    overflow: hidden;
 }
 
 .mlv-data-results-panel .mlv-table {
     flex: 0 0 auto;
     width: 100%;
+}
+
+.mlv-data-results-panel .mlv-row-scroll-table {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.mlv-row-scroll-table {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.mlv-row-scroll-table thead {
+    display: block;
+    position: relative;
+    z-index: 1;
+}
+
+.mlv-row-scroll-table tbody {
+    display: block;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+}
+
+.mlv-row-scroll-table thead tr,
+.mlv-row-scroll-table tbody tr {
+    display: grid;
+    grid-template-columns: var(--mlv-row-scroll-table-columns, repeat(6, minmax(0, 1fr)));
+}
+
+.mlv-row-scroll-table th,
+.mlv-row-scroll-table td {
+    min-width: 0;
+}
+
+.customer-list-table {
+    --mlv-row-scroll-table-columns: minmax(240px, 2fr) minmax(180px, 1.35fr) minmax(92px, 0.55fr) minmax(92px, 0.55fr) minmax(110px, 0.7fr) minmax(128px, 0.75fr);
 }
 
 .mlv-data-results-panel .mlv-empty {
