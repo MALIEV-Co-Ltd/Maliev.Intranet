@@ -507,13 +507,25 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null || p == null) return;
 
+        var processChanged = ProjectPartBulkEdit.ApplyProcess(Part, p);
+        if (!processChanged)
+        {
+            if (_dfmReports.ContainsKey(p.Code))
+            {
+                Logger?.LogInformation("Using cached DFM results for process {ProcessCode}", p.Code);
+                ApplyTypedReportFromCache(p.Code);
+                Part.ResolveDfmReport();
+                await OnPartChanged.InvokeAsync(Part);
+            }
+
+            return;
+        }
+
         // Cancel any in-flight DFM request for the previous process.
         var oldCts = _dfmCts;
         _dfmCts = new CancellationTokenSource();
         oldCts?.Cancel();
         oldCts?.Dispose();
-
-        ProjectPartBulkEdit.ApplyProcess(Part, p);
 
         // Check if we already have results for this process.
         if (_dfmReports.ContainsKey(p.Code))

@@ -1,7 +1,11 @@
+using System.Net;
+using System.Net.Http.Json;
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
+using Maliev.Intranet.Tests.Testing;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -21,6 +25,51 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     public Task InitializeAsync() => Task.CompletedTask;
 
     public new async Task DisposeAsync() => await base.DisposeAsync();
+
+    [Fact]
+    public async Task ProcessCard_WhenAlreadySelected_DoesNotRunDfmAnalysisAgain()
+    {
+        var process = new ProcessDto(Guid.NewGuid(), "FDM", "FDM", null, 10);
+        var dfmRequestCount = 0;
+        Services.AddSingleton(new HttpClient(new MockHttpMessageHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Post &&
+                request.RequestUri?.AbsolutePath == "/api/v1/geometry/f662e601-227c-4ac6-949a-f33b8f598db4/dfm/FDM")
+            {
+                dfmRequestCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new DfmAnalysisResponse
+                    {
+                        UploadId = "f662e601-227c-4ac6-949a-f33b8f598db4",
+                        ProcessCode = "FDM",
+                        Status = "analysis_complete",
+                        DfmReport = new DfmReport { ReportType = "FDM" }
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }))
+        { BaseAddress = new Uri("http://localhost/") });
+
+        var part = new PartViewModel
+        {
+            FileId = Guid.Parse("f662e601-227c-4ac6-949a-f33b8f598db4"),
+            Name = "fixture.stl",
+            StoragePath = "projects/test/fixture.stl",
+            ProcessId = process.Id,
+            ProcessCode = process.Code,
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, [process]));
+
+        await cut.Find(".pcs-process-card--active").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(0, dfmRequestCount);
+    }
 
     [Fact]
     public void ToleranceSection_WhenIsoAndItOptionsExist_GroupsThemSeparately()
