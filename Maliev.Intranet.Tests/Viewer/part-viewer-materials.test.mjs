@@ -1107,7 +1107,7 @@ test('realistic configurator applies CNC machining surface effect when no finish
     assert.equal(result.effectKind, 4);
 });
 
-test('as-machined shader separates face milling cutter arcs from side milling wall scallops', () => {
+test('as-machined shader uses fine side-wall milling lines and controlled face-milling passes', () => {
     const context = loadViewerContext();
     const mesh = {
         name: 'part',
@@ -1131,19 +1131,30 @@ test('as-machined shader separates face milling cutter arcs from side milling wa
         const customCode = surfacePlugin?.getCustomCode('fragment') ?? {};
         ({
             effectKey: material?._malievSurfaceEffect?.key ?? null,
+            effectStripeScale: material?._malievSurfaceEffect?.stripeScale ?? null,
+            effectStripeStrength: material?._malievSurfaceEffect?.stripeStrength ?? null,
+            effectBump: material?._malievSurfaceEffect?.bump ?? null,
             definitions: customCode.CUSTOM_FRAGMENT_DEFINITIONS ?? '',
             beforeLights: customCode.CUSTOM_FRAGMENT_BEFORE_LIGHTS ?? ''
         });
     `, context);
 
     assert.equal(result.effectKey, 'machining');
+    assert.ok(result.effectStripeScale >= 12, `expected fine as-machined line frequency, got ${result.effectStripeScale}`);
+    assert.ok(result.effectStripeStrength <= 0.024, `expected subtle as-machined stripe strength, got ${result.effectStripeStrength}`);
+    assert.ok(result.effectBump <= 0.022, `expected subtle as-machined bump, got ${result.effectBump}`);
     assert.match(result.definitions, /malievMachinedFaceUv/);
     assert.match(result.definitions, /malievMachinedSideUv/);
     assert.match(result.definitions, /malievFaceMillingHeight/);
     assert.match(result.definitions, /malievSideMillingHeight/);
     assert.match(result.definitions, /malievMachinedHeight/);
+    assert.match(result.definitions, /sideFineLines/);
+    assert.match(result.definitions, /faceFeedLines/);
     assert.match(result.definitions, /mix\(sideMarks,\s*faceMarks,\s*faceBlend\)/);
     assert.doesNotMatch(result.definitions, /float\s+fa\s*=\s*sin\(p\.x\s*\*\s*sScl\)/);
+    assert.doesNotMatch(result.definitions, /stepDownScallop/);
+    assert.doesNotMatch(result.definitions, /ridge\s*=\s*smoothstep/);
+    assert.doesNotMatch(result.definitions, /fineFeed\s*=\s*malievVNoise/);
     assert.match(result.beforeLights, /malievHeightGradient/);
     assert.match(result.beforeLights, /normalW\s*=\s*normalize/);
 });
@@ -1200,8 +1211,8 @@ test('realistic configurator renders raw steel and stainless as bright machined 
         assert.ok(material.metallic >= 0.97, `${name} should stay highly metallic, got ${material.metallic}`);
         assert.ok(material.roughness >= 0.20 && material.roughness <= 0.30, `${name} should be smooth raw metal, got ${material.roughness}`);
         assert.equal(material.anisotropyEnabled, false, `${name} should not enable tangent-dependent anisotropy on CAD meshes`);
-        assert.ok(material.effectStripeStrength >= 0.025 && material.effectStripeStrength <= 0.035, `${name} machining marks should be readable, got ${material.effectStripeStrength}`);
-        assert.ok(material.effectBump >= 0.024 && material.effectBump <= 0.032, `${name} machining bump should be visible without gouging, got ${material.effectBump}`);
+        assert.ok(material.effectStripeStrength >= 0.018 && material.effectStripeStrength <= 0.024, `${name} machining marks should be readable but subtle, got ${material.effectStripeStrength}`);
+        assert.ok(material.effectBump >= 0.016 && material.effectBump <= 0.022, `${name} machining bump should be visible without gouging, got ${material.effectBump}`);
         assert.equal(material.profile?.surfaceEffectKey, 'machining', `${name} profile should carry machining`);
         assert.ok(material.profile?.stripeStrength >= 0.012, `${name} should keep visible directional tool marks`);
         assert.match(material.beforeLights, /_isMachined/);

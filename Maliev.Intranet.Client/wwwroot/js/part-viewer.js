@@ -3405,10 +3405,10 @@ const SURFACE_EFFECTS = {
         key: 'machining',
         kind: 4,           // orientation-aware CNC tool marks (face vs side milling); distinct from brushed (2)
         scale: 1.0,
-        strength: 0.020,
-        stripeScale: 4.6,  // fine raw-machined feed marks for bright steel/stainless reflections
-        stripeStrength: 0.030,
-        bump: 0.028,       // readable tool-mark normal bump; raw steel should be machined, not gouged
+        strength: 0.014,
+        stripeScale: 14.0, // very fine as-machined feed marks, subtler than brushed lay lines
+        stripeStrength: 0.022,
+        bump: 0.020,       // readable machining relief without coarse wall scallops
     },
     'powder-grain': {
         key: 'powder-grain',
@@ -3687,25 +3687,23 @@ function getSurfaceEffectPluginClass() {
                 }
                 float malievFaceMillingHeight(vec3 p, float scl, float sScl, vec3 n) {
                     vec2 uv = malievMachinedFaceUv(p, n);
-                    float waviness = malievVNoise(vec3(uv.x * scl * 0.045, uv.y * scl * 0.035, 61.0));
+                    float faceRunout = (malievVNoise(vec3(uv.x * scl * 0.026, uv.y * scl * 0.020, 61.0)) - 0.5) * 0.18;
                     float cutterArc = sin(
-                        (length(vec2(uv.x * 0.30, uv.y * 0.18 + sin(uv.x * 0.045) * 5.5))
-                            + uv.x * 0.10)
-                        * sScl * 0.95
-                        + waviness * 0.65) * 0.5 + 0.5;
-                    float passSweep = sin((uv.y + sin(uv.x * 0.070) * 6.0) * sScl * 0.34) * 0.5 + 0.5;
-                    float stepOver = sin(uv.x * sScl * 0.56 + waviness * 0.45) * 0.5 + 0.5;
-                    float fineFeed = malievVNoise(vec3(uv.x * scl * 1.10, uv.y * scl * 3.80, 73.0));
-                    return clamp(cutterArc * 0.48 + passSweep * 0.25 + stepOver * 0.20 + fineFeed * 0.07, 0.0, 1.0);
+                        (length(vec2(uv.x * 0.11, uv.y * 0.08)) + uv.x * 0.035)
+                        * sScl * 0.34
+                        + faceRunout) * 0.5 + 0.5;
+                    float faceFeedLines = sin((uv.y + faceRunout) * sScl * 0.54) * 0.5 + 0.5;
+                    float faceWiperLines = sin((uv.x * 0.90 + uv.y * 0.10) * sScl * 1.18 + faceRunout * 1.5) * 0.5 + 0.5;
+                    float facePolish = malievVNoise(vec3(uv.x * scl * 1.35, uv.y * scl * 0.16, 73.0));
+                    return clamp(cutterArc * 0.22 + faceFeedLines * 0.46 + faceWiperLines * 0.28 + facePolish * 0.04, 0.0, 1.0);
                 }
                 float malievSideMillingHeight(vec3 p, float scl, float sScl, vec3 n) {
                     vec2 uv = malievMachinedSideUv(p, n);
-                    float waviness = malievVNoise(vec3(uv.x * scl * 0.09, uv.y * scl * 0.035, 89.0));
-                    float verticalFlutes = sin(uv.x * sScl * 0.92 + uv.y * 0.045 + waviness * 0.55) * 0.5 + 0.5;
-                    float stepDownScallop = sin(uv.y * sScl * 1.28 + waviness * 0.45) * 0.5 + 0.5;
-                    float ridge = smoothstep(0.48, 1.0, stepDownScallop);
-                    float fineScratches = malievVNoise(vec3(uv.x * scl * 2.40, uv.y * scl * 0.32, 101.0));
-                    return clamp(verticalFlutes * 0.44 + ridge * 0.34 + fineScratches * 0.22, 0.0, 1.0);
+                    float sideWander = (malievVNoise(vec3(uv.x * scl * 0.055, uv.y * scl * 0.018, 89.0)) - 0.5) * 0.20;
+                    float sideFineLines = sin(uv.x * sScl * 1.22 + uv.y * 0.012 + sideWander) * 0.5 + 0.5;
+                    float sideHairlineLines = sin(uv.x * sScl * 2.65 + sideWander * 1.7) * 0.5 + 0.5;
+                    float sideLongStreaks = malievVNoise(vec3(uv.x * scl * 5.4, uv.y * scl * 0.040, 101.0));
+                    return clamp(sideFineLines * 0.46 + sideHairlineLines * 0.22 + sideLongStreaks * 0.32, 0.0, 1.0);
                 }
                 float malievMachinedHeight(vec3 p, float scl, float sScl, vec3 n) {
                     n = normalize(n);
@@ -3809,6 +3807,7 @@ function getSurfaceEffectPluginClass() {
                     float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
                     float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _isMachined = step(3.5, surfaceEffectKind);
                     float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
                     float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
                     float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
@@ -3827,6 +3826,9 @@ function getSurfaceEffectPluginClass() {
                             - _powderPores * 0.85)
                         * surfaceEffectStrength * _powderAa;
                     float _grain = mix(_standardGrain, _powderGrain, _isPowder);
+                    float _machinedGrain = (_h - 0.5) * surfaceEffectStripeStrength * 0.42
+                        + _relief * 0.08;
+                    _grain = mix(_grain, _machinedGrain, _isMachined);
                     surfaceAlbedo *= clamp(
                         1.0 + _grain + _relief * mix(mix(0.22, 0.035, _isBead), 0.18, _isPowder),
                         mix(mix(0.75, 0.97, _isBead), 0.58, _isPowder),
@@ -3846,6 +3848,7 @@ function getSurfaceEffectPluginClass() {
                     float _ra = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
                     float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _isMachined = step(3.5, surfaceEffectKind);
                     float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
                     float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
                     float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
@@ -3860,7 +3863,12 @@ function getSurfaceEffectPluginClass() {
                         metallicRoughness.g + 0.03 + (_powderFine * 0.08 + _powderPores * 0.12) * _powderAa,
                         0.82,
                         1.0);
+                    float _machinedRoughness = clamp(
+                        metallicRoughness.g + (_h - 0.5) * surfaceEffectStripeStrength * 0.68,
+                        0.06,
+                        1.0);
                     metallicRoughness.g = mix(_standardRoughness, _powderRoughness, _isPowder);
+                    metallicRoughness.g = mix(metallicRoughness.g, _machinedRoughness, _isMachined);
                     metallicRoughness.g = max(metallicRoughness.g, mix(0.0, 0.88, _isBead));
                 }
                 #endif
@@ -3884,6 +3892,7 @@ function getSurfaceEffectPluginClass() {
                         surfaceEffectScale);
                     float _isBead = 1.0 - step(1.5, surfaceEffectKind);
                     float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
+                    float _isMachined = step(3.5, surfaceEffectKind);
                     float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
                     float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
                     float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
@@ -3905,8 +3914,13 @@ function getSurfaceEffectPluginClass() {
                         (_powderFine - 0.5) * surfaceEffectStrength * 0.85 * _powderAa
                         - _powderPoreShadow
                         + _finalRelief * 0.34 * _powderAa;
+                    float _machinedLight =
+                        (_finalSurfaceH - 0.5) * surfaceEffectStripeStrength * 0.48
+                        + _finalRelief * 0.12;
+                    float _surfaceLight = mix(_standardLight, _powderLight, _isPowder);
+                    _surfaceLight = mix(_surfaceLight, _machinedLight, _isMachined);
                     finalColor.rgb *= clamp(
-                        1.0 + mix(_standardLight, _powderLight, _isPowder),
+                        1.0 + _surfaceLight,
                         mix(mix(0.78, 0.97, _isBead), 0.62, _isPowder),
                         mix(mix(1.18, 1.03, _isBead), 1.16, _isPowder));
                 }
