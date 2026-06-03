@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
@@ -73,17 +75,18 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
 
         Assert.Contains("background: transparent", source);
         Assert.Contains("color: var(--maliev-ink)", source);
-        Assert.Contains("--queue-loader-duration: 7.8s", source);
+        Assert.Contains("--queue-loader-duration: 6.0s", source);
         Assert.Contains("width: var(--queue-loader-size)", source);
         Assert.Contains("height: var(--queue-loader-size)", source);
         Assert.Contains(".part-queue-loader__stage", source);
         Assert.Contains(".part-queue-loader__cubie", source);
         Assert.Contains("animation: part-queue-loader-drop var(--queue-loader-duration)", source);
-        Assert.Contains("animation-delay: var(--delay)", source);
+        Assert.Contains("animation-delay: calc(var(--delay) * -1)", source);
+        Assert.Contains("will-change: opacity, transform", source);
         Assert.Contains("@keyframes part-queue-loader-drop", source);
         Assert.Contains("transform: translateY(-32px)", source);
-        Assert.Contains("54%", source);
-        Assert.Contains("66%", source);
+        Assert.Contains("72%", source);
+        Assert.Contains("84%", source);
         Assert.Contains("100%", source);
         Assert.Contains(".part-queue-loader__face-sticker--top", source);
         Assert.Contains(".part-queue-loader__face-sticker--right", source);
@@ -91,6 +94,28 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
         Assert.DoesNotContain("filter: blur", source, StringComparison.Ordinal);
         Assert.DoesNotContain("rotate(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("animation: part-queue-loader 1.5s infinite", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PartQueueLoaderCss_StartsInMotionAndAvoidsBlankLoopGaps()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartQueueLoader.razor.css");
+        var cut = Render<PartQueueLoader>();
+
+        Assert.Contains("animation-delay: calc(var(--delay) * -1)", source);
+        Assert.DoesNotContain("animation-delay: var(--delay)", source, StringComparison.Ordinal);
+
+        var durationSeconds = ExtractCssSeconds(source, "--queue-loader-duration");
+        var maxDelaySeconds = cut.FindAll("g.part-queue-loader__cubie")
+            .Select(cubie => ExtractInlineSeconds(cubie.GetAttribute("style") ?? string.Empty, "--delay"))
+            .Max();
+        var visibleStartPercent = ExtractFirstOpacityPercent(source, "1");
+        var invisiblePercent = ExtractFirstOpacityPercentAfter(source, "0", visibleStartPercent);
+        var visibleWindowSeconds = (invisiblePercent - visibleStartPercent) / 100d * durationSeconds;
+
+        Assert.True(
+            visibleWindowSeconds + maxDelaySeconds >= durationSeconds,
+            $"Cubies can all be invisible for {durationSeconds - visibleWindowSeconds - maxDelaySeconds:0.###}s each loop.");
     }
 
     [Fact]
@@ -124,4 +149,49 @@ public sealed class PartLoadingAnimationTests : BunitContext, IAsyncLifetime
     }
 
     private static string GetSourceDirectory([CallerFilePath] string sourceFile = "") => Path.GetDirectoryName(sourceFile) ?? Environment.CurrentDirectory;
+
+    private static double ExtractCssSeconds(string source, string propertyName)
+    {
+        var match = Regex.Match(source, $@"{Regex.Escape(propertyName)}:\s*(?<value>[0-9.]+)s", RegexOptions.CultureInvariant);
+        Assert.True(match.Success, $"Expected CSS seconds property {propertyName}.");
+
+        return double.Parse(match.Groups["value"].Value, CultureInfo.InvariantCulture);
+    }
+
+    private static double ExtractInlineSeconds(string style, string propertyName)
+    {
+        var match = Regex.Match(style, $@"{Regex.Escape(propertyName)}:\s*(?<value>[0-9.]+)s", RegexOptions.CultureInvariant);
+        Assert.True(match.Success, $"Expected inline seconds property {propertyName}.");
+
+        return double.Parse(match.Groups["value"].Value, CultureInfo.InvariantCulture);
+    }
+
+    private static double ExtractFirstOpacityPercent(string source, string opacity)
+    {
+        var matches = Regex.Matches(
+            source,
+            $@"(?ms)(?<percent>[0-9.]+)%\s*\{{[^}}]*opacity:\s*{Regex.Escape(opacity)};",
+            RegexOptions.CultureInvariant);
+        Assert.True(matches.Count > 0, $"Expected opacity {opacity} keyframe.");
+
+        return matches
+            .Select(match => double.Parse(match.Groups["percent"].Value, CultureInfo.InvariantCulture))
+            .Min();
+    }
+
+    private static double ExtractFirstOpacityPercentAfter(string source, string opacity, double afterPercent)
+    {
+        var matches = Regex.Matches(
+            source,
+            $@"(?ms)(?<percent>[0-9.]+)%\s*\{{[^}}]*opacity:\s*{Regex.Escape(opacity)};",
+            RegexOptions.CultureInvariant);
+        var laterMatches = matches
+            .Select(match => double.Parse(match.Groups["percent"].Value, CultureInfo.InvariantCulture))
+            .Where(percent => percent > afterPercent)
+            .ToArray();
+
+        Assert.True(laterMatches.Length > 0, $"Expected opacity {opacity} keyframe after {afterPercent}%.");
+
+        return laterMatches.Min();
+    }
 }

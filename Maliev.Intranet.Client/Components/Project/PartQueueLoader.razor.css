@@ -1,6 +1,6 @@
 .part-queue-loader {
     --queue-loader-size: clamp(92px, 11vmin, 132px);
-    --queue-loader-duration: 7.8s;
+    --queue-loader-duration: 6.0s;
     width: var(--queue-loader-size);
     height: var(--queue-loader-size);
     display: grid;
@@ -22,7 +22,7 @@
     transform-box: view-box;
     transform-origin: var(--cx) var(--cy);
     animation: part-queue-loader-drop var(--queue-loader-duration) cubic-bezier(.22, 1.1, .36, 1) infinite both;
-    animation-delay: var(--delay);
+    animation-delay: calc(var(--delay) * -1);
     will-change: opacity, transform;
 }
 
@@ -73,12 +73,12 @@
         transform: translateY(0);
     }
 
-    54% {
+    72% {
         opacity: 1;
         transform: translateY(0);
     }
 
-    66% {
+    84% {
         opacity: 0;
         transform: translateY(0);
     }
