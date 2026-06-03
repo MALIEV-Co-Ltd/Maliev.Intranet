@@ -66,21 +66,29 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
             gcsStoragePath,
             payload.GlbStoragePath,
             context.CancellationToken);
+        var viewerStoragePath = ResolveViewerStoragePath(
+            payload.ViewerStoragePath,
+            payload.StoragePath,
+            gcsStoragePath,
+            glbStoragePath);
+        var viewerFileExtension = NormalizeViewerFileExtension(
+            payload.ViewerFileExtension,
+            viewerStoragePath);
 
         _logger.LogInformation(
-            "FileAnalyzedConsumer: storagePath={StoragePath}, GlbPath={GlbPath}",
-            gcsStoragePath, glbStoragePath);
+            "FileAnalyzedConsumer: storagePath={StoragePath}, GlbPath={GlbPath}, ViewerPath={ViewerPath}, ViewerExt={ViewerExt}",
+            gcsStoragePath, glbStoragePath, viewerStoragePath, viewerFileExtension);
 
         if (!string.IsNullOrEmpty(gcsStoragePath))
         {
             try
             {
-                // Generate signed URL first, then store it in cache
-                string? glbUrl = null;
-                if (!string.IsNullOrEmpty(glbStoragePath))
+                // Generate signed viewer URL first, then store it in cache.
+                string? viewerUrl = null;
+                if (!string.IsNullOrEmpty(viewerStoragePath))
                 {
-                    glbUrl = await uploadClient.GetDownloadUrlByPathAsync(
-                        glbStoragePath,
+                    viewerUrl = await uploadClient.GetDownloadUrlByPathAsync(
+                        viewerStoragePath,
                         context.CancellationToken);
                 }
 
@@ -103,13 +111,15 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                 await _analysisStatusService.SetAnalysisCompletedAsync(
                     gcsStoragePath,
                     glbStoragePath ?? existing?.GlbStoragePath,
-                    glbUrl,
+                    viewerUrl,
                     payload.DfmReport ?? existing?.DfmReport,
-                    context.CancellationToken);
+                    context.CancellationToken,
+                    viewerStoragePath,
+                    viewerFileExtension);
 
                 _logger.LogInformation(
-                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, GlbSignedUrl={HasGlbSignedUrl}, hasDfmReport={HasDfmReport}",
-                    gcsStoragePath, glbStoragePath, !string.IsNullOrEmpty(glbUrl), payload.DfmReport != null);
+                    "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, ViewerStoragePath={ViewerStoragePath}, ViewerSignedUrl={HasViewerSignedUrl}, hasDfmReport={HasDfmReport}",
+                    gcsStoragePath, glbStoragePath, viewerStoragePath, !string.IsNullOrEmpty(viewerUrl), payload.DfmReport != null);
 
                 // Convert body metadata to SignalR format
                 var bodies = payload.Bodies?.Select(b => new SignalRBodyInfo(
@@ -128,10 +138,12 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
 
                 var signalRPayload = new GlbReadyPayload(
                     StoragePath: gcsStoragePath,
-                    GlbUrl: glbUrl,
-                    Failed: string.IsNullOrEmpty(glbUrl),
+                    GlbUrl: viewerUrl,
+                    Failed: string.IsNullOrEmpty(viewerUrl),
                     BodyCount: payload.BodyCount,
-                    Bodies: bodies
+                    Bodies: bodies,
+                    ViewerStoragePath: viewerStoragePath,
+                    ViewerFileExtension: viewerFileExtension
                 );
 
                 await SendToFileGroupsAsync(
@@ -215,6 +227,37 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
             eventGlbPath,
             currentGlbPath);
         return eventGlbPath;
+    }
+
+    private static string? ResolveViewerStoragePath(
+        string? eventViewerStoragePath,
+        string eventStoragePath,
+        string currentStoragePath,
+        string? currentGlbStoragePath)
+    {
+        if (string.IsNullOrWhiteSpace(eventViewerStoragePath))
+            return currentGlbStoragePath;
+
+        if (string.Equals(eventViewerStoragePath, eventStoragePath, StringComparison.OrdinalIgnoreCase))
+            return currentStoragePath;
+
+        var eventGlbPath = eventStoragePath + "_viewer.glb";
+        if (string.Equals(eventViewerStoragePath, eventGlbPath, StringComparison.OrdinalIgnoreCase))
+            return currentGlbStoragePath ?? eventViewerStoragePath;
+
+        return eventViewerStoragePath;
+    }
+
+    private static string? NormalizeViewerFileExtension(string? fileExtension, string? storagePath)
+    {
+        var ext = !string.IsNullOrWhiteSpace(fileExtension)
+            ? fileExtension.Trim()
+            : System.IO.Path.GetExtension(storagePath);
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return null;
+
+        return (ext.StartsWith('.') ? ext : "." + ext).ToLowerInvariant();
     }
 
     private async Task SendToFileGroupsAsync(

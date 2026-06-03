@@ -30,6 +30,17 @@ public sealed record FileAnalysisStatusDto
     public string? GlbStoragePath { get; init; }
 
     /// <summary>
+    /// GCS storage path the browser viewer should load.
+    /// For browser-loadable mesh uploads, this may be the original storage path.
+    /// </summary>
+    public string? ViewerStoragePath { get; init; }
+
+    /// <summary>
+    /// Dot-prefixed extension passed to the BabylonJS loader, such as .glb, .stl, or .obj.
+    /// </summary>
+    public string? ViewerFileExtension { get; init; }
+
+    /// <summary>
     /// Pre-signed URL for the GLB viewer artifact. Null until FileAnalyzed event is consumed.
     /// Client should prefer this over calling the viewer-url API.
     /// </summary>

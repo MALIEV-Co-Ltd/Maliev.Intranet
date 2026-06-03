@@ -259,15 +259,22 @@ public class UploadsController(
 
         var status = await analysisStatusService.GetStatusAsync(storagePath, ct);
 
-        // Primary path: resolve the main viewer GLB via the analysis status cache.
-        // The cache is keyed by the original uploaded file's StoragePath and contains
-        // the derived GlbStoragePath once geometry analysis completes.
-        var glbPath = status?.GlbStoragePath;
-        if (!string.IsNullOrEmpty(glbPath))
+        // Primary path: resolve the browser viewer source via the analysis status cache.
+        // For browser-loadable mesh uploads this can be the original StoragePath; for
+        // STEP/IGES it remains the generated GLB artifact path.
+        var viewerPath = status?.ViewerStoragePath ?? status?.GlbStoragePath;
+        if (!string.IsNullOrEmpty(viewerPath))
         {
-            var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(glbPath, ct);
+            var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(viewerPath, ct);
             if (!string.IsNullOrEmpty(signedUrl))
-                return Ok(new { Url = signedUrl });
+                return Ok(new
+                {
+                    Url = signedUrl,
+                    ViewerStoragePath = viewerPath,
+                    ViewerFileExtension = NormalizeViewerFileExtension(
+                        status?.ViewerFileExtension,
+                        viewerPath)
+                });
 
             return NotFound("Viewer artifact not available. The file may still be processing or geometry analysis failed.");
         }
@@ -281,13 +288,30 @@ public class UploadsController(
         {
             var directUrl = await uploadClient.GetDownloadUrlByPathAsync(storagePath, ct);
             if (!string.IsNullOrEmpty(directUrl))
-                return Ok(new { Url = directUrl });
+                return Ok(new
+                {
+                    Url = directUrl,
+                    ViewerStoragePath = storagePath,
+                    ViewerFileExtension = ".glb"
+                });
 
             return NotFound("Viewer artifact not found in storage.");
         }
 
         // Not a GLB path and no cache entry — the file is still processing.
         return NotFound("Viewer artifact not available. The file may still be processing.");
+    }
+
+    private static string? NormalizeViewerFileExtension(string? fileExtension, string? storagePath)
+    {
+        var ext = !string.IsNullOrWhiteSpace(fileExtension)
+            ? fileExtension.Trim()
+            : Path.GetExtension(storagePath);
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return null;
+
+        return (ext.StartsWith('.') ? ext : "." + ext).ToLowerInvariant();
     }
 
     /// <summary>

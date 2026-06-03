@@ -112,12 +112,16 @@ public record FileAnalysisPreviewUrls(
 /// <param name="Failed">True when GLB generation failed.</param>
 /// <param name="BodyCount">Number of bodies in the CAD file (null if single-body or not computed).</param>
 /// <param name="Bodies">Per-body metadata for multi-body files (null if single-body or not computed).</param>
+/// <param name="ViewerStoragePath">GCS storage path loaded by the browser viewer.</param>
+/// <param name="ViewerFileExtension">Dot-prefixed loader extension for the browser viewer.</param>
 public record GlbReadyPayload(
     string StoragePath,
     string? GlbUrl,
     bool Failed,
     int? BodyCount = null,
-    IReadOnlyList<SignalRBodyInfo>? Bodies = null);
+    IReadOnlyList<SignalRBodyInfo>? Bodies = null,
+    string? ViewerStoragePath = null,
+    string? ViewerFileExtension = null);
 
 /// <summary>Per-body metadata for multi-body CAD files, sent via SignalR.</summary>
 /// <param name="Index">Zero-based body index.</param>

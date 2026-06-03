@@ -42,6 +42,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
@@ -66,6 +70,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
@@ -91,6 +99,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = thumbnailUrl ?? existing?.ThumbnailUrl,
             HiResThumbnailUrl = hiResThumbnailUrl ?? existing?.HiResThumbnailUrl,
             PreviewUrls = mergedPreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = PreviewProcessingStatus.Processing,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = existing?.ProcessedAt ?? DateTimeOffset.UtcNow,
@@ -126,6 +138,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = previewUrls,
             GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
             GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = existing?.ErrorCode,
@@ -138,7 +152,14 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
     }
 
     /// <inheritdoc />
-    public Task SetAnalysisCompletedAsync(string uploadId, string? glbStoragePath = null, string? glbSignedUrl = null, object? dfmReport = null, CancellationToken cancellationToken = default)
+    public Task SetAnalysisCompletedAsync(
+        string uploadId,
+        string? glbStoragePath = null,
+        string? glbSignedUrl = null,
+        object? dfmReport = null,
+        CancellationToken cancellationToken = default,
+        string? viewerStoragePath = null,
+        string? viewerFileExtension = null)
     {
         var existing = Get(uploadId);
         var status = new FileAnalysisStatusDto
@@ -153,6 +174,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
             GlbStoragePath = glbStoragePath ?? existing?.GlbStoragePath,
+            ViewerStoragePath = viewerStoragePath ?? glbStoragePath ?? existing?.ViewerStoragePath,
+            ViewerFileExtension = viewerFileExtension ?? existing?.ViewerFileExtension,
             GlbSignedUrl = glbSignedUrl ?? existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = null,
@@ -178,6 +201,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = PreviewProcessingStatus.Completed,
             ErrorCode = existing?.ErrorCode,
             ProcessedAt = DateTimeOffset.UtcNow,
@@ -202,6 +229,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = PreviewProcessingStatus.Failed,
             ErrorCode = "preview-generation-failed",
             ProcessedAt = DateTimeOffset.UtcNow,
@@ -226,6 +257,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             ThumbnailUrl = existing?.ThumbnailUrl,
             HiResThumbnailUrl = existing?.HiResThumbnailUrl,
             PreviewUrls = existing?.PreviewUrls,
+            GlbStoragePath = existing?.GlbStoragePath,
+            ViewerStoragePath = existing?.ViewerStoragePath,
+            ViewerFileExtension = existing?.ViewerFileExtension,
+            GlbSignedUrl = existing?.GlbSignedUrl,
             PreviewProcessingStatus = existing?.PreviewProcessingStatus ?? PreviewProcessingStatus.Pending,
             ErrorCode = errorCode,
             ProcessedAt = DateTimeOffset.UtcNow,
@@ -257,6 +292,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,
             GlbStoragePath = existing.GlbStoragePath,
+            ViewerStoragePath = existing.ViewerStoragePath,
+            ViewerFileExtension = existing.ViewerFileExtension,
             GlbSignedUrl = existing.GlbSignedUrl,
             PreviewProcessingStatus = existing.PreviewProcessingStatus,
             ErrorCode = existing.ErrorCode,
@@ -362,7 +399,8 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
         {
             UploadId = destinationStoragePath,
             PreviewUrls = previewUrls,
-            GlbStoragePath = RewriteStoragePath(status.GlbStoragePath, sourceStoragePath, destinationStoragePath)
+            GlbStoragePath = RewriteStoragePath(status.GlbStoragePath, sourceStoragePath, destinationStoragePath),
+            ViewerStoragePath = RewriteStoragePath(status.ViewerStoragePath, sourceStoragePath, destinationStoragePath)
         };
     }
 
@@ -438,6 +476,10 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = existing.HiResThumbnailUrl,
             PreviewUrls = existing.PreviewUrls,
             GlbStoragePath = newGlbViewerPath,
+            ViewerStoragePath = string.Equals(existing.ViewerStoragePath, existing.GlbStoragePath, StringComparison.OrdinalIgnoreCase)
+                ? newGlbViewerPath
+                : RewriteStoragePath(existing.ViewerStoragePath, oldStoragePath, newStoragePath),
+            ViewerFileExtension = existing.ViewerFileExtension,
             GlbSignedUrl = existing.GlbSignedUrl,
             PreviewProcessingStatus = existing.PreviewProcessingStatus,
             ErrorCode = existing.ErrorCode,
@@ -492,6 +534,9 @@ public sealed class FileAnalysisStatusService : IFileAnalysisStatusService
             HiResThumbnailUrl = destinationThumbnailLargeUrl ?? existing.HiResThumbnailUrl,
             PreviewUrls = previewUrls,
             GlbStoragePath = destinationGlbStoragePath ?? existing.GlbStoragePath,
+            ViewerStoragePath = destinationGlbStoragePath
+                ?? RewriteStoragePath(existing.ViewerStoragePath, sourceStoragePath, destinationStoragePath),
+            ViewerFileExtension = existing.ViewerFileExtension,
             GlbSignedUrl = destinationGlbSignedUrl ?? existing.GlbSignedUrl,
             PreviewProcessingStatus = existing.PreviewProcessingStatus,
             ErrorCode = existing.ErrorCode,

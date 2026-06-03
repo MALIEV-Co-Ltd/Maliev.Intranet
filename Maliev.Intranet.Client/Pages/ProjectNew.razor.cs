@@ -253,7 +253,12 @@ public partial class ProjectNew : IAsyncDisposable
                 foreach (var part in parts)
                 {
                     part.GlbSignedUrl = payload.GlbUrl;
-                    part.GlbStoragePath = BuildViewerGlbStoragePath(NormalizeMigratedArtifactPath(part, payload.StoragePath));
+                    var viewerStoragePath = NormalizeMigratedArtifactPath(part, payload.ViewerStoragePath)
+                        ?? BuildViewerGlbStoragePath(NormalizeMigratedArtifactPath(part, payload.StoragePath));
+                    part.ViewerStoragePath = viewerStoragePath;
+                    part.ViewerFileExtension = NormalizeViewerFileExtension(payload.ViewerFileExtension, viewerStoragePath);
+                    if (string.Equals(part.ViewerFileExtension, ".glb", StringComparison.OrdinalIgnoreCase))
+                        part.GlbStoragePath = viewerStoragePath;
                     part.ViewerUrl = payload.GlbUrl;
 
                     if (payload.BodyCount.HasValue)
@@ -819,6 +824,10 @@ public partial class ProjectNew : IAsyncDisposable
         var normalizedGlbStoragePath = NormalizeMigratedArtifactPath(part, status.GlbStoragePath);
         if (!string.IsNullOrEmpty(normalizedGlbStoragePath))
             part.GlbStoragePath = normalizedGlbStoragePath;
+        var normalizedViewerStoragePath = NormalizeMigratedArtifactPath(part, status.ViewerStoragePath);
+        if (!string.IsNullOrEmpty(normalizedViewerStoragePath))
+            part.ViewerStoragePath = normalizedViewerStoragePath;
+        part.ViewerFileExtension = NormalizeViewerFileExtension(status.ViewerFileExtension, part.ViewerStoragePath ?? part.GlbStoragePath);
         if (!string.IsNullOrEmpty(status.GlbSignedUrl))
             part.GlbSignedUrl = status.GlbSignedUrl;
 
@@ -1319,15 +1328,58 @@ public partial class ProjectNew : IAsyncDisposable
             if (viewerResp.IsSuccessStatusCode)
             {
                 var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
-                var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
-                if (!string.IsNullOrEmpty(resolvedUrl))
-                    part.ViewerUrl = resolvedUrl;
+                ApplyViewerUrlDocument(part, viewerJson);
             }
         }
         catch
         {
             // Non-fatal — viewer URL resolution is best-effort
         }
+    }
+
+    private static void ApplyViewerUrlDocument(PartViewModel part, JsonDocument? viewerJson)
+    {
+        if (viewerJson == null)
+            return;
+
+        var root = viewerJson.RootElement;
+        var resolvedUrl = ReadStringProperty(root, "url", "Url");
+        if (!string.IsNullOrEmpty(resolvedUrl))
+        {
+            part.ViewerUrl = resolvedUrl;
+            part.GlbSignedUrl = resolvedUrl;
+        }
+
+        var viewerStoragePath = ReadStringProperty(root, "viewerStoragePath", "ViewerStoragePath");
+        if (!string.IsNullOrWhiteSpace(viewerStoragePath))
+        {
+            part.ViewerStoragePath = viewerStoragePath;
+        }
+
+        part.ViewerFileExtension = NormalizeViewerFileExtension(
+            ReadStringProperty(root, "viewerFileExtension", "ViewerFileExtension"),
+            part.ViewerStoragePath ?? part.GlbStoragePath ?? part.StoragePath);
+
+        if (string.Equals(part.ViewerFileExtension, ".glb", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(part.ViewerStoragePath))
+        {
+            part.GlbStoragePath = part.ViewerStoragePath;
+        }
+    }
+
+    private static string? ReadStringProperty(JsonElement root, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty(name, out var value)
+                && value.ValueKind == JsonValueKind.String)
+            {
+                return value.GetString();
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1408,6 +1460,18 @@ public partial class ProjectNew : IAsyncDisposable
             : sourceStoragePath + "_viewer.glb";
     }
 
+    private static string? NormalizeViewerFileExtension(string? fileExtension, string? storagePath)
+    {
+        var ext = !string.IsNullOrWhiteSpace(fileExtension)
+            ? fileExtension.Trim()
+            : Path.GetExtension(storagePath);
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return null;
+
+        return ext.StartsWith('.') ? ext.ToLowerInvariant() : "." + ext.ToLowerInvariant();
+    }
+
     private static void ApplyMigratedStoragePaths(PartViewModel part, string oldBasePath, string newBasePath)
     {
         part.ThumbnailSmallGcsPath = RewriteMigratedStoragePath(part.ThumbnailSmallGcsPath, oldBasePath, newBasePath);
@@ -1423,6 +1487,26 @@ public partial class ProjectNew : IAsyncDisposable
         if (!string.Equals(part.GlbStoragePath, rewrittenGlbStoragePath, StringComparison.OrdinalIgnoreCase))
         {
             part.GlbStoragePath = rewrittenGlbStoragePath;
+            part.GlbSignedUrl = null;
+            part.ViewerUrl = null;
+        }
+
+        var rewrittenViewerStoragePath = RewriteMigratedStoragePath(part.ViewerStoragePath, oldBasePath, newBasePath);
+        if (string.IsNullOrWhiteSpace(rewrittenViewerStoragePath)
+            && string.Equals(part.ViewerFileExtension, ".glb", StringComparison.OrdinalIgnoreCase))
+        {
+            rewrittenViewerStoragePath = rewrittenGlbStoragePath;
+        }
+        else if (string.IsNullOrWhiteSpace(rewrittenViewerStoragePath)
+            && (!string.IsNullOrWhiteSpace(part.GlbSignedUrl) || !string.IsNullOrWhiteSpace(part.ViewerUrl)))
+        {
+            rewrittenViewerStoragePath = newBasePath;
+        }
+
+        if (!string.Equals(part.ViewerStoragePath, rewrittenViewerStoragePath, StringComparison.OrdinalIgnoreCase))
+        {
+            part.ViewerStoragePath = rewrittenViewerStoragePath;
+            part.ViewerFileExtension = NormalizeViewerFileExtension(part.ViewerFileExtension, rewrittenViewerStoragePath);
             part.GlbSignedUrl = null;
             part.ViewerUrl = null;
         }
@@ -1445,7 +1529,8 @@ public partial class ProjectNew : IAsyncDisposable
     {
         var part = _parts.FirstOrDefault(p =>
             p.MatchesSourceStoragePath(storagePath)
-            || string.Equals(p.GlbStoragePath, storagePath, StringComparison.OrdinalIgnoreCase));
+            || string.Equals(p.GlbStoragePath, storagePath, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p.ViewerStoragePath, storagePath, StringComparison.OrdinalIgnoreCase));
         if (part == null)
         {
             Snackbar.Add("Part not found for URL refresh.", Severity.Warning);
@@ -1460,11 +1545,9 @@ public partial class ProjectNew : IAsyncDisposable
             if (viewerResp.IsSuccessStatusCode)
             {
                 var viewerJson = await viewerResp.Content.ReadFromJsonAsync<JsonDocument>();
-                var resolvedUrl = viewerJson?.RootElement.GetProperty("url").GetString();
-                if (!string.IsNullOrEmpty(resolvedUrl))
+                ApplyViewerUrlDocument(part, viewerJson);
+                if (!string.IsNullOrEmpty(part.ViewerUrl))
                 {
-                    part.ViewerUrl = resolvedUrl;
-                    part.GlbSignedUrl = resolvedUrl;
                     await InvokeAsync(StateHasChanged);
                     return;
                 }
@@ -2686,8 +2769,10 @@ public partial class ProjectNew : IAsyncDisposable
             ThumbnailSmallGcsPath = part.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = part.ThumbnailLargeGcsPath,
             GlbStoragePath = part.GlbStoragePath,
-            GlbSignedUrl = string.IsNullOrWhiteSpace(part.GlbStoragePath) ? null : part.ModelPreviewUrl,
-            ViewerUrl = string.IsNullOrWhiteSpace(part.GlbStoragePath) ? null : part.ModelPreviewUrl,
+            ViewerStoragePath = part.ViewerStoragePath ?? part.GlbStoragePath,
+            ViewerFileExtension = NormalizeViewerFileExtension(part.ViewerFileExtension, part.ViewerStoragePath ?? part.GlbStoragePath),
+            GlbSignedUrl = string.IsNullOrWhiteSpace(part.ModelPreviewUrl) ? null : part.ModelPreviewUrl,
+            ViewerUrl = string.IsNullOrWhiteSpace(part.ModelPreviewUrl) ? null : part.ModelPreviewUrl,
             OverlayPaths = part.OverlayPaths.Count == 0 ? null : new Dictionary<string, string>(part.OverlayPaths),
             RoughnessCode = part.RoughnessCode,
             MarkingType = part.MarkingType,
@@ -3312,6 +3397,8 @@ public partial class ProjectNew : IAsyncDisposable
             ThumbnailSmallGcsPath = sourcePart.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = sourcePart.ThumbnailLargeGcsPath,
             GlbStoragePath = sourcePart.GlbStoragePath,
+            ViewerStoragePath = sourcePart.ViewerStoragePath,
+            ViewerFileExtension = sourcePart.ViewerFileExtension,
             GlbSignedUrl = sourcePart.GlbSignedUrl,
             ViewerUrl = sourcePart.ViewerUrl,
             Dimensions = sourcePart.Dimensions,
@@ -3547,6 +3634,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private static bool HasViewerArtifactForMigration(PartViewModel part) =>
         !string.IsNullOrWhiteSpace(part.GlbStoragePath) ||
+        !string.IsNullOrWhiteSpace(part.ViewerStoragePath) ||
         !string.IsNullOrWhiteSpace(part.GlbSignedUrl) ||
         !string.IsNullOrWhiteSpace(part.ViewerUrl);
 
@@ -3606,17 +3694,14 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         var json = await resp.Content.ReadFromJsonAsync<JsonDocument>();
-        var url = json?.RootElement.TryGetProperty("url", out var urlProperty) == true
-            ? urlProperty.GetString()
-            : null;
+        ApplyViewerUrlDocument(part, json);
 
-        if (string.IsNullOrEmpty(url))
+        if (string.IsNullOrEmpty(part.ViewerUrl))
         {
             Snackbar.Add("3D preview not available yet for this file.", Severity.Warning);
             return;
         }
 
-        part.ViewerUrl = url;
         await InvokeAsync(StateHasChanged);
     }
 

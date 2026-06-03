@@ -568,7 +568,7 @@
                     {
                         <div class="pbt-preview-viewer-frame">
                             <ModelViewer ViewerUrl="@viewerUrl"
-                                         FileExtension=".glb"
+                                         FileExtension="@ResolvePreviewViewerFileExtension(_previewPart)"
                                          KnownDimensions="@_previewPart.Dimensions"
                                          ViewerSettings="@_previewPart.ViewerSettings"
                                          OnLoadFailed="HandlePreviewViewerLoadFailed" />
@@ -763,6 +763,18 @@
         !string.IsNullOrWhiteSpace(part.ViewerUrl)
             ? part.ViewerUrl
             : part.GlbSignedUrl;
+
+    private static string ResolvePreviewViewerFileExtension(PartViewModel? part)
+    {
+        var ext = !string.IsNullOrWhiteSpace(part?.ViewerFileExtension)
+            ? part.ViewerFileExtension.Trim()
+            : System.IO.Path.GetExtension(part?.ViewerStoragePath ?? part?.GlbStoragePath ?? part?.StoragePath);
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return ".glb";
+
+        return ext.StartsWith('.') ? ext.ToLowerInvariant() : "." + ext.ToLowerInvariant();
+    }
 
     private static bool IsCncProcessCode(string? processCode) =>
         string.Equals(processCode, "CNC", StringComparison.OrdinalIgnoreCase)

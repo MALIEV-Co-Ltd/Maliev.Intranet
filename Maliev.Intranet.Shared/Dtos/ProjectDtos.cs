@@ -325,6 +325,12 @@ public class ProjectPartDto
     /// <summary>Gets or sets the raw GCS path for the GLB viewer artifact.</summary>
     public string? GlbStoragePath { get; set; }
 
+    /// <summary>Gets or sets the storage path loaded by the browser viewer.</summary>
+    public string? ViewerStoragePath { get; set; }
+
+    /// <summary>Gets or sets the dot-prefixed browser viewer file extension.</summary>
+    public string? ViewerFileExtension { get; set; }
+
     /// <summary>Gets or sets raw GCS overlay artifact paths keyed by process/category.</summary>
     public Dictionary<string, string> OverlayPaths { get; set; } = [];
 

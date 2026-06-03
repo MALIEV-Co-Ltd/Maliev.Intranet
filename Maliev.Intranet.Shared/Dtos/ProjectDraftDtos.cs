@@ -198,6 +198,12 @@ public sealed class DraftPartState
     /// <summary>GCS storage path of the GLB artifact. Non-null when analysis produced a 3D model.</summary>
     public string? GlbStoragePath { get; set; }
 
+    /// <summary>Storage path loaded by the browser viewer. May be the original STL/OBJ/GLB upload.</summary>
+    public string? ViewerStoragePath { get; set; }
+
+    /// <summary>Dot-prefixed BabylonJS loader extension for the viewer source.</summary>
+    public string? ViewerFileExtension { get; set; }
+
     /// <summary>Signed URL for GLB viewer. Restores instantly on page reload.</summary>
     public string? ViewerUrl { get; set; }
 

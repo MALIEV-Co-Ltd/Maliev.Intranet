@@ -109,6 +109,12 @@ public class PartViewModel
     /// <summary>GLB artifact for BabylonJS viewer. Source: status.GlbStoragePath</summary>
     public string? GlbStoragePath { get; set; }
 
+    /// <summary>Storage path that the browser viewer should load. May be the original STL/OBJ/GLB upload.</summary>
+    public string? ViewerStoragePath { get; set; }
+
+    /// <summary>Dot-prefixed BabylonJS loader extension for <see cref="ViewerStoragePath"/>.</summary>
+    public string? ViewerFileExtension { get; set; }
+
     /// <summary>Resolved signed viewer URL for BabylonJS inline rendering. Fetched on-demand when user opens 3D view.</summary>
     public string? ViewerUrl { get; set; }
 
@@ -476,6 +482,8 @@ public class PartViewModel
         ThumbnailSmallGcsPath = ThumbnailSmallGcsPath,
         ThumbnailLargeGcsPath = ThumbnailLargeGcsPath,
         GlbStoragePath = GlbStoragePath,
+        ViewerStoragePath = ViewerStoragePath,
+        ViewerFileExtension = ViewerFileExtension,
         GlbSignedUrl = GlbSignedUrl,
         ViewerUrl = ViewerUrl,
         DrawingFiles = DrawingFiles,
@@ -544,6 +552,8 @@ public class PartViewModel
             ThumbnailSmallGcsPath = s.ThumbnailSmallGcsPath,
             ThumbnailLargeGcsPath = s.ThumbnailLargeGcsPath,
             GlbStoragePath = s.GlbStoragePath,
+            ViewerStoragePath = s.ViewerStoragePath,
+            ViewerFileExtension = s.ViewerFileExtension,
             GlbSignedUrl = s.GlbSignedUrl,
             ViewerUrl = s.ViewerUrl,
             DrawingFiles = s.DrawingFiles,

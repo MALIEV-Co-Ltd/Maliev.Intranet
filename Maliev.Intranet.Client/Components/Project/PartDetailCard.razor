@@ -137,7 +137,7 @@
                     @if (!string.IsNullOrEmpty(Part.ViewerUrl))
                     {
                         <ModelViewer @ref="_modelViewer"
-                                     ViewerUrl="@Part.ViewerUrl" FileExtension=".glb"
+                                     ViewerUrl="@Part.ViewerUrl" FileExtension="@ResolveViewerFileExtension()"
                                      KnownDimensions="@Part.Dimensions"
                                      TurningAxis="@BuildTurningAxis()"
                                      ProcessCode="@Part.ProcessCode"
@@ -723,6 +723,18 @@
         }
 
         return null;
+    }
+
+    private string ResolveViewerFileExtension()
+    {
+        var ext = !string.IsNullOrWhiteSpace(Part.ViewerFileExtension)
+            ? Part.ViewerFileExtension.Trim()
+            : System.IO.Path.GetExtension(Part.ViewerStoragePath ?? Part.GlbStoragePath ?? Part.StoragePath);
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return ".glb";
+
+        return ext.StartsWith('.') ? ext.ToLowerInvariant() : "." + ext.ToLowerInvariant();
     }
 
     private static bool IsCncTurningProcess(string? processCode) =>

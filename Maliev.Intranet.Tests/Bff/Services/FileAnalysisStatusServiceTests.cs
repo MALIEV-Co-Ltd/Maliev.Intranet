@@ -49,6 +49,8 @@ public sealed class FileAnalysisStatusServiceTests
         Assert.Equal("https://signed.example/thumb-small.webp", status.PreviewUrls?.ThumbnailSmall);
         Assert.Equal(NewPath + "_thumb_256.webp", status.PreviewUrls?.ThumbnailSmallGcsPath);
         Assert.Equal(NewPath + "_viewer.glb", status.GlbStoragePath);
+        Assert.Equal(NewPath + "_viewer.glb", status.ViewerStoragePath);
+        Assert.Null(status.ViewerFileExtension);
         Assert.Equal("https://signed.example/viewer.glb", status.GlbSignedUrl);
     }
 
@@ -106,6 +108,54 @@ public sealed class FileAnalysisStatusServiceTests
         Assert.Equal(StoragePath + "_viewer.glb", status.GlbStoragePath);
         Assert.Equal("https://signed.example/viewer.glb", status.GlbSignedUrl);
         Assert.NotNull(status.DfmReport);
+    }
+
+    [Fact]
+    public async Task SetPreviewUrlsCompletedAsync_WhenDirectViewerSourceExists_PreservesViewerMetadata()
+    {
+        const string StoragePath = "projects/temp-project/part.stl";
+        var service = CreateService();
+
+        await service.SetAnalysisCompletedAsync(
+            StoragePath,
+            glbSignedUrl: "https://signed.example/part.stl",
+            cancellationToken: default,
+            viewerStoragePath: StoragePath,
+            viewerFileExtension: ".stl");
+
+        await service.SetPreviewUrlsCompletedAsync(StoragePath);
+        await service.SetDfmReportsAsync(StoragePath, new { CncReport = new { ReportType = "CNC_MILL" } });
+
+        var status = await service.GetStatusAsync(StoragePath);
+
+        Assert.NotNull(status);
+        Assert.Null(status.GlbStoragePath);
+        Assert.Equal(StoragePath, status.ViewerStoragePath);
+        Assert.Equal(".stl", status.ViewerFileExtension);
+        Assert.Equal("https://signed.example/part.stl", status.GlbSignedUrl);
+        Assert.NotNull(status.DfmReport);
+    }
+
+    [Fact]
+    public async Task RegisterStoragePathAliasAsync_WhenDirectViewerSourceExists_RewritesViewerSource()
+    {
+        const string OldPath = "projects/temp-project/part.stl";
+        const string NewPath = "customers/customer-1/projects/temp-project/part.stl";
+        var service = CreateService();
+
+        await service.RegisterStoragePathAliasAsync(OldPath, NewPath);
+        await service.SetAnalysisCompletedAsync(
+            OldPath,
+            glbSignedUrl: "https://signed.example/part.stl",
+            cancellationToken: default,
+            viewerStoragePath: OldPath,
+            viewerFileExtension: ".stl");
+
+        var status = await service.GetStatusAsync(NewPath);
+
+        Assert.NotNull(status);
+        Assert.Equal(NewPath, status.ViewerStoragePath);
+        Assert.Equal(".stl", status.ViewerFileExtension);
     }
 
     private static FileAnalysisStatusService CreateService()

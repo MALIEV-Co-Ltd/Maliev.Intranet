@@ -107,6 +107,12 @@ public sealed class SignalRGlbReadyPayload
     /// <summary>Pre-resolved signed URL for the GLB artifact.</summary>
     public string? GlbUrl { get; set; }
 
+    /// <summary>GCS storage path loaded by the browser viewer.</summary>
+    public string? ViewerStoragePath { get; set; }
+
+    /// <summary>Dot-prefixed loader extension for the browser viewer.</summary>
+    public string? ViewerFileExtension { get; set; }
+
     /// <summary>True when GLB generation failed.</summary>
     public bool Failed { get; set; }
 

@@ -1538,6 +1538,8 @@ public class ProjectsController(
                 part.ThumbnailSmallGcsPath = FirstNonEmpty(part.ThumbnailSmallGcsPath, status.PreviewUrls?.ThumbnailSmallGcsPath);
                 part.ThumbnailLargeGcsPath = FirstNonEmpty(part.ThumbnailLargeGcsPath, status.PreviewUrls?.ThumbnailLargeGcsPath);
                 part.GlbStoragePath = FirstNonEmpty(part.GlbStoragePath, status.GlbStoragePath);
+                part.ViewerStoragePath = FirstNonEmpty(part.ViewerStoragePath, status.ViewerStoragePath, status.GlbStoragePath);
+                part.ViewerFileExtension = FirstNonEmpty(part.ViewerFileExtension, status.ViewerFileExtension);
                 part.ModelPreviewUrl = FirstNonEmpty(part.ModelPreviewUrl, status.GlbSignedUrl);
 
                 if (part.Dimensions is null && status.Dimensions is not null)
