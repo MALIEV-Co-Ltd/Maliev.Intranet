@@ -6,28 +6,47 @@ using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
 /// <summary>
 /// Boundary tests for <see cref="AlertsController"/> — exercises the three endpoints
-/// directly against an EF Core in-memory database.
+/// directly against PostgreSQL.
 /// </summary>
-public sealed class AlertsControllerBoundaryTests : IDisposable
+public sealed class AlertsControllerBoundaryTests : IAsyncLifetime
 {
-    private readonly IntranetDbContext _db;
     private const string EmployeeId = "test-employee-001";
     private const string OtherEmployeeId = "test-employee-002";
 
-    public AlertsControllerBoundaryTests()
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18")
+        .WithDatabase("intranet_alerts_tests")
+        .WithUsername("postgres")
+        .WithPassword("postgres")
+        .Build();
+
+    private IntranetDbContext _db = null!;
+
+    public async Task InitializeAsync()
     {
+        await _postgres.StartAsync();
+
         var options = new DbContextOptionsBuilder<IntranetDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseNpgsql(_postgres.GetConnectionString())
             .Options;
         _db = new IntranetDbContext(options);
+        await _db.Database.EnsureCreatedAsync();
     }
 
-    public void Dispose() => _db.Dispose();
+    public async Task DisposeAsync()
+    {
+        if (_db is not null)
+        {
+            await _db.DisposeAsync();
+        }
+
+        await _postgres.DisposeAsync();
+    }
 
     // ── GET /api/v1/alerts ────────────────────────────────────────────────────
 
