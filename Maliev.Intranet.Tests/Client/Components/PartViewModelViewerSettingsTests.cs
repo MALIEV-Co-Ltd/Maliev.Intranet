@@ -66,4 +66,38 @@ public class PartViewModelViewerSettingsTests
 
         Assert.False(restored.ViewerSettings.GridEnabled);
     }
+
+    [Theory]
+    [InlineData("CNC_Milling")]
+    [InlineData("CNC_Turning")]
+    public void ResolveDfmReport_WhenProcessCodeUsesProjectServiceEnum_UsesCncReport(string processCode)
+    {
+        var cncReport = new object();
+        var fdmReport = new object();
+        var part = new PartViewModel
+        {
+            ProcessCode = processCode,
+            CncDfmReport = cncReport,
+            FdmDfmReport = fdmReport,
+        };
+
+        part.ResolveDfmReport();
+
+        Assert.Same(cncReport, part.DfmReport);
+    }
+
+    [Fact]
+    public void FromDraftPartState_WhenProcessCodeUsesProjectServiceEnum_NormalizesForCatalogRestore()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "restored-cnc.stl",
+            ProcessCode = "CNC_Milling",
+        };
+
+        var restored = PartViewModel.FromDraftPartState(part.ToDraftPartState());
+
+        Assert.Equal("CNC_MILL", restored.ProcessCode);
+    }
 }

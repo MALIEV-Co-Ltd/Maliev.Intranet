@@ -783,6 +783,16 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             BagAndTag = false,
             InspectionLevel = InspectionLevel.Dimensional,
             Certificates = ["MaterialCert"],
+            DrawingFiles =
+            [
+                new ProjectPartAttachmentDto
+                {
+                    FileId = Guid.NewGuid(),
+                    FileName = "restored-cnc-drawing.pdf",
+                    StoragePath = "customers/customer-1/projects/project-1/restored-cnc-drawing.pdf",
+                    ContentType = "application/pdf",
+                },
+            ],
             ProcessConfig = new Dictionary<string, string>
             {
                 ["cnc_setup"] = "three_axis",
@@ -809,6 +819,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.False(part.BagAndTag);
         Assert.Equal(InspectionLevel.Dimensional, part.InspectionLevel);
         Assert.Equal(["MaterialCert"], part.Certificates);
+        Assert.Single(part.DrawingFiles);
         Assert.Equal("three_axis", part.ProcessOptionValues["cnc_setup"]);
         Assert.True(part.IsFullyConfigured);
     }

@@ -1186,13 +1186,14 @@ public partial class ProjectNew : IAsyncDisposable
 
         if (string.IsNullOrWhiteSpace(part.ProcessCode)
             || string.IsNullOrWhiteSpace(result.ProcessCode)
-            || !string.Equals(part.ProcessCode, result.ProcessCode, StringComparison.OrdinalIgnoreCase))
+            || !ProcessCodeNormalizer.Equals(part.ProcessCode, result.ProcessCode))
         {
             return false;
         }
 
-        var report = BuildDfmReportFromLocalGeometryRuntimeResult(part.ProcessCode, result);
-        SetDfmReportForProcess(part, part.ProcessCode, report);
+        var processCode = ProcessCodeNormalizer.Normalize(part.ProcessCode) ?? part.ProcessCode;
+        var report = BuildDfmReportFromLocalGeometryRuntimeResult(processCode, result);
+        SetDfmReportForProcess(part, processCode, report);
         part.ResolveDfmReport();
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
@@ -1239,10 +1240,10 @@ public partial class ProjectNew : IAsyncDisposable
         string processCode,
         object? report)
     {
-        var upperProcessCode = processCode.ToUpperInvariant();
-        if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
+        var normalizedProcessCode = ProcessCodeNormalizer.Normalize(processCode);
+        if (normalizedProcessCode is "SLA_DLP")
             part.SlaDfmReport = report;
-        else if (upperProcessCode is "CNC" or "CNC_MILL" or "CNC_TURN")
+        else if (normalizedProcessCode is "CNC_MILL" or "CNC_TURN" or "CNC_5AXIS")
             part.CncDfmReport = report;
         else
             part.FdmDfmReport = report;
@@ -2556,7 +2557,8 @@ public partial class ProjectNew : IAsyncDisposable
             foreach (var partState in draft.Parts)
             {
                 var partVm = PartViewModel.FromDraftPartState(partState);
-                if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
+                NormalizePartProcessSelection(partVm);
+                if (!string.IsNullOrEmpty(partVm.ProcessCode))
                     _ = ReloadPartCatalogAsync(partVm);
 
                 // Catch-up fetch for any part with a storage path — refreshes thumbnail signed URLs,
@@ -2632,7 +2634,7 @@ public partial class ProjectNew : IAsyncDisposable
             var partVm = CreatePartViewModelFromProjectPart(part);
             _parts.Add(partVm);
 
-            if (partVm.ProcessId.HasValue && !string.IsNullOrEmpty(partVm.ProcessCode))
+            if (!string.IsNullOrEmpty(partVm.ProcessCode))
                 catalogReloadTasks.Add(ReloadPartCatalogAsync(partVm));
 
             ScheduleStatusCatchUp(partVm);
@@ -2650,9 +2652,8 @@ public partial class ProjectNew : IAsyncDisposable
     {
         var unitPrice = part.ConfirmedPrice ?? part.ConfirmedUnitPrice ?? part.EstimatedPrice ?? part.AiSuggestedPrice;
         var bodies = DeserializeBodies(part.BodiesJson);
-        var process = string.IsNullOrWhiteSpace(part.ProcessType)
-            ? null
-            : _processes.FirstOrDefault(p => p.Code.Equals(part.ProcessType, StringComparison.OrdinalIgnoreCase));
+        var process = FindProcessByCodeOrAlias(part.ProcessType);
+        var processCode = process?.Code ?? ProcessCodeNormalizer.Normalize(part.ProcessType) ?? part.ProcessType;
 
         var partVm = new PartViewModel
         {
@@ -2660,7 +2661,7 @@ public partial class ProjectNew : IAsyncDisposable
             ServerPartId = part.Id,
             Name = part.FileName,
             StoragePath = part.FileReference,
-            ProcessCode = process?.Code ?? part.ProcessType,
+            ProcessCode = processCode,
             ProcessId = process?.Id,
             MaterialId = part.MaterialId,
             MaterialCode = part.MaterialCode,
@@ -2714,6 +2715,28 @@ public partial class ProjectNew : IAsyncDisposable
         partVm.ResolveDfmReport();
         ApplyResumedDfmTerminalState(partVm);
         return partVm;
+    }
+
+    private ProcessDto? FindProcessByCodeOrAlias(string? processCode)
+    {
+        var normalizedProcessCode = ProcessCodeNormalizer.Normalize(processCode);
+        if (string.IsNullOrWhiteSpace(normalizedProcessCode))
+            return null;
+
+        return _processes.FirstOrDefault(process =>
+            string.Equals(process.Code, normalizedProcessCode, StringComparison.OrdinalIgnoreCase)
+            || ProcessCodeNormalizer.Equals(process.Code, processCode));
+    }
+
+    private void NormalizePartProcessSelection(PartViewModel part)
+    {
+        var normalizedProcessCode = ProcessCodeNormalizer.Normalize(part.ProcessCode);
+        if (string.IsNullOrWhiteSpace(normalizedProcessCode))
+            return;
+
+        var process = FindProcessByCodeOrAlias(normalizedProcessCode);
+        part.ProcessCode = process?.Code ?? normalizedProcessCode;
+        part.ProcessId ??= process?.Id;
     }
 
     private async Task RestoreQuotationCommercialFieldsAsync(Guid? quotationId)
@@ -2824,7 +2847,8 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task ReloadPartCatalogAsync(PartViewModel part)
     {
-        if (!part.ProcessId.HasValue || string.IsNullOrEmpty(part.ProcessCode))
+        NormalizePartProcessSelection(part);
+        if (string.IsNullOrEmpty(part.ProcessCode))
             return;
 
         try

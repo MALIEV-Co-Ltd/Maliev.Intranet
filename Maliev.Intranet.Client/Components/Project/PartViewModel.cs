@@ -201,10 +201,10 @@ public class PartViewModel
     /// </summary>
     public void ResolveDfmReport()
     {
-        DfmReport = ProcessCode?.ToUpperInvariant() switch
+        DfmReport = ProcessCodeNormalizer.Normalize(ProcessCode) switch
         {
-            "SLA" or "SLA_DLP" or "DLP" => SlaDfmReport,
-            "CNC" or "CNC_MILL" or "CNC_TURN" => CncDfmReport,
+            "SLA_DLP" => SlaDfmReport,
+            "CNC_MILL" or "CNC_TURN" or "CNC_5AXIS" => CncDfmReport,
             _ => FdmDfmReport,  // FDM, SLS, MJF, MJ, BJ, DMLS all use FDM report structure
         };
     }
@@ -456,7 +456,7 @@ public class PartViewModel
         StoragePathAliases = [.. StoragePathAliases],
         Name = Name,
         Quantity = Quantity,
-        ProcessCode = ProcessCode,
+        ProcessCode = ProcessCodeNormalizer.Normalize(ProcessCode) ?? ProcessCode,
         ProcessId = ProcessId,
         MaterialCode = MaterialCode,
         MaterialId = MaterialId,
@@ -524,7 +524,7 @@ public class PartViewModel
             StoragePathAliases = [.. s.StoragePathAliases],
             Name = s.Name,
             Quantity = s.Quantity,
-            ProcessCode = s.ProcessCode,
+            ProcessCode = ProcessCodeNormalizer.Normalize(s.ProcessCode) ?? s.ProcessCode,
             ProcessId = s.ProcessId,
             MaterialCode = s.MaterialCode,
             MaterialId = s.MaterialId,
