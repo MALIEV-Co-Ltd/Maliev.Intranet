@@ -25,6 +25,16 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void BrowserDfmCurrentReportUsesNormalizedProcessCodes()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "BrowserDfmReportSync.cs")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("ProcessCodeNormalizer.Equals(part.ProcessCode, processCode)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("string.Equals(part.ProcessCode, processCode", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")

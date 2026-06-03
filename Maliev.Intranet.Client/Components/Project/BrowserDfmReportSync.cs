@@ -11,7 +11,7 @@ internal static class BrowserDfmReportSync
         part.DfmReport != null
         && !part.DfmAnalysisTimedOut
         && part.AnalysisErrorCode == null
-        && string.Equals(part.ProcessCode, processCode, StringComparison.OrdinalIgnoreCase);
+        && ProcessCodeNormalizer.Equals(part.ProcessCode, processCode);
 
     internal static async Task<bool> WaitForCurrentReportAsync(
         PartViewModel part,
