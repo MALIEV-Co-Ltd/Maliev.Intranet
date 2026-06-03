@@ -47,7 +47,7 @@ try
     // Add Service Defaults (OpenTelemetry, health checks, etc.)
     builder.AddServiceDefaults();
     builder.Services.AddDefaultApiVersioning();
-    builder.AddServiceMeters("intranet-meter");
+    builder.AddServiceMeters("intranet-meter", "intranet-portal");
     var useIntranetDatabase = !builder.Environment.IsEnvironment("Testing") ||
         !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IntranetDbContext"));
     if (useIntranetDatabase)

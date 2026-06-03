@@ -208,6 +208,17 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("return accepted === true;", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BrowserLocalDfmTelemetry_PostsCompletionToSameOriginBff()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("const LOCAL_ADVISORY_TELEMETRY_URL = '/api/v1/geometry/runtime/telemetry';", source, StringComparison.Ordinal);
+        Assert.Contains("function postLocalAdvisoryTelemetry(endpointUrl, payload)", source, StringComparison.Ordinal);
+        Assert.Contains("navigator.sendBeacon", source, StringComparison.Ordinal);
+        Assert.Contains("accepted,", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

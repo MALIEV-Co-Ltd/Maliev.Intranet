@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
@@ -7,6 +8,7 @@ using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
@@ -74,13 +76,21 @@ public class GeometryControllerTests
 
     private static GeometryController MakeController(UploadServiceClient uploadClient, GeometryServiceClient geometryClient)
     {
-        return new(geometryClient, uploadClient, NullLogger<GeometryController>.Instance)
+        return new(geometryClient, uploadClient, MakeMetrics(), NullLogger<GeometryController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
             }
         };
+    }
+
+    private static Maliev.Intranet.Bff.BffMetrics MakeMetrics()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        using var provider = services.BuildServiceProvider();
+        return new Maliev.Intranet.Bff.BffMetrics(provider.GetRequiredService<IMeterFactory>());
     }
 
     [Fact]
@@ -338,5 +348,24 @@ public class GeometryControllerTests
         var content = Assert.IsType<ContentResult>(result);
         Assert.Equal(404, content.StatusCode);
         Assert.Contains("Runtime asset not found", content.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GeometryController_ExposesBrowserRuntimeTelemetryWithoutCallingGeometryService()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Maliev.Intranet.Bff",
+            "Controllers",
+            "GeometryController.cs"));
+
+        Assert.Contains("[HttpPost(\"runtime/telemetry\")]", source, StringComparison.Ordinal);
+        Assert.Contains("BrowserGeometryRuntimeTelemetryRequest", source, StringComparison.Ordinal);
+        Assert.Contains("RecordBrowserDfmRuntimeCompletion", source, StringComparison.Ordinal);
+        Assert.Contains("return NoContent();", source, StringComparison.Ordinal);
     }
 }
