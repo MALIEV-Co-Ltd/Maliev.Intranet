@@ -261,6 +261,18 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("clearLocalAdvisoryPanel(canvasId);", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BrowserLocalDfmRuntime_NotifiesBlazorWhenLocalAttemptCannotRun()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function notifyLocalAdvisoryUnavailableDotNet(dotNetRef, payload)", source, StringComparison.Ordinal);
+        Assert.Contains("NotifyLocalGeometryRuntimeUnavailable", source, StringComparison.Ordinal);
+        Assert.Contains("options.dotNetRef", source, StringComparison.Ordinal);
+        Assert.Contains("'input_too_large'", source, StringComparison.Ordinal);
+        Assert.Contains("'worker_failed'", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

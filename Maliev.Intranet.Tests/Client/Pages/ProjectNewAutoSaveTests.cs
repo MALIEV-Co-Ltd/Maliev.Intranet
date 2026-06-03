@@ -1808,6 +1808,36 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleLocalGeometryRuntimeUnavailableAsync_WhenResultMatchesProcess_ReleasesLocalDfmWait()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "local-large.stl",
+            StoragePath = "projects/local-large.stl",
+            ProcessCode = "CNC_MILL",
+        };
+        GetParts(cut.Instance).Add(part);
+
+        await InvokePrivateTaskWithArgsAsync(cut, "HandleLocalGeometryRuntimeUnavailableAsync", new PartLocalGeometryRuntimeUnavailable
+        {
+            Part = part,
+            Result = new LocalGeometryRuntimeUnavailable
+            {
+                ProcessCode = "CNC_MILL",
+                Reason = "input_too_large",
+            },
+        });
+
+        Assert.Equal("CNC_MILL", part.LocalDfmRuntimeTerminalProcessCode);
+        Assert.Equal("input_too_large", part.LocalDfmRuntimeTerminalReason);
+        Assert.Null(part.DfmReport);
+        Assert.Null(part.AnalysisErrorCode);
+        Assert.False(part.DfmAnalysisTimedOut);
+    }
+
+    [Fact]
     public async Task ApplyFileAnalysisCompletedPayloadAsync_WhenPreviewUrlResolutionFails_PreservesThumbnail()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();

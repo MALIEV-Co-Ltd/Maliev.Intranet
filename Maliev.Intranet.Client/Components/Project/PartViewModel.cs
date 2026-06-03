@@ -68,6 +68,12 @@ public class PartViewModel
     /// <summary>True after the transient all-clear DFM overlay has already been shown for the current process.</summary>
     public bool DfmAllClearNotified { get; set; }
 
+    /// <summary>Current process code for a terminal local browser DFM attempt that produced no report.</summary>
+    public string? LocalDfmRuntimeTerminalProcessCode { get; set; }
+
+    /// <summary>Machine-readable reason why the current local browser DFM attempt ended without a report.</summary>
+    public string? LocalDfmRuntimeTerminalReason { get; set; }
+
     /// <summary>Original file size in bytes from the browser File API.</summary>
     public long? FileSizeBytes { get; set; }
 

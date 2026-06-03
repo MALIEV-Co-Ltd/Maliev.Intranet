@@ -1187,6 +1187,18 @@ public partial class ProjectNew : IAsyncDisposable
         return true;
     }
 
+    private async Task HandleLocalGeometryRuntimeUnavailableAsync(PartLocalGeometryRuntimeUnavailable completion)
+    {
+        if (!_parts.Contains(completion.Part))
+            return;
+
+        BrowserDfmReportSync.MarkTerminalLocalAttempt(
+            completion.Part,
+            completion.Result.ProcessCode,
+            completion.Result.Reason);
+        await InvokeAsync(StateHasChanged);
+    }
+
     private static bool TryApplyLocalGeometryRuntimeResult(
         PartViewModel part,
         LocalGeometryRuntimeResult result)
@@ -1212,6 +1224,7 @@ public partial class ProjectNew : IAsyncDisposable
         var report = BuildDfmReportFromLocalGeometryRuntimeResult(processCode, result);
         SetDfmReportForProcess(part, processCode, report);
         part.ResolveDfmReport();
+        BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
         return true;
@@ -1308,6 +1321,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.FdmDfmReport = null;
 
         part.DfmReport = null;
+        BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
     }

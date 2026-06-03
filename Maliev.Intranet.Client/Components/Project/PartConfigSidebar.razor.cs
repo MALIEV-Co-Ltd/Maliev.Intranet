@@ -1782,6 +1782,7 @@ public partial class PartConfigSidebar : ComponentBase
         var part = Part!;
         // Capture the token that was created for this invocation in OnProcessChanged.
         var token = _dfmCts?.Token ?? CancellationToken.None;
+        BrowserDfmReportSync.ClearTerminalLocalAttempt(part, process.Code);
 
         StateHasChanged();
 

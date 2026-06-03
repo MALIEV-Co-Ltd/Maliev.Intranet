@@ -35,6 +35,22 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void BrowserDfmTerminalLocalAttemptEndsGraceWaitBeforeServerFallback()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "BrowserDfmReportSync.cs")
+            .ReplaceLineEndings("\n");
+        var waitBlock = ExtractBlock(source, "internal static async Task<bool> WaitForCurrentReportAsync");
+
+        Assert.Contains("HasTerminalLocalAttempt(part, processCode)", source, StringComparison.Ordinal);
+        Assert.True(
+            waitBlock.IndexOf("HasTerminalLocalAttempt(part, processCode)", StringComparison.Ordinal)
+            < waitBlock.IndexOf("Task.Delay", StringComparison.Ordinal),
+            "BrowserDfmReportSync must stop waiting as soon as the browser reports a terminal local runtime attempt.");
+        Assert.Contains("MarkTerminalLocalAttempt", source, StringComparison.Ordinal);
+        Assert.Contains("ClearTerminalLocalAttempt", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
