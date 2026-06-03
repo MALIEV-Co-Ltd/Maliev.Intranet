@@ -117,10 +117,12 @@
 }
 
 .mlv-data-results-panel {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: clamp(360px, 52dvh, 760px);
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 .mlv-data-results-panel .mlv-table {

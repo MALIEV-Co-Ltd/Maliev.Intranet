@@ -1161,9 +1161,11 @@ public class ModuleRegressionSourceTests
 
         Assert.Contains("display: flex;", dataBodyBlock, StringComparison.Ordinal);
         Assert.Contains("flex-direction: column;", dataBodyBlock, StringComparison.Ordinal);
-        Assert.Contains("flex: 1 1 auto;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("flex: 1 1 0;", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("min-height: clamp(360px, 52dvh, 760px);", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("display: flex;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("overflow-y: auto;", resultsPanelBlock, StringComparison.Ordinal);
+        Assert.Contains("scrollbar-width: thin;", resultsPanelBlock, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 auto;", emptyBlock, StringComparison.Ordinal);
         Assert.Contains(".mlv-data-page-body > .mlv-pagination-footer", moduleStyles, StringComparison.Ordinal);
 
