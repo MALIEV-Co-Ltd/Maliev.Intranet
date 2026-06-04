@@ -663,7 +663,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
 
     assert.equal(result?.authority, 'local_primary');
     assert.equal(result?.executionMode, 'primary_interactive');
-    assert.equal(panels.at(-1)?.textContent, 'Local preliminary DFM: no warnings · local primary · 1 tris');
+    assert.equal(panels.length, 0);
     assert.equal(currentPanel, null);
     assert.equal(dotNetCalls.length, 2);
     assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeStarted');
@@ -683,6 +683,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(events[1].type, 'maliev:geometry-local-runtime-complete');
     assert.deepEqual(JSON.parse(JSON.stringify(events[1].detail)), {
         canvasId: 'viewer',
+        storagePath: null,
         processCode: 'CNC_MILL',
         runtimeVersion: '1.0.0',
         algorithmVersion: 'browser-first-dfm-v1',
@@ -709,6 +710,82 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(telemetryPosts[1].url, '/api/v1/geometry/runtime/telemetry');
     assert.equal(telemetryPosts[1].payload.processCode, 'CNC_MILL');
     assert.equal(telemetryPosts[1].payload.accepted, true);
+});
+
+test('runLocalAdvisoryGeometry refuses to fabricate a default process code', async () => {
+    const context = loadViewerContext();
+    const dotNetCalls = [];
+    const telemetryPosts = [];
+    let workerStarted = false;
+    let panelRendered = false;
+    const host = {
+        querySelector: () => null,
+        appendChild: () => {
+            panelRendered = true;
+        },
+    };
+    context.document.createElement = () => ({
+        setAttribute: () => {},
+        style: {},
+        textContent: '',
+        remove() {},
+    });
+    context.document.getElementById = () => ({ parentElement: host });
+    context.setTimeout = () => 1;
+    context.clearTimeout = () => {};
+    context.dotNetCalls = dotNetCalls;
+    context.fetch = async (url, init = {}) => {
+        if (init?.method === 'POST') {
+            telemetryPosts.push({ url, payload: JSON.parse(init.body) });
+            return { ok: true };
+        }
+
+        throw new Error(`Unexpected manifest fetch for ${url}`);
+    };
+    context.Worker = class Worker {
+        constructor() {
+            workerStarted = true;
+        }
+
+        terminate() {}
+    };
+    context.scene = {
+        meshes: [
+            makeMesh('model', {
+                uniqueId: 202,
+                positions: [0, 0, 0, 10, 0, 0, 0, 10, 0],
+                indices: [0, 1, 2],
+                totalVertices: 3,
+            }),
+        ],
+    };
+
+    const result = await vm.runInContext(`
+        scenes.viewer = scene;
+        tagModelMeshesForAnalysis('viewer', scene);
+        runLocalAdvisoryGeometry('viewer', {
+            dotNetRef: {
+                invokeMethodAsync: async (method, payload) => {
+                    dotNetCalls.push({ method, payload });
+                    return true;
+                }
+            }
+        });
+    `, context);
+
+    assert.equal(result, null);
+    assert.equal(workerStarted, false);
+    assert.equal(panelRendered, false);
+    assert.equal(dotNetCalls.length, 1);
+    assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeUnavailable');
+    assert.deepEqual(JSON.parse(JSON.stringify(dotNetCalls[0].payload)), {
+        processCode: null,
+        reason: 'process_code_missing',
+    });
+    assert.equal(telemetryPosts.length, 1);
+    assert.equal(telemetryPosts[0].payload.processCode, null);
+    assert.equal(telemetryPosts[0].payload.status, 'unavailable');
+    assert.equal(telemetryPosts[0].payload.reason, 'process_code_missing');
 });
 
 test('runLocalAdvisoryGeometry can analyze direct file bytes before viewer mesh buffers exist', async () => {
