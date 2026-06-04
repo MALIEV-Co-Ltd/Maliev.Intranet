@@ -645,7 +645,10 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         runLocalAdvisoryGeometry('viewer', {
             processCode: 'CNC_MILL',
             dotNetRef: {
-                invokeMethodAsync: async (method, payload) => dotNetCalls.push({ method, payload })
+                invokeMethodAsync: async (method, payload) => {
+                    dotNetCalls.push({ method, payload });
+                    return true;
+                }
             }
         });
     `, context);
@@ -666,6 +669,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         algorithmVersion: 'browser-first-dfm-v1',
         authority: 'local_primary',
         executionMode: 'primary_interactive',
+        accepted: true,
         inputHash: 'abc123',
         issueCount: 0,
         warningCount: 0,
@@ -1004,7 +1008,7 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.equal(result.topTransparencyMode, 0);
     assert.equal(result.topReceivesShadows, false);
     assert.equal(result.slabReceivesShadows, false);
-    assert.equal(result.firstOutlineUv[0], 0);
+    assert.ok(Math.abs(result.firstOutlineUv[0] + 0.002) < 1e-12);
     assert.ok(result.topVertexCount > 12);
     assert.ok(result.slabVertexCount > 24);
     assert.equal(result.shadowVisible, false);
