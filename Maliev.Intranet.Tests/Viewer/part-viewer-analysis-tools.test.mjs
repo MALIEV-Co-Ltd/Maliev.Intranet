@@ -559,6 +559,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     const panels = [];
     const events = [];
     const dotNetCalls = [];
+    const telemetryPosts = [];
     let currentPanel = null;
     const host = {
         querySelector: () => currentPanel,
@@ -586,21 +587,28 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     };
     context.dotNetCalls = dotNetCalls;
     context.window.dispatchEvent = event => events.push(event);
-    context.fetch = async () => ({
-        ok: true,
-        json: async () => ({
-            manifestVersion: 1,
-            runtimeVersion: '1.0.0',
-            algorithmVersion: 'browser-first-dfm-v1',
-            executionMode: 'primary_interactive',
-            authority: 'local_primary',
-            isAuthoritative: false,
-            minFrontendApiVersion: 1,
-            assets: {
-                worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
-            },
-        }),
-    });
+    context.fetch = async (url, init = {}) => {
+        if (init?.method === 'POST') {
+            telemetryPosts.push({ url, payload: JSON.parse(init.body) });
+            return { ok: true };
+        }
+
+        return {
+            ok: true,
+            json: async () => ({
+                manifestVersion: 1,
+                runtimeVersion: '1.0.0',
+                algorithmVersion: 'browser-first-dfm-v1',
+                executionMode: 'primary_interactive',
+                authority: 'local_primary',
+                isAuthoritative: false,
+                minFrontendApiVersion: 1,
+                assets: {
+                    worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                },
+            }),
+        };
+    };
     context.Worker = class Worker {
         constructor(url) {
             this.url = url;
@@ -662,9 +670,16 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(dotNetCalls[0].payload.processCode, 'CNC_MILL');
     assert.equal(dotNetCalls[1].method, 'NotifyLocalGeometryRuntimeComplete');
     assert.equal(dotNetCalls[1].payload.processCode, 'CNC_MILL');
-    assert.equal(events.length, 1);
-    assert.equal(events[0].type, 'maliev:geometry-local-runtime-complete');
+    assert.equal(events.length, 2);
+    assert.equal(events[0].type, 'maliev:geometry-local-runtime-started');
     assert.deepEqual(JSON.parse(JSON.stringify(events[0].detail)), {
+        processCode: 'CNC_MILL',
+        status: 'started',
+        authority: 'local_primary',
+        executionMode: 'primary_interactive',
+    });
+    assert.equal(events[1].type, 'maliev:geometry-local-runtime-complete');
+    assert.deepEqual(JSON.parse(JSON.stringify(events[1].detail)), {
         canvasId: 'viewer',
         processCode: 'CNC_MILL',
         runtimeVersion: '1.0.0',
@@ -679,6 +694,17 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         metrics: { faceCount: 1 },
         issues: [],
     });
+    assert.equal(telemetryPosts.length, 2);
+    assert.equal(telemetryPosts[0].url, '/api/v1/geometry/runtime/telemetry');
+    assert.deepEqual(telemetryPosts[0].payload, {
+        processCode: 'CNC_MILL',
+        status: 'started',
+        authority: 'local_primary',
+        executionMode: 'primary_interactive',
+    });
+    assert.equal(telemetryPosts[1].url, '/api/v1/geometry/runtime/telemetry');
+    assert.equal(telemetryPosts[1].payload.processCode, 'CNC_MILL');
+    assert.equal(telemetryPosts[1].payload.accepted, true);
 });
 
 test('runLocalAdvisoryGeometry can analyze direct file bytes before viewer mesh buffers exist', async () => {

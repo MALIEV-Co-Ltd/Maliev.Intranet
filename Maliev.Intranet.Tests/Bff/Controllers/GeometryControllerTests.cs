@@ -113,6 +113,24 @@ public class GeometryControllerTests
     }
 
     [Fact]
+    public void RecordRuntimeTelemetry_AcceptsBrowserLocalStart()
+    {
+        var controller = MakeController(
+            MakeUploadClient(),
+            MakeGeometryClient(new DfmAnalysisResponse { Status = "analysis_complete" }));
+
+        var result = controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
+        {
+            ProcessCode = "CNC_MILL",
+            Status = "started",
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive"
+        });
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
     public async Task AnalyzeForProcess_Returns410_WhenFileNotInUploadService()
     {
         var controller = MakeController(
@@ -384,6 +402,7 @@ public class GeometryControllerTests
 
         Assert.Contains("[HttpPost(\"runtime/telemetry\")]", source, StringComparison.Ordinal);
         Assert.Contains("BrowserGeometryRuntimeTelemetryRequest", source, StringComparison.Ordinal);
+        Assert.Contains("RecordBrowserDfmRuntimeStart", source, StringComparison.Ordinal);
         Assert.Contains("RecordBrowserDfmRuntimeCompletion", source, StringComparison.Ordinal);
         Assert.Contains("RecordServerDfmProxyRequest(processCode, \"browser_local_miss\")", source, StringComparison.Ordinal);
         Assert.Contains("return NoContent();", source, StringComparison.Ordinal);

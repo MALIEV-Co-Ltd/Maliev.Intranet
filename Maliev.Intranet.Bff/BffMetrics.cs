@@ -10,6 +10,7 @@ public class BffMetrics
 {
     private readonly UpDownCounter<long> _activeSessionsCounter;
     private readonly Counter<long> _browserDfmRuntimeCompletions;
+    private readonly Counter<long> _browserDfmRuntimeStarts;
     private readonly Counter<long> _browserDfmRuntimeTerminalAttempts;
     private readonly Counter<long> _serverDfmProxyRequests;
 
@@ -25,6 +26,10 @@ public class BffMetrics
             "intranet_browser_dfm_runtime_completions",
             unit: "{completion}",
             description: "Counts browser-first local DFM runtime completions observed by Intranet.");
+        _browserDfmRuntimeStarts = meter.CreateCounter<long>(
+            "intranet_browser_dfm_runtime_starts",
+            unit: "{start}",
+            description: "Counts browser-first local DFM runtime starts observed by Intranet.");
         _browserDfmRuntimeTerminalAttempts = meter.CreateCounter<long>(
             "intranet_browser_dfm_runtime_terminal_attempts",
             unit: "{attempt}",
@@ -62,6 +67,25 @@ public class BffMetrics
         {
             { "process_family", NormalizeProcessFamily(processCode) },
             { "accepted", accepted },
+            { "authority", NormalizeMarker(authority, "other") },
+            { "execution_mode", NormalizeMarker(executionMode, "other") },
+        });
+    }
+
+    /// <summary>
+    /// Records that a browser-first local DFM runtime started.
+    /// </summary>
+    /// <param name="processCode">The process code requested for the browser runtime.</param>
+    /// <param name="authority">The runtime authority marker.</param>
+    /// <param name="executionMode">The runtime execution mode marker.</param>
+    public void RecordBrowserDfmRuntimeStart(
+        string? processCode,
+        string? authority,
+        string? executionMode)
+    {
+        _browserDfmRuntimeStarts.Add(1, new TagList
+        {
+            { "process_family", NormalizeProcessFamily(processCode) },
             { "authority", NormalizeMarker(authority, "other") },
             { "execution_mode", NormalizeMarker(executionMode, "other") },
         });

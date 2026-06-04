@@ -234,6 +234,16 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void BrowserLocalDfmTelemetry_PostsStartToSameOriginBff()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        Assert.Contains("function dispatchLocalAdvisoryStartedTelemetry(payload)", source, StringComparison.Ordinal);
+        Assert.Contains("status: 'started'", source, StringComparison.Ordinal);
+        Assert.Contains("dispatchLocalAdvisoryStartedTelemetry(payload);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BrowserLocalDfmTelemetry_PostsTerminalUnavailableToSameOriginBff()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
