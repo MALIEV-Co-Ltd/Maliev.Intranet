@@ -28,6 +28,9 @@ public class UploadsController(
     ILogger<UploadsController> logger) : ControllerBase
 {
     private const string StreamingUploadClientName = "UploadServiceClient.StreamingProxy";
+    private static readonly HashSet<string> BrowserViewerSourceExtensions = new(
+        [".glb", ".gltf", ".obj", ".stl"],
+        StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
@@ -242,6 +245,22 @@ public class UploadsController(
         if (status != null)
             return Ok(status);
 
+        var directBrowserViewerArtifact = await TryRecoverDirectBrowserViewerArtifactAsync(storagePath, ct);
+        if (directBrowserViewerArtifact != null)
+        {
+            return Ok(new FileAnalysisStatusDto
+            {
+                UploadId = storagePath,
+                Status = FileAnalysisStatus.Completed,
+                GlbStoragePath = null,
+                ViewerStoragePath = directBrowserViewerArtifact.StoragePath,
+                ViewerFileExtension = directBrowserViewerArtifact.FileExtension,
+                GlbSignedUrl = directBrowserViewerArtifact.SignedUrl,
+                PreviewProcessingStatus = PreviewProcessingStatus.Completed,
+                ProcessedAt = DateTimeOffset.UtcNow
+            });
+        }
+
         var recoveredViewerArtifact = await TryRecoverConventionalViewerGlbAsync(storagePath, ct);
         return recoveredViewerArtifact != null
             ? Ok(new FileAnalysisStatusDto
@@ -295,6 +314,17 @@ public class UploadsController(
             return NotFound("Viewer artifact not available. The file may still be processing or geometry analysis failed.");
         }
 
+        var directBrowserViewerArtifact = await TryRecoverDirectBrowserViewerArtifactAsync(storagePath, ct);
+        if (directBrowserViewerArtifact != null)
+        {
+            return Ok(new
+            {
+                Url = directBrowserViewerArtifact.SignedUrl,
+                ViewerStoragePath = directBrowserViewerArtifact.StoragePath,
+                ViewerFileExtension = directBrowserViewerArtifact.FileExtension
+            });
+        }
+
         // Fallback: for overlay GLB files (e.g. "_FDM__thin_wall_overlay.glb") and other
         // artifacts that are stored directly in GCS but never tracked in the analysis cache,
         // try signing the requested storagePath directly. This is safe because
@@ -327,6 +357,33 @@ public class UploadsController(
 
         // Not a GLB path and no cache entry — the file is still processing.
         return NotFound("Viewer artifact not available. The file may still be processing.");
+    }
+
+    private async Task<RecoveredViewerArtifact?> TryRecoverDirectBrowserViewerArtifactAsync(
+        string storagePath,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return null;
+
+        var extension = Path.GetExtension(storagePath);
+        if (!BrowserViewerSourceExtensions.Contains(extension))
+            return null;
+
+        string? signedUrl;
+        try
+        {
+            signedUrl = await uploadClient.GetDownloadUrlByPathAsync(storagePath, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Could not sign direct browser viewer source for {StoragePath}.", storagePath);
+            return null;
+        }
+
+        return string.IsNullOrEmpty(signedUrl)
+            ? null
+            : new RecoveredViewerArtifact(storagePath, signedUrl, NormalizeViewerFileExtension(null, storagePath) ?? extension);
     }
 
     private async Task<RecoveredViewerArtifact?> TryRecoverConventionalViewerGlbAsync(
