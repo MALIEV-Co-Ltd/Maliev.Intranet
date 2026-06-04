@@ -109,6 +109,7 @@ public class BffMetricsTests
         Assert.Equal("cnc", browserTags["process_family"]);
         Assert.Equal("browser_primary", browserTags["execution_path"]);
         Assert.Equal("satisfied", browserTags["decision"]);
+        Assert.Equal("avoided", browserTags["server_cpu"]);
         Assert.Equal("local_primary", browserTags["authority"]);
         Assert.Equal("primary_interactive", browserTags["execution_mode"]);
 
@@ -117,6 +118,7 @@ public class BffMetricsTests
         Assert.Equal("server_fallback", serverTags["execution_path"]);
         Assert.Equal("server_requested", serverTags["decision"]);
         Assert.Equal("browser_local_miss", serverTags["fallback_reason"]);
+        Assert.Equal("consumed", serverTags["server_cpu"]);
     }
 
     [Fact]

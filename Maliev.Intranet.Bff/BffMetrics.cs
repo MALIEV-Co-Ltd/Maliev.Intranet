@@ -93,6 +93,7 @@ public class BffMetrics
                 { "process_family", NormalizeProcessFamily(processCode) },
                 { "execution_path", "browser_primary" },
                 { "decision", "satisfied" },
+                { "server_cpu", "avoided" },
                 { "authority", NormalizeMarker(authority, "other") },
                 { "execution_mode", NormalizeMarker(executionMode, "other") },
             });
@@ -173,6 +174,7 @@ public class BffMetrics
             { "execution_path", "server_fallback" },
             { "decision", "server_requested" },
             { "fallback_reason", NormalizeMarker(fallbackReason, "browser_local_miss") },
+            { "server_cpu", "consumed" },
         });
     }
 
