@@ -198,6 +198,20 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void PartConfigSidebar_DfmGoneResponseDoesNotOverrideActiveBrowserAttempt()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
+            .ReplaceLineEndings("\n");
+        var goneBranch = ExtractBlock(source, "else if (response.StatusCode == System.Net.HttpStatusCode.Gone)");
+
+        Assert.Contains("BrowserDfmReportSync.HasActiveLocalAttempt(part, process.Code)", goneBranch, StringComparison.Ordinal);
+        Assert.True(
+            goneBranch.IndexOf("BrowserDfmReportSync.HasActiveLocalAttempt(part, process.Code)", StringComparison.Ordinal)
+            < goneBranch.IndexOf("part.AnalysisErrorCode = \"FILE_MISSING\";", StringComparison.Ordinal),
+            "PartConfigSidebar must not stamp FILE_MISSING while browser-first local DFM is still running for the current process.");
+    }
+
+    [Fact]
     public void PartConfigSidebar_PublishesDfmStateForEquivalentProcessCodes()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
