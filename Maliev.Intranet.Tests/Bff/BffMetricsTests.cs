@@ -70,6 +70,56 @@ public class BffMetricsTests
     }
 
     [Fact]
+    public void DfmExecutionDecisionMetrics_EmitBrowserSatisfiedAndServerFallbackTags()
+    {
+        var meterFactoryMock = new Mock<IMeterFactory>();
+        using var meter = new Meter("test");
+        meterFactoryMock.Setup(x => x.Create(It.IsAny<MeterOptions>())).Returns(meter);
+
+        var measurements = new List<Dictionary<string, object?>>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, meterListener) =>
+            {
+                if (instrument.Name == "intranet_dfm_execution_decisions")
+                {
+                    meterListener.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var tag in tags)
+            {
+                snapshot[tag.Key] = tag.Value;
+            }
+
+            measurements.Add(snapshot);
+        });
+        listener.Start();
+
+        var metrics = new BffMetrics(meterFactoryMock.Object);
+        metrics.RecordBrowserDfmRuntimeCompletion("CNC_MILL", true, "local_primary", "primary_interactive");
+        metrics.RecordServerDfmProxyRequest("CNC_MILL", "browser_local_miss");
+
+        Assert.Equal(2, measurements.Count);
+
+        var browserTags = measurements[0];
+        Assert.Equal("cnc", browserTags["process_family"]);
+        Assert.Equal("browser_primary", browserTags["execution_path"]);
+        Assert.Equal("satisfied", browserTags["decision"]);
+        Assert.Equal("local_primary", browserTags["authority"]);
+        Assert.Equal("primary_interactive", browserTags["execution_mode"]);
+
+        var serverTags = measurements[1];
+        Assert.Equal("cnc", serverTags["process_family"]);
+        Assert.Equal("server_fallback", serverTags["execution_path"]);
+        Assert.Equal("server_requested", serverTags["decision"]);
+        Assert.Equal("browser_local_miss", serverTags["fallback_reason"]);
+    }
+
+    [Fact]
     public void RecordBrowserDfmRuntimeStart_EmitsStartMetricTags()
     {
         var meterFactoryMock = new Mock<IMeterFactory>();

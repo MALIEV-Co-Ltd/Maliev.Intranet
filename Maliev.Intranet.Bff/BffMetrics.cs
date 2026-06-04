@@ -14,6 +14,7 @@ public class BffMetrics
     private readonly Histogram<long> _browserDfmRuntimeInputTriangles;
     private readonly Counter<long> _browserDfmRuntimeStarts;
     private readonly Counter<long> _browserDfmRuntimeTerminalAttempts;
+    private readonly Counter<long> _dfmExecutionDecisions;
     private readonly Counter<long> _serverDfmProxyRequests;
 
     /// <summary>
@@ -44,6 +45,10 @@ public class BffMetrics
             "intranet_browser_dfm_runtime_terminal_attempts",
             unit: "{attempt}",
             description: "Counts browser-first local DFM runtime attempts that ended before producing a local report.");
+        _dfmExecutionDecisions = meter.CreateCounter<long>(
+            "intranet_dfm_execution_decisions",
+            unit: "{decision}",
+            description: "Counts whether DFM work was satisfied by browser-local execution or required GeometryService fallback.");
         _serverDfmProxyRequests = meter.CreateCounter<long>(
             "intranet_server_dfm_proxy_requests",
             unit: "{request}",
@@ -80,6 +85,18 @@ public class BffMetrics
             { "authority", NormalizeMarker(authority, "other") },
             { "execution_mode", NormalizeMarker(executionMode, "other") },
         });
+
+        if (accepted)
+        {
+            _dfmExecutionDecisions.Add(1, new TagList
+            {
+                { "process_family", NormalizeProcessFamily(processCode) },
+                { "execution_path", "browser_primary" },
+                { "decision", "satisfied" },
+                { "authority", NormalizeMarker(authority, "other") },
+                { "execution_mode", NormalizeMarker(executionMode, "other") },
+            });
+        }
     }
 
     /// <summary>
@@ -148,6 +165,13 @@ public class BffMetrics
         _serverDfmProxyRequests.Add(1, new TagList
         {
             { "process_family", NormalizeProcessFamily(processCode) },
+            { "fallback_reason", NormalizeMarker(fallbackReason, "browser_local_miss") },
+        });
+        _dfmExecutionDecisions.Add(1, new TagList
+        {
+            { "process_family", NormalizeProcessFamily(processCode) },
+            { "execution_path", "server_fallback" },
+            { "decision", "server_requested" },
             { "fallback_reason", NormalizeMarker(fallbackReason, "browser_local_miss") },
         });
     }
