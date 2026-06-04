@@ -11,6 +11,7 @@ public class BffMetrics
     private readonly UpDownCounter<long> _activeSessionsCounter;
     private readonly Counter<long> _browserDfmRuntimeCompletions;
     private readonly Counter<long> _browserDfmRuntimeTerminalAttempts;
+    private readonly Counter<long> _serverDfmProxyRequests;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BffMetrics"/> class.
@@ -28,6 +29,10 @@ public class BffMetrics
             "intranet_browser_dfm_runtime_terminal_attempts",
             unit: "{attempt}",
             description: "Counts browser-first local DFM runtime attempts that ended before producing a local report.");
+        _serverDfmProxyRequests = meter.CreateCounter<long>(
+            "intranet_server_dfm_proxy_requests",
+            unit: "{request}",
+            description: "Counts lazy server DFM requests forwarded to GeometryService after local browser DFM did not satisfy the process.");
     }
 
     /// <summary>
@@ -81,6 +86,20 @@ public class BffMetrics
             { "reason", NormalizeMarker(reason, "local_runtime_unavailable") },
             { "authority", NormalizeMarker(authority, "other") },
             { "execution_mode", NormalizeMarker(executionMode, "other") },
+        });
+    }
+
+    /// <summary>
+    /// Records a lazy server DFM request forwarded to GeometryService.
+    /// </summary>
+    /// <param name="processCode">The requested manufacturing process code.</param>
+    /// <param name="fallbackReason">The low-cardinality reason the browser-local path did not satisfy the request.</param>
+    public void RecordServerDfmProxyRequest(string? processCode, string? fallbackReason)
+    {
+        _serverDfmProxyRequests.Add(1, new TagList
+        {
+            { "process_family", NormalizeProcessFamily(processCode) },
+            { "fallback_reason", NormalizeMarker(fallbackReason, "browser_local_miss") },
         });
     }
 

@@ -166,6 +166,7 @@ public class GeometryController(
         request.StoragePath = resolvedPath;
         request.DownloadUrl = signedUrl;
 
+        bffMetrics.RecordServerDfmProxyRequest(processCode, "browser_local_miss");
         var result = await geometryServiceClient.AnalyzeForProcessAsync(uploadId, processCode, request, ct);
 
         if (result == null)

@@ -385,6 +385,7 @@ public class GeometryControllerTests
         Assert.Contains("[HttpPost(\"runtime/telemetry\")]", source, StringComparison.Ordinal);
         Assert.Contains("BrowserGeometryRuntimeTelemetryRequest", source, StringComparison.Ordinal);
         Assert.Contains("RecordBrowserDfmRuntimeCompletion", source, StringComparison.Ordinal);
+        Assert.Contains("RecordServerDfmProxyRequest(processCode, \"browser_local_miss\")", source, StringComparison.Ordinal);
         Assert.Contains("return NoContent();", source, StringComparison.Ordinal);
     }
 }
