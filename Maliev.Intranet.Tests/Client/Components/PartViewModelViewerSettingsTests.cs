@@ -1,5 +1,6 @@
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
@@ -99,5 +100,46 @@ public class PartViewModelViewerSettingsTests
         var restored = PartViewModel.FromDraftPartState(part.ToDraftPartState());
 
         Assert.Equal("CNC_MILL", restored.ProcessCode);
+    }
+
+    [Fact]
+    public void ToDraftPartState_WhenBrowserLocalDfmUsesSharedDto_RoundTripsReport()
+    {
+        var report = new DfmReport
+        {
+            ReportType = "CNC_MILL",
+            Issues =
+            [
+                new Maliev.Intranet.Shared.Dtos.DfmIssue
+                {
+                    Category = "mesh_integrity",
+                    Severity = "warning",
+                    Title = "Mesh may be non-manifold",
+                    Description = "Local browser DFM found boundary edges.",
+                    Value = 8,
+                    Threshold = 0,
+                    FaceIndices = [1, 2, 3],
+                    Centroid = [1.25, 2.5, 3.75],
+                },
+            ],
+        };
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "local-dfm-cnc.stl",
+            ProcessCode = "CNC_MILL",
+            CncDfmReport = report,
+        };
+        part.ResolveDfmReport();
+
+        var restored = PartViewModel.FromDraftPartState(part.ToDraftPartState());
+
+        var restoredReport = Assert.IsType<DfmReport>(restored.DfmReport);
+        Assert.Same(restoredReport, restored.CncDfmReport);
+        Assert.Equal("CNC_MILL", restoredReport.ReportType);
+        var restoredIssue = Assert.Single(restoredReport.Issues);
+        Assert.Equal("mesh_integrity", restoredIssue.Category);
+        Assert.Equal([1, 2, 3], restoredIssue.FaceIndices);
+        Assert.Equal([1.25, 2.5, 3.75], restoredIssue.Centroid);
     }
 }

@@ -12,6 +12,8 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// </summary>
 public class PartViewModel
 {
+    private const string SharedDfmReportDraftKind = "shared_dto";
+
     // ── Persisted to DraftPartState ────────────────────────────────────
 
     /// <summary>The original file name / display name for this part.</summary>
@@ -528,10 +530,10 @@ public class PartViewModel
         ProcessConfig = ProcessOptionValues
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
             .ToDictionary(pair => pair.Key, pair => pair.Value!),
-        // Serialise typed DFM payloads to JSON so BuildDfmIssues works after restore
-        FdmDfmReportJson = FdmDfmReport is FdmDfmReportPayload fdm ? JsonSerializer.Serialize(fdm) : null,
-        SlaDfmReportJson = SlaDfmReport is SlaDfmReportPayload sla ? JsonSerializer.Serialize(sla) : null,
-        CncDfmReportJson = CncDfmReport is CncDfmReportPayload cnc ? JsonSerializer.Serialize(cnc) : null,
+        // Serialise DFM payloads to JSON so BuildDfmIssues works after restore.
+        FdmDfmReportJson = SerializeDfmReportForDraft(FdmDfmReport),
+        SlaDfmReportJson = SerializeDfmReportForDraft(SlaDfmReport),
+        CncDfmReportJson = SerializeDfmReportForDraft(CncDfmReport),
         OverlayPaths = OverlayPaths,
         BodyCount = BodyCount,
         BodiesJson = Bodies.Count > 0 ? JsonSerializer.Serialize(Bodies) : null,
@@ -618,18 +620,46 @@ public class PartViewModel
             vm.Bodies = JsonSerializer.Deserialize<List<BodyInfo>>(s.BodiesJson) ?? [];
 
         // Deserialise DFM reports from JSON so BuildDfmIssues pattern-matching works correctly.
-        // Without this, the reports arrive as JsonElement after catch-up which never matches
-        // FdmDfmReportPayload / SlaDfmReportPayload / CncDfmReportPayload.
-        if (!string.IsNullOrEmpty(s.FdmDfmReportJson))
-            vm.FdmDfmReport = JsonSerializer.Deserialize<FdmDfmReportPayload>(s.FdmDfmReportJson);
-        if (!string.IsNullOrEmpty(s.SlaDfmReportJson))
-            vm.SlaDfmReport = JsonSerializer.Deserialize<SlaDfmReportPayload>(s.SlaDfmReportJson);
-        if (!string.IsNullOrEmpty(s.CncDfmReportJson))
-            vm.CncDfmReport = JsonSerializer.Deserialize<CncDfmReportPayload>(s.CncDfmReportJson);
+        // This preserves both MassTransit typed payloads and browser-local DfmReport DTOs.
+        vm.FdmDfmReport = DeserializeDfmReportForDraft<FdmDfmReportPayload>(s.FdmDfmReportJson);
+        vm.SlaDfmReport = DeserializeDfmReportForDraft<SlaDfmReportPayload>(s.SlaDfmReportJson);
+        vm.CncDfmReport = DeserializeDfmReportForDraft<CncDfmReportPayload>(s.CncDfmReportJson);
 
         // Resolve DfmReport from the typed per-process reports so overlay panels start correctly.
         vm.ResolveDfmReport();
 
         return vm;
+    }
+
+    private static string? SerializeDfmReportForDraft(object? report) =>
+        report switch
+        {
+            null => null,
+            DfmReport dto => JsonSerializer.Serialize(new DraftSharedDfmReport(dto)),
+            FdmDfmReportPayload fdm => JsonSerializer.Serialize(fdm),
+            SlaDfmReportPayload sla => JsonSerializer.Serialize(sla),
+            CncDfmReportPayload cnc => JsonSerializer.Serialize(cnc),
+            _ => null,
+        };
+
+    private static object? DeserializeDfmReportForDraft<TTypedReport>(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.TryGetProperty(nameof(DraftSharedDfmReport.ReportKind), out var kind)
+            && string.Equals(kind.GetString(), SharedDfmReportDraftKind, StringComparison.Ordinal)
+            && document.RootElement.TryGetProperty(nameof(DraftSharedDfmReport.Report), out var reportElement))
+        {
+            return reportElement.Deserialize<DfmReport>();
+        }
+
+        return JsonSerializer.Deserialize<TTypedReport>(json);
+    }
+
+    private sealed record DraftSharedDfmReport(DfmReport Report)
+    {
+        public string ReportKind { get; init; } = SharedDfmReportDraftKind;
     }
 }
