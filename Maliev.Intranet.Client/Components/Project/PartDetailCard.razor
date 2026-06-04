@@ -506,6 +506,8 @@
     private string? _lastMaterialColor;
     private string? _lastFinishCode;
     private string? _lastRoughnessCode;
+    private string? _pendingLocalDfmProcessCode;
+    private bool _viewerConfigurationPushPending;
     private bool _hasPushedInitialMaterialConfig;
     private List<DfmIssue> _dfmIssues = [];
     private bool _viewerLoadFailed;
@@ -565,6 +567,8 @@
             {
                 _viewerLoadFailed = false;
                 _viewerErrorMessage = null;
+                _pendingLocalDfmProcessCode = null;
+                _viewerConfigurationPushPending = false;
                 _hasPushedInitialMaterialConfig = false;
             }
         }
@@ -575,7 +579,6 @@
             _viewerLoadFailed = false;
             _viewerErrorMessage = null;
 
-            // Push material/colour/finish changes from the configurator sidebar to the 3D viewer
             var materialColor = ColorNameToHex(GetMaterialColorFromOptions(Part));
             var materialChanged = !string.Equals(Part.MaterialCode, _lastMaterialCode, StringComparison.Ordinal);
             var colorChanged = !string.Equals(materialColor, _lastMaterialColor, StringComparison.Ordinal);
@@ -584,20 +587,7 @@
             var initialPush = !_hasPushedInitialMaterialConfig
                 && !string.IsNullOrEmpty(Part.MaterialCode);
             if (materialChanged || colorChanged || finishChanged || roughnessChanged || processChanged || initialPush)
-            {
-                _lastMaterialCode = Part.MaterialCode;
-                _lastMaterialColor = materialColor;
-                _lastFinishCode = Part.FinishCode;
-                _lastRoughnessCode = Part.RoughnessCode;
-                _hasPushedInitialMaterialConfig = true;
-                if (_modelViewer != null)
-                {
-                    await _modelViewer.ApplyConfiguratorMaterialAsync(
-                        Part.ProcessCode, Part.MaterialCode, materialColor, Part.FinishCode, Part.RoughnessCode);
-                    if (processChanged)
-                        await _modelViewer.RunLocalGeometryRuntimeAsync(Part.ProcessCode);
-                }
-            }
+                await PushViewerConfiguratorStateAsync(processChanged ? Part.ProcessCode : null);
 
             // Initialize multi-body viewer when bodies are available
             if (Part.BodyCount > 1 && Part.Bodies.Count > 0 && !_multiBodyInitialized)
@@ -640,6 +630,51 @@
         }
 
         await base.OnParametersSetAsync();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_modelViewer == null || string.IsNullOrEmpty(Part.ViewerUrl))
+            return;
+
+        if (!_viewerConfigurationPushPending && string.IsNullOrWhiteSpace(_pendingLocalDfmProcessCode))
+            return;
+
+        var localDfmProcessCode = _pendingLocalDfmProcessCode;
+        if (!string.IsNullOrWhiteSpace(localDfmProcessCode)
+            && !ProcessCodeNormalizer.Equals(Part.ProcessCode, localDfmProcessCode))
+        {
+            localDfmProcessCode = null;
+        }
+
+        await PushViewerConfiguratorStateAsync(localDfmProcessCode);
+    }
+
+    private async Task PushViewerConfiguratorStateAsync(string? localDfmProcessCode = null)
+    {
+        if (_modelViewer == null)
+        {
+            _viewerConfigurationPushPending = true;
+            if (!string.IsNullOrWhiteSpace(localDfmProcessCode))
+                _pendingLocalDfmProcessCode = Part.ProcessCode;
+            return;
+        }
+
+        var materialColor = ColorNameToHex(GetMaterialColorFromOptions(Part));
+        _lastMaterialCode = Part.MaterialCode;
+        _lastMaterialColor = materialColor;
+        _lastFinishCode = Part.FinishCode;
+        _lastRoughnessCode = Part.RoughnessCode;
+        _hasPushedInitialMaterialConfig = true;
+        _viewerConfigurationPushPending = false;
+        _pendingLocalDfmProcessCode = null;
+
+        await _modelViewer.ApplyConfiguratorMaterialAsync(
+            Part.ProcessCode, Part.MaterialCode, materialColor, Part.FinishCode, Part.RoughnessCode);
+
+        if (!string.IsNullOrWhiteSpace(localDfmProcessCode))
+            await _modelViewer.RunLocalGeometryRuntimeAsync(localDfmProcessCode);
     }
 
     private async Task CloseViewer()

@@ -150,6 +150,26 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void PartDetailCard_DefersBrowserLocalDfmUntilViewerReferenceExists()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("private string? _pendingLocalDfmProcessCode;", source, StringComparison.Ordinal);
+        Assert.Contains("private bool _viewerConfigurationPushPending;", source, StringComparison.Ordinal);
+        Assert.Contains("protected override async Task OnAfterRenderAsync", source, StringComparison.Ordinal);
+        Assert.Contains("_pendingLocalDfmProcessCode = Part.ProcessCode;", source, StringComparison.Ordinal);
+        Assert.Contains("await _modelViewer.RunLocalGeometryRuntimeAsync(localDfmProcessCode);", source, StringComparison.Ordinal);
+
+        var pushMethod = ExtractBlock(source, "private async Task PushViewerConfiguratorStateAsync");
+        Assert.Contains("if (_modelViewer == null)", pushMethod, StringComparison.Ordinal);
+        Assert.True(
+            pushMethod.IndexOf("if (_modelViewer == null)", StringComparison.Ordinal)
+            < pushMethod.IndexOf("_hasPushedInitialMaterialConfig = true;", StringComparison.Ordinal),
+            "PartDetailCard must not mark the initial viewer config push complete before the ModelViewer @ref exists.");
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
