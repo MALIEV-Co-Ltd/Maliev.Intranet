@@ -26,6 +26,10 @@ public class ProjectPartBulkEditTests
             DfmAnalysisTimedOut = true,
             AnalysisErrorCode = "DFM_REPORT_UNAVAILABLE",
             DfmReport = new object(),
+            LocalDfmRuntimeRunningProcessCode = "FDM",
+            LocalDfmRuntimeStartedAtUtc = DateTimeOffset.UtcNow,
+            LocalDfmRuntimeTerminalProcessCode = "FDM",
+            LocalDfmRuntimeTerminalReason = "worker_failed",
             AvailableMaterials = [new CatalogMaterialDto(materialId, "PLA", "PLA", "Plastic", null, null, 10)],
             AvailableFinishes = [new CatalogSurfaceFinishDto(finishId, "As printed", "AS_PRINTED", null, 0m, null, 10)],
             AvailableTolerances = [new CatalogToleranceDto(toleranceId, "Standard", "STD", "ISO 2768", "m", null, 0m, 10)],
@@ -57,6 +61,10 @@ public class ProjectPartBulkEditTests
         Assert.False(part.DfmAllClearNotified);
         Assert.False(part.DfmAnalysisTimedOut);
         Assert.Null(part.AnalysisErrorCode);
+        Assert.Null(part.LocalDfmRuntimeRunningProcessCode);
+        Assert.Null(part.LocalDfmRuntimeStartedAtUtc);
+        Assert.Null(part.LocalDfmRuntimeTerminalProcessCode);
+        Assert.Null(part.LocalDfmRuntimeTerminalReason);
     }
 
     [Fact]

@@ -296,5 +296,9 @@ public static class ProjectPartBulkEdit
         part.DfmAllClearNotified = false;
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
+        part.LocalDfmRuntimeRunningProcessCode = null;
+        part.LocalDfmRuntimeStartedAtUtc = null;
+        part.LocalDfmRuntimeTerminalProcessCode = null;
+        part.LocalDfmRuntimeTerminalReason = null;
     }
 }
