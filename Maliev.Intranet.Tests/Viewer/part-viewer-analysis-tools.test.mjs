@@ -677,6 +677,8 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         status: 'started',
         authority: 'local_primary',
         executionMode: 'primary_interactive',
+        inputByteCount: 84,
+        inputTriangleCount: 1,
     });
     assert.equal(events[1].type, 'maliev:geometry-local-runtime-complete');
     assert.deepEqual(JSON.parse(JSON.stringify(events[1].detail)), {
@@ -701,6 +703,8 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         status: 'started',
         authority: 'local_primary',
         executionMode: 'primary_interactive',
+        inputByteCount: 84,
+        inputTriangleCount: 1,
     });
     assert.equal(telemetryPosts[1].url, '/api/v1/geometry/runtime/telemetry');
     assert.equal(telemetryPosts[1].payload.processCode, 'CNC_MILL');

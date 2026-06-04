@@ -76,11 +76,15 @@ public class GeometryController(
             bffMetrics.RecordBrowserDfmRuntimeStart(
                 request.ProcessCode,
                 request.Authority,
-                request.ExecutionMode);
+                request.ExecutionMode,
+                request.InputByteCount,
+                request.InputTriangleCount);
 
             logger.LogInformation(
-                "Browser-first intranet DFM local runtime started for process {ProcessCode}",
-                request.ProcessCode);
+                "Browser-first intranet DFM local runtime started for process {ProcessCode}; inputBytes={InputByteCount}; inputTriangles={InputTriangleCount}",
+                request.ProcessCode,
+                request.InputByteCount,
+                request.InputTriangleCount);
 
             return NoContent();
         }
@@ -388,6 +392,12 @@ public sealed class BrowserGeometryRuntimeTelemetryRequest
 
     /// <summary>The browser runtime input hash, logged only for correlation and never used as a metric tag.</summary>
     public string? InputHash { get; set; }
+
+    /// <summary>The approximate browser-local runtime input size in bytes.</summary>
+    public long? InputByteCount { get; set; }
+
+    /// <summary>The approximate browser-local runtime triangle workload.</summary>
+    public long? InputTriangleCount { get; set; }
 
     /// <summary>Whether this payload represents a terminal local runtime attempt.</summary>
     public bool IsTerminalUnavailable =>

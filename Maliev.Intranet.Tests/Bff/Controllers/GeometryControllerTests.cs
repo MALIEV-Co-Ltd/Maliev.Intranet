@@ -124,7 +124,9 @@ public class GeometryControllerTests
             ProcessCode = "CNC_MILL",
             Status = "started",
             Authority = "local_primary",
-            ExecutionMode = "primary_interactive"
+            ExecutionMode = "primary_interactive",
+            InputByteCount = 84,
+            InputTriangleCount = 1
         });
 
         Assert.IsType<NoContentResult>(result);
@@ -403,6 +405,8 @@ public class GeometryControllerTests
         Assert.Contains("[HttpPost(\"runtime/telemetry\")]", source, StringComparison.Ordinal);
         Assert.Contains("BrowserGeometryRuntimeTelemetryRequest", source, StringComparison.Ordinal);
         Assert.Contains("RecordBrowserDfmRuntimeStart", source, StringComparison.Ordinal);
+        Assert.Contains("InputByteCount", source, StringComparison.Ordinal);
+        Assert.Contains("InputTriangleCount", source, StringComparison.Ordinal);
         Assert.Contains("RecordBrowserDfmRuntimeCompletion", source, StringComparison.Ordinal);
         Assert.Contains("RecordServerDfmProxyRequest(processCode, \"browser_local_miss\")", source, StringComparison.Ordinal);
         Assert.Contains("return NoContent();", source, StringComparison.Ordinal);

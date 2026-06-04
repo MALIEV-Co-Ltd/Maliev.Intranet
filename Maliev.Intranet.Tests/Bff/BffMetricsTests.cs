@@ -107,4 +107,44 @@ public class BffMetricsTests
         Assert.Equal("local_primary", tags["authority"]);
         Assert.Equal("primary_interactive", tags["execution_mode"]);
     }
+
+    [Fact]
+    public void RecordBrowserDfmRuntimeStart_RecordsLocalInputWorkload()
+    {
+        var meterFactoryMock = new Mock<IMeterFactory>();
+        using var meter = new Meter("test");
+        meterFactoryMock.Setup(x => x.Create(It.IsAny<MeterOptions>())).Returns(meter);
+
+        var measurements = new Dictionary<string, (long Value, Dictionary<string, object?> Tags)>(StringComparer.Ordinal);
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, meterListener) =>
+            {
+                if (instrument.Name is "intranet_browser_dfm_runtime_input_bytes"
+                    or "intranet_browser_dfm_runtime_input_triangles")
+                {
+                    meterListener.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, _) =>
+        {
+            var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var tag in tags)
+            {
+                snapshot[tag.Key] = tag.Value;
+            }
+
+            measurements[instrument.Name] = (measurement, snapshot);
+        });
+        listener.Start();
+
+        var metrics = new BffMetrics(meterFactoryMock.Object);
+        metrics.RecordBrowserDfmRuntimeStart("CNC_MILL", "local_primary", "primary_interactive", 84, 1);
+
+        Assert.Equal(84, measurements["intranet_browser_dfm_runtime_input_bytes"].Value);
+        Assert.Equal("cnc", measurements["intranet_browser_dfm_runtime_input_bytes"].Tags["process_family"]);
+        Assert.Equal(1, measurements["intranet_browser_dfm_runtime_input_triangles"].Value);
+        Assert.Equal("cnc", measurements["intranet_browser_dfm_runtime_input_triangles"].Tags["process_family"]);
+    }
 }

@@ -240,6 +240,8 @@ public sealed class ModelViewerRenderingSourceTests
 
         Assert.Contains("function dispatchLocalAdvisoryStartedTelemetry(payload)", source, StringComparison.Ordinal);
         Assert.Contains("status: 'started'", source, StringComparison.Ordinal);
+        Assert.Contains("inputByteCount: payload?.inputByteCount ?? null", source, StringComparison.Ordinal);
+        Assert.Contains("inputTriangleCount: payload?.inputTriangleCount ?? null", source, StringComparison.Ordinal);
         Assert.Contains("dispatchLocalAdvisoryStartedTelemetry(payload);", source, StringComparison.Ordinal);
     }
 
