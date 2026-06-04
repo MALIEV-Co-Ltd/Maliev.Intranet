@@ -4,12 +4,14 @@ using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -74,9 +76,17 @@ public class GeometryControllerTests
         { BaseAddress = new Uri("http://test") });
     }
 
-    private static GeometryController MakeController(UploadServiceClient uploadClient, GeometryServiceClient geometryClient)
+    private static GeometryController MakeController(
+        UploadServiceClient uploadClient,
+        GeometryServiceClient geometryClient,
+        IFileAnalysisStatusService? analysisStatusService = null)
     {
-        return new(geometryClient, uploadClient, MakeMetrics(), NullLogger<GeometryController>.Instance)
+        return new(
+            geometryClient,
+            uploadClient,
+            MakeMetrics(),
+            analysisStatusService ?? Mock.Of<IFileAnalysisStatusService>(),
+            NullLogger<GeometryController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -94,13 +104,13 @@ public class GeometryControllerTests
     }
 
     [Fact]
-    public void RecordRuntimeTelemetry_AcceptsTerminalUnavailableAttempt()
+    public async Task RecordRuntimeTelemetry_AcceptsTerminalUnavailableAttempt()
     {
         var controller = MakeController(
             MakeUploadClient(),
             MakeGeometryClient(new DfmAnalysisResponse { Status = "analysis_complete" }));
 
-        var result = controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
+        var result = await controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
         {
             ProcessCode = "CNC_MILL",
             Status = "unavailable",
@@ -113,13 +123,13 @@ public class GeometryControllerTests
     }
 
     [Fact]
-    public void RecordRuntimeTelemetry_AcceptsBrowserLocalStart()
+    public async Task RecordRuntimeTelemetry_AcceptsBrowserLocalStart()
     {
         var controller = MakeController(
             MakeUploadClient(),
             MakeGeometryClient(new DfmAnalysisResponse { Status = "analysis_complete" }));
 
-        var result = controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
+        var result = await controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
         {
             ProcessCode = "CNC_MILL",
             Status = "started",
@@ -130,6 +140,50 @@ public class GeometryControllerTests
         });
 
         Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task RecordRuntimeTelemetry_WhenAcceptedLocalMetricsProvided_StoresDimensions()
+    {
+        var statusService = new Mock<IFileAnalysisStatusService>();
+        var controller = MakeController(
+            MakeUploadClient(),
+            MakeGeometryClient(new DfmAnalysisResponse { Status = "analysis_complete" }),
+            statusService.Object);
+
+        var result = await controller.RecordRuntimeTelemetry(new BrowserGeometryRuntimeTelemetryRequest
+        {
+            ProcessCode = "CNC_MILL",
+            StoragePath = StoragePath,
+            Accepted = true,
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive",
+            Metrics = new BrowserGeometryRuntimeMetrics
+            {
+                VolumeMm3 = 12500,
+                IsManifold = false,
+                NonManifoldEdgeCount = 4,
+                BoundingBox = new BrowserGeometryRuntimeBoundingBox
+                {
+                    X = 10,
+                    Y = 20,
+                    Z = 30
+                }
+            }
+        });
+
+        Assert.IsType<NoContentResult>(result);
+        statusService.Verify(x => x.SetDimensionsAsync(
+            StoragePath,
+            It.Is<FileAnalysisDimensionsDto>(dimensions =>
+                dimensions.X == 10
+                && dimensions.Y == 20
+                && dimensions.Z == 30
+                && dimensions.VolumeMm3 == 12500),
+            false,
+            "Browser local DFM found 4 non-manifold edge(s).",
+            4,
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -5212,6 +5212,7 @@ function dispatchLocalAdvisoryTelemetry(canvasId, result, accepted) {
         const issues = Array.isArray(result?.issues) ? result.issues : [];
         const detail = {
             canvasId,
+            storagePath: result?.storagePath ?? null,
             processCode: result?.processCode ?? null,
             runtimeVersion: result?.runtimeVersion ?? null,
             algorithmVersion: result?.algorithmVersion ?? null,
@@ -5550,6 +5551,9 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
             runtimeInput,
             options.processCode ?? 'FDM',
             resolveLocalAdvisoryTimeoutMs(manifest, options));
+        result.storagePath = typeof options.storagePath === 'string' && options.storagePath.trim()
+            ? options.storagePath.trim()
+            : null;
         if (localAdvisoryRuns[canvasId] !== runId ||
             !isBrowserFirstRuntimeContract(result)) {
             clearLocalAdvisoryPanel(canvasId);

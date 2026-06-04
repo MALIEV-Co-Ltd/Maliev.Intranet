@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ public class GeometryController(
     GeometryServiceClient geometryServiceClient,
     UploadServiceClient uploadServiceClient,
     BffMetrics bffMetrics,
+    IFileAnalysisStatusService analysisStatusService,
     ILogger<GeometryController> logger) : ControllerBase
 {
     /// <summary>
@@ -66,10 +68,13 @@ public class GeometryController(
     /// Records that the browser-first local DFM runtime completed on the client.
     /// </summary>
     /// <param name="request">The browser runtime telemetry payload.</param>
+    /// <param name="ct">The cancellation token.</param>
     /// <returns>A no-content acknowledgement.</returns>
     [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("runtime/telemetry")]
-    public IActionResult RecordRuntimeTelemetry([FromBody] BrowserGeometryRuntimeTelemetryRequest request)
+    public async Task<IActionResult> RecordRuntimeTelemetry(
+        [FromBody] BrowserGeometryRuntimeTelemetryRequest request,
+        CancellationToken ct = default)
     {
         if (request.IsStarted)
         {
@@ -111,6 +116,23 @@ public class GeometryController(
             request.Authority,
             request.ExecutionMode);
 
+        if (request.Accepted
+            && TryBuildLocalDimensions(
+                request,
+                out var dimensions,
+                out var isManifold,
+                out var nonManifoldReason,
+                out var nonManifoldFaceCount))
+        {
+            await analysisStatusService.SetDimensionsAsync(
+                request.StoragePath!,
+                dimensions,
+                isManifold,
+                nonManifoldReason,
+                nonManifoldFaceCount,
+                ct);
+        }
+
         logger.LogInformation(
             "Browser-first intranet DFM completed locally for process {ProcessCode}; accepted={Accepted}; issues={IssueCount}; warnings={WarningCount}; faces={FaceCount}",
             request.ProcessCode,
@@ -120,6 +142,63 @@ public class GeometryController(
             request.FaceCount);
 
         return NoContent();
+    }
+
+    private static bool TryBuildLocalDimensions(
+        BrowserGeometryRuntimeTelemetryRequest request,
+        out FileAnalysisDimensionsDto dimensions,
+        out bool isManifold,
+        out string? nonManifoldReason,
+        out int? nonManifoldFaceCount)
+    {
+        dimensions = new FileAnalysisDimensionsDto
+        {
+            X = 0,
+            Y = 0,
+            Z = 0,
+            VolumeMm3 = 0
+        };
+        isManifold = request.Metrics?.IsManifold ?? true;
+        nonManifoldReason = null;
+        nonManifoldFaceCount = null;
+
+        if (string.IsNullOrWhiteSpace(request.StoragePath) ||
+            request.Metrics?.BoundingBox is not { } boundingBox ||
+            !TryGetFiniteNonNegative(boundingBox.X, out var x) ||
+            !TryGetFiniteNonNegative(boundingBox.Y, out var y) ||
+            !TryGetFiniteNonNegative(boundingBox.Z, out var z) ||
+            !TryGetFiniteNonNegative(request.Metrics.VolumeMm3, out var volumeMm3))
+        {
+            return false;
+        }
+
+        dimensions = new FileAnalysisDimensionsDto
+        {
+            X = x,
+            Y = y,
+            Z = z,
+            VolumeMm3 = volumeMm3
+        };
+
+        if (TryGetFiniteNonNegative(request.Metrics.NonManifoldEdgeCount, out var edgeCountValue)
+            && edgeCountValue > 0
+            && edgeCountValue <= int.MaxValue)
+        {
+            var edgeCount = (int)Math.Round(edgeCountValue, MidpointRounding.AwayFromZero);
+            isManifold = false;
+            nonManifoldFaceCount = edgeCount;
+            nonManifoldReason = string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"Browser local DFM found {edgeCount:N0} non-manifold edge(s).");
+        }
+
+        return true;
+    }
+
+    private static bool TryGetFiniteNonNegative(double? value, out double number)
+    {
+        number = value.GetValueOrDefault();
+        return value.HasValue && double.IsFinite(number) && number >= 0;
     }
 
     /// <summary>
@@ -357,6 +436,9 @@ public class GeometryController(
 /// </summary>
 public sealed class BrowserGeometryRuntimeTelemetryRequest
 {
+    /// <summary>The storage path of the active part whose browser runtime produced the result.</summary>
+    public string? StoragePath { get; set; }
+
     /// <summary>The manufacturing process code analyzed by the browser runtime.</summary>
     public string? ProcessCode { get; set; }
 
@@ -390,6 +472,9 @@ public sealed class BrowserGeometryRuntimeTelemetryRequest
     /// <summary>The number of triangle faces analyzed locally.</summary>
     public double? FaceCount { get; set; }
 
+    /// <summary>Mesh metrics computed locally by the browser runtime.</summary>
+    public BrowserGeometryRuntimeMetrics? Metrics { get; set; }
+
     /// <summary>The browser runtime input hash, logged only for correlation and never used as a metric tag.</summary>
     public string? InputHash { get; set; }
 
@@ -406,4 +491,49 @@ public sealed class BrowserGeometryRuntimeTelemetryRequest
 
     /// <summary>Whether this payload represents the start of a local runtime attempt.</summary>
     public bool IsStarted => string.Equals(Status, "started", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>
+/// Local browser mesh metrics accepted from the GeometryService-owned browser runtime.
+/// </summary>
+public sealed class BrowserGeometryRuntimeMetrics
+{
+    /// <summary>Number of mesh vertices analyzed locally.</summary>
+    public double? VertexCount { get; set; }
+
+    /// <summary>Number of mesh triangle faces analyzed locally.</summary>
+    public double? FaceCount { get; set; }
+
+    /// <summary>Computed local volume in cubic millimeters.</summary>
+    public double? VolumeMm3 { get; set; }
+
+    /// <summary>Computed local surface area in square millimeters.</summary>
+    public double? SurfaceAreaMm2 { get; set; }
+
+    /// <summary>Computed local bounding box dimensions in millimeters.</summary>
+    public BrowserGeometryRuntimeBoundingBox? BoundingBox { get; set; }
+
+    /// <summary>Whether the local mesh appears manifold.</summary>
+    public bool? IsManifold { get; set; }
+
+    /// <summary>Number of non-manifold edges found locally.</summary>
+    public double? NonManifoldEdgeCount { get; set; }
+
+    /// <summary>Runtime complexity bucket for the mesh.</summary>
+    public string? Complexity { get; set; }
+}
+
+/// <summary>
+/// Local browser bounding box dimensions accepted from runtime telemetry.
+/// </summary>
+public sealed class BrowserGeometryRuntimeBoundingBox
+{
+    /// <summary>Width of the bounding box in millimeters.</summary>
+    public double? X { get; set; }
+
+    /// <summary>Depth of the bounding box in millimeters.</summary>
+    public double? Y { get; set; }
+
+    /// <summary>Height of the bounding box in millimeters.</summary>
+    public double? Z { get; set; }
 }

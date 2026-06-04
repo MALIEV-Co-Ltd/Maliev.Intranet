@@ -183,11 +183,14 @@ public sealed class ModelViewerRenderingSourceTests
 
         Assert.Contains("[Parameter] public string?                    BrowserFileClientId", modelViewer, StringComparison.Ordinal);
         Assert.Contains("[Parameter] public string?                    BrowserFileName", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("[Parameter] public string?                    StoragePath", modelViewer, StringComparison.Ordinal);
         Assert.Contains("clientUploadId = BrowserFileClientId", modelViewer, StringComparison.Ordinal);
         Assert.Contains("fileName = BrowserFileName", modelViewer, StringComparison.Ordinal);
+        Assert.Contains("storagePath = StoragePath", modelViewer, StringComparison.Ordinal);
         Assert.Contains("fileBytesProvider = \"projectNewUploads\"", modelViewer, StringComparison.Ordinal);
         Assert.Contains("BrowserFileClientId=\"@Part.ClientUploadId\"", partDetail, StringComparison.Ordinal);
         Assert.Contains("BrowserFileName=\"@Part.Name\"", partDetail, StringComparison.Ordinal);
+        Assert.Contains("StoragePath=\"@Part.StoragePath\"", partDetail, StringComparison.Ordinal);
         Assert.Contains("async function getFileBytes(clientUploadId)", uploadHelper, StringComparison.Ordinal);
         Assert.Contains("function getObjectUrl(clientUploadId)", uploadHelper, StringComparison.Ordinal);
         Assert.Contains("scheduleClearFile", uploadHelper, StringComparison.Ordinal);
@@ -231,6 +234,8 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("function postLocalAdvisoryTelemetry(endpointUrl, payload)", source, StringComparison.Ordinal);
         Assert.Contains("navigator.sendBeacon", source, StringComparison.Ordinal);
         Assert.Contains("accepted,", source, StringComparison.Ordinal);
+        Assert.Contains("storagePath: result?.storagePath ?? null", source, StringComparison.Ordinal);
+        Assert.Contains("metrics: result?.metrics ?? null", source, StringComparison.Ordinal);
     }
 
     [Fact]
