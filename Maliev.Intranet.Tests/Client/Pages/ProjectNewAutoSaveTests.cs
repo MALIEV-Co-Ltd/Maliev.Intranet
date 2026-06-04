@@ -1808,6 +1808,38 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleLocalGeometryRuntimeStartedAsync_WhenResultMatchesProcess_MarksBrowserRuntimeRunning()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "local-started.stl",
+            StoragePath = "projects/local-started.stl",
+            ProcessCode = "CNC_MILL",
+            LocalDfmRuntimeTerminalProcessCode = "CNC_MILL",
+            LocalDfmRuntimeTerminalReason = "worker_failed",
+        };
+        GetParts(cut.Instance).Add(part);
+
+        await InvokePrivateTaskWithArgsAsync(cut, "HandleLocalGeometryRuntimeStartedAsync", new PartLocalGeometryRuntimeStarted
+        {
+            Part = part,
+            Result = new LocalGeometryRuntimeStarted
+            {
+                ProcessCode = "CNC_MILL",
+            },
+        });
+
+        Assert.Equal("CNC_MILL", part.LocalDfmRuntimeRunningProcessCode);
+        Assert.NotNull(part.LocalDfmRuntimeStartedAtUtc);
+        Assert.Null(part.LocalDfmRuntimeTerminalProcessCode);
+        Assert.Null(part.LocalDfmRuntimeTerminalReason);
+        Assert.Null(part.AnalysisErrorCode);
+        Assert.False(part.DfmAnalysisTimedOut);
+    }
+
+    [Fact]
     public async Task HandleLocalGeometryRuntimeUnavailableAsync_WhenResultMatchesProcess_ReleasesLocalDfmWait()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();

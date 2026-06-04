@@ -51,6 +51,38 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void BrowserDfmStartedLocalAttemptExtendsServerFallbackWindow()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "BrowserDfmReportSync.cs")
+            .ReplaceLineEndings("\n");
+        var waitBlock = ExtractBlock(source, "internal static async Task<bool> WaitForCurrentReportAsync");
+
+        Assert.Contains("MarkLocalAttemptStarted", source, StringComparison.Ordinal);
+        Assert.Contains("HasActiveLocalAttempt(part, processCode)", waitBlock, StringComparison.Ordinal);
+        Assert.Contains("GetActiveLocalAttemptDeadline(part, processCode)", waitBlock, StringComparison.Ordinal);
+        Assert.True(
+            waitBlock.IndexOf("GetActiveLocalAttemptDeadline(part, processCode)", StringComparison.Ordinal)
+            < waitBlock.IndexOf("DateTimeOffset.UtcNow >= effectiveDeadline", StringComparison.Ordinal),
+            "Server DFM fallback must account for a browser worker that started after the initial grace window began.");
+    }
+
+    [Fact]
+    public void ModelViewer_NotifiesBlazorWhenBrowserLocalDfmStarts()
+    {
+        var viewer = ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor")
+            .ReplaceLineEndings("\n");
+        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("NotifyLocalGeometryRuntimeStarted", viewer, StringComparison.Ordinal);
+        Assert.Contains("notifyLocalAdvisoryStartedDotNet", script, StringComparison.Ordinal);
+        Assert.True(
+            script.IndexOf("await notifyLocalAdvisoryStartedDotNet", StringComparison.Ordinal)
+            < script.IndexOf("const result = await analyzeWithLocalAdvisoryWorker", StringComparison.Ordinal),
+            "The browser must tell Blazor that local DFM has started before awaiting worker completion.");
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")

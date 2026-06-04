@@ -1187,6 +1187,26 @@ public partial class ProjectNew : IAsyncDisposable
         return true;
     }
 
+    private async Task HandleLocalGeometryRuntimeStartedAsync(PartLocalGeometryRuntimeStarted completion)
+    {
+        if (!_parts.Contains(completion.Part))
+            return;
+
+        if (string.IsNullOrWhiteSpace(completion.Part.ProcessCode)
+            || string.IsNullOrWhiteSpace(completion.Result.ProcessCode)
+            || !ProcessCodeNormalizer.Equals(completion.Part.ProcessCode, completion.Result.ProcessCode))
+        {
+            return;
+        }
+
+        BrowserDfmReportSync.MarkLocalAttemptStarted(
+            completion.Part,
+            completion.Result.ProcessCode);
+        completion.Part.DfmAnalysisTimedOut = false;
+        completion.Part.AnalysisErrorCode = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task HandleLocalGeometryRuntimeUnavailableAsync(PartLocalGeometryRuntimeUnavailable completion)
     {
         if (!_parts.Contains(completion.Part))
@@ -1225,6 +1245,7 @@ public partial class ProjectNew : IAsyncDisposable
         SetDfmReportForProcess(part, processCode, report);
         part.ResolveDfmReport();
         BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
+        BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
         return true;
@@ -1322,6 +1343,7 @@ public partial class ProjectNew : IAsyncDisposable
 
         part.DfmReport = null;
         BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
+        BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
     }

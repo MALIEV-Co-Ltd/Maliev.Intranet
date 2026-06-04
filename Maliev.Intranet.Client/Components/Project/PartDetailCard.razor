@@ -146,6 +146,7 @@
                                      ViewerSettings="@Part.ViewerSettings"
                                      ViewerSettingsChanged="HandleViewerSettingsChangedAsync"
                                      OnLocalGeometryRuntimeCompleted="HandleLocalGeometryRuntimeCompletedAsync"
+                                     OnLocalGeometryRuntimeStarted="HandleLocalGeometryRuntimeStartedAsync"
                                      OnLocalGeometryRuntimeUnavailable="HandleLocalGeometryRuntimeUnavailableAsync"
                                      OnLoadFailed="HandleViewerLoadFailed"
                                      OnBodyPicked="HandleBodyPickedAsync" />
@@ -324,6 +325,9 @@
 
     /// <summary>Callback invoked when browser-first local DFM completes for this part.</summary>
     [Parameter] public Func<PartLocalGeometryRuntimeResult, Task<bool>>? OnLocalGeometryRuntimeCompleted { get; set; }
+
+    /// <summary>Callback invoked when browser-first local DFM starts for this part.</summary>
+    [Parameter] public Func<PartLocalGeometryRuntimeStarted, Task>? OnLocalGeometryRuntimeStarted { get; set; }
 
     /// <summary>Callback invoked when browser-first local DFM cannot complete for this part.</summary>
     [Parameter] public Func<PartLocalGeometryRuntimeUnavailable, Task>? OnLocalGeometryRuntimeUnavailable { get; set; }
@@ -666,6 +670,18 @@
             return false;
 
         return await OnLocalGeometryRuntimeCompleted(new PartLocalGeometryRuntimeResult
+        {
+            Part = Part,
+            Result = result,
+        });
+    }
+
+    private async Task HandleLocalGeometryRuntimeStartedAsync(LocalGeometryRuntimeStarted result)
+    {
+        if (OnLocalGeometryRuntimeStarted is null)
+            return;
+
+        await OnLocalGeometryRuntimeStarted(new PartLocalGeometryRuntimeStarted
         {
             Part = Part,
             Result = result,

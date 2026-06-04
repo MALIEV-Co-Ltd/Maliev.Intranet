@@ -657,9 +657,11 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(result?.executionMode, 'primary_interactive');
     assert.equal(panels.at(-1)?.textContent, 'Local preliminary DFM: no warnings · local primary · 1 tris');
     assert.equal(currentPanel, null);
-    assert.equal(dotNetCalls.length, 1);
-    assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeComplete');
+    assert.equal(dotNetCalls.length, 2);
+    assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeStarted');
     assert.equal(dotNetCalls[0].payload.processCode, 'CNC_MILL');
+    assert.equal(dotNetCalls[1].method, 'NotifyLocalGeometryRuntimeComplete');
+    assert.equal(dotNetCalls[1].payload.processCode, 'CNC_MILL');
     assert.equal(events.length, 1);
     assert.equal(events[0].type, 'maliev:geometry-local-runtime-complete');
     assert.deepEqual(JSON.parse(JSON.stringify(events[0].detail)), {

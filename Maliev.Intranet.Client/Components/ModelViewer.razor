@@ -239,6 +239,8 @@
     [Parameter] public EventCallback<PartViewerSettings> ViewerSettingsChanged { get; set; }
     /// <summary>Raised when the browser geometry runtime completes local DFM analysis. Returns true when the result was accepted.</summary>
     [Parameter] public Func<LocalGeometryRuntimeResult, Task<bool>>? OnLocalGeometryRuntimeCompleted { get; set; }
+    /// <summary>Raised when the browser geometry runtime starts local DFM analysis.</summary>
+    [Parameter] public Func<LocalGeometryRuntimeStarted, Task>? OnLocalGeometryRuntimeStarted { get; set; }
     /// <summary>Raised when the browser geometry runtime cannot complete a local DFM attempt.</summary>
     [Parameter] public Func<LocalGeometryRuntimeUnavailable, Task>? OnLocalGeometryRuntimeUnavailable { get; set; }
 
@@ -1280,6 +1282,14 @@
             return false;
 
         return await OnLocalGeometryRuntimeCompleted(result);
+    }
+
+    /// <summary>JSInvokable callback when browser-first local DFM starts.</summary>
+    [JSInvokable]
+    public async Task NotifyLocalGeometryRuntimeStarted(LocalGeometryRuntimeStarted result)
+    {
+        if (OnLocalGeometryRuntimeStarted is not null)
+            await OnLocalGeometryRuntimeStarted(result);
     }
 
     /// <summary>JSInvokable callback when browser-first local DFM cannot run or complete.</summary>

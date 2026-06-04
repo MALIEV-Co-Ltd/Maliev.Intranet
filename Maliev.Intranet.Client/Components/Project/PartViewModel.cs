@@ -68,6 +68,12 @@ public class PartViewModel
     /// <summary>True after the transient all-clear DFM overlay has already been shown for the current process.</summary>
     public bool DfmAllClearNotified { get; set; }
 
+    /// <summary>Current process code for a browser local DFM attempt that is actively running.</summary>
+    public string? LocalDfmRuntimeRunningProcessCode { get; set; }
+
+    /// <summary>UTC timestamp when the current browser local DFM attempt started.</summary>
+    public DateTimeOffset? LocalDfmRuntimeStartedAtUtc { get; set; }
+
     /// <summary>Current process code for a terminal local browser DFM attempt that produced no report.</summary>
     public string? LocalDfmRuntimeTerminalProcessCode { get; set; }
 

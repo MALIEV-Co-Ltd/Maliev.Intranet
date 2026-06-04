@@ -5,6 +5,7 @@ internal static class BrowserDfmReportSync
     // Cover the manifest's desktop worker timeout plus callback/render margin before
     // falling back to the server DFM endpoint. This keeps browser DFM primary.
     private const int BrowserDfmGracePeriodMs = 30_000;
+    private const int BrowserDfmStartedGracePeriodMs = 30_000;
     private const int BrowserDfmPollIntervalMs = 100;
 
     internal static bool HasCurrentReport(PartViewModel part, string processCode) =>
@@ -16,6 +17,25 @@ internal static class BrowserDfmReportSync
     internal static bool HasTerminalLocalAttempt(PartViewModel part, string processCode) =>
         !string.IsNullOrWhiteSpace(part.LocalDfmRuntimeTerminalProcessCode)
         && ProcessCodeNormalizer.Equals(part.LocalDfmRuntimeTerminalProcessCode, processCode);
+
+    internal static bool HasActiveLocalAttempt(PartViewModel part, string processCode) =>
+        !string.IsNullOrWhiteSpace(part.LocalDfmRuntimeRunningProcessCode)
+        && part.LocalDfmRuntimeStartedAtUtc.HasValue
+        && ProcessCodeNormalizer.Equals(part.LocalDfmRuntimeRunningProcessCode, processCode);
+
+    internal static void MarkLocalAttemptStarted(
+        PartViewModel part,
+        string? processCode)
+    {
+        var normalizedProcessCode = ProcessCodeNormalizer.Normalize(processCode)
+            ?? ProcessCodeNormalizer.Normalize(part.ProcessCode);
+        if (string.IsNullOrWhiteSpace(normalizedProcessCode))
+            return;
+
+        part.LocalDfmRuntimeRunningProcessCode = normalizedProcessCode;
+        part.LocalDfmRuntimeStartedAtUtc = DateTimeOffset.UtcNow;
+        ClearTerminalLocalAttempt(part, normalizedProcessCode);
+    }
 
     internal static void MarkTerminalLocalAttempt(
         PartViewModel part,
@@ -31,6 +51,7 @@ internal static class BrowserDfmReportSync
         part.LocalDfmRuntimeTerminalReason = string.IsNullOrWhiteSpace(reason)
             ? "local_runtime_unavailable"
             : reason.Trim();
+        ClearActiveLocalAttempt(part, normalizedProcessCode);
     }
 
     internal static void ClearTerminalLocalAttempt(PartViewModel part, string? processCode = null)
@@ -45,6 +66,26 @@ internal static class BrowserDfmReportSync
         part.LocalDfmRuntimeTerminalReason = null;
     }
 
+    internal static void ClearActiveLocalAttempt(PartViewModel part, string? processCode = null)
+    {
+        if (!string.IsNullOrWhiteSpace(processCode)
+            && !ProcessCodeNormalizer.Equals(part.LocalDfmRuntimeRunningProcessCode, processCode))
+        {
+            return;
+        }
+
+        part.LocalDfmRuntimeRunningProcessCode = null;
+        part.LocalDfmRuntimeStartedAtUtc = null;
+    }
+
+    internal static DateTimeOffset? GetActiveLocalAttemptDeadline(PartViewModel part, string processCode)
+    {
+        if (!HasActiveLocalAttempt(part, processCode))
+            return null;
+
+        return part.LocalDfmRuntimeStartedAtUtc!.Value.AddMilliseconds(BrowserDfmStartedGracePeriodMs);
+    }
+
     internal static async Task<bool> WaitForCurrentReportAsync(
         PartViewModel part,
         string processCode,
@@ -56,8 +97,17 @@ internal static class BrowserDfmReportSync
             return false;
 
         var deadline = DateTimeOffset.UtcNow.AddMilliseconds(BrowserDfmGracePeriodMs);
-        while (DateTimeOffset.UtcNow < deadline)
+        while (true)
         {
+            var activeDeadline = HasActiveLocalAttempt(part, processCode)
+                ? GetActiveLocalAttemptDeadline(part, processCode)
+                : null;
+            var effectiveDeadline = activeDeadline.HasValue && activeDeadline.Value > deadline
+                ? activeDeadline.Value
+                : deadline;
+            if (DateTimeOffset.UtcNow >= effectiveDeadline)
+                return false;
+
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Delay(BrowserDfmPollIntervalMs, cancellationToken);
             if (HasTerminalLocalAttempt(part, processCode))
@@ -65,7 +115,5 @@ internal static class BrowserDfmReportSync
             if (HasCurrentReport(part, processCode))
                 return true;
         }
-
-        return false;
     }
 }
