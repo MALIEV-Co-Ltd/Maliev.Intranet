@@ -40,6 +40,12 @@ public sealed class LocalGeometryRuntimeStarted
 {
     /// <summary>Manufacturing process code requested for the browser runtime attempt.</summary>
     public string? ProcessCode { get; set; }
+
+    /// <summary>Approximate browser-local runtime input size in bytes.</summary>
+    public long? InputByteCount { get; set; }
+
+    /// <summary>Approximate browser-local runtime triangle workload.</summary>
+    public long? InputTriangleCount { get; set; }
 }
 
 /// <summary>

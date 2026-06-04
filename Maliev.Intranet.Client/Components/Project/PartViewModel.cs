@@ -74,6 +74,12 @@ public class PartViewModel
     /// <summary>UTC timestamp when the current browser local DFM attempt started.</summary>
     public DateTimeOffset? LocalDfmRuntimeStartedAtUtc { get; set; }
 
+    /// <summary>Approximate input size in bytes for the current browser local DFM attempt.</summary>
+    public long? LocalDfmRuntimeInputByteCount { get; set; }
+
+    /// <summary>Approximate triangle workload for the current browser local DFM attempt.</summary>
+    public long? LocalDfmRuntimeInputTriangleCount { get; set; }
+
     /// <summary>Current process code for a terminal local browser DFM attempt that produced no report.</summary>
     public string? LocalDfmRuntimeTerminalProcessCode { get; set; }
 

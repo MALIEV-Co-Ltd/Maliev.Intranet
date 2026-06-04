@@ -25,7 +25,9 @@ internal static class BrowserDfmReportSync
 
     internal static void MarkLocalAttemptStarted(
         PartViewModel part,
-        string? processCode)
+        string? processCode,
+        long? inputByteCount = null,
+        long? inputTriangleCount = null)
     {
         var normalizedProcessCode = ProcessCodeNormalizer.Normalize(processCode)
             ?? ProcessCodeNormalizer.Normalize(part.ProcessCode);
@@ -34,6 +36,8 @@ internal static class BrowserDfmReportSync
 
         part.LocalDfmRuntimeRunningProcessCode = normalizedProcessCode;
         part.LocalDfmRuntimeStartedAtUtc = DateTimeOffset.UtcNow;
+        part.LocalDfmRuntimeInputByteCount = inputByteCount is > 0 ? inputByteCount : null;
+        part.LocalDfmRuntimeInputTriangleCount = inputTriangleCount is > 0 ? inputTriangleCount : null;
         ClearTerminalLocalAttempt(part, normalizedProcessCode);
     }
 
@@ -76,6 +80,8 @@ internal static class BrowserDfmReportSync
 
         part.LocalDfmRuntimeRunningProcessCode = null;
         part.LocalDfmRuntimeStartedAtUtc = null;
+        part.LocalDfmRuntimeInputByteCount = null;
+        part.LocalDfmRuntimeInputTriangleCount = null;
     }
 
     internal static DateTimeOffset? GetActiveLocalAttemptDeadline(PartViewModel part, string processCode)

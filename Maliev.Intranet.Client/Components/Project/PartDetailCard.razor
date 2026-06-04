@@ -250,6 +250,7 @@
                              DfmIssues="@_dfmIssues"
                              IsVisible="@(_dfmIssues.Count > 0 && !Part.DfmAcknowledged)"
                              Analyzing="@IsDfmAnalyzing"
+                             AnalyzingMessage="@GetDfmAnalyzingMessage()"
                              TimedOut="@DfmUnavailable"
                              ErrorMessage="@(DfmUnavailable ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
                              AllClear="@ShouldShowAllClearOverlay()"
@@ -418,7 +419,7 @@
         if (Part.QueuedUpload) return "Queued for upload";
         if (Part.Uploading) return "Uploading...";
         if (Part.AwaitingPreview) return "Processing geometry...";
-        if (IsDfmAnalyzing) return "Analyzing your model...";
+        if (IsDfmAnalyzing) return GetDfmAnalyzingMessage();
         if (Part.PricingLoading) return "Calculating pricing...";
 
         return GetStatusLabel();
@@ -433,6 +434,34 @@
         if (Part.PricingLoading) return "Updating quote pricing and lead time.";
 
         return Part.StatusText;
+    }
+
+    private string GetDfmAnalyzingMessage()
+    {
+        if (BrowserDfmReportSync.HasActiveLocalAttempt(Part, Part.ProcessCode ?? string.Empty))
+        {
+            var workload = FormatLocalDfmWorkload();
+            return string.IsNullOrEmpty(workload)
+                ? "Running local DFM on this device"
+                : $"Running local DFM on this device ({workload})";
+        }
+
+        return "Analyzing your model...";
+    }
+
+    private string? FormatLocalDfmWorkload()
+    {
+        if (Part.LocalDfmRuntimeInputTriangleCount is > 0)
+        {
+            return $"{Part.LocalDfmRuntimeInputTriangleCount.Value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} triangles";
+        }
+
+        if (Part.LocalDfmRuntimeInputByteCount is > 0)
+        {
+            return FormatFileSize(Part.LocalDfmRuntimeInputByteCount.Value);
+        }
+
+        return null;
     }
 
     private static string FormatRelative(DateTimeOffset t)

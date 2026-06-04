@@ -19,7 +19,7 @@ else if (Analyzing)
         <div class="dfm-overlay-header">
             <div class="dfm-header-left">
                 <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-                <span>Analyzing your model&hellip;</span>
+                <span>@(AnalyzingMessage ?? "Analyzing your model...")</span>
             </div>
         </div>
     </div>
@@ -171,6 +171,9 @@ else if (IsVisible && DfmIssues.Count > 0)
 
     /// <summary>True while DFM analysis is in progress but no report has arrived yet.</summary>
     [Parameter] public bool Analyzing { get; set; }
+
+    /// <summary>Optional message shown while DFM analysis is in progress.</summary>
+    [Parameter] public string? AnalyzingMessage { get; set; }
 
     /// <summary>True when DFM analysis timed out on the client or a failure event arrived. Shows 'unavailable' notice.</summary>
     [Parameter] public bool TimedOut { get; set; }

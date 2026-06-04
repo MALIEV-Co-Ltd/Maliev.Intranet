@@ -298,6 +298,8 @@ public static class ProjectPartBulkEdit
         part.AnalysisErrorCode = null;
         part.LocalDfmRuntimeRunningProcessCode = null;
         part.LocalDfmRuntimeStartedAtUtc = null;
+        part.LocalDfmRuntimeInputByteCount = null;
+        part.LocalDfmRuntimeInputTriangleCount = null;
         part.LocalDfmRuntimeTerminalProcessCode = null;
         part.LocalDfmRuntimeTerminalReason = null;
     }

@@ -1201,7 +1201,9 @@ public partial class ProjectNew : IAsyncDisposable
 
         BrowserDfmReportSync.MarkLocalAttemptStarted(
             completion.Part,
-            completion.Result.ProcessCode);
+            completion.Result.ProcessCode,
+            completion.Result.InputByteCount,
+            completion.Result.InputTriangleCount);
         completion.Part.DfmAnalysisTimedOut = false;
         completion.Part.AnalysisErrorCode = null;
         await InvokeAsync(StateHasChanged);

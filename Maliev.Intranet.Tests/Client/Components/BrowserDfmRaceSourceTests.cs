@@ -83,6 +83,43 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void BrowserLocalDfmStartCarriesWorkloadIntoPartState()
+    {
+        var runtimeModels = ReadRepoFile("Maliev.Intranet.Client", "Components", "LocalGeometryRuntimeResult.cs")
+            .ReplaceLineEndings("\n");
+        var partModel = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartViewModel.cs")
+            .ReplaceLineEndings("\n");
+        var sync = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "BrowserDfmReportSync.cs")
+            .ReplaceLineEndings("\n");
+        var project = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("public long? InputByteCount { get; set; }", runtimeModels, StringComparison.Ordinal);
+        Assert.Contains("public long? InputTriangleCount { get; set; }", runtimeModels, StringComparison.Ordinal);
+        Assert.Contains("public long? LocalDfmRuntimeInputByteCount { get; set; }", partModel, StringComparison.Ordinal);
+        Assert.Contains("public long? LocalDfmRuntimeInputTriangleCount { get; set; }", partModel, StringComparison.Ordinal);
+        Assert.Contains("part.LocalDfmRuntimeInputByteCount = inputByteCount", sync, StringComparison.Ordinal);
+        Assert.Contains("part.LocalDfmRuntimeInputTriangleCount = inputTriangleCount", sync, StringComparison.Ordinal);
+        Assert.Contains("completion.Result.InputByteCount", project, StringComparison.Ordinal);
+        Assert.Contains("completion.Result.InputTriangleCount", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DfmOverlayDistinguishesBrowserLocalWorkFromServerFallback()
+    {
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+        var overlay = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "DfmOverlayPanel.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("AnalyzingMessage=\"@GetDfmAnalyzingMessage()\"", detail, StringComparison.Ordinal);
+        Assert.Contains("Running local DFM on this device", detail, StringComparison.Ordinal);
+        Assert.Contains("LocalDfmRuntimeInputTriangleCount", detail, StringComparison.Ordinal);
+        Assert.Contains("[Parameter] public string? AnalyzingMessage { get; set; }", overlay, StringComparison.Ordinal);
+        Assert.Contains("AnalyzingMessage ?? \"Analyzing your model", overlay, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
