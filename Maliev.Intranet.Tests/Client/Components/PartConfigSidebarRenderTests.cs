@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
@@ -69,6 +70,41 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         await cut.Find(".pcs-process-card--active").ClickAsync(new MouseEventArgs());
 
         Assert.Equal(0, dfmRequestCount);
+    }
+
+    [Fact]
+    public async Task AnalyzeProcessForDfm_WhenBrowserLocalReportIsCurrent_PreservesCatalogOptions()
+    {
+        var process = new ProcessDto(Guid.NewGuid(), "CNC_MILL", "CNC milling", null, 10);
+        var material = new CatalogMaterialDto(Guid.NewGuid(), "Brass C360", "BRASS_C360", "Metal", null, null, 10);
+        var finish = new CatalogSurfaceFinishDto(Guid.NewGuid(), "As-machined", "AS_MACHINED", 1.6m, 0m, null, 10);
+        var tolerance = new CatalogToleranceDto(Guid.NewGuid(), "General tolerances", "GENERAL", "ISO 2768", "m", "+-0.1mm", 0m, 10);
+        var report = new DfmReport { ReportType = "CNC_MILL" };
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "browser-local.stl",
+            ProcessId = process.Id,
+            ProcessCode = process.Code,
+            DfmReport = report,
+            CncDfmReport = report,
+            AvailableMaterials = [material],
+            AvailableFinishes = [finish],
+            AvailableTolerances = [tolerance],
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, [process]));
+
+        await cut.InvokeAsync(() => InvokePrivateTask(cut.Instance, "AnalyzeProcessForDfm", process));
+
+        Assert.Single(part.AvailableMaterials);
+        Assert.Same(material, part.AvailableMaterials[0]);
+        Assert.Single(part.AvailableFinishes);
+        Assert.Same(finish, part.AvailableFinishes[0]);
+        Assert.Single(part.AvailableTolerances);
+        Assert.Same(tolerance, part.AvailableTolerances[0]);
     }
 
     [Fact]
@@ -1002,5 +1038,15 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     private static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
     {
         return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+    }
+
+    private static async Task InvokePrivateTask(object instance, string methodName, params object?[] parameters)
+    {
+        var method = instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        var task = (Task?)method.Invoke(instance, parameters);
+        Assert.NotNull(task);
+        await task;
     }
 }

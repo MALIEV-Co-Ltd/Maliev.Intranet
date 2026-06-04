@@ -1893,9 +1893,6 @@ public partial class PartConfigSidebar : ComponentBase
             if (ProcessCodeNormalizer.Equals(part.ProcessCode, process.Code))
             {
                 part.ResolveDfmReport();
-                part.AvailableMaterials = [];
-                part.AvailableFinishes = [];
-                part.AvailableTolerances = [];
                 StateHasChanged();
                 await OnPartChanged.InvokeAsync(part);
             }
