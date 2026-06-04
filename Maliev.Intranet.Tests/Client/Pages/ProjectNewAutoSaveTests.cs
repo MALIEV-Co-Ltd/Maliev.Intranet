@@ -1740,7 +1740,19 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             RuntimeVersion = "1.0.0",
             AlgorithmVersion = "browser-first-dfm-v1",
             InputHash = "abc123",
-            Metrics = new LocalGeometryRuntimeMetrics { FaceCount = 27122 },
+            Metrics = new LocalGeometryRuntimeMetrics
+            {
+                FaceCount = 27122,
+                VolumeMm3 = 12500,
+                IsManifold = false,
+                NonManifoldEdgeCount = 8,
+                BoundingBox = new LocalGeometryRuntimeBoundingBox
+                {
+                    X = 25,
+                    Y = 20,
+                    Z = 10,
+                },
+            },
             Issues =
             [
                 new LocalGeometryRuntimeIssue
@@ -1770,6 +1782,15 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var issue = Assert.Single(report.Issues);
         Assert.Equal("mesh_integrity", issue.Category);
         Assert.Equal([1, 2, 3], issue.FaceIndices);
+        Assert.Equal(12500, part.VolumeMm3);
+        Assert.NotNull(part.Dimensions);
+        Assert.Equal(25, part.Dimensions.X);
+        Assert.Equal(20, part.Dimensions.Y);
+        Assert.Equal(10, part.Dimensions.Z);
+        Assert.Equal(12500, part.Dimensions.VolumeMm3);
+        Assert.False(part.IsManifold);
+        Assert.Equal(8, part.NonManifoldFaceCount);
+        Assert.Equal("Browser local DFM found 8 non-manifold edge(s).", part.NonManifoldReason);
         Assert.False(part.DfmAnalysisTimedOut);
         Assert.Null(part.AnalysisErrorCode);
     }

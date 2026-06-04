@@ -77,6 +77,9 @@ public sealed class LocalGeometryRuntimeMetrics
     /// <summary>Computed surface area in square millimeters.</summary>
     public double? SurfaceAreaMm2 { get; set; }
 
+    /// <summary>Bounding box dimensions computed locally in millimeters.</summary>
+    public LocalGeometryRuntimeBoundingBox? BoundingBox { get; set; }
+
     /// <summary>Whether the local mesh appears manifold.</summary>
     public bool? IsManifold { get; set; }
 
@@ -85,6 +88,21 @@ public sealed class LocalGeometryRuntimeMetrics
 
     /// <summary>Runtime complexity bucket for the mesh.</summary>
     public string? Complexity { get; set; }
+}
+
+/// <summary>
+/// Bounding box dimensions produced by the browser geometry runtime.
+/// </summary>
+public sealed class LocalGeometryRuntimeBoundingBox
+{
+    /// <summary>Width of the bounding box in millimeters.</summary>
+    public double? X { get; set; }
+
+    /// <summary>Depth of the bounding box in millimeters.</summary>
+    public double? Y { get; set; }
+
+    /// <summary>Height of the bounding box in millimeters.</summary>
+    public double? Z { get; set; }
 }
 
 /// <summary>

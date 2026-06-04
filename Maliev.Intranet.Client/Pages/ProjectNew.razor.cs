@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -1284,11 +1285,63 @@ public partial class ProjectNew : IAsyncDisposable
         var report = BuildDfmReportFromLocalGeometryRuntimeResult(processCode, result);
         SetDfmReportForProcess(part, processCode, report);
         part.ResolveDfmReport();
+        ApplyLocalGeometryRuntimeMetrics(part, result.Metrics);
         BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
         BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
         return true;
+    }
+
+    private static void ApplyLocalGeometryRuntimeMetrics(
+        PartViewModel part,
+        LocalGeometryRuntimeMetrics? metrics)
+    {
+        if (metrics is null)
+            return;
+
+        if (TryGetFiniteNonNegative(metrics.VolumeMm3, out var volumeMm3))
+            part.VolumeMm3 = volumeMm3;
+
+        if (metrics.BoundingBox is { } boundingBox
+            && TryGetFiniteNonNegative(boundingBox.X, out var x)
+            && TryGetFiniteNonNegative(boundingBox.Y, out var y)
+            && TryGetFiniteNonNegative(boundingBox.Z, out var z))
+        {
+            part.Dimensions = new FileAnalysisDimensionsDto
+            {
+                X = x,
+                Y = y,
+                Z = z,
+                VolumeMm3 = part.VolumeMm3,
+            };
+        }
+
+        if (metrics.IsManifold.HasValue)
+            part.IsManifold = metrics.IsManifold.Value;
+
+        if (TryGetFiniteNonNegative(metrics.NonManifoldEdgeCount, out var edgeCountValue)
+            && edgeCountValue > 0
+            && edgeCountValue <= int.MaxValue)
+        {
+            var edgeCount = (int)Math.Round(edgeCountValue, MidpointRounding.AwayFromZero);
+            part.IsManifold = false;
+            part.NonManifoldFaceCount = edgeCount;
+            part.NonManifoldReason = string.Create(
+                CultureInfo.InvariantCulture,
+                $"Browser local DFM found {edgeCount:N0} non-manifold edge(s).");
+        }
+        else if (metrics.IsManifold == true)
+        {
+            part.NonManifoldFaceCount = null;
+            part.NonManifoldReason = null;
+        }
+    }
+
+    private static bool TryGetFiniteNonNegative(double? value, out double number)
+    {
+        number = value.GetValueOrDefault();
+        return value.HasValue && double.IsFinite(number) && number >= 0;
     }
 
     private static DfmReport BuildDfmReportFromLocalGeometryRuntimeResult(
