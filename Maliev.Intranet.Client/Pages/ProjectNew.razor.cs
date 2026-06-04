@@ -77,7 +77,9 @@ public partial class ProjectNew : IAsyncDisposable
     // ── Upload catch-up / watchdog ─────────────────────────────────────
     private const int CatchUpDelayMs = 5000;   // first fetch after SignalR group join
     private const int StatusPollIntervalMs = 30_000; // subsequent interval
+    private const int MissingAnalysisStatusMaxPolls = 3;
     private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _missingAnalysisStatusPolls = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
     private static readonly JsonSerializerOptions SignalRJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -641,6 +643,7 @@ public partial class ProjectNew : IAsyncDisposable
             if (_statusPollCts.TryGetValue(storagePath, out var cts) && cts.Token == ct)
             {
                 _statusPollCts.Remove(storagePath);
+                _missingAnalysisStatusPolls.Remove(storagePath);
                 cts.Dispose();
             }
         }
@@ -652,6 +655,7 @@ public partial class ProjectNew : IAsyncDisposable
         if (_statusPollCts.TryGetValue(storagePath, out var cts))
         {
             _statusPollCts.Remove(storagePath);
+            _missingAnalysisStatusPolls.Remove(storagePath);
             cts.Cancel();
             cts.Dispose();
         }
@@ -736,6 +740,20 @@ public partial class ProjectNew : IAsyncDisposable
             var statusResponse = await Http.GetAsync(
                 $"api/v1/uploads/analysis-status?storagePath={Uri.EscapeDataString(storagePath)}");
 
+            if (statusResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var missingPolls = _missingAnalysisStatusPolls.TryGetValue(storagePath, out var existingMissingPolls)
+                    ? existingMissingPolls + 1
+                    : 1;
+                _missingAnalysisStatusPolls[storagePath] = missingPolls;
+
+                if (missingPolls >= MissingAnalysisStatusMaxPolls)
+                    MarkAnalysisStatusUnavailable(part);
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
             if (!statusResponse.IsSuccessStatusCode)
             {
                 await ResolveViewerUrlAsync(part);
@@ -743,6 +761,7 @@ public partial class ProjectNew : IAsyncDisposable
                 return;
             }
 
+            _missingAnalysisStatusPolls.Remove(storagePath);
             var status = await statusResponse.Content.ReadFromJsonAsync<FileAnalysisStatusDto>();
             if (status == null)
             {
@@ -760,6 +779,25 @@ public partial class ProjectNew : IAsyncDisposable
             // Catch-up fetch is a safety net — failures are non-fatal; SignalR will deliver the final state
             await InvokeAsync(() => Snackbar.Add($"Status fetch failed for {part.Name}: {ex.Message}", Severity.Warning));
         }
+    }
+
+    private static void MarkAnalysisStatusUnavailable(PartViewModel part)
+    {
+        if (part.DfmReport != null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(part.ProcessCode)
+            && BrowserDfmReportSync.HasActiveLocalAttempt(part, part.ProcessCode))
+        {
+            var localDeadline = BrowserDfmReportSync.GetActiveLocalAttemptDeadline(part, part.ProcessCode);
+            if (!localDeadline.HasValue || DateTimeOffset.UtcNow < localDeadline.Value)
+                return;
+        }
+
+        part.AwaitingPreview = false;
+        part.DfmAnalysisTimedOut = true;
+        part.AnalysisErrorCode = "ANALYSIS_STATUS_NOT_FOUND";
+        part.StatusText = DfmStatusMessages.GetStatusText(part.AnalysisErrorCode);
     }
 
     private async Task LoadRequestedCustomerAsync(Guid customerId)

@@ -120,6 +120,36 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void ProjectNew_StatusWatchdogBoundsMissingAnalysisStatusWithoutViewerUrlFanout()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+        var fetchBlock = ExtractBlock(source, "private async Task FetchCurrentStatusAsync");
+        var notFoundBranch = ExtractBlock(fetchBlock, "if (statusResponse.StatusCode == System.Net.HttpStatusCode.NotFound)");
+
+        Assert.Contains("MissingAnalysisStatusMaxPolls", source, StringComparison.Ordinal);
+        Assert.Contains("missingPolls >= MissingAnalysisStatusMaxPolls", notFoundBranch, StringComparison.Ordinal);
+        Assert.Contains("MarkAnalysisStatusUnavailable(part);", notFoundBranch, StringComparison.Ordinal);
+        Assert.Contains("return;", notFoundBranch, StringComparison.Ordinal);
+        Assert.True(
+            fetchBlock.IndexOf("statusResponse.StatusCode == System.Net.HttpStatusCode.NotFound", StringComparison.Ordinal)
+            < fetchBlock.IndexOf("ResolveViewerUrlAsync(part)", StringComparison.Ordinal),
+            "Missing analysis-status rows must be bounded before the watchdog fans out into repeated viewer-url calls.");
+    }
+
+    [Fact]
+    public void ModelViewer_DoesNotRenderSecondLocalDfmPanelWhenBlazorHandlesRuntimeState()
+    {
+        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("shouldRenderLocalAdvisoryPanel(options)", script, StringComparison.Ordinal);
+        Assert.Contains("const renderLocalPanel = shouldRenderLocalAdvisoryPanel(options);", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n    renderLocalAdvisoryStatus(canvasId, 'pending');", script, StringComparison.Ordinal);
+        Assert.Contains("if (renderLocalPanel) renderLocalAdvisoryStatus(canvasId, 'pending');", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_DfmGoneResponseDoesNotOverrideCurrentBrowserReport()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
