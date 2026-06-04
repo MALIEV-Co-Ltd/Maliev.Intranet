@@ -560,6 +560,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     const events = [];
     const dotNetCalls = [];
     const telemetryPosts = [];
+    const workerMessages = [];
     let currentPanel = null;
     const host = {
         querySelector: () => currentPanel,
@@ -605,6 +606,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
                 minFrontendApiVersion: 1,
                 assets: {
                     worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                    wasm: '/geometry/client-runtime/assets/client-geometry-kernel.def456.wasm',
                 },
             }),
         };
@@ -615,6 +617,7 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         }
 
         postMessage(message) {
+            workerMessages.push({ url: this.url, message });
             this.onmessage({
                 data: {
                     id: message.id,
@@ -663,6 +666,9 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
 
     assert.equal(result?.authority, 'local_primary');
     assert.equal(result?.executionMode, 'primary_interactive');
+    assert.equal(workerMessages.length, 1);
+    assert.equal(workerMessages[0].url, '/api/v1/geometry/runtime/assets/client-geometry-runtime.abc123.worker.js');
+    assert.equal(workerMessages[0].message.wasmUrl, '/api/v1/geometry/runtime/assets/client-geometry-kernel.def456.wasm');
     assert.equal(panels.length, 0);
     assert.equal(currentPanel, null);
     assert.equal(dotNetCalls.length, 2);

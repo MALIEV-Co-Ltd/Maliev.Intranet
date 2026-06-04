@@ -5312,7 +5312,7 @@ function terminateLocalAdvisoryWorker(canvasId) {
     delete localAdvisoryWorkers[canvasId];
 }
 
-function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, input, processCode, timeoutMs) {
+function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, wasmUrl, input, processCode, timeoutMs) {
     terminateLocalAdvisoryWorker(canvasId);
 
     return new Promise((resolve, reject) => {
@@ -5336,7 +5336,7 @@ function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, input, processCode,
             terminateLocalAdvisoryWorker(canvasId);
             reject(new Error(event?.message || 'Local advisory geometry worker failed.'));
         };
-        worker.postMessage({ id: messageId, input, processCode });
+        worker.postMessage({ id: messageId, input, processCode, wasmUrl });
     });
 }
 
@@ -5554,10 +5554,14 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
                 unavailablePayload('asset_unavailable'));
             return null;
         }
+        const wasmUrl = resolveRuntimeAssetUrl(
+            manifest.assets?.wasm,
+            options.assetBaseUrl ?? LOCAL_ADVISORY_ASSET_BASE_URL);
 
         const result = await analyzeWithLocalAdvisoryWorker(
             canvasId,
             workerUrl,
+            wasmUrl,
             runtimeInput,
             processCode,
             resolveLocalAdvisoryTimeoutMs(manifest, options));
