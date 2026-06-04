@@ -378,6 +378,9 @@ public class GeometryControllerTests
             {
                 NoCache = true
             };
+            response.Headers.Add("X-Maliev-Geometry-Execution-Mode", "primary_interactive");
+            response.Headers.Add("X-Maliev-Geometry-Authority", "local_primary");
+            response.Headers.Add("X-Maliev-Geometry-Server-Role", "fallback_and_final_validation");
             return Task.FromResult(response);
         });
         var controller = MakeController(MakeUploadClient(), geometryClient);
@@ -390,6 +393,9 @@ public class GeometryControllerTests
         Assert.Contains("\"runtimeVersion\":\"0.1.0\"", content.Content, StringComparison.Ordinal);
         Assert.Equal("/geometry/client-runtime/manifest.json", requestedPath);
         Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
+        Assert.Equal("primary_interactive", controller.Response.Headers["X-Maliev-Geometry-Execution-Mode"].ToString());
+        Assert.Equal("local_primary", controller.Response.Headers["X-Maliev-Geometry-Authority"].ToString());
+        Assert.Equal("fallback_and_final_validation", controller.Response.Headers["X-Maliev-Geometry-Server-Role"].ToString());
     }
 
     [Fact]
@@ -413,6 +419,9 @@ public class GeometryControllerTests
             };
             response.Headers.CacheControl.Extensions.Add(
                 new System.Net.Http.Headers.NameValueHeaderValue("immutable"));
+            response.Headers.Add("X-Maliev-Geometry-Execution-Mode", "primary_interactive");
+            response.Headers.Add("X-Maliev-Geometry-Authority", "local_primary");
+            response.Headers.Add("X-Maliev-Geometry-Server-Role", "fallback_and_final_validation");
             return Task.FromResult(response);
         });
         var controller = MakeController(MakeUploadClient(), geometryClient);
@@ -424,6 +433,9 @@ public class GeometryControllerTests
         Assert.Equal([0x00, 0x61, 0xFF, 0x7F], content.FileContents);
         Assert.Equal("/geometry/client-runtime/assets/client-geometry-runtime.abc.worker.js", requestedPath);
         Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Equal("primary_interactive", controller.Response.Headers["X-Maliev-Geometry-Execution-Mode"].ToString());
+        Assert.Equal("local_primary", controller.Response.Headers["X-Maliev-Geometry-Authority"].ToString());
+        Assert.Equal("fallback_and_final_validation", controller.Response.Headers["X-Maliev-Geometry-Server-Role"].ToString());
     }
 
     [Fact]

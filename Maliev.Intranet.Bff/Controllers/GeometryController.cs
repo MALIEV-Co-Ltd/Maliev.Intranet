@@ -23,6 +23,13 @@ public class GeometryController(
     IFileAnalysisStatusService analysisStatusService,
     ILogger<GeometryController> logger) : ControllerBase
 {
+    private static readonly string[] RuntimeExecutionHeaders =
+    [
+        "X-Maliev-Geometry-Execution-Mode",
+        "X-Maliev-Geometry-Authority",
+        "X-Maliev-Geometry-Server-Role"
+    ];
+
     /// <summary>
     /// Proxies the browser advisory geometry runtime manifest from GeometryService.
     /// </summary>
@@ -392,6 +399,7 @@ public class GeometryController(
         {
             Response.Headers.CacheControl = cacheControl;
         }
+        ForwardRuntimeExecutionHeaders(response);
 
         return new ContentResult
         {
@@ -412,6 +420,7 @@ public class GeometryController(
         {
             Response.Headers.CacheControl = cacheControl;
         }
+        ForwardRuntimeExecutionHeaders(response);
 
         var contentType = response.Content.Headers.ContentType?.ToString()
             ?? fallbackContentType;
@@ -428,6 +437,17 @@ public class GeometryController(
         return new FileContentResult(
             await response.Content.ReadAsByteArrayAsync(ct),
             contentType);
+    }
+
+    private void ForwardRuntimeExecutionHeaders(HttpResponseMessage response)
+    {
+        foreach (var headerName in RuntimeExecutionHeaders)
+        {
+            if (response.Headers.TryGetValues(headerName, out var values))
+            {
+                Response.Headers[headerName] = string.Join(",", values);
+            }
+        }
     }
 }
 
