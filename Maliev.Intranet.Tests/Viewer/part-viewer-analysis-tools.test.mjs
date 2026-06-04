@@ -718,6 +718,115 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(telemetryPosts[1].payload.accepted, true);
 });
 
+test('runLocalAdvisoryGeometry retries transient manifest failures before fallback', async () => {
+    const context = loadViewerContext();
+    const dotNetCalls = [];
+    const manifestFetches = [];
+    const telemetryPosts = [];
+    const workerMessages = [];
+    let manifestAttempt = 0;
+
+    context.setTimeout = () => 1;
+    context.clearTimeout = () => {};
+    context.CustomEvent = class CustomEvent {
+        constructor(type, init = {}) {
+            this.type = type;
+            this.detail = init.detail;
+        }
+    };
+    context.window.dispatchEvent = () => {};
+    context.fetch = async (url, init = {}) => {
+        if (init?.method === 'POST') {
+            telemetryPosts.push({ url, payload: JSON.parse(init.body) });
+            return { ok: true };
+        }
+
+        manifestFetches.push({ url, init });
+        manifestAttempt += 1;
+        if (manifestAttempt === 1) {
+            return { ok: false, status: 500 };
+        }
+
+        return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+                manifestVersion: 1,
+                runtimeVersion: '1.0.0',
+                algorithmVersion: 'browser-first-dfm-v1',
+                executionMode: 'primary_interactive',
+                authority: 'local_primary',
+                isAuthoritative: false,
+                minFrontendApiVersion: 1,
+                assets: {
+                    worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                    wasm: '/geometry/client-runtime/assets/client-geometry-kernel.def456.wasm',
+                },
+            }),
+        };
+    };
+    context.Worker = class Worker {
+        constructor(url) {
+            this.url = url;
+        }
+
+        postMessage(message) {
+            workerMessages.push({ url: this.url, message });
+            this.onmessage({
+                data: {
+                    id: message.id,
+                    ok: true,
+                    result: {
+                        authority: 'local_primary',
+                        isAuthoritative: false,
+                        executionMode: 'primary_interactive',
+                        processCode: message.processCode,
+                        runtimeVersion: '1.0.0',
+                        algorithmVersion: 'browser-first-dfm-v1',
+                        inputHash: 'retry123',
+                        metrics: { faceCount: 1 },
+                        issues: [],
+                    },
+                },
+            });
+        }
+
+        terminate() {}
+    };
+    context.scene = {
+        meshes: [
+            makeMesh('model', {
+                uniqueId: 202,
+                positions: [0, 0, 0, 10, 0, 0, 0, 10, 0],
+                indices: [0, 1, 2],
+                totalVertices: 3,
+            }),
+        ],
+    };
+    context.dotNetCalls = dotNetCalls;
+
+    const result = await vm.runInContext(`
+        scenes.viewer = scene;
+        tagModelMeshesForAnalysis('viewer', scene);
+        runLocalAdvisoryGeometry('viewer', {
+            processCode: 'CNC_MILL',
+            dotNetRef: {
+                invokeMethodAsync: async (method, payload) => {
+                    dotNetCalls.push({ method, payload });
+                    return true;
+                }
+            }
+        });
+    `, context);
+
+    assert.equal(result?.authority, 'local_primary');
+    assert.equal(manifestFetches.length, 2);
+    assert.equal(manifestFetches[0].url, '/api/v1/geometry/runtime/manifest');
+    assert.equal(workerMessages.length, 1);
+    assert.equal(dotNetCalls.at(-1).method, 'NotifyLocalGeometryRuntimeComplete');
+    assert.equal(telemetryPosts.at(-1).payload.accepted, true);
+});
+
 test('runLocalAdvisoryGeometry refuses to fabricate a default process code', async () => {
     const context = loadViewerContext();
     const dotNetCalls = [];
