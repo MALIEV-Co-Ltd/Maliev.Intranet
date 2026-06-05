@@ -206,6 +206,19 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void ModelViewer_InitializationPayloadIncludesBrowserLocalRuntimeMetadata()
+    {
+        var modelViewer = ModelViewer.ReplaceLineEndings("\n");
+        var captureBlock = ExtractBlock(modelViewer, "private object CaptureViewerRuntimeSettings");
+
+        Assert.Contains("ProcessCode", captureBlock, StringComparison.Ordinal);
+        Assert.Contains("storagePath = StoragePath", captureBlock, StringComparison.Ordinal);
+        Assert.Contains("browserFileClientId = BrowserFileClientId", captureBlock, StringComparison.Ordinal);
+        Assert.Contains("browserFileName = BrowserFileName", captureBlock, StringComparison.Ordinal);
+        Assert.Contains("fileBytesProvider = \"projectNewUploads\"", captureBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_RetainsBrowserViewerFilesUntilPartLifecycleEnds()
     {
         var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
