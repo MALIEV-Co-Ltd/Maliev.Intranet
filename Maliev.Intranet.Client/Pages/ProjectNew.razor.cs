@@ -86,6 +86,16 @@ public partial class ProjectNew : IAsyncDisposable
     {
         PropertyNameCaseInsensitive = true
     };
+    private static readonly HashSet<string> DefaultBrowserViewerExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".3mf",
+        ".glb",
+        ".gltf",
+        ".obj",
+        ".stl"
+    };
+    private HashSet<string>? _runtimeBrowserViewerExtensions;
+    private Task<HashSet<string>?>? _runtimeBrowserViewerExtensionsTask;
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -1617,7 +1627,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task<bool> TryApplyLocalViewerUrlAsync(PartViewModel part)
     {
-        var viewerExtension = ResolveBrowserFileViewerExtension(part);
+        var viewerExtension = await ResolveBrowserFileViewerExtensionAsync(part);
         if (viewerExtension is null || string.IsNullOrWhiteSpace(part.ClientUploadId))
             return false;
 
@@ -1641,10 +1651,10 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private static bool CanUseBrowserFileViewer(PartViewModel part)
-        => ResolveBrowserFileViewerExtension(part) is not null;
+    private bool CanUseBrowserFileViewer(PartViewModel part)
+        => ResolveBrowserFileViewerExtension(part, _runtimeBrowserViewerExtensions ?? DefaultBrowserViewerExtensions) is not null;
 
-    private static bool ShouldRetainBrowserUploadFile(PartViewModel part) =>
+    private bool ShouldRetainBrowserUploadFile(PartViewModel part) =>
         !string.IsNullOrWhiteSpace(part.ClientUploadId)
         && !string.IsNullOrWhiteSpace(part.StoragePath)
         && string.IsNullOrWhiteSpace(part.Error)
@@ -1676,10 +1686,78 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
-    private static string? ResolveBrowserFileViewerExtension(PartViewModel part)
+    private async Task<string?> ResolveBrowserFileViewerExtensionAsync(PartViewModel part)
+    {
+        var extensions = await GetRuntimeBrowserViewerExtensionsAsync();
+        return ResolveBrowserFileViewerExtension(part, extensions ?? DefaultBrowserViewerExtensions);
+    }
+
+    private async Task<HashSet<string>?> GetRuntimeBrowserViewerExtensionsAsync()
+    {
+        if (_runtimeBrowserViewerExtensions is { Count: > 0 })
+            return _runtimeBrowserViewerExtensions;
+
+        _runtimeBrowserViewerExtensionsTask ??= FetchRuntimeBrowserViewerExtensionsAsync();
+        var extensions = await _runtimeBrowserViewerExtensionsTask;
+        if (extensions is { Count: > 0 })
+        {
+            _runtimeBrowserViewerExtensions = extensions;
+        }
+        else
+        {
+            _runtimeBrowserViewerExtensionsTask = null;
+        }
+
+        return extensions;
+    }
+
+    private async Task<HashSet<string>?> FetchRuntimeBrowserViewerExtensionsAsync()
+    {
+        try
+        {
+            using var response = await Http.GetAsync("api/v1/geometry/runtime/manifest");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            using var manifest = await response.Content.ReadFromJsonAsync<JsonDocument>();
+            return manifest is null ? null : ReadDirectBrowserViewerExtensions(manifest.RootElement);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException or OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Could not load browser geometry runtime artifact policy.");
+            return null;
+        }
+    }
+
+    private static HashSet<string>? ReadDirectBrowserViewerExtensions(JsonElement root)
+    {
+        if (!root.TryGetProperty("artifactPolicy", out var artifactPolicy)
+            || !artifactPolicy.TryGetProperty("directBrowserViewerExtensions", out var extensions)
+            || extensions.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extension in extensions.EnumerateArray())
+        {
+            if (extension.ValueKind != JsonValueKind.String)
+                continue;
+
+            var normalized = NormalizeViewerFileExtension(extension.GetString(), null);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                result.Add(normalized);
+            }
+        }
+
+        return result.Count > 0 ? result : null;
+    }
+
+    private static string? ResolveBrowserFileViewerExtension(PartViewModel part, ISet<string> browserViewerExtensions)
     {
         var ext = NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name);
-        return ext is ".3mf" or ".stl" or ".obj" or ".glb" or ".gltf" ? ext : null;
+        return !string.IsNullOrWhiteSpace(ext) && browserViewerExtensions.Contains(ext) ? ext : null;
     }
 
     private static void ApplyMigratedStoragePaths(PartViewModel part, string oldBasePath, string newBasePath)

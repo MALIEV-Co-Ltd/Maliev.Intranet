@@ -197,9 +197,11 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("TryApplyLocalViewerUrlAsync(part)", projectNew, StringComparison.Ordinal);
         Assert.Contains("window.projectNewUploads.getObjectUrl", projectNew, StringComparison.Ordinal);
         Assert.Contains("CanUseBrowserFileViewer", projectNew, StringComparison.Ordinal);
-        Assert.Contains("ResolveBrowserFileViewerExtension(part)", projectNew, StringComparison.Ordinal);
-        Assert.Contains("NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name)", projectNew, StringComparison.Ordinal);
-        Assert.Contains("return ext is \".3mf\" or \".stl\" or \".obj\" or \".glb\" or \".gltf\" ? ext : null;", projectNew, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrowserFileViewerExtensionAsync(part)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("api/v1/geometry/runtime/manifest", projectNew, StringComparison.Ordinal);
+        Assert.Contains("artifactPolicy", projectNew, StringComparison.Ordinal);
+        Assert.Contains("directBrowserViewerExtensions", projectNew, StringComparison.Ordinal);
+        Assert.Contains("DefaultBrowserViewerExtensions", projectNew, StringComparison.Ordinal);
         Assert.Contains("PersistableViewerUrl(ViewerUrl)", partViewModel, StringComparison.Ordinal);
     }
 
