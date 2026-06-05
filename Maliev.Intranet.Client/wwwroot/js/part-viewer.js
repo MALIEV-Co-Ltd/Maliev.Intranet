@@ -699,6 +699,7 @@ const analysisModelMeshIds  = {};   // canvasId → Set<mesh.uniqueId> for real 
 const analysisCameraButtons = {};   // canvasId → previous ArcRotate pointer buttons while analysis tools are active
 const localAdvisoryRuns     = {};   // canvasId → latest local advisory run id
 const localAdvisoryWorkers  = {};   // canvasId → active geometry worker
+let localAdvisoryWorkerQueue = Promise.resolve();
 
 // ── Auto-rotation animation state ────────────────────────────────────────────
 const edgesEnabled          = {};  // canvasId → boolean
@@ -5445,6 +5446,14 @@ function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, wasmUrl, input, pro
     });
 }
 
+function enqueueLocalAdvisoryWorker(work) {
+    const run = localAdvisoryWorkerQueue
+        .catch(() => {})
+        .then(work);
+    localAdvisoryWorkerQueue = run.catch(() => {});
+    return run;
+}
+
 function isBrowserFirstRuntimeContract(value) {
     return value?.isAuthoritative === false &&
         value?.authority === 'local_primary' &&
@@ -5809,13 +5818,21 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
             manifest.assets?.wasm,
             options.assetBaseUrl ?? LOCAL_ADVISORY_ASSET_BASE_URL);
 
-        const result = await analyzeWithLocalAdvisoryWorker(
-            canvasId,
-            workerUrl,
-            wasmUrl,
-            runtimeInput,
-            processCode,
-            resolveLocalAdvisoryTimeoutMs(manifest, options));
+        const result = await enqueueLocalAdvisoryWorker(() => {
+            if (localAdvisoryRuns[canvasId] !== runId) return null;
+
+            return analyzeWithLocalAdvisoryWorker(
+                canvasId,
+                workerUrl,
+                wasmUrl,
+                runtimeInput,
+                processCode,
+                resolveLocalAdvisoryTimeoutMs(manifest, options));
+        });
+        if (!result) {
+            clearLocalAdvisoryPanel(canvasId);
+            return null;
+        }
         result.storagePath = typeof options.storagePath === 'string' && options.storagePath.trim()
             ? options.storagePath.trim()
             : null;

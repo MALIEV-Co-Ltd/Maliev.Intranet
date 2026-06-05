@@ -840,6 +840,126 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(telemetryPosts[1].payload.accepted, true);
 });
 
+test('runLocalAdvisoryGeometry serializes local worker execution across canvases', async () => {
+    const context = loadViewerContext();
+    const workerMessages = [];
+    const workerInstances = [];
+    context.workerMessages = workerMessages;
+    context.workerInstances = workerInstances;
+    context.setTimeout = globalThis.setTimeout;
+    context.clearTimeout = globalThis.clearTimeout;
+    context.fetch = async (url, init = {}) => {
+        if (init?.method === 'POST') return { ok: true };
+
+        return {
+            ok: true,
+            json: async () => ({
+                manifestVersion: 1,
+                runtimeVersion: '1.0.0',
+                algorithmVersion: 'browser-first-dfm-v1',
+                executionMode: 'primary_interactive',
+                authority: 'local_primary',
+                isAuthoritative: false,
+                minFrontendApiVersion: 1,
+                assets: {
+                    worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                    wasm: '/geometry/client-runtime/assets/client-geometry-kernel.def456.wasm',
+                },
+            }),
+        };
+    };
+    context.Worker = class Worker {
+        constructor(url) {
+            this.url = url;
+            workerInstances.push(this);
+        }
+
+        postMessage(message) {
+            workerMessages.push({ url: this.url, message, worker: this });
+        }
+
+        terminate() {}
+    };
+
+    const result = await vm.runInContext(`(async () => {
+        const complete = (index, hash) => {
+            const entry = workerMessages[index];
+            entry.worker.onmessage({
+                data: {
+                    id: entry.message.id,
+                    ok: true,
+                    result: {
+                        authority: 'local_primary',
+                        isAuthoritative: false,
+                        executionMode: 'primary_interactive',
+                        processCode: entry.message.processCode,
+                        runtimeVersion: '1.0.0',
+                        algorithmVersion: 'browser-first-dfm-v1',
+                        inputHash: hash,
+                        metrics: { faceCount: index + 1 },
+                        issues: [],
+                    },
+                },
+            });
+        };
+        const waitForWorkerCount = async count => {
+            for (let attempt = 0; attempt < 20 && workerMessages.length < count; attempt += 1) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+
+            return workerMessages.length;
+        };
+
+        const first = runLocalAdvisoryGeometry('viewer-one', {
+            processCode: 'CNC_MILL',
+            fileName: 'first.obj',
+            fileBytes: Uint8Array.from([111, 98, 106, 49])
+        });
+        const second = runLocalAdvisoryGeometry('viewer-two', {
+            processCode: 'FDM',
+            fileName: 'second.obj',
+            fileBytes: Uint8Array.from([111, 98, 106, 50])
+        });
+
+        const startedBeforeFirstCompletes = await waitForWorkerCount(1);
+        if (startedBeforeFirstCompletes < 1) {
+            return {
+                startedBeforeFirstCompletes,
+                startedAfterFirstCompletes: workerMessages.length,
+                firstHash: null,
+                secondHash: null,
+            };
+        }
+
+        complete(0, 'first-hash');
+        const firstResult = await first;
+        const startedAfterFirstCompletes = await waitForWorkerCount(2);
+        if (startedAfterFirstCompletes < 2) {
+            return {
+                startedBeforeFirstCompletes,
+                startedAfterFirstCompletes,
+                firstHash: firstResult.inputHash,
+                secondHash: null,
+            };
+        }
+
+        complete(1, 'second-hash');
+        const secondResult = await second;
+
+        return ({
+            startedBeforeFirstCompletes,
+            startedAfterFirstCompletes,
+            firstHash: firstResult.inputHash,
+            secondHash: secondResult.inputHash,
+        });
+    })()`, context);
+
+    assert.equal(result.startedBeforeFirstCompletes, 1);
+    assert.equal(result.startedAfterFirstCompletes, 2);
+    assert.equal(result.firstHash, 'first-hash');
+    assert.equal(result.secondHash, 'second-hash');
+});
+
 test('runLocalAdvisoryGeometry retries transient manifest failures before fallback', async () => {
     const context = loadViewerContext();
     const dotNetCalls = [];
