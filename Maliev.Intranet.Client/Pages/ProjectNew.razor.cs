@@ -1154,6 +1154,9 @@ public partial class ProjectNew : IAsyncDisposable
                 if (BrowserDfmReportSync.HasCurrentReport(part, processCode))
                     return;
 
+                if (BrowserDfmReportSync.HasActiveLocalAttempt(part, processCode))
+                    return;
+
                 part.DfmAnalysisTimedOut = false;
                 part.AnalysisErrorCode = "FILE_MISSING";
                 Snackbar.Add("File expired or missing. Re-upload to run DFM analysis.", Severity.Error);
