@@ -236,6 +236,8 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("navigator.sendBeacon", source, StringComparison.Ordinal);
         Assert.Contains("accepted,", source, StringComparison.Ordinal);
         Assert.Contains("storagePath: result?.storagePath ?? null", source, StringComparison.Ordinal);
+        Assert.Contains("inputByteCount: result?.inputByteCount ?? null", source, StringComparison.Ordinal);
+        Assert.Contains("inputTriangleCount: result?.inputTriangleCount ?? null", source, StringComparison.Ordinal);
         Assert.Contains("metrics: result?.metrics ?? null", source, StringComparison.Ordinal);
     }
 

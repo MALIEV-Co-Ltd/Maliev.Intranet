@@ -819,6 +819,8 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
         executionMode: 'primary_interactive',
         accepted: true,
         inputHash: 'abc123',
+        inputByteCount: 84,
+        inputTriangleCount: 1,
         issueCount: 0,
         warningCount: 0,
         faceCount: 1,
@@ -838,6 +840,8 @@ test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', asy
     assert.equal(telemetryPosts[1].url, '/api/v1/geometry/runtime/telemetry');
     assert.equal(telemetryPosts[1].payload.processCode, 'CNC_MILL');
     assert.equal(telemetryPosts[1].payload.accepted, true);
+    assert.equal(telemetryPosts[1].payload.inputByteCount, 84);
+    assert.equal(telemetryPosts[1].payload.inputTriangleCount, 1);
 });
 
 test('runLocalAdvisoryGeometry serializes local worker execution across canvases', async () => {
@@ -1214,6 +1218,8 @@ test('runLocalAdvisoryGeometry can analyze direct file bytes before viewer mesh 
     `, context);
 
     assert.equal(result?.authority, 'local_primary');
+    assert.equal(result?.inputByteCount, 4);
+    assert.equal(result?.inputTriangleCount, 2);
     assert.equal(workerMessages.length, 1);
     assert.equal(workerMessages[0].input.fileName, 'plate.glb');
     assert.deepEqual(Array.from(workerMessages[0].input.fileBytes), [103, 108, 84, 70]);
@@ -1288,6 +1294,8 @@ test('runLocalAdvisoryGeometry can resolve direct file bytes from the upload sto
     `, context);
 
     assert.equal(result?.authority, 'local_primary');
+    assert.equal(result?.inputByteCount, 5);
+    assert.equal(result?.inputTriangleCount, 4);
     assert.equal(workerMessages.length, 1);
     assert.equal(workerMessages[0].input.fileName, 'plate.stl');
     assert.deepEqual(Array.from(workerMessages[0].input.fileBytes), [115, 111, 108, 105, 100]);

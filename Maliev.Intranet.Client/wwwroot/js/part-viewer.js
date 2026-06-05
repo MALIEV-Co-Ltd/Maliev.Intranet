@@ -3266,6 +3266,7 @@ const ADDITIVE_LAYER_PRESET_KEYS = new Set([
     'nylon-powder',
 ]);
 const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'peek', 'petg-clear', 'acrylic-clear', 'resin-clear']);
+const TRANSPARENT_REALISTIC_PRESET_KEYS = new Set(['petg-clear', 'acrylic-clear', 'resin-clear']);
 const FDM_LAYER_EFFECT_KEY = 'fdm-layer-lines';
 const FDM_LAYER_HEIGHT_MM = 0.2;
 const POWDER_BED_LAYER_HEIGHT_MM = 0.3;
@@ -4537,6 +4538,7 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
         console.warn(`[BabylonViewer] Unknown configurator material: ${materialKey}, falling back to aluminum`);
         materialKey = 'aluminum';
     }
+    const preset = CONFIG.MATERIAL_REALISTIC[materialKey] || CONFIG.MATERIAL_REALISTIC['aluminum'];
 
     // Colour-keyed POM presets keep their tuned albedo because the sidebar
     // swatch is only used to choose the preset and can be lighter than the
@@ -4544,9 +4546,11 @@ export function configureMaterialFromConfigurator(canvasId, materialKey, colorHe
     const customAlbedo = resolveConfiguratorCustomAlbedo(materialKey, colorHex);
 
     // Determine roughness/metallic modifiers from finish type
-    const finishModifiers = getFinishModifiers(finishCode, materialKey);
-    const preset = CONFIG.MATERIAL_REALISTIC[materialKey] || CONFIG.MATERIAL_REALISTIC['aluminum'];
+    const baseFinishModifiers = getFinishModifiers(finishCode, materialKey);
     const raRoughness = roughnessCode ? (CONFIG.CNC_ROUGHNESS_MAP[roughnessCode] ?? null) : null;
+    const finishModifiers = TRANSPARENT_REALISTIC_PRESET_KEYS.has(materialKey)
+        ? getTransparentFinishModifiers(preset, baseFinishModifiers, raRoughness)
+        : baseFinishModifiers;
     const surfaceEffect = resolveSurfaceEffect(processCode, materialKey, finishCode, finishModifiers);
     const nextFinishModifiers = {
         ...finishModifiers,
@@ -4674,6 +4678,23 @@ function getFinishModifiers(finishCode, materialKey = '') {
         return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null, absoluteRoughness: 0.26 };
     }
     return { roughnessOffset: 0.0, metallicOffset: 0.0, surfaceEffectKey: null };
+}
+
+function getTransparentFinishModifiers(preset, finishModifiers, raRoughness) {
+    const rawRoughness = resolveFinishRoughness(preset, finishModifiers, raRoughness);
+    const baseRoughness = preset?.roughness ?? 0.1;
+    const translucentHazeLimit = Math.max(baseRoughness + 0.10, 0.22);
+
+    return {
+        roughnessOffset: 0.0,
+        metallicOffset: -(preset?.metallic ?? 0),
+        surfaceEffectKey: null,
+        absoluteRoughness: clamp(
+            Math.min(rawRoughness, translucentHazeLimit),
+            baseRoughness,
+            0.28),
+        polishedReflectionSmoothing: finishModifiers?.polishedReflectionSmoothing ?? false,
+    };
 }
 
 function resolveFinishRoughness(preset, finishModifiers, raRoughness) {
@@ -5326,6 +5347,8 @@ function dispatchLocalAdvisoryTelemetry(canvasId, result, accepted) {
             executionMode: result?.executionMode ?? null,
             accepted,
             inputHash: result?.inputHash ?? null,
+            inputByteCount: result?.inputByteCount ?? null,
+            inputTriangleCount: result?.inputTriangleCount ?? null,
             issueCount: issues.length,
             warningCount: issues.filter(issue => issue?.severity !== 'info').length,
             faceCount: Number(result?.metrics?.faceCount ?? 0),
@@ -5765,13 +5788,15 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
     const runtimeInput = meshBuffers.length > 0
         ? { meshBuffers }
         : { fileBytes: runtimeFileBytes, fileName: runtimeFileName };
+    const inputByteCount = getLocalAdvisoryInputByteLength(runtimeInput);
+    const inputTriangleCount = countLocalAdvisoryInputTriangles(runtimeInput);
 
     await notifyLocalAdvisoryStartedDotNet(
         options.dotNetRef,
         {
             processCode,
-            inputByteCount: getLocalAdvisoryInputByteLength(runtimeInput),
-            inputTriangleCount: countLocalAdvisoryInputTriangles(runtimeInput),
+            inputByteCount,
+            inputTriangleCount,
         });
     if (renderLocalPanel) renderLocalAdvisoryStatus(canvasId, 'pending');
     try {
@@ -5836,6 +5861,10 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
         result.storagePath = typeof options.storagePath === 'string' && options.storagePath.trim()
             ? options.storagePath.trim()
             : null;
+        result.inputByteCount = inputByteCount;
+        result.inputTriangleCount = inputTriangleCount > 0
+            ? inputTriangleCount
+            : Math.max(0, Math.round(Number(result?.metrics?.faceCount ?? 0)));
         if (localAdvisoryRuns[canvasId] !== runId ||
             !isBrowserFirstRuntimeContract(result)) {
             clearLocalAdvisoryPanel(canvasId);

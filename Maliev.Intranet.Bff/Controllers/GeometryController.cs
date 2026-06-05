@@ -208,7 +208,9 @@ public class GeometryController(
             request.ProcessCode,
             request.Accepted,
             request.Authority,
-            request.ExecutionMode);
+            request.ExecutionMode,
+            request.InputByteCount,
+            request.InputTriangleCount);
 
         if (request.Accepted
             && TryBuildLocalDimensions(
