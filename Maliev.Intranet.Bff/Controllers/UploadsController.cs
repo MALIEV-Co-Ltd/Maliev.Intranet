@@ -29,7 +29,7 @@ public class UploadsController(
 {
     private const string StreamingUploadClientName = "UploadServiceClient.StreamingProxy";
     private static readonly HashSet<string> BrowserViewerSourceExtensions = new(
-        [".glb", ".gltf", ".obj", ".stl"],
+        [".3mf", ".glb", ".gltf", ".obj", ".stl"],
         StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -160,12 +160,14 @@ public class UploadsController(
             : request.ContentType;
 
         var storagePath = BuildProjectUploadPath(request.ProjectId, request.CustomerId, fileName);
+        var metadataTags = BuildBrowserPrimaryUploadMetadata(extension);
         var (session, errorContent, statusCode) = await uploadClient.InitiateResumableUploadWithDiagnosticsAsync(
             fileName,
             contentType,
             request.FileSize,
             storagePath,
             true,
+            metadataTags,
             ct);
 
         return session != null
@@ -773,6 +775,19 @@ public class UploadsController(
             ".rar" => "application/vnd.rar",
             ".7z" => "application/x-7z-compressed",
             _ => "application/octet-stream"
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string>? BuildBrowserPrimaryUploadMetadata(string extension)
+    {
+        if (!BrowserViewerSourceExtensions.Contains(extension))
+            return null;
+
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["geometry.executionPolicy"] = "browser_primary",
+            ["geometry.browserRuntime"] = "required",
+            ["geometry.serverGlbExport"] = "skip_for_browser_viewable"
         };
     }
 

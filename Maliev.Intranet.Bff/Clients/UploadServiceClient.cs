@@ -37,7 +37,13 @@ public class UploadServiceClient
     public async Task<BffUploadResponse?> UploadFileAsync(string fileName, Stream content, string contentType, string path, bool overwrite = true, CancellationToken ct = default)
     {
         var totalSize = GetStreamLength(content);
-        var session = await InitiateResumableUploadAsync(fileName, contentType, totalSize, path, overwrite, ct);
+        var session = await InitiateResumableUploadAsync(
+            fileName,
+            contentType,
+            totalSize,
+            path,
+            overwrite,
+            ct: ct);
         if (session == null || string.IsNullOrWhiteSpace(session.SessionUri))
         {
             return null;
@@ -74,6 +80,7 @@ public class UploadServiceClient
         long fileSize,
         string path,
         bool overwrite = true,
+        IReadOnlyDictionary<string, string>? metadataTags = null,
         CancellationToken ct = default)
     {
         var (session, _, _) = await InitiateResumableUploadWithDiagnosticsAsync(
@@ -82,6 +89,7 @@ public class UploadServiceClient
             fileSize,
             path,
             overwrite,
+            metadataTags,
             ct);
 
         return session;
@@ -96,6 +104,7 @@ public class UploadServiceClient
         long fileSize,
         string path,
         bool overwrite = true,
+        IReadOnlyDictionary<string, string>? metadataTags = null,
         CancellationToken ct = default)
     {
         var initiateRequest = new InitiateResumableUploadRequest(
@@ -104,7 +113,8 @@ public class UploadServiceClient
             ServiceName: "Intranet",
             ContentType: contentType,
             TotalSize: fileSize,
-            Overwrite: overwrite);
+            Overwrite: overwrite,
+            MetadataTags: metadataTags);
 
         var initiateResponse = await _httpClient.PostAsJsonAsync("/upload/v1/uploads/resumable", initiateRequest, ct);
         if (!initiateResponse.IsSuccessStatusCode)
@@ -421,7 +431,8 @@ internal sealed record InitiateResumableUploadRequest(
     string ServiceName,
     string ContentType,
     long TotalSize,
-    bool Overwrite);
+    bool Overwrite,
+    IReadOnlyDictionary<string, string>? MetadataTags);
 
 internal sealed record InitiateResumableUploadResponse(
     string UploadId,

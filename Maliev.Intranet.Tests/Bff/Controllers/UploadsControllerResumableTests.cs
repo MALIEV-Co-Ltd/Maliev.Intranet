@@ -75,6 +75,11 @@ public class UploadsControllerResumableTests
         Assert.Equal("model/stl", payload.GetProperty("contentType").GetString());
         Assert.Equal(1024, payload.GetProperty("totalSize").GetInt64());
         Assert.True(payload.GetProperty("overwrite").GetBoolean());
+
+        var metadataTags = payload.GetProperty("metadataTags");
+        Assert.Equal("browser_primary", metadataTags.GetProperty("geometry.executionPolicy").GetString());
+        Assert.Equal("required", metadataTags.GetProperty("geometry.browserRuntime").GetString());
+        Assert.Equal("skip_for_browser_viewable", metadataTags.GetProperty("geometry.serverGlbExport").GetString());
     }
 
     [Fact]
