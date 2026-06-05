@@ -534,6 +534,62 @@ test('transparent realistic material refraction tracks the promoted studio envir
         'transparent material refraction should follow the promoted high-quality studio environment');
 });
 
+test('transparent realistic presets stay translucent when opaque CNC finishes are selected', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'clear-part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        const snapshot = (materialKey, finishCode, processCode) => {
+            configureMaterialFromConfigurator('viewer', materialKey, null, finishCode, 'RA_3_2', processCode);
+            setRenderMode('viewer', 'realistic');
+            const material = scene.meshes[0].material;
+            return {
+                materialName: material?.name ?? null,
+                alpha: material?.alpha ?? null,
+                transparencyMode: material?.transparencyMode ?? null,
+                metallic: material?.metallic ?? null,
+                roughness: material?.roughness ?? null,
+                effectKey: material?._malievSurfaceEffect?.key ?? null,
+                linkRefractionWithTransparency: material?.linkRefractionWithTransparency ?? null,
+                useRadianceOverAlpha: material?.useRadianceOverAlpha ?? null,
+                refractionEnabled: material?.subSurface?.isRefractionEnabled ?? null
+            };
+        };
+        ({
+            brushedAcrylic: snapshot('acrylic-clear', 'BRUSHED', 'CNC_MILL'),
+            beadBlastAcrylic: snapshot('acrylic-clear', 'BEAD_BLAST', 'CNC_MILL'),
+            polishedResin: snapshot('resin-clear', 'MIRROR_POLISH', 'SLA_DLP')
+        });
+    `, context);
+
+    for (const [name, material] of Object.entries(result)) {
+        assert.equal(material.transparencyMode, context.BABYLON.Material.MATERIAL_ALPHABLEND, `${name} should stay alpha blended`);
+        assert.ok(material.alpha > 0.30 && material.alpha < 0.70, `${name} should stay translucent, got alpha ${material.alpha}`);
+        assert.equal(material.metallic, 0, `${name} should stay dielectric, got metallic ${material.metallic}`);
+        assert.equal(material.effectKey, null, `${name} should not use opaque surface darkening plugins`);
+        assert.equal(material.linkRefractionWithTransparency, true, `${name} should keep refraction linked to alpha`);
+        assert.equal(material.useRadianceOverAlpha, true, `${name} should keep environment radiance through alpha`);
+        assert.equal(material.refractionEnabled, true, `${name} should keep PBR refraction enabled`);
+        assert.ok(material.roughness <= 0.28, `${name} should stay translucent instead of heavily frosted/black, got roughness ${material.roughness}`);
+    }
+
+    assert.equal(result.brushedAcrylic.materialName, '__realistic_acrylic-clear__');
+    assert.equal(result.beadBlastAcrylic.materialName, '__realistic_acrylic-clear__');
+    assert.equal(result.polishedResin.materialName, '__realistic_resin-clear__');
+});
+
 test('viewer module imports before Babylon globals are loaded', async () => {
     const previousWindow = globalThis.window;
     delete globalThis.BABYLON;
