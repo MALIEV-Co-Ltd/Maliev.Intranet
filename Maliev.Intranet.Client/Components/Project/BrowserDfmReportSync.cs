@@ -8,11 +8,25 @@ internal static class BrowserDfmReportSync
     private const int BrowserDfmStartedGracePeriodMs = 30_000;
     private const int BrowserDfmPollIntervalMs = 100;
 
-    internal static bool HasCurrentReport(PartViewModel part, string processCode) =>
-        part.DfmReport != null
-        && !part.DfmAnalysisTimedOut
-        && part.AnalysisErrorCode == null
-        && ProcessCodeNormalizer.Equals(part.ProcessCode, processCode);
+    internal static bool HasCurrentReport(PartViewModel part, string processCode)
+    {
+        if (!ProcessCodeNormalizer.Equals(part.ProcessCode, processCode))
+            return false;
+
+        var directReport = part.DfmReport;
+        part.ResolveDfmReport();
+        if (part.DfmReport is null && directReport is not null)
+            part.DfmReport = directReport;
+
+        if (part.DfmReport is null)
+            return false;
+
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+        ClearTerminalLocalAttempt(part, processCode);
+        ClearActiveLocalAttempt(part, processCode);
+        return true;
+    }
 
     internal static bool HasTerminalLocalAttempt(PartViewModel part, string processCode) =>
         !string.IsNullOrWhiteSpace(part.LocalDfmRuntimeTerminalProcessCode)
