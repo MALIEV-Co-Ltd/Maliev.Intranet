@@ -122,6 +122,46 @@ public class BffMetricsTests
     }
 
     [Fact]
+    public void RecordServerDfmAnalysisReady_EmitsConsumedServerCpuDecision()
+    {
+        var meterFactoryMock = new Mock<IMeterFactory>();
+        using var meter = new Meter("test");
+        meterFactoryMock.Setup(x => x.Create(It.IsAny<MeterOptions>())).Returns(meter);
+
+        var measurements = new List<Dictionary<string, object?>>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, meterListener) =>
+            {
+                if (instrument.Name == "intranet_dfm_execution_decisions")
+                {
+                    meterListener.EnableMeasurementEvents(instrument);
+                }
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var tag in tags)
+            {
+                snapshot[tag.Key] = tag.Value;
+            }
+
+            measurements.Add(snapshot);
+        });
+        listener.Start();
+
+        var metrics = new BffMetrics(meterFactoryMock.Object);
+        metrics.RecordServerDfmAnalysisReady("CNC_MILL");
+
+        var tags = Assert.Single(measurements);
+        Assert.Equal("cnc", tags["process_family"]);
+        Assert.Equal("server_async_event", tags["execution_path"]);
+        Assert.Equal("server_completed", tags["decision"]);
+        Assert.Equal("consumed", tags["server_cpu"]);
+    }
+
+    [Fact]
     public void RecordBrowserDfmRuntimeStart_EmitsStartMetricTags()
     {
         var meterFactoryMock = new Mock<IMeterFactory>();

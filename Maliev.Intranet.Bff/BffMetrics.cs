@@ -178,6 +178,21 @@ public class BffMetrics
         });
     }
 
+    /// <summary>
+    /// Records that a server DFM analysis result was received from GeometryService.
+    /// </summary>
+    /// <param name="processCode">The manufacturing process represented by the DFM report.</param>
+    public void RecordServerDfmAnalysisReady(string? processCode)
+    {
+        _dfmExecutionDecisions.Add(1, new TagList
+        {
+            { "process_family", NormalizeProcessFamily(processCode) },
+            { "execution_path", "server_async_event" },
+            { "decision", "server_completed" },
+            { "server_cpu", "consumed" },
+        });
+    }
+
     private static string NormalizeProcessFamily(string? processCode)
     {
         var normalized = NormalizeMarker(processCode, "unknown")

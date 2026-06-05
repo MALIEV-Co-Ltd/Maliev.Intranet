@@ -19,6 +19,7 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
     private readonly IHubContext<NotificationHub> _hub;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IFileAnalysisStatusService _analysisStatusService;
+    private readonly BffMetrics _bffMetrics;
     private readonly ILogger<DfmAnalysisReadyConsumer> _logger;
 
     /// <summary>
@@ -28,11 +29,13 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         IHubContext<NotificationHub> hub,
         IHttpClientFactory httpClientFactory,
         IFileAnalysisStatusService analysisStatusService,
+        BffMetrics bffMetrics,
         ILogger<DfmAnalysisReadyConsumer> logger)
     {
         _hub = hub;
         _httpClientFactory = httpClientFactory;
         _analysisStatusService = analysisStatusService;
+        _bffMetrics = bffMetrics;
         _logger = logger;
     }
 
@@ -111,6 +114,7 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
         var fdmReport = DeserializeReport<FdmDfmReportPayload>(payload.FdmReport);
         var slaReport = DeserializeReport<SlaDfmReportPayload>(payload.SlaReport);
         var cncReport = DeserializeReport<CncDfmReportPayload>(payload.CncReport);
+        RecordServerDfmReports(fdmReport, slaReport, cncReport);
 
         // Extract raw overlay paths from payload (MassTransit deserialises object? as JsonElement).
         Dictionary<string, string>? rawOverlayPaths = null;
@@ -216,6 +220,27 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
                 "DfmAnalysisReady",
                 payload,
                 cancellationToken);
+        }
+    }
+
+    private void RecordServerDfmReports(
+        FdmDfmReportPayload? fdmReport,
+        SlaDfmReportPayload? slaReport,
+        CncDfmReportPayload? cncReport)
+    {
+        if (fdmReport is not null)
+        {
+            _bffMetrics.RecordServerDfmAnalysisReady("FDM");
+        }
+
+        if (slaReport is not null)
+        {
+            _bffMetrics.RecordServerDfmAnalysisReady("SLA");
+        }
+
+        if (cncReport is not null)
+        {
+            _bffMetrics.RecordServerDfmAnalysisReady("CNC_MILL");
         }
     }
 
