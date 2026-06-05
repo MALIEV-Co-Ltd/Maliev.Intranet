@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Polly.Timeout;
 
 namespace Maliev.Intranet.Tests.Bff.Controllers;
 
@@ -86,6 +87,7 @@ public class GeometryControllerTests
             uploadClient,
             MakeMetrics(),
             analysisStatusService ?? Mock.Of<IFileAnalysisStatusService>(),
+            new GeometryRuntimeFallbackProvider(),
             NullLogger<GeometryController>.Instance)
         {
             ControllerContext = new ControllerContext
@@ -396,6 +398,127 @@ public class GeometryControllerTests
         Assert.Equal("primary_interactive", controller.Response.Headers["X-Maliev-Geometry-Execution-Mode"].ToString());
         Assert.Equal("local_primary", controller.Response.Headers["X-Maliev-Geometry-Authority"].ToString());
         Assert.Equal("fallback_and_final_validation", controller.Response.Headers["X-Maliev-Geometry-Server-Role"].ToString());
+    }
+
+    [Fact]
+    public async Task GetRuntimeManifest_FallsBackToPackagedRuntime_WhenGeometryServiceTimesOut()
+    {
+        var geometryClient = MakeGeometryClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException(
+                "The request was canceled due to the configured HttpClient.Timeout of 30 seconds elapsing.",
+                new TimeoutException("The operation was canceled."))));
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeManifest(default);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(200, content.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", content.ContentType);
+        Assert.Contains("\"runtimeVersion\":\"1.0.0\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains("\"runtimeKind\":\"browser-first-geometry\"", content.Content, StringComparison.Ordinal);
+        Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task GetRuntimeManifest_FallsBackToPackagedRuntime_WhenGeometryServicePollyTimeouts()
+    {
+        var geometryClient = MakeGeometryClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TimeoutRejectedException(
+                "The operation didn't complete within the allowed timeout of '00:01:00'.")));
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeManifest(default);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(200, content.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", content.ContentType);
+        Assert.Contains("\"runtimeVersion\":\"1.0.0\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains("\"runtimeKind\":\"browser-first-geometry\"", content.Content, StringComparison.Ordinal);
+        Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task GetRuntimeAsset_FallsBackToPackagedRuntime_WhenGeometryServiceTimesOut()
+    {
+        var geometryClient = MakeGeometryClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException(
+                "The request was canceled due to the configured HttpClient.Timeout of 30 seconds elapsing.",
+                new TimeoutException("The operation was canceled."))));
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+        var manifest = Assert.IsType<ContentResult>(await controller.GetRuntimeManifest(default));
+        using var document = JsonDocument.Parse(manifest.Content!);
+        var workerPath = document.RootElement
+            .GetProperty("assets")
+            .GetProperty("worker")
+            .GetString();
+        Assert.NotNull(workerPath);
+        var workerName = workerPath.Split('/').Last();
+
+        var result = await controller.GetRuntimeAsset(workerName, default);
+
+        var content = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/javascript; charset=utf-8", content.ContentType);
+        Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Contains(
+            "MALIEV_BROWSER_GEOMETRY_RUNTIME_VERSION",
+            System.Text.Encoding.UTF8.GetString(content.FileContents),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetRuntimeAsset_FallsBackToPackagedRuntime_WhenGeometryServicePollyTimeouts()
+    {
+        var geometryClient = MakeGeometryClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TimeoutRejectedException(
+                "The operation didn't complete within the allowed timeout of '00:01:00'.")));
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+        var manifest = Assert.IsType<ContentResult>(await controller.GetRuntimeManifest(default));
+        using var document = JsonDocument.Parse(manifest.Content!);
+        var workerPath = document.RootElement
+            .GetProperty("assets")
+            .GetProperty("worker")
+            .GetString();
+        Assert.NotNull(workerPath);
+        var workerName = workerPath.Split('/').Last();
+
+        var result = await controller.GetRuntimeAsset(workerName, default);
+
+        var content = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/javascript; charset=utf-8", content.ContentType);
+        Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
+        Assert.Contains(
+            "MALIEV_BROWSER_GEOMETRY_RUNTIME_VERSION",
+            System.Text.Encoding.UTF8.GetString(content.FileContents),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetRuntimeAsset_ServesPackagedRuntimeAssetWithoutCallingGeometryService_WhenAssetNameMatches()
+    {
+        var provider = new GeometryRuntimeFallbackProvider();
+        using var manifestDocument = JsonDocument.Parse(
+            System.Text.Encoding.UTF8.GetString(provider.GetManifest().Content));
+        var workerPath = manifestDocument.RootElement
+            .GetProperty("assets")
+            .GetProperty("worker")
+            .GetString();
+        Assert.NotNull(workerPath);
+        var workerName = workerPath.Split('/').Last();
+        var geometryServiceCalled = false;
+        var geometryClient = MakeGeometryClient((_, _) =>
+        {
+            geometryServiceCalled = true;
+            return Task.FromException<HttpResponseMessage>(
+                new InvalidOperationException("Packaged runtime assets must not call GeometryService."));
+        });
+        var controller = MakeController(MakeUploadClient(), geometryClient);
+
+        var result = await controller.GetRuntimeAsset(workerName, default);
+
+        Assert.False(geometryServiceCalled);
+        var content = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/javascript; charset=utf-8", content.ContentType);
+        Assert.Contains("immutable", controller.Response.Headers.CacheControl.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

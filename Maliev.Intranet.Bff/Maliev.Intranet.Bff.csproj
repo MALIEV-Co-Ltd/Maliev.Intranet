@@ -47,4 +47,9 @@
     <PackageReference Include="MudBlazor" Version="9.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="GeometryRuntimeFallback\client-geometry-runtime.worker.js" />
+    <EmbeddedResource Include="GeometryRuntimeFallback\client-geometry-runtime.worker.js" />
+  </ItemGroup>
+
 </Project>

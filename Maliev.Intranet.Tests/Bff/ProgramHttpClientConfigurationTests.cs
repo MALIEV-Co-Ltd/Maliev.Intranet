@@ -25,6 +25,19 @@ public class ProgramHttpClientConfigurationTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Program_DoesNotSynchronouslyConnectRedisDuringStartup()
+    {
+        var programSource = File.ReadAllText(FindProgramSource());
+
+        Assert.DoesNotContain(
+            "ConnectionMultiplexer.Connect(redisConnectionString)",
+            programSource,
+            StringComparison.Ordinal);
+        Assert.Contains("IPostConfigureOptions<KeyManagementOptions>", programSource, StringComparison.Ordinal);
+        Assert.Contains("RedisXmlRepository", programSource, StringComparison.Ordinal);
+    }
+
     private static string FindProgramSource()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

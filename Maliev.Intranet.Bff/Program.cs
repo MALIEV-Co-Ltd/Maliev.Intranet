@@ -15,9 +15,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
@@ -97,13 +100,17 @@ try
     var dataProtectionBuilder = builder.Services.AddDataProtection()
         .SetApplicationName("MalievIntranet");
 
-    var redisConnectionString = builder.Configuration.GetConnectionString("redis");
-    IConnectionMultiplexer? redis = null;
-    if (!string.IsNullOrEmpty(redisConnectionString))
-    {
-        redis = ConnectionMultiplexer.Connect(redisConnectionString);
-        builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
-    }
+    builder.Services.AddSingleton<IPostConfigureOptions<KeyManagementOptions>>(sp =>
+        new PostConfigureOptions<KeyManagementOptions>(Options.DefaultName, options =>
+        {
+            var redis = sp.GetService<IConnectionMultiplexer>();
+            if (redis is not null)
+            {
+                options.XmlRepository = new RedisXmlRepository(
+                    () => redis.GetDatabase(),
+                    "Maliev:DataProtection:Keys");
+            }
+        }));
 
     if (builder.Environment.IsDevelopment())
     {
@@ -118,10 +125,6 @@ try
 
         Directory.CreateDirectory(keysDirectory);
         dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
-    }
-    else if (!string.IsNullOrEmpty(redisConnectionString))
-    {
-        dataProtectionBuilder.PersistKeysToStackExchangeRedis(redis!, "Maliev:DataProtection:Keys");
     }
 
     var certPath = builder.Configuration["DataProtection:CertificatePath"];
@@ -461,6 +464,7 @@ try
     // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.
     builder.AddBffLongRunningServiceClient<GeometryServiceClient>("GeometryService",
         attemptTimeout: TimeSpan.FromSeconds(300));
+    builder.Services.AddSingleton<GeometryRuntimeFallbackProvider>();
 
     // Named HTTP client with service account authentication for reference data
     builder.Services.AddHttpClient("CountryServiceAccount", (sp, client) =>
