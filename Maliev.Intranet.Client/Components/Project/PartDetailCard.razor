@@ -404,6 +404,7 @@
         _dfmIssues.Count == 0
         && Part.ViewerUrl != null
         && Part.DfmReport == null
+        && !BrowserDfmReportSync.HasTerminalLocalAttempt(Part, Part.ProcessCode ?? string.Empty)
         && !DfmUnavailable
         && !Part.DfmAcknowledged
         && !string.IsNullOrEmpty(Part.ProcessCode);

@@ -78,7 +78,7 @@ public sealed class BrowserDfmRaceSourceTests
         Assert.Contains("notifyLocalAdvisoryStartedDotNet", script, StringComparison.Ordinal);
         Assert.True(
             script.IndexOf("await notifyLocalAdvisoryStartedDotNet", StringComparison.Ordinal)
-            < script.IndexOf("const result = await analyzeWithLocalAdvisoryWorker", StringComparison.Ordinal),
+            < script.IndexOf("const result = await enqueueLocalAdvisoryWorker", StringComparison.Ordinal),
             "The browser must tell Blazor that local DFM has started before awaiting worker completion.");
     }
 
@@ -117,6 +117,17 @@ public sealed class BrowserDfmRaceSourceTests
         Assert.Contains("LocalDfmRuntimeInputTriangleCount", detail, StringComparison.Ordinal);
         Assert.Contains("[Parameter] public string? AnalyzingMessage { get; set; }", overlay, StringComparison.Ordinal);
         Assert.Contains("AnalyzingMessage ?? \"Analyzing your model", overlay, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DfmOverlayStopsAnalyzingWhenBrowserLocalDfmTerminalStateExists()
+    {
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")
+            .ReplaceLineEndings("\n");
+        var analyzingBlock = ExtractBlock(detail, "private bool IsDfmAnalyzing");
+
+        Assert.Contains("!BrowserDfmReportSync.HasTerminalLocalAttempt(Part, Part.ProcessCode ?? string.Empty)", analyzingBlock, StringComparison.Ordinal);
+        Assert.Contains("&& !DfmUnavailable", analyzingBlock, StringComparison.Ordinal);
     }
 
     [Fact]
