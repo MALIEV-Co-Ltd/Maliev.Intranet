@@ -97,6 +97,33 @@ public class SystemHealthControllerTests
     }
 
     [Fact]
+    public async Task GetSystemHealth_UsesServiceSpecificProbeTimeoutConfiguration()
+    {
+        var probeService = CreateProbeService(
+            async (request, ct) =>
+            {
+                if (request.RequestUri?.AbsolutePath == "/geometry/liveness")
+                {
+                    var wait = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    using var registration = ct.Register(() => wait.TrySetCanceled(ct));
+                    await wait.Task;
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            },
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["SystemHealth:ProbeTimeouts:GeometryService:LivenessSeconds"] = "1"
+            });
+
+        var services = await probeService.CheckAllAsync(CancellationToken.None);
+
+        var geometry = Assert.Single(services, service => service.ServiceName == "GeometryService");
+        Assert.Equal("Unreachable", geometry.Status);
+        Assert.Equal("Health probe /geometry/liveness timed out after 1 seconds.", geometry.ErrorMessage);
+    }
+
+    [Fact]
     public async Task GetSystemHealth_ThrottlesConcurrentServiceProbes()
     {
         var currentConcurrency = 0;
@@ -207,7 +234,8 @@ public class SystemHealthControllerTests
 
     private static SystemHealthProbeService CreateProbeService(
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler,
-        int? maxConcurrentProbes = null)
+        int? maxConcurrentProbes = null,
+        IReadOnlyDictionary<string, string?>? configurationValues = null)
     {
         var factory = new Mock<IHttpClientFactory>();
         factory
@@ -215,12 +243,23 @@ public class SystemHealthControllerTests
             .Returns(() => new HttpClient(new MockHttpMessageHandler(handler)));
 
         var configurationBuilder = new ConfigurationBuilder();
+        var settings = new Dictionary<string, string?>();
+        if (configurationValues is not null)
+        {
+            foreach (var item in configurationValues)
+            {
+                settings[item.Key] = item.Value;
+            }
+        }
+
         if (maxConcurrentProbes is not null)
         {
-            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["SystemHealth:MaxConcurrentProbes"] = maxConcurrentProbes.Value.ToString()
-            });
+            settings["SystemHealth:MaxConcurrentProbes"] = maxConcurrentProbes.Value.ToString();
+        }
+
+        if (settings.Count > 0)
+        {
+            configurationBuilder.AddInMemoryCollection(settings);
         }
 
         var configuration = configurationBuilder.Build();

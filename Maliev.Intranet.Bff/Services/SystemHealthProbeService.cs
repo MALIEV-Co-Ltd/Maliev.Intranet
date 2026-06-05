@@ -106,7 +106,11 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
             var client = httpClientFactory.CreateClient("ServiceHealthCheck");
             client.BaseAddress = new Uri(baseUrl);
 
-            var liveness = await ProbeWithTransientRetriesAsync(client, target.LivenessPath, TimeSpan.FromSeconds(5), ct);
+            var liveness = await ProbeWithTransientRetriesAsync(
+                client,
+                target.LivenessPath,
+                ResolveProbeTimeout(target.ServiceName, "Liveness", TimeSpan.FromSeconds(5)),
+                ct);
             status.LivenessResponseTimeMs = liveness.ResponseTimeMs;
             if (!liveness.IsSuccess)
             {
@@ -116,7 +120,11 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
                 return status;
             }
 
-            var readiness = await ProbeWithTransientRetriesAsync(client, target.ReadinessPath, TimeSpan.FromSeconds(10), ct);
+            var readiness = await ProbeWithTransientRetriesAsync(
+                client,
+                target.ReadinessPath,
+                ResolveProbeTimeout(target.ServiceName, "Readiness", TimeSpan.FromSeconds(10)),
+                ct);
             status.ReadinessResponseTimeMs = readiness.ResponseTimeMs;
             status.ResponseTimeMs = readiness.ResponseTimeMs;
             if (readiness.IsSuccess)
@@ -136,6 +144,17 @@ public sealed class SystemHealthProbeService(IHttpClientFactory httpClientFactor
         }
 
         return status;
+    }
+
+    private TimeSpan ResolveProbeTimeout(string serviceName, string probeName, TimeSpan defaultTimeout)
+    {
+        var configuredSeconds =
+            configuration.GetValue<double?>($"SystemHealth:ProbeTimeouts:{serviceName}:{probeName}Seconds") ??
+            configuration.GetValue<double?>($"SystemHealth:{probeName}TimeoutSeconds");
+
+        return configuredSeconds is > 0
+            ? TimeSpan.FromSeconds(configuredSeconds.Value)
+            : defaultTimeout;
     }
 
     private static async Task<ProbeResult> ProbeWithTransientRetriesAsync(
