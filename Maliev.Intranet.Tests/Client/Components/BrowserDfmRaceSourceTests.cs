@@ -237,6 +237,38 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void ProjectNew_BrowserPrimaryPolicyPreventsInteractiveServerDfmFallback()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+        var analyzeBlock = ExtractBlock(source, "private async Task RunProcessDfmAnalysisAsync");
+
+        Assert.Contains("interactiveServerDfmFallbackForBrowserPrimaryUploads", source, StringComparison.Ordinal);
+        Assert.Contains("ShouldRunInteractiveServerDfmFallbackAsync(part)", analyzeBlock, StringComparison.Ordinal);
+        Assert.Contains("MarkBrowserPrimaryLocalDfmUnavailable(part, processCode", analyzeBlock, StringComparison.Ordinal);
+        Assert.True(
+            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallbackAsync(part)", StringComparison.Ordinal)
+            < analyzeBlock.IndexOf("Http.PostAsJsonAsync", StringComparison.Ordinal),
+            "ProjectNew must honor browser-primary runtime policy before posting to the GeometryService server DFM fallback endpoint.");
+    }
+
+    [Fact]
+    public void PartConfigSidebar_BrowserPrimaryPolicyPreventsInteractiveServerDfmFallback()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
+            .ReplaceLineEndings("\n");
+        var analyzeBlock = ExtractBlock(source, "private async Task AnalyzeProcessForDfm");
+
+        Assert.Contains("[Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; }", source, StringComparison.Ordinal);
+        Assert.Contains("ShouldRunInteractiveServerDfmFallback(part)", analyzeBlock, StringComparison.Ordinal);
+        Assert.Contains("MarkBrowserPrimaryLocalDfmUnavailable(part, process.Code", analyzeBlock, StringComparison.Ordinal);
+        Assert.True(
+            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallback(part)", StringComparison.Ordinal)
+            < analyzeBlock.IndexOf("Http.PostAsJsonAsync", StringComparison.Ordinal),
+            "PartConfigSidebar must honor browser-primary runtime policy before posting to the GeometryService server DFM fallback endpoint.");
+    }
+
+    [Fact]
     public void PartConfigSidebar_PublishesDfmStateForEquivalentProcessCodes()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")

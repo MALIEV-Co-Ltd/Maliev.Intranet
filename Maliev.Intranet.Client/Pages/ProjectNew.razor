@@ -93,6 +93,7 @@
                             SelectedPartsChanged="OnBulkSelectionChanged"
                             TempProjectId="@_tempProjectId"
                             CustomerId="@_selectedCustomerId"
+                            BrowserPrimaryServerDfmFallbackEnabled="@_browserPrimaryServerDfmFallbackEnabled.GetValueOrDefault(false)"
                             OnPartChanged="OnPartChanged"
                             OnProcessChanged="OnBulkTableProcessChanged"
                             OnBulkApply="ApplyBulkEditAsync"
@@ -126,6 +127,7 @@
                                 Processes="@_processes"
                                 TempProjectId="@_tempProjectId"
                                 CustomerId="@_selectedCustomerId"
+                                BrowserPrimaryServerDfmFallbackEnabled="@_browserPrimaryServerDfmFallbackEnabled.GetValueOrDefault(false)"
                                 OnPartChanged="OnPartChanged"
                                 LayoutMode="@_layoutMode"
                                 OnLayoutModeChanged="SetLayoutModeAsync" />

@@ -96,6 +96,8 @@ public partial class ProjectNew : IAsyncDisposable
     };
     private HashSet<string>? _runtimeBrowserViewerExtensions;
     private Task<HashSet<string>?>? _runtimeBrowserViewerExtensionsTask;
+    private bool? _browserPrimaryServerDfmFallbackEnabled;
+    private Task<bool?>? _browserPrimaryServerDfmFallbackEnabledTask;
 
     // ── Pricing debounce ───────────────────────────────────────────────
     private readonly Dictionary<Guid, CancellationTokenSource> _pricingTokens = new();
@@ -1128,11 +1130,18 @@ public partial class ProjectNew : IAsyncDisposable
         var processCode = process.Code;
         try
         {
-            ResetProcessDfmStateForRetry(part, processCode);
+            var runInteractiveServerDfmFallback = await ShouldRunInteractiveServerDfmFallbackAsync(part);
+            ResetProcessDfmStateForRetry(part, processCode, clearLocalAttempts: runInteractiveServerDfmFallback);
             await InvokeAsync(StateHasChanged);
 
             if (await BrowserDfmReportSync.WaitForCurrentReportAsync(part, processCode, CancellationToken.None))
                 return;
+
+            if (!runInteractiveServerDfmFallback)
+            {
+                MarkBrowserPrimaryLocalDfmUnavailable(part, processCode, "interactive_server_dfm_fallback_disabled");
+                return;
+            }
 
             using var response = await Http.PostAsJsonAsync(
                 $"api/v1/geometry/{part.FileId}/dfm/{Uri.EscapeDataString(processCode)}",
@@ -1224,6 +1233,66 @@ public partial class ProjectNew : IAsyncDisposable
 
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
+    }
+
+    private async Task<bool> ShouldRunInteractiveServerDfmFallbackAsync(PartViewModel part)
+    {
+        if (!IsBrowserPrimaryDfmPart(part, _runtimeBrowserViewerExtensions ?? DefaultBrowserViewerExtensions))
+            return true;
+
+        var enabled = await GetBrowserPrimaryServerDfmFallbackEnabledAsync();
+        return enabled.GetValueOrDefault(false);
+    }
+
+    private async Task<bool?> GetBrowserPrimaryServerDfmFallbackEnabledAsync()
+    {
+        if (_browserPrimaryServerDfmFallbackEnabled.HasValue)
+            return _browserPrimaryServerDfmFallbackEnabled.Value;
+
+        _browserPrimaryServerDfmFallbackEnabledTask ??= FetchBrowserPrimaryServerDfmFallbackEnabledAsync();
+        var enabled = await _browserPrimaryServerDfmFallbackEnabledTask;
+        if (enabled.HasValue)
+        {
+            _browserPrimaryServerDfmFallbackEnabled = enabled.Value;
+        }
+        else
+        {
+            _browserPrimaryServerDfmFallbackEnabledTask = null;
+        }
+
+        return enabled;
+    }
+
+    private async Task<bool?> FetchBrowserPrimaryServerDfmFallbackEnabledAsync()
+    {
+        try
+        {
+            using var response = await Http.GetAsync("api/v1/geometry/runtime/manifest");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            using var manifest = await response.Content.ReadFromJsonAsync<JsonDocument>();
+            return manifest is null
+                ? null
+                : ReadInteractiveServerDfmFallbackForBrowserPrimaryUploads(manifest.RootElement);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException or OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Could not load browser geometry runtime fallback policy.");
+            return null;
+        }
+    }
+
+    private static void MarkBrowserPrimaryLocalDfmUnavailable(
+        PartViewModel part,
+        string processCode,
+        string reason)
+    {
+        BrowserDfmReportSync.MarkTerminalLocalAttempt(part, processCode, reason);
+        part.DfmAnalysisTimedOut = true;
+        part.AnalysisErrorCode = DfmStatusMessages.BrowserLocalDfmUnavailable;
+        part.StatusText = DfmStatusMessages.GetStatusText(part.AnalysisErrorCode);
+        part.ResolveDfmReport();
     }
 
     private async Task<bool> HandleLocalGeometryRuntimeCompletedAsync(PartLocalGeometryRuntimeResult completion)
@@ -1437,7 +1506,7 @@ public partial class ProjectNew : IAsyncDisposable
         await RunProcessDfmAnalysisAsync(part, process);
     }
 
-    private static void ResetProcessDfmStateForRetry(PartViewModel part, string processCode)
+    private static void ResetProcessDfmStateForRetry(PartViewModel part, string processCode, bool clearLocalAttempts = true)
     {
         var upperProcessCode = processCode.ToUpperInvariant();
         if (upperProcessCode is "SLA" or "SLA_DLP" or "DLP")
@@ -1448,8 +1517,11 @@ public partial class ProjectNew : IAsyncDisposable
             part.FdmDfmReport = null;
 
         part.DfmReport = null;
-        BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
-        BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
+        if (clearLocalAttempts)
+        {
+            BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
+            BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
+        }
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
     }
@@ -1720,7 +1792,12 @@ public partial class ProjectNew : IAsyncDisposable
                 return null;
 
             using var manifest = await response.Content.ReadFromJsonAsync<JsonDocument>();
-            return manifest is null ? null : ReadDirectBrowserViewerExtensions(manifest.RootElement);
+            if (manifest is null)
+                return null;
+
+            _browserPrimaryServerDfmFallbackEnabled =
+                ReadInteractiveServerDfmFallbackForBrowserPrimaryUploads(manifest.RootElement);
+            return ReadDirectBrowserViewerExtensions(manifest.RootElement);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException or OperationCanceledException)
         {
@@ -1753,6 +1830,22 @@ public partial class ProjectNew : IAsyncDisposable
 
         return result.Count > 0 ? result : null;
     }
+
+    private static bool? ReadInteractiveServerDfmFallbackForBrowserPrimaryUploads(JsonElement root)
+    {
+        if (root.TryGetProperty("fallbackPolicy", out var fallbackPolicy)
+            && fallbackPolicy.TryGetProperty("interactiveServerDfmFallbackForBrowserPrimaryUploads", out var enabled)
+            && enabled.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            return enabled.GetBoolean();
+        }
+
+        return null;
+    }
+
+    private static bool IsBrowserPrimaryDfmPart(PartViewModel part, ISet<string> browserViewerExtensions)
+        => !string.IsNullOrWhiteSpace(part.ClientUploadId)
+        && ResolveBrowserFileViewerExtension(part, browserViewerExtensions) is not null;
 
     private static string? ResolveBrowserFileViewerExtension(PartViewModel part, ISet<string> browserViewerExtensions)
     {

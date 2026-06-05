@@ -420,6 +420,10 @@ public class GeometryControllerTests
             "\"directBrowserViewerExtensions\":[\".3mf\",\".glb\",\".gltf\",\".obj\",\".stl\"]",
             content.Content,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "\"interactiveServerDfmFallbackForBrowserPrimaryUploads\":false",
+            content.Content,
+            StringComparison.Ordinal);
         Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
     }
 

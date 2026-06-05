@@ -59,6 +59,9 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>Callback invoked when the user requests a different project editor layout.</summary>
     [Parameter] public EventCallback<LayoutMode> OnLayoutModeChanged { get; set; }
 
+    /// <summary>True when browser-primary uploads may fall back to server DFM during interactive quoting.</summary>
+    [Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; } = true;
+
     private bool _routingExpanded;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
@@ -1782,7 +1785,9 @@ public partial class PartConfigSidebar : ComponentBase
         var part = Part!;
         // Capture the token that was created for this invocation in OnProcessChanged.
         var token = _dfmCts?.Token ?? CancellationToken.None;
-        BrowserDfmReportSync.ClearTerminalLocalAttempt(part, process.Code);
+        var runInteractiveServerDfmFallback = ShouldRunInteractiveServerDfmFallback(part);
+        if (runInteractiveServerDfmFallback)
+            BrowserDfmReportSync.ClearTerminalLocalAttempt(part, process.Code);
 
         StateHasChanged();
 
@@ -1794,6 +1799,13 @@ public partial class PartConfigSidebar : ComponentBase
             if (await BrowserDfmReportSync.WaitForCurrentReportAsync(part, process.Code, token))
             {
                 Logger?.LogInformation("Using browser-first local DFM results for process {ProcessCode}", process.Code);
+                return;
+            }
+
+            if (!runInteractiveServerDfmFallback)
+            {
+                MarkBrowserPrimaryLocalDfmUnavailable(part, process.Code, "interactive_server_dfm_fallback_disabled");
+                await OnPartChanged.InvokeAsync(part);
                 return;
             }
 
@@ -1905,6 +1917,39 @@ public partial class PartConfigSidebar : ComponentBase
                 await OnPartChanged.InvokeAsync(part);
             }
         }
+    }
+
+    private bool ShouldRunInteractiveServerDfmFallback(PartViewModel part)
+        => BrowserPrimaryServerDfmFallbackEnabled || !IsBrowserPrimaryDfmPart(part);
+
+    private static bool IsBrowserPrimaryDfmPart(PartViewModel part)
+        => !string.IsNullOrWhiteSpace(part.ClientUploadId)
+        && NormalizeBrowserViewerFileExtension(part.ViewerFileExtension ?? Path.GetExtension(part.StoragePath ?? part.Name)) is not null;
+
+    private static string? NormalizeBrowserViewerFileExtension(string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+            return null;
+
+        var normalized = extension.StartsWith('.')
+            ? extension.ToLowerInvariant()
+            : "." + extension.ToLowerInvariant();
+
+        return normalized is ".3mf" or ".glb" or ".gltf" or ".obj" or ".stl"
+            ? normalized
+            : null;
+    }
+
+    private static void MarkBrowserPrimaryLocalDfmUnavailable(
+        PartViewModel part,
+        string processCode,
+        string reason)
+    {
+        BrowserDfmReportSync.MarkTerminalLocalAttempt(part, processCode, reason);
+        part.DfmAnalysisTimedOut = true;
+        part.AnalysisErrorCode = DfmStatusMessages.BrowserLocalDfmUnavailable;
+        part.StatusText = DfmStatusMessages.GetStatusText(part.AnalysisErrorCode);
+        part.ResolveDfmReport();
     }
 
     /// <summary>

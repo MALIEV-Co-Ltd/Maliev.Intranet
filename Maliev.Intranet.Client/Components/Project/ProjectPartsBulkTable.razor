@@ -347,6 +347,7 @@
                                                        Processes="@Processes"
                                                        TempProjectId="@TempProjectId"
                                                        CustomerId="@CustomerId"
+                                                       BrowserPrimaryServerDfmFallbackEnabled="@BrowserPrimaryServerDfmFallbackEnabled"
                                                        DisplayMode="@PartConfigSidebarDisplayMode.Inline"
                                                        OnPartChanged="@OnPartChanged" />
                                 </div>
@@ -520,6 +521,7 @@
                                            Processes="@Processes"
                                            TempProjectId="@TempProjectId"
                                            CustomerId="@CustomerId"
+                                           BrowserPrimaryServerDfmFallbackEnabled="@BrowserPrimaryServerDfmFallbackEnabled"
                                            DisplayMode="@PartConfigSidebarDisplayMode.Inline"
                                            OnPartChanged="@OnPartChanged" />
                     </div>
@@ -633,6 +635,9 @@
 
     /// <summary>The selected customer identifier, forwarded to advanced configuration panels.</summary>
     [Parameter] public Guid? CustomerId { get; set; }
+
+    /// <summary>True when browser-primary uploads may fall back to server DFM during interactive quoting.</summary>
+    [Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; } = true;
 
     private readonly HashSet<PartViewModel> _expandedParts = new(ReferenceEqualityComparer.Instance);
     private readonly PartConfigurationBulkPatch _bulkPatch = new();

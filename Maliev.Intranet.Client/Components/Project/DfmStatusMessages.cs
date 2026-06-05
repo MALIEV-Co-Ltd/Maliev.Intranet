@@ -3,10 +3,12 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// <summary>Maps backend geometry error codes to user-friendly status text.</summary>
 internal static class DfmStatusMessages
 {
+    internal const string BrowserLocalDfmUnavailable = "BROWSER_LOCAL_DFM_UNAVAILABLE";
     internal const string PersistedDfmReportUnavailable = "DFM_REPORT_UNAVAILABLE";
 
     internal static string GetFriendlyMessage(string? errorCode) => errorCode switch
     {
+        BrowserLocalDfmUnavailable => "Local DFM could not run on this device. Final manufacturability validation will run before quote.",
         "SIZE_LIMIT_EXCEEDED" => "File too large for analysis (max 200 MB).",
         "MULTI_BODY_ERROR" => "Assembly has multiple bodies — please upload one part at a time.",
         "FILE_CORRUPT" => "Could not read file — it may be corrupt or use unsupported features.",
@@ -24,6 +26,7 @@ internal static class DfmStatusMessages
 
     internal static string GetStatusText(string? errorCode) => errorCode switch
     {
+        BrowserLocalDfmUnavailable => "Local DFM unavailable",
         "SIZE_LIMIT_EXCEEDED" => "Analysis failed: file too large",
         "MULTI_BODY_ERROR" => "Analysis failed: multi-body assembly",
         "FILE_CORRUPT" => "Analysis failed: corrupt file",
