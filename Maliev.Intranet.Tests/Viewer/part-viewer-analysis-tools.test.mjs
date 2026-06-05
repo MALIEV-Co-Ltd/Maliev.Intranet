@@ -554,6 +554,128 @@ test('runtime asset resolver maps GeometryService manifest assets to same-origin
     assert.equal(urls.rejected, null);
 });
 
+test('viewer settings preserve retained browser upload metadata for local runtime', () => {
+    const context = loadViewerContext();
+
+    const settings = vm.runInContext(`
+        normalizeViewerSettings({
+            renderMode: 'realistic',
+            browserFileClientId: 'client-upload-1',
+            browserFileName: 'bracket.3mf',
+            fileBytesProvider: 'projectNewUploads',
+            storagePath: 'projects/p1/bracket.3mf'
+        });
+    `, context);
+
+    assert.equal(settings.browserFileClientId, 'client-upload-1');
+    assert.equal(settings.browserFileName, 'bracket.3mf');
+    assert.equal(settings.fileBytesProvider, 'projectNewUploads');
+    assert.equal(settings.storagePath, 'projects/p1/bracket.3mf');
+});
+
+test('local viewer mesh extraction creates a Babylon mesh from browser runtime buffers', async () => {
+    const context = loadViewerContext();
+    const workerMessages = [];
+    const manifestFetches = [];
+    context.window.projectNewUploads = {
+        getFileBytes: async clientUploadId => {
+            assert.equal(clientUploadId, 'upload-client-3mf');
+            return Uint8Array.from([80, 75, 3, 4, 51, 109, 102]);
+        },
+    };
+    context.setTimeout = () => 1;
+    context.clearTimeout = () => {};
+    context.fetch = async url => {
+        manifestFetches.push(url);
+        return {
+            ok: true,
+            json: async () => ({
+                manifestVersion: 1,
+                runtimeVersion: '1.0.0',
+                algorithmVersion: 'browser-first-dfm-v1',
+                executionMode: 'primary_interactive',
+                authority: 'local_primary',
+                isAuthoritative: false,
+                minFrontendApiVersion: 1,
+                assets: {
+                    worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                    wasm: '/geometry/client-runtime/assets/client-geometry-kernel.def456.wasm',
+                },
+                capabilities: {
+                    localOperations: ['mesh_extraction'],
+                },
+            }),
+        };
+    };
+    context.Worker = class Worker {
+        constructor(url) {
+            this.url = url;
+        }
+
+        postMessage(message) {
+            workerMessages.push({ url: this.url, message });
+            this.onmessage({
+                data: {
+                    id: message.id,
+                    ok: true,
+                    result: {
+                        authority: 'local_primary',
+                        isAuthoritative: false,
+                        executionMode: 'primary_interactive',
+                        operation: 'extract_mesh',
+                        sourceFormat: '3mf',
+                        runtimeVersion: '1.0.0',
+                        algorithmVersion: 'browser-first-dfm-v1',
+                        meshBuffers: {
+                            positions: [0, 0, 0, 25, 0, 0, 0, 25, 0],
+                            indices: [0, 1, 2],
+                        },
+                        metrics: { faceCount: 1 },
+                    },
+                },
+            });
+        }
+
+        terminate() {}
+    };
+    context.scene = { meshes: [], rootNodes: [] };
+
+    const result = await vm.runInContext(`
+        const settings = normalizeViewerSettings({
+            browserFileClientId: 'upload-client-3mf',
+            browserFileName: 'housing.3mf',
+            fileBytesProvider: 'projectNewUploads'
+        });
+        tryLoadLocalViewerMeshFromRuntime('viewer', scene, '.3mf', settings);
+    `, context);
+
+    assert.equal(result?.name, '__local_runtime_mesh__');
+    assert.equal(context.scene.meshes.length, 1);
+    assert.deepEqual(Array.from(context.scene.meshes[0].vertexData.positions), [0, 0, 0, 25, 0, 0, 0, 25, 0]);
+    assert.deepEqual(Array.from(context.scene.meshes[0].vertexData.indices), [0, 1, 2]);
+    assert.equal(context.scene.meshes[0].metadata.malievLocalRuntimeSource, '3mf');
+    assert.equal(manifestFetches[0], '/api/v1/geometry/runtime/manifest');
+    assert.equal(workerMessages.length, 1);
+    assert.equal(workerMessages[0].url, '/api/v1/geometry/runtime/assets/client-geometry-runtime.abc123.worker.js');
+    assert.equal(workerMessages[0].message.operation, 'extract_mesh');
+    assert.equal(workerMessages[0].message.wasmUrl, '/api/v1/geometry/runtime/assets/client-geometry-kernel.def456.wasm');
+    assert.equal(workerMessages[0].message.input.fileName, 'housing.3mf');
+    assert.deepEqual(Array.from(workerMessages[0].message.input.fileBytes), [80, 75, 3, 4, 51, 109, 102]);
+});
+
+test('initialize tries local viewer mesh extraction before signed-url SceneLoader fallback', () => {
+    const viewerPath = new URL('../../Maliev.Intranet.Client/wwwroot/js/part-viewer.js', import.meta.url);
+    const source = fs.readFileSync(viewerPath, 'utf8');
+
+    const localIndex = source.indexOf('tryLoadLocalViewerMeshFromRuntime(canvasId, scene, forcedExt, viewerSettings');
+    const fallbackIndex = source.indexOf('_loadAttempt(0);');
+
+    assert.ok(localIndex >= 0, 'initialize should try local runtime mesh extraction');
+    assert.ok(fallbackIndex >= 0, 'initialize should retain signed-url SceneLoader fallback');
+    assert.ok(localIndex < fallbackIndex, 'local runtime mesh extraction must run before signed-url fallback');
+    assert.ok(source.includes("operation: 'extract_mesh'"), 'viewer runtime must request mesh extraction');
+});
+
 test('runLocalAdvisoryGeometry accepts browser-first local primary runtime', async () => {
     const context = loadViewerContext();
     const panels = [];
