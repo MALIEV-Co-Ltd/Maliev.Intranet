@@ -416,6 +416,10 @@ public class GeometryControllerTests
         Assert.Equal("application/json; charset=utf-8", content.ContentType);
         Assert.Contains("\"runtimeVersion\":\"1.0.0\"", content.Content, StringComparison.Ordinal);
         Assert.Contains("\"runtimeKind\":\"browser-first-geometry\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains(
+            "\"directBrowserViewerExtensions\":[\".3mf\",\".glb\",\".gltf\",\".obj\",\".stl\"]",
+            content.Content,
+            StringComparison.Ordinal);
         Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
     }
 

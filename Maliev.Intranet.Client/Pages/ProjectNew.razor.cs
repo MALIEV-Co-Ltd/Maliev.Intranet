@@ -1676,7 +1676,7 @@ public partial class ProjectNew : IAsyncDisposable
     private static string? ResolveBrowserFileViewerExtension(PartViewModel part)
     {
         var ext = NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name);
-        return ext is ".stl" or ".obj" or ".glb" or ".gltf" ? ext : null;
+        return ext is ".3mf" or ".stl" or ".obj" or ".glb" or ".gltf" ? ext : null;
     }
 
     private static void ApplyMigratedStoragePaths(PartViewModel part, string oldBasePath, string newBasePath)

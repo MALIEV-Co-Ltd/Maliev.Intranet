@@ -199,6 +199,7 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("CanUseBrowserFileViewer", projectNew, StringComparison.Ordinal);
         Assert.Contains("ResolveBrowserFileViewerExtension(part)", projectNew, StringComparison.Ordinal);
         Assert.Contains("NormalizeViewerFileExtension(null, part.StoragePath ?? part.Name)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("return ext is \".3mf\" or \".stl\" or \".obj\" or \".glb\" or \".gltf\" ? ext : null;", projectNew, StringComparison.Ordinal);
         Assert.Contains("PersistableViewerUrl(ViewerUrl)", partViewModel, StringComparison.Ordinal);
     }
 
