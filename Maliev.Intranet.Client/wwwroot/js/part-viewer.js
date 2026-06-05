@@ -277,6 +277,15 @@ const CONFIG = {
         normalPositionToleranceRatio: 0.00012,
         polishedNormalPositionToleranceMin: 0.12,
         polishedNormalPositionToleranceRatio: 0.00024,
+        ssaoEnabled: true,
+        ssaoRatio: 0.5,
+        ssaoBlurRatio: 0.5,
+        ssaoRadius: 3.2,
+        ssaoTotalStrength: 0.26,
+        ssaoBase: 0.04,
+        ssaoArea: 0.0075,
+        ssaoFallOff: 0.000001,
+        ssaoSamples: 8,
     },
 
     // =========================================================================
@@ -294,6 +303,9 @@ const CONFIG = {
             intensity:     1.35,
             shadowMapSize: 2048,
             shadowDarkness: 0.10,
+            shadowBias: 0.00008,
+            shadowNormalBias: 0.018,
+            contactHardeningLightSizeUVRatio: 0.08,
         },
         fill: {
             direction:  { x: 0.85, y: -0.40, z: -0.20 },
@@ -326,6 +338,9 @@ const CONFIG = {
             intensity:     2.60,
             shadowMapSize: 2048,
             shadowDarkness: 0.08,
+            shadowBias: 0.00008,
+            shadowNormalBias: 0.018,
+            contactHardeningLightSizeUVRatio: 0.09,
         },
         rim: {
             direction:  { x: -0.80, y: -0.30, z: 0.55 },
@@ -587,6 +602,136 @@ function toVector3(vector) {
     return new BABYLON.Vector3(vector.x, vector.y, vector.z);
 }
 
+function configureSoftShadowGenerator(shadowGenerator, keyConfig) {
+    if (!shadowGenerator) return;
+
+    shadowGenerator.usePercentageCloserFiltering = true;
+    shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_HIGH ?? shadowGenerator.filteringQuality;
+    shadowGenerator.setDarkness?.(keyConfig?.shadowDarkness ?? 0.10);
+    shadowGenerator.transparencyShadow = true;
+    shadowGenerator.bias = keyConfig?.shadowBias ?? 0.00008;
+    shadowGenerator.normalBias = keyConfig?.shadowNormalBias ?? 0.018;
+    shadowGenerator.useContactHardeningShadow = true;
+    shadowGenerator.contactHardeningLightSizeUVRatio = keyConfig?.contactHardeningLightSizeUVRatio ?? 0.08;
+}
+
+function addShadowCasterOnce(shadowGenerator, mesh) {
+    if (!shadowGenerator || !mesh) return;
+
+    const casterKey = mesh.uniqueId ?? mesh.name ?? mesh;
+    shadowGenerator._malievShadowCasterKeys ??= new Set();
+    if (shadowGenerator._malievShadowCasterKeys.has(casterKey)) return;
+
+    try {
+        const renderList = shadowGenerator.getShadowMap?.()?.renderList;
+        if (Array.isArray(renderList) && renderList.includes(mesh)) {
+            shadowGenerator._malievShadowCasterKeys.add(casterKey);
+            return;
+        }
+    } catch (_) {}
+
+    shadowGenerator.addShadowCaster?.(mesh);
+    shadowGenerator._malievShadowCasterKeys.add(casterKey);
+}
+
+function isCuttingMatTopMesh(mesh) {
+    return mesh?.name === '__cutting_mat__';
+}
+
+function isCuttingMatSlabMesh(mesh) {
+    return mesh?.name === '__cutting_mat_slab__';
+}
+
+function shouldCastModelShadow(mesh) {
+    const name = mesh?.name ?? '';
+    if (!mesh || isCuttingMatTopMesh(mesh) || isCuttingMatSlabMesh(mesh)) return false;
+    if (name === '__grid__' || name === '__shadow_catcher__' || name === '__root__') return false;
+    if (name.startsWith('__axis') || name.startsWith('bbox_')) return false;
+    if (isAnalysisHelperMesh(mesh)) return false;
+    return true;
+}
+
+function syncSceneShadowParticipation(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const shadowGenerator = shadowGenerators[canvasId] ?? null;
+    scene.meshes.forEach(mesh => {
+        if (!mesh) return;
+
+        if (mesh.name === '__shadow_catcher__' || mesh.name === '__grid__' || isCuttingMatTopMesh(mesh)) {
+            mesh.receiveShadows = true;
+            return;
+        }
+
+        if (isCuttingMatSlabMesh(mesh) || isAnalysisHelperMesh(mesh)) {
+            mesh.receiveShadows = false;
+            return;
+        }
+
+        if (shouldCastModelShadow(mesh)) {
+            addShadowCasterOnce(shadowGenerator, mesh);
+            mesh.receiveShadows = true;
+        }
+    });
+}
+
+function disposeRealisticSsao(canvasId) {
+    const pipeline = ssaoPipelines[canvasId];
+    if (!pipeline) return;
+
+    try { pipeline.dispose?.(); } catch (_) {}
+    delete ssaoPipelines[canvasId];
+}
+
+function configureRealisticSsao(pipeline) {
+    const cfg = CONFIG.REALISTIC;
+    pipeline.radius = cfg.ssaoRadius;
+    pipeline.totalStrength = cfg.ssaoTotalStrength;
+    pipeline.base = cfg.ssaoBase;
+    pipeline.area = cfg.ssaoArea;
+    pipeline.fallOff = cfg.ssaoFallOff;
+    pipeline.samples = cfg.ssaoSamples;
+    pipeline.expensiveBlur = false;
+}
+
+function syncRealisticSsao(canvasId) {
+    const scene = scenes[canvasId];
+    const enabled = scene
+        && currentRenderModes[canvasId] === 'realistic'
+        && CONFIG.REALISTIC.ssaoEnabled !== false
+        && typeof BABYLON.SSAO2RenderingPipeline === 'function';
+
+    if (!enabled) {
+        disposeRealisticSsao(canvasId);
+        return;
+    }
+
+    const camera = mainCameras[canvasId] ?? scene.activeCamera;
+    if (!camera) return;
+
+    try {
+        let pipeline = ssaoPipelines[canvasId];
+        if (!pipeline || pipeline.scene !== scene) {
+            disposeRealisticSsao(canvasId);
+            pipeline = new BABYLON.SSAO2RenderingPipeline(
+                `__maliev_ssao_${canvasId}__`,
+                scene,
+                {
+                    ssaoRatio: CONFIG.REALISTIC.ssaoRatio,
+                    blurRatio: CONFIG.REALISTIC.ssaoBlurRatio,
+                },
+                [camera]);
+            ssaoPipelines[canvasId] = pipeline;
+        }
+
+        configureRealisticSsao(pipeline);
+    } catch (err) {
+        console.warn('[BabylonViewer] SSAO unavailable for this viewer:', err);
+        disposeRealisticSsao(canvasId);
+    }
+}
+
 /**
  * Projects a 3D world position to 2D screen coordinates and positions an HTML element there.
  * Used for floating labels that follow 3D points (measure tool, thickness analysis).
@@ -700,6 +845,7 @@ const analysisCameraButtons = {};   // canvasId → previous ArcRotate pointer b
 const localAdvisoryRuns     = {};   // canvasId → latest local advisory run id
 const localAdvisoryWorkers  = {};   // canvasId → active geometry worker
 let localAdvisoryWorkerQueue = Promise.resolve();
+const ssaoPipelines         = {};   // canvasId → BABYLON.SSAO2RenderingPipeline
 
 // ── Auto-rotation animation state ────────────────────────────────────────────
 const edgesEnabled          = {};  // canvasId → boolean
@@ -2175,10 +2321,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 key.specular  = toColor3(_lc.key.diffuse);
 
                 const shadowGenerator = new BABYLON.ShadowGenerator(_lc.key.shadowMapSize, key);
-                shadowGenerator.usePercentageCloserFiltering = true;
-                shadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
-                shadowGenerator.setDarkness(_lc.key.shadowDarkness);
-                shadowGenerator.transparencyShadow = true;
+                configureSoftShadowGenerator(shadowGenerator, _lc.key);
                 shadowGenerators[canvasId] = shadowGenerator;
 
                 // Fill / rim lights (no shadows)
@@ -2410,14 +2553,11 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     console.warn('[BabylonViewer] Shadow generator not found for canvas:', canvasId);
                 }
                 _scene.meshes.forEach(m => {
-                    if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis') && !m.name.startsWith('__cutting_mat')) {
+                    if (shouldCastModelShadow(m)) {
                         if (m.material) origMats[m.uniqueId] = m.material;
-                        if (shadowGen) {
-                            shadowGen.addShadowCaster(m);
-                        }
-                        m.receiveShadows = false;
                     }
                 });
+                syncSceneShadowParticipation(canvasId);
 
                 // Capture immutable baseline for "default solid look" — never overwritten.
                 // Used by setRenderMode('solid') and flipped-triangles disable to restore a clean state.
@@ -6086,10 +6226,7 @@ export function applyStudioLighting(canvasId, isDark) {
     key.specular  = toColor3(_lc.key.diffuse);
 
     const shadowGen = new BABYLON.ShadowGenerator(_lc.key.shadowMapSize, key);
-    shadowGen.usePercentageCloserFiltering = true;
-    shadowGen.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
-    shadowGen.setDarkness(_lc.key.shadowDarkness);
-    shadowGen.transparencyShadow = true;
+    configureSoftShadowGenerator(shadowGen, _lc.key);
     shadowGenerators[canvasId] = shadowGen;
 
     // Fill / rim / back lights
@@ -6120,17 +6257,7 @@ export function applyStudioLighting(canvasId, isDark) {
         key.position = new BABYLON.Vector3(mc.x - dist, mc.y - dist, bb.max.z + dist);
     }
 
-    // Re-register model meshes as shadow casters without projecting shadows onto CAD surfaces or the mat.
-    scene.meshes.forEach(m => {
-        if (m.name?.startsWith('__cutting_mat')) {
-            m.receiveShadows = false;
-            return;
-        }
-        if (m.name !== '__grid__' && m.name !== '__shadow_catcher__' && !m.name.startsWith('__axis')) {
-            shadowGen.addShadowCaster(m);
-            m.receiveShadows = false;
-        }
-    });
+    syncSceneShadowParticipation(canvasId);
 }
 
 // ── setRenderMode ─────────────────────────────────────────────────────────────
@@ -6220,6 +6347,7 @@ export function setRenderMode(canvasId, mode) {
     }
 
     currentRenderModes[canvasId] = mode;
+    syncRealisticSsao(canvasId);
 
     // Smooth normals transition — queue the realistic quality pass so first
     // paint is not blocked by normal recomputation on large CAD/STL meshes.
@@ -6230,6 +6358,7 @@ export function setRenderMode(canvasId, mode) {
         restoreOriginalNormals(canvasId);
     }
     _syncCuttingMatRenderMode(canvasId);
+    syncSceneShadowParticipation(canvasId);
 }
 
 // ── setCameraPreset ───────────────────────────────────────────────────────────
@@ -6933,9 +7062,10 @@ export function showCuttingMat(canvasId) {
     // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
     // surface.  Leaving it visible causes z-fighting that makes the model shadow
     // appear shifted / "ghosted" on the mat and can leak through the slab when
-    // viewed from below. The mat is a visual reference surface, not a shadow receiver.
+    // viewed from below. The mat top becomes the shadow receiver while visible.
     const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
     if (shadowCatcher) shadowCatcher.isVisible = false;
+    syncSceneShadowParticipation(canvasId);
 
     _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
         fromZ: -slideOffset,
@@ -7089,11 +7219,15 @@ function _syncCuttingMatRenderMode(canvasId) {
         try { oldMat.dispose?.(false, false); } catch (_) {}
     }
 
-    [top, slab].forEach(mesh => {
-        if (!mesh) return;
-        mesh.receiveShadows = false;
-        disableSectionClippingForMesh(mesh);
-    });
+    if (top) {
+        top.receiveShadows = true;
+        disableSectionClippingForMesh(top);
+    }
+
+    if (slab) {
+        slab.receiveShadows = false;
+        disableSectionClippingForMesh(slab);
+    }
 }
 
 function _sceneMeshByName(scene, name) {
@@ -7312,7 +7446,7 @@ function _createRoundedMatTopMesh(scene, outline, width, height) {
     vertexData.applyToMesh(mesh);
 
     mesh.isPickable = false;
-    mesh.receiveShadows = false;
+    mesh.receiveShadows = true;
     return markAnalysisHelperMesh(mesh);
 }
 
@@ -7394,6 +7528,7 @@ export function hideCuttingMat(canvasId) {
 
     if (meshes.length === 0) {
         if (shadowCatcher) shadowCatcher.isVisible = true;
+        syncSceneShadowParticipation(canvasId);
         _restoreModelCameraFit(canvasId);
         _restoreCuttingMatCameraClipping(canvasId);
         return;
@@ -7413,6 +7548,7 @@ export function hideCuttingMat(canvasId) {
         onComplete: () => {
             meshes.forEach(mesh => mesh.dispose(false, true));
             if (shadowCatcher) shadowCatcher.isVisible = true;
+            syncSceneShadowParticipation(canvasId);
             _restoreModelCameraFit(canvasId);
             _restoreCuttingMatCameraClipping(canvasId);
         },
@@ -8488,6 +8624,7 @@ export function dispose(canvasId) {
         try { shadowGenerators[canvasId].dispose(); } catch (_) {}
         delete shadowGenerators[canvasId];
     }
+    disposeRealisticSsao(canvasId);
 
     disposeSectionVisuals(canvasId, scenes[canvasId]);
 

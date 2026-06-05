@@ -214,6 +214,40 @@ function loadViewerContext() {
                     rawCubeTextures.push(this);
                 }
             },
+            ShadowGenerator: Object.assign(class ShadowGenerator {
+                constructor(size, light) {
+                    this.size = size;
+                    this.light = light;
+                    this.casters = [];
+                }
+
+                addShadowCaster(mesh) {
+                    this.casters.push(mesh);
+                }
+
+                setDarkness(value) {
+                    this.darkness = value;
+                    this._darkness = value;
+                }
+
+                dispose() {
+                    this.disposed = true;
+                }
+            }, {
+                QUALITY_HIGH: 2,
+            }),
+            SSAO2RenderingPipeline: class SSAO2RenderingPipeline {
+                constructor(name, scene, ratio, cameras) {
+                    this.name = name;
+                    this.scene = scene;
+                    this.ratio = ratio;
+                    this.cameras = cameras;
+                }
+
+                dispose() {
+                    this.disposed = true;
+                }
+            },
             StandardMaterial: class StandardMaterial {
                 constructor(name, scene) {
                     this.name = name;
@@ -270,6 +304,7 @@ function makeScene(mesh) {
         environmentIntensity: 0,
         environmentTexture: null,
         imageProcessingConfiguration: {},
+        activeCamera: { name: 'active-camera' },
         getMaterialByName(name) {
             return this.materials.find(material => material.name === name) ?? null;
         },
@@ -615,15 +650,37 @@ test('studio lighting keeps shadows soft enough for dark studio mode', () => {
 
     const result = vm.runInContext(`({
         light: CONFIG.STUDIO_LIGHT.key.shadowDarkness,
-        dark: CONFIG.STUDIO_DARK.key.shadowDarkness
+        dark: CONFIG.STUDIO_DARK.key.shadowDarkness,
+        generator: (() => {
+            const shadow = new BABYLON.ShadowGenerator(1024, {});
+            configureSoftShadowGenerator(shadow, CONFIG.STUDIO_LIGHT.key);
+            return {
+                usesPcf: shadow.usePercentageCloserFiltering,
+                filteringQuality: shadow.filteringQuality,
+                transparencyShadow: shadow.transparencyShadow,
+                darkness: shadow._darkness,
+                bias: shadow.bias,
+                normalBias: shadow.normalBias,
+                contactHardening: shadow.useContactHardeningShadow,
+                contactSize: shadow.contactHardeningLightSizeUVRatio
+            };
+        })()
     })`, context);
 
     assert.ok(result.light <= 0.12);
     assert.ok(result.dark <= 0.10);
     assert.ok(result.dark <= result.light);
+    assert.equal(result.generator.usesPcf, true);
+    assert.equal(result.generator.filteringQuality, context.BABYLON.ShadowGenerator.QUALITY_HIGH);
+    assert.equal(result.generator.transparencyShadow, true);
+    assert.equal(result.generator.darkness, result.light);
+    assert.ok(result.generator.bias > 0 && result.generator.bias < 0.001);
+    assert.ok(result.generator.normalBias > 0 && result.generator.normalBias < 0.1);
+    assert.equal(result.generator.contactHardening, true);
+    assert.ok(result.generator.contactSize > 0 && result.generator.contactSize < 0.2);
 });
 
-test('realistic render mode preserves stable cutting mat texture materials without receiving shadows', () => {
+test('realistic render mode preserves stable cutting mat texture materials and receives soft floor shadows', () => {
     const context = loadViewerContext();
     const matTexture = { name: 'cutting-mat-texture' };
     const model = {
@@ -665,21 +722,71 @@ test('realistic render mode preserves stable cutting mat texture materials witho
 
     const result = vm.runInContext(`
         scenes.viewer = scene;
+        shadowGenerators.viewer = new BABYLON.ShadowGenerator(CONFIG.STUDIO_LIGHT.key.shadowMapSize, {});
         setRenderMode('viewer', 'realistic');
         ({
             topIsPbr: scene.meshes[1].material instanceof BABYLON.PBRMaterial,
             slabIsPbr: scene.meshes[2].material instanceof BABYLON.PBRMaterial,
             actualTexturePreserved: scene.meshes[1].material.diffuseTexture?.name === 'cutting-mat-texture',
+            modelReceivesShadows: scene.meshes[0].receiveShadows,
             topReceivesShadows: scene.meshes[1].receiveShadows,
-            slabReceivesShadows: scene.meshes[2].receiveShadows
+            slabReceivesShadows: scene.meshes[2].receiveShadows,
+            shadowCasterNames: shadowGenerators.viewer.casters.map(mesh => mesh.name)
         });
     `, context);
 
     assert.equal(result.topIsPbr, false);
     assert.equal(result.slabIsPbr, false);
     assert.equal(result.actualTexturePreserved, true);
-    assert.equal(result.topReceivesShadows, false);
+    assert.equal(result.modelReceivesShadows, true);
+    assert.equal(result.topReceivesShadows, true);
     assert.equal(result.slabReceivesShadows, false);
+    assert.deepEqual(result.shadowCasterNames, ['part']);
+});
+
+test('realistic render mode enables subtle SSAO and disposes it outside realistic mode', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        mainCameras.viewer = scene.activeCamera;
+        setRenderMode('viewer', 'realistic');
+        const pipeline = ssaoPipelines.viewer;
+        setRenderMode('viewer', 'solid');
+        ({
+            enabled: !!pipeline,
+            name: pipeline?.name ?? null,
+            ssaoRatio: pipeline?.ratio?.ssaoRatio ?? null,
+            blurRatio: pipeline?.ratio?.blurRatio ?? null,
+            radius: pipeline?.radius ?? null,
+            totalStrength: pipeline?.totalStrength ?? null,
+            base: pipeline?.base ?? null,
+            disposedAfterSolid: pipeline?.disposed === true,
+            stillRegistered: !!ssaoPipelines.viewer
+        });
+    `, context);
+
+    assert.equal(result.enabled, true);
+    assert.equal(result.name, '__maliev_ssao_viewer__');
+    assert.ok(result.ssaoRatio > 0 && result.ssaoRatio <= 0.75);
+    assert.ok(result.blurRatio > 0 && result.blurRatio <= 0.75);
+    assert.ok(result.radius > 0 && result.radius <= 6);
+    assert.ok(result.totalStrength > 0 && result.totalStrength <= 0.8);
+    assert.ok(result.base >= 0 && result.base < result.totalStrength);
+    assert.equal(result.disposedAfterSolid, true);
+    assert.equal(result.stillRegistered, false);
 });
 
 test('cutting mat slab meets textured top surface without perspective edge cracks', () => {
