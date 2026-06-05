@@ -540,10 +540,11 @@ public partial class ProjectNew : IAsyncDisposable
             part.ProgressPercent = 100;
             part.AwaitingPreview = true;
             part.StatusText = "Processing geometry...";
-            await TryApplyLocalViewerUrlAsync(part);
+            var completedLocally = await TryCompleteBrowserPrimaryViewerLocallyAsync(part);
 
             await JoinPartFileGroupsAsync(part);
-            StartStatusWatchdog(part, completedUpload.StoragePath);
+            if (!completedLocally)
+                StartStatusWatchdog(part, completedUpload.StoragePath);
 
             if (_selectedCustomerId.HasValue &&
                 completedUpload.StoragePath.StartsWith("projects/", StringComparison.OrdinalIgnoreCase))
@@ -1636,6 +1637,19 @@ public partial class ProjectNew : IAsyncDisposable
         {
             // Non-fatal — overlay URL resolution is best-effort
         }
+    }
+
+    private async Task<bool> TryCompleteBrowserPrimaryViewerLocallyAsync(PartViewModel part)
+    {
+        if (!await TryApplyLocalViewerUrlAsync(part))
+            return false;
+
+        part.AwaitingPreview = false;
+        part.StatusText = "Ready";
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+        TriggerAutoSave();
+        return true;
     }
 
     private static string? NormalizeMigratedArtifactPath(PartViewModel part, string? storagePath)

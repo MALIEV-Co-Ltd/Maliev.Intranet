@@ -371,6 +371,39 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task TryCompleteBrowserPrimaryViewerLocallyAsync_WhenObjectUrlExists_MarksPreviewReady()
+    {
+        const string storagePath = "projects/temp/local-bracket.stl";
+        const string objectUrl = "blob:http://test/local-bracket";
+
+        JSInterop
+            .Setup<string?>("window.projectNewUploads.getObjectUrl", _ => true)
+            .SetResult(objectUrl);
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            Name = "local-bracket.stl",
+            StoragePath = storagePath,
+            ClientUploadId = "client-local-bracket",
+            AwaitingPreview = true,
+            StatusText = "Processing geometry..."
+        };
+
+        var completedLocally = await InvokePrivateTaskWithResultAsync<bool>(
+            cut,
+            "TryCompleteBrowserPrimaryViewerLocallyAsync",
+            part);
+
+        Assert.True(completedLocally);
+        Assert.False(part.AwaitingPreview);
+        Assert.Equal("Ready", part.StatusText);
+        Assert.Equal(objectUrl, part.ViewerUrl);
+        Assert.Equal(storagePath, part.ViewerStoragePath);
+        Assert.Equal(".stl", part.ViewerFileExtension);
+    }
+
+    [Fact]
     public async Task HandleFileSelectedAsync_WhenTwoValidFilesSelected_StartsBothUploads()
     {
         var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);

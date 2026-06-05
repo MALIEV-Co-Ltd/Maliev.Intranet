@@ -253,6 +253,25 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void ProjectNew_BrowserPrimaryUploadSkipsServerStatusWatchdogAfterLocalViewer()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+        var uploadBlock = ExtractBlock(source, "private async Task UploadSingleProjectFileAsync");
+
+        Assert.Contains("TryCompleteBrowserPrimaryViewerLocallyAsync(part)", uploadBlock, StringComparison.Ordinal);
+        Assert.Contains("StartStatusWatchdog(part, completedUpload.StoragePath)", uploadBlock, StringComparison.Ordinal);
+        Assert.True(
+            uploadBlock.IndexOf("TryCompleteBrowserPrimaryViewerLocallyAsync(part)", StringComparison.Ordinal)
+            < uploadBlock.IndexOf("StartStatusWatchdog(part, completedUpload.StoragePath)", StringComparison.Ordinal),
+            "ProjectNew must try the browser-local viewer path before starting analysis-status polling.");
+        Assert.Contains("if (!completedLocally)", uploadBlock, StringComparison.Ordinal);
+        var localViewerBlock = ExtractBlock(source, "private async Task<bool> TryCompleteBrowserPrimaryViewerLocallyAsync");
+        Assert.Contains("part.AwaitingPreview = false;", localViewerBlock, StringComparison.Ordinal);
+        Assert.Contains("part.StatusText = \"Ready\";", localViewerBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PartConfigSidebar_BrowserPrimaryPolicyPreventsInteractiveServerDfmFallback()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
