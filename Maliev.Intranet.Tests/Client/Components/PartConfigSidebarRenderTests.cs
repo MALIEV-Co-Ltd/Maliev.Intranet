@@ -242,11 +242,11 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.NotEmpty(cut.FindAll(".pcs-option-image"));
         Assert.NotEmpty(cut.FindAll(".pcs-option-image-fallback"));
-        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/white-plastic-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-plastic-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-anodized-clear-part-surface.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-painted-blue-part-surface.png']"));
-        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.png']"));
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/white-plastic-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/black-plastic-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-anodized-clear-part-surface.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/finish-painted-blue-part-surface.webp']"));
+        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.webp']"));
     }
 
     [Fact]
@@ -396,7 +396,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.webp']"));
     }
 
     [Fact]
@@ -419,7 +419,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/natural-grey-plastic-part-material.webp']"));
     }
 
     [Fact]
@@ -469,7 +469,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains("Natural Grey", colorChoices.First().TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Black", StringComparison.Ordinal));
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("White", StringComparison.Ordinal));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/natural-grey-plastic-part-material.webp']"));
     }
 
     [Fact]
@@ -524,13 +524,13 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Orange", StringComparison.Ordinal));
         Assert.Contains(colorChoices, choice => choice.TextContent.Contains("Pink", StringComparison.Ordinal));
         Assert.DoesNotContain(colorChoices, choice => choice.TextContent.Contains("Natural Grey", StringComparison.Ordinal));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-black-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-red-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-blue-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-green-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-yellow-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-orange-powder-fusion-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-pink-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-black-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-red-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-blue-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-green-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-yellow-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-orange-powder-fusion-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-color-choice img[src='/images/materials/dyed-pink-powder-fusion-part-material.webp']"));
     }
 
     [Fact]
@@ -554,7 +554,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/natural-grey-plastic-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/natural-grey-plastic-part-material.webp']"));
     }
 
     [Fact]
@@ -578,7 +578,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/dyed-black-powder-fusion-part-material.png']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/dyed-black-powder-fusion-part-material.webp']"));
     }
 
     [Fact]
@@ -628,13 +628,13 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/aluminum-6061-part-material.png']"));
-        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-bead-blast-part-surface.png']"));
-        Assert.NotNull(cut.Find(".pcs-roughness-card img[src='/images/materials/roughness-ra-3-2-part-surface.png']"));
-        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-tapped-holes-part.png']"));
-        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-thread-inserts-part.png']"));
-        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.png']"));
-        Assert.NotNull(cut.Find("[data-config-section='inspection'] img[src='/images/materials/inspection-standard-part-check.png']"));
+        Assert.NotNull(cut.Find(".pcs-mat-card img[src='/images/materials/aluminum-6061-part-material.webp']"));
+        Assert.NotNull(cut.Find(".pcs-fin-card img[src='/images/materials/finish-bead-blast-part-surface.webp']"));
+        Assert.NotNull(cut.Find(".pcs-roughness-card img[src='/images/materials/roughness-ra-3-2-part-surface.webp']"));
+        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-tapped-holes-part.webp']"));
+        Assert.NotNull(cut.Find(".pcs-feature-card img[src='/images/materials/feature-thread-inserts-part.webp']"));
+        Assert.NotNull(cut.Find(".pcs-choice-card img[src='/images/materials/deburr-edges-part-detail.webp']"));
+        Assert.NotNull(cut.Find("[data-config-section='inspection'] img[src='/images/materials/inspection-standard-part-check.webp']"));
     }
 
     [Fact]
@@ -787,13 +787,13 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             "wwwroot",
             "images",
             "materials",
-            "feature-thread-inserts-part.png");
+            "feature-thread-inserts-part.webp");
         var genericInsertPath = FindRepoFile(
             "Maliev.Intranet.Client",
             "wwwroot",
             "images",
             "materials",
-            "feature-steel-inserts-part.png");
+            "feature-steel-inserts-part.webp");
 
         Assert.NotEqual(File.ReadAllBytes(genericInsertPath), File.ReadAllBytes(threadInsertPath));
     }
@@ -862,27 +862,33 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
                 "PartConfigSidebar.razor.cs")
             .ReplaceLineEndings("\n");
 
-        Assert.Contains("[\"anodizedgreen\"] = \"finish-anodized-green-part-surface.png\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("[\"anodizedgreen\"] = \"finish-painted-green-part-surface.png\"", source, StringComparison.Ordinal);
+        Assert.Contains("[\"anodizedgreen\"] = \"finish-anodized-green-part-surface.webp\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[\"anodizedgreen\"] = \"finish-painted-green-part-surface.webp\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void MaterialPreviewAssets_MatchReferenceCanvasSize()
+    public void MaterialPreviewAssets_AreBoundedWebpThumbnails()
     {
         var referencePath = FindRepoFile(
             "Maliev.Intranet.Client",
             "wwwroot",
             "images",
             "materials",
-            "aluminum-6061-part-material.png");
+            "aluminum-6061-part-material.webp");
         var directory = Path.GetDirectoryName(referencePath)!;
-        var referenceSize = ReadPngDimensions(referencePath);
+        var webpFiles = Directory.EnumerateFiles(directory, "*.webp").ToArray();
 
-        Assert.Equal((1254, 1254), referenceSize);
+        Assert.NotEmpty(webpFiles);
+        Assert.Empty(Directory.EnumerateFiles(directory, "*.png"));
 
-        foreach (var file in Directory.EnumerateFiles(directory, "*.png"))
+        foreach (var file in webpFiles)
         {
-            Assert.Equal(referenceSize, ReadPngDimensions(file));
+            var dimensions = ReadWebpDimensions(file);
+            Assert.InRange(dimensions.Width, 1, 512);
+            Assert.InRange(dimensions.Height, 1, 512);
+            Assert.True(
+                new FileInfo(file).Length <= 128 * 1024,
+                $"Thumbnail {Path.GetFileName(file)} is larger than expected.");
         }
     }
 
@@ -1023,21 +1029,54 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         throw new FileNotFoundException($"Unable to locate {Path.Combine(relativeParts)} from {AppContext.BaseDirectory}.");
     }
 
-    private static (int Width, int Height) ReadPngDimensions(string path)
+    private static (int Width, int Height) ReadWebpDimensions(string path)
     {
-        Span<byte> header = stackalloc byte[24];
-        using var stream = File.OpenRead(path);
-        var read = stream.Read(header);
-        Assert.True(read == header.Length, $"Unable to read PNG header for {path}.");
+        var bytes = File.ReadAllBytes(path);
+        Assert.True(bytes.Length >= 30, $"Unable to read WebP header for {path}.");
+        Assert.Equal("RIFF", ReadAscii(bytes, 0, 4));
+        Assert.Equal("WEBP", ReadAscii(bytes, 8, 4));
 
-        var width = ReadBigEndianInt32(header[16..20]);
-        var height = ReadBigEndianInt32(header[20..24]);
-        return (width, height);
+        var offset = 12;
+        while (offset + 8 <= bytes.Length)
+        {
+            var chunk = ReadAscii(bytes, offset, 4);
+            var chunkSize = ReadLittleEndianInt32(bytes.AsSpan(offset + 4, 4));
+            var dataOffset = offset + 8;
+            Assert.True(dataOffset + chunkSize <= bytes.Length, $"Invalid WebP chunk in {path}.");
+
+            return chunk switch
+            {
+                "VP8X" when chunkSize >= 10 => (
+                    ReadLittleEndianUInt24(bytes.AsSpan(dataOffset + 4, 3)) + 1,
+                    ReadLittleEndianUInt24(bytes.AsSpan(dataOffset + 7, 3)) + 1),
+                "VP8L" when chunkSize >= 5 => ReadWebpLosslessDimensions(bytes.AsSpan(dataOffset, 5)),
+                "VP8 " when chunkSize >= 10 => (
+                    ReadLittleEndianInt16(bytes.AsSpan(dataOffset + 6, 2)) & 0x3fff,
+                    ReadLittleEndianInt16(bytes.AsSpan(dataOffset + 8, 2)) & 0x3fff),
+                _ => throw new InvalidDataException($"Unsupported WebP chunk {chunk} in {path}."),
+            };
+        }
+
+        throw new InvalidDataException($"Unable to locate WebP image data in {path}.");
     }
 
-    private static int ReadBigEndianInt32(ReadOnlySpan<byte> bytes)
+    private static string ReadAscii(byte[] bytes, int offset, int count) =>
+        System.Text.Encoding.ASCII.GetString(bytes, offset, count);
+
+    private static int ReadLittleEndianInt16(ReadOnlySpan<byte> bytes) =>
+        bytes[0] | (bytes[1] << 8);
+
+    private static int ReadLittleEndianInt32(ReadOnlySpan<byte> bytes) =>
+        bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+
+    private static int ReadLittleEndianUInt24(ReadOnlySpan<byte> bytes) =>
+        bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
+
+    private static (int Width, int Height) ReadWebpLosslessDimensions(ReadOnlySpan<byte> bytes)
     {
-        return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+        Assert.Equal(0x2f, bytes[0]);
+        var bits = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
+        return ((bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1);
     }
 
     private static async Task InvokePrivateTask(object instance, string methodName, params object?[] parameters)
