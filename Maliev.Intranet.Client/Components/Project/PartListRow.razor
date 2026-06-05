@@ -186,6 +186,7 @@
             <PartConfigSidebar Part="@Part"
                                Processes="@Processes"
                                TempProjectId="@TempProjectId"
+                               BrowserPrimaryServerDfmFallbackEnabled="@BrowserPrimaryServerDfmFallbackEnabled"
                                DisplayMode="@PartConfigSidebarDisplayMode.Inline"
                                OnPartChanged="@OnPartChanged" />
         </div>
@@ -204,6 +205,9 @@
 
     /// <summary>The temporary project identifier, forwarded to <see cref="PartConfigSidebar"/>.</summary>
     [Parameter] public Guid TempProjectId { get; set; }
+
+    /// <summary>Whether browser-primary uploads may fall back to interactive server DFM.</summary>
+    [Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; } = true;
 
     /// <summary>Callback invoked when the selection checkbox changes.</summary>
     [Parameter] public EventCallback<bool> OnSelectChanged { get; set; }

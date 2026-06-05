@@ -288,6 +288,16 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
+    public void PartListRow_ForwardsBrowserPrimaryPolicyToExpandedSidebar()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartListRow.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("[Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; } = true;", source, StringComparison.Ordinal);
+        Assert.Contains("BrowserPrimaryServerDfmFallbackEnabled=\"@BrowserPrimaryServerDfmFallbackEnabled\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PartConfigSidebar_PublishesDfmStateForEquivalentProcessCodes()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs")
