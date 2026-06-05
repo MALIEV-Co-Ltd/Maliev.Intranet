@@ -743,7 +743,7 @@ test('runLocalAdvisoryGeometry retries transient manifest failures before fallba
 
         manifestFetches.push({ url, init });
         manifestAttempt += 1;
-        if (manifestAttempt === 1) {
+        if (manifestAttempt <= 3) {
             return { ok: false, status: 500 };
         }
 
@@ -820,7 +820,7 @@ test('runLocalAdvisoryGeometry retries transient manifest failures before fallba
     `, context);
 
     assert.equal(result?.authority, 'local_primary');
-    assert.equal(manifestFetches.length, 2);
+    assert.equal(manifestFetches.length, 4);
     assert.equal(manifestFetches[0].url, '/api/v1/geometry/runtime/manifest');
     assert.equal(workerMessages.length, 1);
     assert.equal(dotNetCalls.at(-1).method, 'NotifyLocalGeometryRuntimeComplete');
