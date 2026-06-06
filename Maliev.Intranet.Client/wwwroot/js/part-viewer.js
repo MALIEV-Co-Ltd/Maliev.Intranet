@@ -260,8 +260,8 @@ const CONFIG = {
         environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
         contrast: 1.15,
         exposure: 1.1,
-        fastEnvironmentTextureSize: 128,
-        environmentTextureSize: 256,
+        fastEnvironmentTextureSize: 64,
+        environmentTextureSize: 128,
         /** Edge angle threshold in degrees for normal smoothing. Edges sharper
          *  than this stay hard; gentler creases get blended. 0 = no smoothing,
          *  180 = fully smooth all edges. Raised from 55 to 75 to handle coarse
@@ -277,7 +277,7 @@ const CONFIG = {
         normalPositionToleranceRatio: 0.00012,
         polishedNormalPositionToleranceMin: 0.12,
         polishedNormalPositionToleranceRatio: 0.00024,
-        ssaoEnabled: true,
+        ssaoEnabled: false,
         ssaoRatio: 0.5,
         ssaoBlurRatio: 0.5,
         ssaoRadius: 3.2,
@@ -285,7 +285,11 @@ const CONFIG = {
         ssaoBase: 0.04,
         ssaoArea: 0.0075,
         ssaoFallOff: 0.000001,
-        ssaoSamples: 8,
+        ssaoSamples: 4,
+        maxDeferredRealisticVertices: 180000,
+        maxDeferredRealisticIndices: 240000,
+        maxSmoothNormalsVerticesPerMesh: 120000,
+        maxSmoothNormalsIndicesPerMesh: 360000,
     },
 
     // =========================================================================
@@ -301,7 +305,7 @@ const CONFIG = {
             direction:     { x: -0.50, y: -1.10, z: -0.80 },
             diffuse:       { r: 1.00, g: 0.98, b: 0.95 },
             intensity:     1.35,
-            shadowMapSize: 2048,
+            shadowMapSize: 1024,
             shadowDarkness: 0.10,
             shadowBias: 0.00008,
             shadowNormalBias: 0.018,
@@ -336,7 +340,7 @@ const CONFIG = {
             direction:     { x: 0.65, y: -1.10, z: -0.60 },
             diffuse:       { r: 1.00, g: 0.84, b: 0.65 },
             intensity:     2.60,
-            shadowMapSize: 2048,
+            shadowMapSize: 1024,
             shadowDarkness: 0.08,
             shadowBias: 0.00008,
             shadowNormalBias: 0.018,
@@ -606,12 +610,12 @@ function configureSoftShadowGenerator(shadowGenerator, keyConfig) {
     if (!shadowGenerator) return;
 
     shadowGenerator.usePercentageCloserFiltering = true;
-    shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_HIGH ?? shadowGenerator.filteringQuality;
+    shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_MEDIUM ?? shadowGenerator.filteringQuality;
     shadowGenerator.setDarkness?.(keyConfig?.shadowDarkness ?? 0.10);
     shadowGenerator.transparencyShadow = true;
     shadowGenerator.bias = keyConfig?.shadowBias ?? 0.00008;
     shadowGenerator.normalBias = keyConfig?.shadowNormalBias ?? 0.018;
-    shadowGenerator.useContactHardeningShadow = true;
+    shadowGenerator.useContactHardeningShadow = false;
     shadowGenerator.contactHardeningLightSizeUVRatio = keyConfig?.contactHardeningLightSizeUVRatio ?? 0.08;
 }
 
@@ -3726,11 +3730,8 @@ function getSurfaceEffectPluginClass() {
         constructor(material, effect) {
             super(material, 'MalievSurfaceEffect', 210, { MALIEV_SURFACE_EFFECT: false });
             this._targetMaterial = material;
-            // Keep the plugin enabled even for "none" so CNC finish switches only
-            // update uniforms instead of forcing a new shader variant compile.
-            this._isEnabled = true;
             this.setEffect(effect);
-            this._enable(true);
+            this._enable(this._isEnabled);
         }
 
         getClassName() { return 'SurfaceEffectPlugin'; }
@@ -3738,6 +3739,8 @@ function getSurfaceEffectPluginClass() {
         setEffect(effect) {
             this._effect = getSurfaceEffect(effect?.key);
             this._targetMaterial._malievSurfaceEffect = this._effect.kind > 0 ? this._effect : null;
+            this._isEnabled = this._effect.kind > 0;
+            this._enable(this._isEnabled);
         }
 
         prepareDefines(defines) {
@@ -4199,13 +4202,10 @@ function getTransparentTranslucencyIntensity(preset) {
 function configureRealisticPbrQuality(pbr) {
     if (!pbr) return;
 
-    // Geometric specular anti-aliasing tames metallic shimmer cheaply.
-    // NOTE: realTimeFiltering was intentionally removed; it ran per-pixel IBL
-    // prefiltering (64 samples) on a *static* studio cube that is already mip +
-    // SH prefiltered. It was expensive (mobile-hostile) and a driver-dependent
-    // instability source; the prefiltered environment gives stable specular IBL.
-    pbr.enableSpecularAntiAliasing = true;
-    pbr.forceIrradianceInFragment = true;
+    // Geometric specular anti-aliasing plus forceIrradianceInFragment are
+    // intentionally kept off for office-class GPUs to reduce fragment cost.
+    pbr.enableSpecularAntiAliasing = false;
+    pbr.forceIrradianceInFragment = false;
 }
 
 function isFdmProcess(processCode) {
@@ -4359,8 +4359,11 @@ function applyRealisticTransparencySettings(material, preset) {
     if (preset.alpha != null && preset.alpha < 1.0) {
         material.alpha = clamp(preset.alpha, 0.2, 1);
         material.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
-        material.needDepthPrePass = true;
-        material.separateCullingPass = true;
+        // Depth pre-pass + separate culling for transparent materials can trigger a
+        // driver-dependent MRT draw-call failure path on some GPUs. Keep the
+        // transparent render path stable by using the simpler blended pass here.
+        material.needDepthPrePass = false;
+        material.separateCullingPass = false;
         material.backFaceCulling = false;
         material.useAlphaFromAlbedoTexture = false;
         material.useRadianceOverAlpha = true;
@@ -4398,6 +4401,8 @@ function applyRealisticTransparencySettings(material, preset) {
             material.alpha = 0.55;
             material.useRadianceOverAlpha = false;
             material.useSpecularOverAlpha = false;
+            material.needDepthPrePass = false;
+            material.separateCullingPass = false;
         }
     } else {
         material.alpha = 1;
@@ -4599,6 +4604,36 @@ function applyRealisticMaterial(canvasId, materialType) {
     });
 }
 
+function shouldSkipRealisticDeferredUpgrade(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return true;
+
+    const maxVertices = CONFIG.REALISTIC.maxDeferredRealisticVertices ?? 180000;
+    const maxIndices = CONFIG.REALISTIC.maxDeferredRealisticIndices ?? 240000;
+    let totalVertices = 0;
+    let totalIndices = 0;
+
+    for (const mesh of scene.meshes) {
+        if (isSystemMesh(mesh)
+            || typeof mesh.getTotalVertices !== 'function'
+            || typeof mesh.getIndices !== 'function') {
+            continue;
+        }
+
+        const indices = mesh.getIndices();
+        if (!indices) continue;
+
+        totalVertices += mesh.getTotalVertices();
+        totalIndices += indices.length;
+
+        if (totalVertices > maxVertices || totalIndices > maxIndices) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function scheduleRealisticQualityUpgrade(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
@@ -4610,6 +4645,10 @@ function scheduleRealisticQualityUpgrade(canvasId) {
         if (realisticQualityTaskTokens[canvasId] !== token
             || scenes[canvasId] !== scene
             || currentRenderModes[canvasId] !== 'realistic') {
+            return;
+        }
+
+        if (shouldSkipRealisticDeferredUpgrade(canvasId)) {
             return;
         }
 
@@ -5005,6 +5044,12 @@ function applySmoothNormals(canvasId, options = getRealisticNormalSmoothingOptio
         }
 
         const vertCount = positions.length / 3;
+        const maxVertices = CONFIG.REALISTIC.maxSmoothNormalsVerticesPerMesh ?? 120000;
+        const maxIndices = CONFIG.REALISTIC.maxSmoothNormalsIndicesPerMesh ?? 360000;
+        if (vertCount > maxVertices || indices.length > maxIndices) {
+            return;
+        }
+
         const faceNormals = [];
         const positionFaceMap = new Map();
         const smoothNormals = new Float32Array(vertCount * 3);
