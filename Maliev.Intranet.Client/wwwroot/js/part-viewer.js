@@ -4363,19 +4363,41 @@ function applyRealisticTransparencySettings(material, preset) {
         material.separateCullingPass = true;
         material.backFaceCulling = false;
         material.useAlphaFromAlbedoTexture = false;
-        material.linkRefractionWithTransparency = true;
         material.useRadianceOverAlpha = true;
         material.useSpecularOverAlpha = true;
+
+        const refractionTexture = getRealisticRefractionTexture(material);
+        const hasRefractionTexture = !!refractionTexture;
+
+        material.linkRefractionWithTransparency = hasRefractionTexture;
+
         if (preset.indexOfRefraction != null) {
             material.indexOfRefraction = preset.indexOfRefraction;
+            if (material.subSurface) {
+                material.subSurface.indexOfRefraction = preset.indexOfRefraction;
+            }
         }
+
         if (material.subSurface) {
-            const refractionTexture = getRealisticRefractionTexture(material);
             material.subSurface.refractionTexture = refractionTexture;
-            material.subSurface.isRefractionEnabled = !!refractionTexture;
-            material.subSurface.isTranslucencyEnabled = true;
-            material.subSurface.refractionIntensity = getTransparentRefractionIntensity(preset);
-            material.subSurface.translucencyIntensity = getTransparentTranslucencyIntensity(preset);
+            material.subSurface.isRefractionEnabled = hasRefractionTexture;
+            material.subSurface.isTranslucencyEnabled = hasRefractionTexture;
+            material.subSurface.refractionIntensity = hasRefractionTexture
+                ? getTransparentRefractionIntensity(preset)
+                : 0;
+            material.subSurface.translucencyIntensity = hasRefractionTexture
+                ? getTransparentTranslucencyIntensity(preset)
+                : 0;
+        }
+
+        // If the environment refraction texture is unavailable (network/load race),
+        // keep the part visible by disabling refraction blending that can otherwise
+        // collapse to a fully transparent/black result.
+        if (!hasRefractionTexture && material.subSurface) {
+            material.emissiveColor = toColor3(material.albedoColor) ?? new BABYLON.Color3(0.9, 0.9, 0.95);
+            material.alpha = 0.55;
+            material.useRadianceOverAlpha = false;
+            material.useSpecularOverAlpha = false;
         }
     } else {
         material.alpha = 1;
