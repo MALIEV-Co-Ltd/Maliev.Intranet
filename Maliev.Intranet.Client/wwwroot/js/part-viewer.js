@@ -4186,6 +4186,14 @@ function findMaterialPlugin(material, pluginName) {
         || null;
 }
 
+function getTransparentRefractionIntensity(preset) {
+    return clamp(preset?.refractionIntensity ?? 0.35, 0.2, 1);
+}
+
+function getTransparentTranslucencyIntensity(preset) {
+    return Math.max(0.2, Math.min(1, 1 - (preset?.roughness ?? 0.1)));
+}
+
 // ── Realistic material ─────────────────────────────────────────────────────────
 
 function configureRealisticPbrQuality(pbr) {
@@ -4349,7 +4357,7 @@ function syncRealisticMaterialProperties(material, preset, custom, finishMod, pr
 
 function applyRealisticTransparencySettings(material, preset) {
     if (preset.alpha != null && preset.alpha < 1.0) {
-        material.alpha = preset.alpha;
+        material.alpha = clamp(preset.alpha, 0.2, 1);
         material.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
         material.needDepthPrePass = true;
         material.separateCullingPass = true;
@@ -4366,10 +4374,8 @@ function applyRealisticTransparencySettings(material, preset) {
             material.subSurface.refractionTexture = refractionTexture;
             material.subSurface.isRefractionEnabled = !!refractionTexture;
             material.subSurface.isTranslucencyEnabled = true;
-            material.subSurface.refractionIntensity = refractionTexture
-                ? clamp(1 - preset.alpha, 0.05, 1)
-                : 0;
-            material.subSurface.translucencyIntensity = clamp(1 - (preset.roughness ?? 0.1), 0.2, 1);
+            material.subSurface.refractionIntensity = getTransparentRefractionIntensity(preset);
+            material.subSurface.translucencyIntensity = getTransparentTranslucencyIntensity(preset);
         }
     } else {
         material.alpha = 1;
@@ -4410,7 +4416,7 @@ function refreshRealisticRefractionTextures(canvasId, scene) {
         material.subSurface.refractionTexture = refractionTexture;
         material.subSurface.isRefractionEnabled = !!refractionTexture;
         material.subSurface.refractionIntensity = refractionTexture
-            ? clamp(1 - preset.alpha, 0.05, 1)
+            ? getTransparentRefractionIntensity(preset)
             : 0;
     });
 }
