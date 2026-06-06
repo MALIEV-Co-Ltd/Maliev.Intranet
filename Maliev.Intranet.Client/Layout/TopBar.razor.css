@@ -426,7 +426,7 @@
 }
 
 .topbar-right ::deep .mud-button-root.topbar-theme-toggle {
-    color: var(--mud-palette-text-secondary);
+    color: var(--mud-palette-text-primary);
     transition: background 0.15s ease, color 0.15s ease;
 }
 

@@ -316,8 +316,8 @@
     private string MobileNavButtonLabel => _mobileNavOpen ? "Close navigation menu" : "Open navigation menu";
 
     private string GetThemeIcon() => LayoutService.IsDarkMode
-        ? Icons.Material.Outlined.LightMode
-        : ThemeIcons.Dark;
+        ? ThemeIcons.Dark
+        : Icons.Material.Outlined.LightMode;
 
     private string GetThemeLabel() => LayoutService.IsDarkMode
         ? "Dark Theme"

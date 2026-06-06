@@ -102,8 +102,8 @@ public partial class Login : ComponentBase
     }
 
     private string GetThemeIcon() => LayoutService.IsDarkMode
-        ? Icons.Material.Outlined.LightMode
-        : ThemeIcons.Dark;
+        ? ThemeIcons.Dark
+        : Icons.Material.Outlined.LightMode;
 
     private string GetThemeTooltip() => LayoutService.IsDarkMode
         ? "Switch to Light Mode"
