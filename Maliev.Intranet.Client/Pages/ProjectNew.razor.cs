@@ -79,6 +79,7 @@ public partial class ProjectNew : IAsyncDisposable
     private const int CatchUpDelayMs = 5000;   // first fetch after SignalR group join
     private const int StatusPollIntervalMs = 30_000; // subsequent interval
     private const int MissingAnalysisStatusMaxPolls = 3;
+    private const string MaterialColorKey = "material_color";
     private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _missingAnalysisStatusPolls = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
@@ -2153,6 +2154,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     private async Task OnPartChanged(PartViewModel part)
     {
+        NormalizeSelectedMaterialForClearPetg(part);
+
         if (part.ProcessId.HasValue && !string.IsNullOrEmpty(part.ProcessCode)
             && part.AvailableMaterials.Count == 0) // only reload catalog on process change (OnProcessChanged clears AvailableMaterials before invoking this)
         {
@@ -2178,6 +2181,7 @@ public partial class ProjectNew : IAsyncDisposable
                 part.AvailableTolerances = FilterProcessTolerances(processCode, tolerancesTask.Result ?? []).ToList();
                 part.AvailableProcessOptions = configOptionsTask.Result ?? [];
 
+                NormalizeSelectedMaterialForClearPetg(part);
                 ApplyCatalogDefaults(part);
             }
             catch (Exception)
@@ -2310,6 +2314,52 @@ public partial class ProjectNew : IAsyncDisposable
 
         if (IsCncProcessCode(part.ProcessCode) && string.IsNullOrWhiteSpace(part.RoughnessCode))
             part.RoughnessCode = "RA_3_2";
+    }
+
+    private static void NormalizeSelectedMaterialForClearPetg(PartViewModel part)
+    {
+        if (!part.MaterialId.HasValue)
+            return;
+
+        var selectedMaterial = part.AvailableMaterials.FirstOrDefault(material => material.Id == part.MaterialId.Value);
+        if (selectedMaterial == null || !IsClearPetgMaterial(selectedMaterial))
+            return;
+
+        var basePetgMaterial = part.AvailableMaterials
+            .FirstOrDefault(material => IsPetgMaterial(material) && !IsClearPetgMaterial(material));
+
+        if (basePetgMaterial == null)
+        {
+            part.MaterialCode = "PETG";
+            part.MaterialId = selectedMaterial.Id;
+            part.ProcessOptionValues[MaterialColorKey] = "Clear";
+            return;
+        }
+
+        part.MaterialId = basePetgMaterial.Id;
+        part.MaterialCode = basePetgMaterial.Code;
+        part.ProcessOptionValues[MaterialColorKey] = "Clear";
+    }
+
+    private static bool IsClearPetgMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeMaterialText(material.Code, material.Name, material.Description);
+        return normalized.Contains("petg", StringComparison.Ordinal) && normalized.Contains("clear", StringComparison.Ordinal);
+    }
+
+    private static bool IsPetgMaterial(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeMaterialText(material.Code, material.Name, material.Description);
+        return normalized.Contains("petg", StringComparison.Ordinal)
+            && !normalized.Contains("clear", StringComparison.Ordinal)
+            && !normalized.Contains("transp", StringComparison.Ordinal)
+            && !normalized.Contains("transparent", StringComparison.Ordinal);
+    }
+
+    private static string NormalizeMaterialText(params string?[] values)
+    {
+        var combined = string.Concat(values.Where(value => !string.IsNullOrWhiteSpace(value)));
+        return new string(combined.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     }
 
     private static CatalogToleranceDto? SelectDefaultTolerance(
@@ -3349,6 +3399,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.AvailableFinishes = finishesTask.Result ?? [];
             part.AvailableTolerances = FilterProcessTolerances(part.ProcessCode, tolerancesTask.Result ?? []).ToList();
             part.AvailableProcessOptions = configOptionsTask.Result ?? [];
+            NormalizeSelectedMaterialForClearPetg(part);
             RestoreCatalogSelections(part);
 
             if (part.MaterialId.HasValue)

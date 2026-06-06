@@ -2048,6 +2048,51 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void NormalizeSelectedMaterialForClearPetg_WhenClearPetgSelected_MapsToBasePetgAndSetsClearColor()
+    {
+        var petgId = Guid.NewGuid();
+        var clearPetgId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            MaterialId = clearPetgId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(petgId, "PETG", "PETG", "Polymer", null, "Durable, slightly flexible.", 110),
+                new CatalogMaterialDto(clearPetgId, "Clear PETG", "PETG_CLEAR", "Polymer", null, "Translucent clear PETG.", 115),
+            ],
+            ProcessOptionValues = [],
+        };
+
+        NormalizeSelectedMaterialForClearPetg(part);
+
+        Assert.Equal(petgId, part.MaterialId);
+        Assert.Equal("PETG", part.MaterialCode);
+        Assert.Equal("Clear", part.ProcessOptionValues["material_color"]);
+    }
+
+    [Fact]
+    public void NormalizeSelectedMaterialForClearPetg_WhenBasePetgSelected_DoesNotForceClearColor()
+    {
+        var petgId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            MaterialId = petgId,
+            MaterialCode = "PETG",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(petgId, "PETG", "PETG", "Polymer", null, "Durable, slightly flexible.", 110),
+            ],
+            ProcessOptionValues = [],
+        };
+
+        NormalizeSelectedMaterialForClearPetg(part);
+
+        Assert.Equal(petgId, part.MaterialId);
+        Assert.Equal("PETG", part.MaterialCode);
+        Assert.False(part.ProcessOptionValues.ContainsKey("material_color"));
+    }
+
+    [Fact]
     public void RefreshLeadTimeOptionsFromPricing_WhenNoLeadTimeSelected_SelectsStandardWithBufferedRanges()
     {
         var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
@@ -2135,6 +2180,14 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     {
         var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
             .GetMethod("ApplyCatalogDefaults", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(null, [part]);
+    }
+
+    private static void NormalizeSelectedMaterialForClearPetg(PartViewModel part)
+    {
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("NormalizeSelectedMaterialForClearPetg", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method.Invoke(null, [part]);
     }
