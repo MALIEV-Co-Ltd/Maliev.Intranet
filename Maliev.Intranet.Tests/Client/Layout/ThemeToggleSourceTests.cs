@@ -28,11 +28,12 @@ public class ThemeToggleSourceTests
         Assert.DoesNotContain("Auto Theme", navMenu, StringComparison.Ordinal);
         Assert.DoesNotContain("auto-mode-gradient", navMenu, StringComparison.Ordinal);
         Assert.DoesNotContain("auto-mode-icon", navMenuStyles, StringComparison.Ordinal);
-        Assert.Contains(".topbar-right ::deep .mud-button-root.topbar-theme-toggle", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right .topbar-theme-toggle", topBarStyles, StringComparison.Ordinal);
         Assert.Contains("color: var(--mud-palette-text-primary);", topBarStyles, StringComparison.Ordinal);
-        Assert.Contains(".topbar-right ::deep .mud-button-root.topbar-theme-toggle:hover", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right .topbar-theme-toggle:hover", topBarStyles, StringComparison.Ordinal);
         Assert.Contains("color: var(--mud-palette-primary);", topBarStyles, StringComparison.Ordinal);
-        Assert.Contains("path[d^=\"M21 14.5\"]", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .topbar-theme-toggle .mud-icon-root", topBarStyles, StringComparison.Ordinal);
+        Assert.Contains(".topbar-right ::deep .topbar-theme-toggle .topbar-theme-icon path[d^=\"M21 14.5\"]", topBarStyles, StringComparison.Ordinal);
         Assert.Contains("fill: none;", topBarStyles, StringComparison.Ordinal);
         Assert.Contains("stroke: currentColor;", topBarStyles, StringComparison.Ordinal);
         Assert.Contains("color: var(--mud-palette-text-primary);", loginStyles, StringComparison.Ordinal);

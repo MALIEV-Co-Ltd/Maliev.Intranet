@@ -409,6 +409,21 @@
     margin-left: 0;
 }
 
+.topbar-right .topbar-theme-toggle {
+    color: var(--mud-palette-text-primary);
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--maliev-radius-sm);
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
 .topbar-right ::deep .mud-button-root.mud-icon-button {
     border: 0 !important;
     background: transparent;
@@ -425,21 +440,23 @@
     box-shadow: var(--maliev-focus-ring) !important;
 }
 
-.topbar-right ::deep .mud-button-root.topbar-theme-toggle {
-    color: var(--mud-palette-text-primary);
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.topbar-right ::deep .mud-button-root.topbar-theme-toggle:hover,
-.topbar-right ::deep .mud-button-root.topbar-theme-toggle:active {
+.topbar-right .topbar-theme-toggle:hover,
+.topbar-right .topbar-theme-toggle:active {
     color: var(--mud-palette-primary);
+    background: var(--maliev-panel-3);
+    box-shadow: none;
 }
 
-.topbar-right ::deep .mud-button-root.topbar-theme-toggle .mud-icon-root {
-    color: currentColor;
+.topbar-right .topbar-theme-toggle:focus-visible {
+    box-shadow: var(--maliev-focus-ring) !important;
+    outline: none;
 }
 
-.topbar-right ::deep .mud-button-root.topbar-theme-toggle path[d^="M21 14.5"] {
+.topbar-right ::deep .topbar-theme-toggle .mud-icon-root {
+    color: inherit;
+}
+
+.topbar-right ::deep .topbar-theme-toggle .topbar-theme-icon path[d^="M21 14.5"] {
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -979,7 +996,7 @@
         padding-left: 6px;
     }
 
-    .topbar-right ::deep .topbar-theme-toggle {
+    .topbar-right .topbar-theme-toggle {
         display: inline-flex !important;
     }
 }

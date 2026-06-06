@@ -204,11 +204,14 @@
 
         @* Theme toggle *@
         <MudTooltip Text="@GetThemeLabel()" Placement="Placement.Bottom">
-            <MudIconButton Icon="@GetThemeIcon()"
-                           Class="topbar-theme-toggle"
-                           Size="Size.Medium"
-                           OnClick="@OnToggleTheme"
-                           Color="Color.Default" />
+            <button type="button"
+                    class="topbar-theme-toggle"
+                    aria-label="@GetThemeLabel()"
+                    @onclick="OnToggleTheme">
+                <MudIcon Icon="@GetThemeIcon()"
+                         Class="topbar-theme-icon"
+                         Size="Size.Small" />
+            </button>
         </MudTooltip>
 
         @* AI Assistant *@
