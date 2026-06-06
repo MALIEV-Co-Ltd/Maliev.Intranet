@@ -15,10 +15,10 @@ public class ThemeToggleSourceTests
 
         Assert.Contains("LayoutService.IsDarkMode", topBar, StringComparison.Ordinal);
         Assert.Contains("ThemeIcons.Dark", topBar, StringComparison.Ordinal);
+        Assert.Contains("Icons.Material.Outlined.LightMode", topBar, StringComparison.Ordinal);
         Assert.Contains("ThemeIcons.Dark", login, StringComparison.Ordinal);
         Assert.Contains("M21 14.5A8.5 8.5 0 0 1 9.5 3", themeIcons, StringComparison.Ordinal);
         Assert.DoesNotContain("Icons.Material.Outlined.DarkMode", topBar, StringComparison.Ordinal);
-        Assert.Contains("Icons.Material.Outlined.LightMode", topBar, StringComparison.Ordinal);
         Assert.Contains("? \"Dark Theme\"", topBar, StringComparison.Ordinal);
         Assert.Contains(": \"Light Theme\"", topBar, StringComparison.Ordinal);
         Assert.DoesNotContain("AutoMode", topBar, StringComparison.Ordinal);
