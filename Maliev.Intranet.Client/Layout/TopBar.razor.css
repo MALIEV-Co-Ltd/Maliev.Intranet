@@ -409,7 +409,7 @@
     margin-left: 0;
 }
 
-.topbar-right .topbar-theme-toggle {
+.topbar-right ::deep .topbar-theme-toggle {
     color: var(--mud-palette-text-primary);
     display: inline-grid;
     place-items: center;
@@ -440,14 +440,14 @@
     box-shadow: var(--maliev-focus-ring) !important;
 }
 
-.topbar-right .topbar-theme-toggle:hover,
-.topbar-right .topbar-theme-toggle:active {
+.topbar-right ::deep .topbar-theme-toggle:hover,
+.topbar-right ::deep .topbar-theme-toggle:active {
     color: var(--mud-palette-primary);
     background: var(--maliev-panel-3);
     box-shadow: none;
 }
 
-.topbar-right .topbar-theme-toggle:focus-visible {
+.topbar-right ::deep .topbar-theme-toggle:focus-visible {
     box-shadow: var(--maliev-focus-ring) !important;
     outline: none;
 }
@@ -996,7 +996,7 @@
         padding-left: 6px;
     }
 
-    .topbar-right .topbar-theme-toggle {
+    .topbar-right ::deep .topbar-theme-toggle {
         display: inline-flex !important;
     }
 }
