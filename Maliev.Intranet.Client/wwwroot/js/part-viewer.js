@@ -659,8 +659,6 @@ function configureSoftShadowGenerator(shadowGenerator, keyConfig) {
     shadowGenerator.transparencyShadow = true;
     shadowGenerator.bias       = keyConfig?.shadowBias       ?? 0.00008;
     shadowGenerator.normalBias = keyConfig?.shadowNormalBias ?? 0.018;
-    // Store the UV ratio from config even though PCF (not PCSS) is active — keeps the value
-    // available if the shadow mode is inspected or the preset is switched at runtime.
     shadowGenerator.contactHardeningLightSizeUVRatio = keyConfig?.contactHardeningLightSizeUVRatio ?? 0.08;
 }
 
@@ -2953,8 +2951,29 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     const axesCam = gizmo.axesCam;
                     engine.setViewport(axesCam.viewport);
                     engine.clear(null, false, true, false);
+
+                    // scene.autoClear MUST be false here: BabylonJS scene.render() calls
+                    // engine.clear() (autoClear) which issues WebGL glClear() — that call
+                    // ignores the current viewport and clears the ENTIRE framebuffer, erasing
+                    // the already-rendered main scene.  We clear depth manually above.
+                    // scene.prePassRenderer (SSAO G-Buffer) must also be disabled: in realistic
+                    // mode it re-runs for axesCam and sees only gizmo meshes (layerMask
+                    // mismatch), producing a near-empty G-Buffer that corrupts or blanks the
+                    // gizmo viewport output.
+                    const prevAutoClear   = scene.autoClear;
+                    const prevAutoClearDS = scene.autoClearDepthAndStencil;
+                    scene.autoClear              = false;
+                    scene.autoClearDepthAndStencil = false;
+                    const prePass = scene.prePassRenderer;
+                    const prevPrePass = prePass ? prePass.enabled : false;
+                    if (prePass) prePass.enabled = false;
+
                     scene.activeCamera = axesCam;
                     scene.render();
+
+                    scene.autoClear              = prevAutoClear;
+                    scene.autoClearDepthAndStencil = prevAutoClearDS;
+                    if (prePass) prePass.enabled  = prevPrePass;
                 } catch (_) {
                     // Gizmo render errors must not kill the main render loop
                 } finally {

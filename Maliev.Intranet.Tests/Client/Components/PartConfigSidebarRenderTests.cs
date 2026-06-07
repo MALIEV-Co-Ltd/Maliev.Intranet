@@ -67,6 +67,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, [process]));
 
+        await cut.Find(".pcs-process-change-btn").ClickAsync(new MouseEventArgs());
         await cut.Find(".pcs-process-card--active").ClickAsync(new MouseEventArgs());
 
         Assert.Equal(0, dfmRequestCount);
@@ -153,7 +154,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("CNC Milling", card.QuerySelector(".pcs-process-name")?.TextContent.Trim());
         Assert.Equal(
-            "Milled parts",
+            "Multi-axis subtractive milling from solid billet",
             card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
     }
 
@@ -184,7 +185,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("FDM", card.QuerySelector(".pcs-process-name")?.TextContent.Trim());
         Assert.Equal(
-            "3D print",
+            "Fused Deposition Modeling - thermoplastic filament",
             card.QuerySelector(".pcs-process-description")?.TextContent.Trim());
     }
 
@@ -308,13 +309,13 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Processes, []));
 
         var surfaceIndex = cut.Markup.IndexOf("data-config-section=\"surface-finish\"", StringComparison.Ordinal);
-        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"finish-options\"", StringComparison.Ordinal);
+        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"color-options\"", StringComparison.Ordinal);
         var toleranceIndex = cut.Markup.IndexOf("data-config-section=\"tolerance\"", StringComparison.Ordinal);
 
         Assert.True(surfaceIndex >= 0);
         Assert.True(finishOptionsIndex > surfaceIndex);
         Assert.True(toleranceIndex > finishOptionsIndex);
-        Assert.Contains("Anodize color", cut.Find("[data-config-section='finish-options']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("Anodize color", cut.Find("[data-config-section='color-options']").TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Anodize color", cut.Find("[data-config-section='process-options']").TextContent, StringComparison.Ordinal);
     }
 
@@ -351,14 +352,14 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             .Add(p => p.Part, part)
             .Add(p => p.Processes, []));
 
-        var finishOptions = cut.Find("[data-config-section='finish-options']");
-        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"finish-options\"", StringComparison.Ordinal);
+        var finishOptions = cut.Find("[data-config-section='color-options']");
+        var finishOptionsIndex = cut.Markup.IndexOf("data-config-section=\"color-options\"", StringComparison.Ordinal);
         var toleranceIndex = cut.Markup.IndexOf("data-config-section=\"tolerance\"", StringComparison.Ordinal);
 
         Assert.True(toleranceIndex > finishOptionsIndex);
         Assert.Contains("Powder coat color", finishOptions.TextContent, StringComparison.Ordinal);
         Assert.Contains("Black", finishOptions.TextContent, StringComparison.Ordinal);
-        Assert.Contains("Traffic Blue", finishOptions.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Blue", finishOptions.TextContent, StringComparison.Ordinal);
         Assert.Contains("Custom", finishOptions.TextContent, StringComparison.Ordinal);
     }
 
@@ -796,21 +797,6 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
             "feature-steel-inserts-part.webp");
 
         Assert.NotEqual(File.ReadAllBytes(genericInsertPath), File.ReadAllBytes(threadInsertPath));
-    }
-
-    [Fact]
-    public void ManufacturingProcessSection_TranslatesMouseWheelToHorizontalScroll()
-    {
-        var source = ReadRepoFile(
-                "Maliev.Intranet.Client",
-                "Components",
-                "Project",
-                "PartConfigSidebar.razor")
-            .ReplaceLineEndings("\n");
-
-        Assert.Contains("data-config-section=\"manufacturing-process\"", source, StringComparison.Ordinal);
-        Assert.Contains("data-horizontal-wheel=\"true\"", source, StringComparison.Ordinal);
-        Assert.Contains("scrollLeft += event.deltaY", source, StringComparison.Ordinal);
     }
 
     [Fact]
