@@ -1885,9 +1885,9 @@ git commit -m "test(bff): add test for thumbnail fallback endpoint"
 
 ---
 
-### Phase 3: Server Deprecation
+### Phase 3: Runtime Manifest Update (No Server Deprecation)
 
-This phase marks server-side generation as deprecated for browser-primary uploads. GeometryService still runs for fallback, but new uploads use client generation.
+This phase updates the browser runtime manifest to declare client-side preview generation capability. The server-side GeometryService thumbnail generation **remains fully operational** for other internal consumers (JobService, PDF/Quotation service, etc.). Only the BFF's consumers are deprecated since client now generates its own thumbnails.
 
 #### Task 3.1: Update GeometryRuntimeFallbackProvider Manifest
 
@@ -1896,7 +1896,7 @@ This phase marks server-side generation as deprecated for browser-primary upload
 
 - [ ] **Step 1: Update manifest capabilities**
 
-Find the `artifactPolicy` section and update:
+Find the `artifactPolicy` section and update `browserViewableUploads` to declare client-side preview:
 
 ```csharp
             artifactPolicy = new
@@ -1907,21 +1907,21 @@ Find the `artifactPolicy` section and update:
                     viewerSource = "original_upload",
                     serverEagerMetrics = false,
                     serverGlbExport = false,
-                    serverPreviewImages = false  // ← Changed from true (or new field)
+                    serverPreviewImages = false  // ← Client generates thumbnails for browser-primary
                 },
                 serverGeneratedViewerUploads = new
                 {
                     viewerSource = "generated_glb",
                     serverEagerMetrics = true,
                     serverGlbExport = true,
-                    serverPreviewImages = true
+                    serverPreviewImages = true  // ← Keep for JobService, PDF/Quotation, etc.
                 }
             },
 ```
 
 - [ ] **Step 2: Update capabilities section**
 
-Find the `capabilities` section and update:
+Find the `capabilities` section and add `local_preview_image_generation`:
 
 ```csharp
             capabilities = new
@@ -1944,13 +1944,13 @@ Find the `capabilities` section and update:
                     "thin_feature_screening",
                     "process_dfm_screening",
                     "local_overlay_hints",
-                    "local_preview_image_generation"  // ← New
+                    "local_preview_image_generation"  // ← New: client can generate previews
                 },
                 serverOperations = new[]
                 {
                     "authoritative_dfm",
                     "durable_glb_artifacts",
-                    "durable_preview_images",  // ← Keep for fallback only
+                    "durable_preview_images",  // ← Keep: other services need this
                     "final_quote_validation"
                 }
             }
@@ -1971,108 +1971,62 @@ Expected: Build succeeds
 
 ```bash
 git add Maliev.Intranet.Bff/Services/GeometryRuntimeFallbackProvider.cs
-git commit -m "feat(bff): update runtime manifest to declare client-side preview generation"
+git commit -m "feat(bff): update runtime manifest to declare client-side preview generation capability"
 ```
 
-#### Task 3.2: Mark SmallThumbnailReadyConsumer as Obsolete
+#### Task 3.2: Mark BFF Consumers as Obsolete (Not GeometryService)
 
 **Files:**
 - Modify: `Maliev.Intranet.Bff/Consumers/SmallThumbnailReadyConsumer.cs`
+- Modify: `Maliev.Intranet.Bff/Consumers/PreviewImagesGeneratedConsumer.cs`
 
-- [ ] **Step 1: Add Obsolete attribute**
-
-At the class level, add:
+- [ ] **Step 1: Add Obsolete attribute to SmallThumbnailReadyConsumer**
 
 ```csharp
-[Obsolete("Deprecated in favor of client-side thumbnail generation. Kept for fallback only.")]
+[Obsolete("Deprecated for Intranet browser uploads - client generates thumbnails. Kept for legacy/fallback.")]
 public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
 ```
 
-- [ ] **Step 2: Add deprecation warning log**
-
-In the `Consume` method, add at the start:
+- [ ] **Step 2: Add deprecation log in Consume method**
 
 ```csharp
 _logger.LogWarning(
-    "SmallThumbnailReadyConsumer is deprecated. Client-side generation should handle thumbnails. " +
-    "This consumer only runs for legacy uploads or fallback scenarios.");
+    "SmallThumbnailReadyConsumer is deprecated for Intranet uploads. " +
+    "Client-side generation now handles thumbnails. This consumer runs for legacy/fallback only.");
 ```
 
-- [ ] **Step 3: Verify build succeeds**
+- [ ] **Step 3: Add Obsolete attribute to PreviewImagesGeneratedConsumer**
+
+```csharp
+[Obsolete("Deprecated for Intranet browser uploads - client generates thumbnails. Kept for fallback & other services.")]
+public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEvent>
+```
+
+- [ ] **Step 4: Add deprecation log in Consume method**
+
+```csharp
+_logger.LogWarning(
+    "PreviewImagesGeneratedConsumer is deprecated for Intranet uploads. " +
+    "Client-side generation now handles thumbnails. This consumer runs for fallback & other service requests.");
+```
+
+- [ ] **Step 5: Verify build succeeds**
 
 Run: `dotnet build Maliev.Intranet.Bff/Maliev.Intranet.Bff.csproj`
-Expected: Build succeeds (CS0618 warnings acceptable since we want the obsolete consumer to still compile)
+Expected: Build succeeds (CS0618 warnings expected - consumers still compile and function for fallback/other services)
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add Maliev.Intranet.Bff/Consumers/SmallThumbnailReadyConsumer.cs
-git commit -m "chore(bff): mark SmallThumbnailReadyConsumer as deprecated"
+git add Maliev.Intranet.Bff/Consumers/SmallThumbnailReadyConsumer.cs Maliev.Intranet.Bff/Consumers/PreviewImagesGeneratedConsumer.cs
+git commit -m "chore(bff): mark thumbnail consumers as deprecated for Intranet (server still serves other services)"
 ```
 
 ---
 
-### Phase 4: Cleanup (Optional, Future)
+### Phase 4: (Future - Only if GeometryService removes thumbnail support)
 
-This phase removes the deprecated code entirely. Should be done in a separate PR after monitoring Phase 3 in production.
-
-#### Task 4.1: Remove SmallThumbnailReadyConsumer
-
-**Files:**
-- Delete: `Maliev.Intranet.Bff/Consumers/SmallThumbnailReadyConsumer.cs`
-
-- [ ] **Step 1: Remove consumer from Program.cs registration**
-
-In `Program.cs`, find and remove:
-```csharp
-mt.AddConsumer<SmallThumbnailReadyConsumer>();
-```
-
-And in the endpoint configuration:
-```csharp
-ep.ConfigureConsumer<SmallThumbnailReadyConsumer>(ctx);
-```
-
-- [ ] **Step 2: Delete the consumer file**
-
-Run: `rm Maliev.Intranet.Bff/Consumers/SmallThumbnailReadyConsumer.cs`
-
-- [ ] **Step 3: Verify build succeeds**
-
-Run: `dotnet build Maliev.Intranet.slnx`
-Expected: Build succeeds
-
-- [ ] **Step 4: Run all tests**
-
-Run: `dotnet test Maliev.Intranet.slnx`
-Expected: All tests pass
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add -A
-git commit -m "chore(bff): remove deprecated SmallThumbnailReadyConsumer"
-```
-
-#### Task 4.2: Remove GeometryService Thumbnail Code (External Repo)
-
-**Files:** External (Maliev.GeometryService repo)
-
-- [ ] **Step 1: Coordinate with GeometryService team**
-
-Notify GeometryService team to remove thumbnail generation code (Python files that render PNGs).
-
-- [ ] **Step 2: Verify no other services depend on the events**
-
-Search for `SmallThumbnailReadyEvent` and `PreviewImagesGeneratedEvent` in all repos.
-
-- [ ] **Step 3: Remove event contracts from Maliev.MessagingContracts**
-
-Remove `SmallThumbnailReadyEvent` from `Maliev.MessagingContracts/Contracts/Geometry/`.
-
-- [ ] **Step 4: Update BFF to not consume the event**
-
-Remove consumer registration and handler.
+This phase is **NOT planned** - GeometryService thumbnail generation remains for JobService, PDF/Quotation, and other internal consumers. The BFF consumers are kept (with deprecation warnings) to handle fallback scenarios.
 
 ---
 

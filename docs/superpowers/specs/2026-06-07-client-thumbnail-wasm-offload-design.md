@@ -139,10 +139,12 @@ Client → POST /api/v1/geometry/runtime/thumbnail-fallback
 | `Projects.razor`, `ProjectDetail.razor` | Show skeleton → partial → complete states |
 | `ProjectNew.razor.cs` | Trigger generation immediately after upload completes |
 
-### Deprecated (Phase 3)
+### Deprecated (Phase 3 - BFF Consumers Only)
 
-- `SmallThumbnailReadyConsumer` - removed (replaced by client generation)
-- `PreviewImagesGeneratedConsumer` - kept as fallback handler only
+- `SmallThumbnailReadyConsumer` - marked `[Obsolete]` for Intranet uploads; kept for legacy/fallback & other services
+- `PreviewImagesGeneratedConsumer` - marked `[Obsolete]` for Intranet uploads; kept for fallback & other services (JobService, PDF/Quotation)
+
+**Note**: GeometryService thumbnail generation is **NOT removed** - it continues to serve other internal consumers (JobService for job tickets, PDF service for quotations, etc.). Only the BFF's RabbitMQ consumers are deprecated for the Intranet client path.
 
 ---
 
@@ -738,19 +740,24 @@ The existing `PreviewImagesGeneratedConsumer` handles the response (unchanged) a
 - Components handle "fallback" state with skeleton + "Server processing..." text
 - **Outcome**: Full functionality, fallback works, can deploy safely
 
-### Phase 3: Server Deprecation
+### Phase 3: Runtime Manifest Update (BFF Consumer Deprecation Only)
 
-- Mark `SmallThumbnailReadyConsumer` as deprecated (keep for fallback)
-- Update `GeometryRuntimeFallbackProvider` manifest: `serverPreviewImages: false` for browser-primary
-- GeometryService stops generating thumbnails for browser-primary uploads
-- **Outcome**: Cost reduction realized, server only handles fallback
+- Mark BFF's `SmallThumbnailReadyConsumer` and `PreviewImagesGeneratedConsumer` as `[Obsolete]` for Intranet uploads
+- Update `GeometryRuntimeFallbackProvider` manifest: `serverPreviewImages: false` for browser-primary; `serverPreviewImages: true` for server-generated uploads (JobService, PDF/Quotation)
+- GeometryService **continues** generating thumbnails for other internal consumers
+- **Outcome**: Cost reduction for Intranet path realized; server still serves JobService, PDF/Quotation, etc.
 
-### Phase 4: Cleanup
+### Phase 4: (Not Planned - GeometryService Thumbnails Remain)
 
-- Remove `SmallThumbnailReadyConsumer` entirely
-- Remove GeometryService thumbnail code (Python)
-- Update all DTOs to remove server-only fields
-- **Outcome**: Full offload complete, server is fallback only
+GeometryService thumbnail generation is NOT removed. It continues to serve:
+- JobService (job tickets)
+- PDF/Quotation service (quotation documents)
+- Any other internal consumers
+
+The BFF consumers are kept (with deprecation warnings) to handle:
+- Legacy uploads
+- Fallback scenarios
+- Non-Intranet service requests
 
 **Rollback strategy**: Each phase is independently deployable. If issues arise, revert the client subscription in consuming components (1-line change per component).
 
