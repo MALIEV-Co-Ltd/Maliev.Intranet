@@ -290,6 +290,10 @@ const CONFIG = {
         maxDeferredRealisticIndices: 240000,
         maxSmoothNormalsVerticesPerMesh: 120000,
         maxSmoothNormalsIndicesPerMesh: 360000,
+        // Idle-time budget per chunk in ms for the deferred smooth-normal upgrade.
+        // Stays under a single animation frame so the main thread can paint and
+        // process input while the heavy CAD-edge smoothing runs in the background.
+        smoothNormalsChunkBudgetMs: 6,
     },
 
     // =========================================================================
@@ -642,13 +646,21 @@ function _computeKeyLightPosition(dirConfig, modelCenter, dist) {
 function configureSoftShadowGenerator(shadowGenerator, keyConfig) {
     if (!shadowGenerator) return;
 
-    shadowGenerator.usePercentageCloserFiltering = true;
+    // Use PCF (Percentage Closer Filtering) — reliable across all hardware and model sizes.
+    // PCSS (useContactHardeningShadow) was previously set here and OVERRODE the PCF line
+    // because the two modes are mutually exclusive (last assignment wins). With the corrected
+    // light position (autoUpdateExtends fitting tightly to the model), PCSS produced a
+    // penumbra radius wider than the entire shadow footprint for small parts, making shadows
+    // completely invisible. PCF gives crisp, always-visible shadows for product photography.
+    shadowGenerator.usePercentageCloserFiltering   = true;
+    shadowGenerator.useContactHardeningShadow      = false;
     shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_HIGH ?? shadowGenerator.filteringQuality;
     shadowGenerator.setDarkness?.(keyConfig?.shadowDarkness ?? 0.10);
     shadowGenerator.transparencyShadow = true;
-    shadowGenerator.bias = keyConfig?.shadowBias ?? 0.00008;
+    shadowGenerator.bias       = keyConfig?.shadowBias       ?? 0.00008;
     shadowGenerator.normalBias = keyConfig?.shadowNormalBias ?? 0.018;
-    shadowGenerator.useContactHardeningShadow = true;
+    // Store the UV ratio from config even though PCF (not PCSS) is active — keeps the value
+    // available if the shadow mode is inspected or the preset is switched at runtime.
     shadowGenerator.contactHardeningLightSizeUVRatio = keyConfig?.contactHardeningLightSizeUVRatio ?? 0.08;
 }
 
@@ -710,6 +722,49 @@ function syncSceneShadowParticipation(canvasId) {
             addShadowCasterOnce(shadowGenerator, mesh);
             mesh.receiveShadows = true;
         }
+    });
+}
+
+/**
+ * Extends the shadow frustum to cover the full 8x shadow catcher area.
+ * Creates invisible corner meshes and adds them as shadow casters so the
+ * auto-frustum encompasses the entire catcher, not just the model.
+ */
+function extendShadowFrustum(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const shadowGen = shadowGenerators[canvasId];
+    if (!shadowGen) return;
+
+    const bb = sceneBoundingBoxes[canvasId];
+    if (!bb) return;
+
+    const sizeX = bb.max.x - bb.min.x;
+    const sizeY = bb.max.y - bb.min.y;
+    const extHalf = Math.max(sizeX, sizeY) * 4; // half of catcher (8x / 2)
+    const baseZ = bb.min.z;
+
+    // Create 4 invisible boxes at catcher corners to extend shadow frustum.
+    // They must have proper bounding info so autoUpdateExtends includes them.
+    const extNames = ['__shadow_ext_0', '__shadow_ext_1', '__shadow_ext_2', '__shadow_ext_3'];
+    const corners = [
+        [-extHalf, -extHalf, baseZ],
+        [ extHalf, -extHalf, baseZ],
+        [-extHalf,  extHalf, baseZ],
+        [ extHalf,  extHalf, baseZ],
+    ];
+
+    corners.forEach((pos, i) => {
+        let ext = scene.getMeshByName(extNames[i]);
+        if (!ext) {
+            // Use small but non-trivial size so bounding box is meaningful.
+            ext = BABYLON.MeshBuilder.CreateBox(extNames[i], { size: 1 }, scene);
+            ext.isVisible = false;
+            ext.isPickable = false;
+            // Do NOT set doNotSyncBoundingInfo — we WANT its bounds to extend the frustum.
+        }
+        ext.position.set(pos[0], pos[1], pos[2]);
+        addShadowCasterOnce(shadowGen, ext);
     });
 }
 
@@ -2274,6 +2329,9 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         loadGenerations[canvasId] = (loadGenerations[canvasId] || 0) + 1;
         const currentGen = loadGenerations[canvasId];
 
+        // Store DotNetObjectReference for callbacks
+        if (dotNetRef) dotNetRefs[canvasId] = dotNetRef;
+
         darkModes[canvasId]        = !!isDark;
         modelLoadState[canvasId]   = 'loading';
         originalMaterials[canvasId]= {};
@@ -2509,7 +2567,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // ── Permanent shadow-catcher ground plane ──
                 // Creates an always-on ground mesh to catch shadows from the model.
                 // The grid toggle is independent and creates/disposes its own ground.
-                const bbSizeXY = Math.max(finalBb.max.x - finalBb.min.x, finalBb.max.y - finalBb.min.y) * 3;
+                const bbSizeXY = Math.max(finalBb.max.x - finalBb.min.x, finalBb.max.y - finalBb.min.y) * 8;
                 const catcher = BABYLON.MeshBuilder.CreateGround('__shadow_catcher__', { width: bbSizeXY, height: bbSizeXY }, _scene);
                 catcher.rotation.x = Math.PI / 2;   // world XY plane (Z-up)
                 catcher.position.z = finalBb.min.z;  // sit at model base
@@ -2628,6 +2686,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     }
                 });
                 syncSceneShadowParticipation(canvasId);
+                extendShadowFrustum(canvasId);
 
                 // Capture immutable baseline for "default solid look" — never overwritten.
                 // Used by setRenderMode('solid') and flipped-triangles disable to restore a clean state.
@@ -2876,7 +2935,35 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 cam.alpha += autoSpeedCurrent[canvasId];
             }
 
+            // Render main camera (full screen)
+            scene.activeCamera = cam;
             scene.render();
+
+            // Render axis gizmo camera on top with cleared depth buffer in its viewport.
+            // Clearing depth lets gizmo meshes always pass the depth test regardless of
+            // what the main scene wrote, so the axes are never occluded.
+            // BabylonJS engine.clear(color, backBuffer, depth, stencil):
+            //   null  = don't touch the color buffer (preserve main scene render)
+            //   false = don't clear back buffer
+            //   true  = clear depth buffer  ← essential; without this gizmo fails depth test
+            //   false = don't clear stencil
+            const gizmo = axisGizmoLayer[canvasId];
+            if (gizmo && gizmo.axesCam && !gizmo.axesCam.isDisposed()) {
+                try {
+                    const axesCam = gizmo.axesCam;
+                    engine.setViewport(axesCam.viewport);
+                    engine.clear(null, false, true, false);
+                    scene.activeCamera = axesCam;
+                    scene.render();
+                } catch (_) {
+                    // Gizmo render errors must not kill the main render loop
+                } finally {
+                    scene.activeCamera = cam;
+                }
+            }
+
+            // Restore main camera as active for next frame
+            scene.activeCamera = cam;
         });
 
         const resizeHandler = () => {
@@ -3159,7 +3246,7 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return l;
     }
 
-    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(-LEN, 0, 0)], COL_X);  // X+ direction, red
+    makeAxisLine('__axisX__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(LEN, 0, 0)], COL_X);   // X+ direction, red
     makeAxisLine('__axisY__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, LEN, 0)], COL_Y);  // Y+ direction, green
     makeAxisLine('__axisZ__', [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, LEN)], COL_Z);  // Z+ direction, blue
 
@@ -3183,7 +3270,7 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         return cone;
     }
 
-    makeCone('__axisXArr__', new BABYLON.Vector3(-1, 0, 0), COL_X);  // X+ direction, red
+    makeCone('__axisXArr__', new BABYLON.Vector3(1, 0, 0), COL_X);   // X+ direction, red
     makeCone('__axisYArr__', new BABYLON.Vector3(0, 1, 0), COL_Y);  // Y+ direction, green
     makeCone('__axisZArr__', new BABYLON.Vector3(0, 0, 1), COL_Z);  // Z+ direction, blue
 
@@ -3215,11 +3302,13 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         updateAxisLabels(canvasId, scene, axesCam);
     });
 
-    scene.activeCameras = [mainCam, axesCam];
+    // NOTE: We do NOT use scene.activeCameras for the gizmo.
+    // The render loop will manually render the gizmo camera with depth cleared in its viewport.
+    // This avoids depth buffer conflicts between perspective (main) and orthographic (gizmo) cameras.
 
     // ── Hover labels (X, Y, Z text that appear on mouseover) ──
     const labelDefs = [
-        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(-(LEN + 0.28), 0, 0) },  // X+, red
+        { name: 'X', color: '#f04444', pos: new BABYLON.Vector3(LEN + 0.28, 0, 0) },     // X+, red
         { name: 'Y', color: '#22c750', pos: new BABYLON.Vector3(0, LEN + 0.28, 0) },  // Y+, green
         { name: 'Z', color: '#3882f5', pos: new BABYLON.Vector3(0, 0, LEN + 0.28) },  // Z+, blue
     ];
@@ -3273,9 +3362,10 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     axisMouseHandlers[canvasId + '_leave']   = onMouseLeave;
 
     axisGizmoLayer[canvasId] = {
+        axesCam: axesCam,
         dispose() {
             scene.onBeforeRenderObservable.remove(syncObs);
-            scene.activeCameras = [mainCam];
+            scene.activeCamera = mainCam;
             axesCam.dispose();
             ['__axisX__','__axisY__','__axisZ__','__axisXArr__','__axisYArr__','__axisZArr__']
                 .forEach(n => { const m = scene.getMeshByName(n); if (m) m.dispose(); });
@@ -3632,22 +3722,32 @@ function getFdmLayerPluginClass() {
                     vec3 keyLight = normalize(vec3(-0.38, -0.58, 0.72));
                     return clamp(dot(reliefNormal, keyLight) - dot(baseNormal, keyLight), -0.22, 0.22) * sideMask;
                 }
+                // Fragment-scope cache — assigned in CUSTOM_FRAGMENT_BEFORE_LIGHTS, reused by later hooks.
+                float malievFdmPhase    = 0.0;
+                float malievFdmVis      = 1.0;
+                float malievFdmMoire    = 1.0;
+                float malievFdmSideMask = 0.0;
+                vec3  malievFdmDerNorm  = vec3(0.0, 0.0, 1.0);
                 #endif
             `,
                 CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
                 #ifdef FDMLAYER
                 #ifdef NORMAL
                 {
+                    // Cache phase, visibility, moire and derivative normal once for all FDM hooks.
+                    malievFdmPhase    = vPositionW.z / max(fdmLayerH, 0.001);
+                    malievFdmVis      = malievFdmLayerVisibility(malievFdmPhase);
+                    malievFdmMoire    = malievFdmLayerMoireDampening(malievFdmPhase);
+                    malievFdmDerNorm  = malievFdmDerivativeNormal(vPositionW);
+                    malievFdmSideMask = malievFdmLayerSideMask(malievFdmDerNorm);
+
                     vec3 _fdmBaseNormal = normalize(normalW);
                     vec3 _fdmAxis = vec3(0.0, 0.0, 1.0);
                     vec3 _fdmTangent = _fdmAxis - _fdmBaseNormal * dot(_fdmAxis, _fdmBaseNormal);
-                    float _fdmSideMask = smoothstep(0.10, 0.42, length(_fdmTangent));
+                    float _fdmBumpSideMask = smoothstep(0.10, 0.42, length(_fdmTangent));
                     _fdmTangent = normalize(_fdmTangent + vec3(0.0001, 0.0, 0.0));
-                    float _fdmPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmVisibility = malievFdmLayerVisibility(_fdmPhase);
-                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmPhase);
-                    float _fdmSlope = malievFdmLayerWave(_fdmPhase);
-                    normalW = normalize(_fdmBaseNormal - _fdmTangent * _fdmSlope * fdmLayerBump * _fdmSideMask * _fdmVisibility * _fdmMoireDampening);
+                    float _fdmSlope = malievFdmLayerWave(malievFdmPhase);
+                    normalW = normalize(_fdmBaseNormal - _fdmTangent * _fdmSlope * fdmLayerBump * _fdmBumpSideMask * malievFdmVis * malievFdmMoire);
                 }
                 #endif
                 #endif
@@ -3655,14 +3755,10 @@ function getFdmLayerPluginClass() {
                 CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS: `
                 #ifdef FDMLAYER
                 {
-                    vec3 _fdmRoughNormal = malievFdmDerivativeNormal(vPositionW);
-                    float _fdmRoughSideMask = malievFdmLayerSideMask(_fdmRoughNormal);
-                    float _fdmRoughPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmVisibility = malievFdmLayerVisibility(_fdmRoughPhase);
-                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmRoughPhase);
-                    float _fdmGroove = malievFdmLayerGroove(_fdmRoughPhase);
+                    // Uses cached globals from BEFORE_LIGHTS — no repeated dFdx/dFdy or phase recomputation.
+                    float _fdmGroove = malievFdmLayerGroove(malievFdmPhase);
                     metallicRoughness.g = clamp(
-                        metallicRoughness.g + (_fdmGroove - 0.5) * fdmLayerStrength * _fdmRoughSideMask * _fdmVisibility * _fdmMoireDampening * 0.40,
+                        metallicRoughness.g + (_fdmGroove - 0.5) * fdmLayerStrength * malievFdmSideMask * malievFdmVis * malievFdmMoire * 0.40,
                         0.05,
                         1.0);
                 }
@@ -3671,14 +3767,10 @@ function getFdmLayerPluginClass() {
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef FDMLAYER
                 {
-                    float _fdmFinalPhase = vPositionW.z / max(fdmLayerH, 0.001);
-                    float _fdmVisibility = malievFdmLayerVisibility(_fdmFinalPhase);
-                    float _fdmMoireDampening = malievFdmLayerMoireDampening(_fdmFinalPhase);
-                    vec3 _fdmFinalNormal = malievFdmDerivativeNormal(vPositionW);
-                    float _fdmFinalSideMask = malievFdmLayerSideMask(_fdmFinalNormal);
-                    float _fdmRelief = malievFdmLayerRelief(vPositionW, _fdmFinalPhase, fdmLayerBump);
-                    float _fdmRidge = malievFdmLayerRidge(_fdmFinalPhase);
-                    float _fdmGroove = malievFdmLayerGroove(_fdmFinalPhase);
+                    // Uses cached globals from BEFORE_LIGHTS — no repeated dFdx/dFdy or phase recomputation.
+                    float _fdmRelief = malievFdmLayerRelief(vPositionW, malievFdmPhase, fdmLayerBump);
+                    float _fdmRidge = malievFdmLayerRidge(malievFdmPhase);
+                    float _fdmGroove = malievFdmLayerGroove(malievFdmPhase);
                     float _fdmVisualGain = clamp(fdmLayerStrength / 0.034, 0.20, 0.92);
                     float _fdmRidgeHighlight = smoothstep(0.40, 0.94, _fdmRidge) * 0.12 * _fdmVisualGain;
                     float _fdmGrooveShadow = smoothstep(0.22, 0.82, _fdmGroove) * 0.18 * _fdmVisualGain;
@@ -3686,9 +3778,9 @@ function getFdmLayerPluginClass() {
                         _fdmRelief * (1.08 + _fdmVisualGain * 0.22)
                         + _fdmRidgeHighlight
                         - _fdmGrooveShadow)
-                        * _fdmFinalSideMask
-                        * _fdmVisibility
-                        * _fdmMoireDampening;
+                        * malievFdmSideMask
+                        * malievFdmVis
+                        * malievFdmMoire;
                     finalColor.rgb *= clamp(1.0 + _fdmLayerLight, 0.74, 1.24);
                 }
                 #endif
@@ -4098,49 +4190,80 @@ function getSurfaceEffectPluginClass() {
                     vec3 keyLight = normalize(vec3(-0.38, -0.58, 0.72));
                     return clamp(dot(reliefNormal, keyLight) - dot(baseNormal, keyLight), -0.35, 0.35);
                 }
+                // Fragment-scope cache — assigned once in CUSTOM_FRAGMENT_BEFORE_LIGHTS,
+                // reused by UPDATE_ALBEDO / UPDATE_METALLICROUGHNESS / BEFORE_FRAGCOLOR.
+                // Eliminates ~8× redundant VNoise evaluations per fragment.
+                float malievMseH        = 0.0;
+                float malievMseSpeckle  = 0.0;
+                float malievMsePowFine  = 0.0;
+                float malievMsePowPores = 0.0;
+                float malievMsePowAa    = 1.0;
+                float malievMseRelief   = 0.0;
+                float malievMseBeadH    = 0.5;
+                float malievMseIsBead   = 0.0;
+                float malievMseIsPowder = 0.0;
+                float malievMseIsMach   = 0.0;
+                // Single-octave fast gradient for powder normal bump — 6 VNoise vs 36 for malievHeightGradient.
+                vec3 malievPowFastGrad(vec3 p, float scl) {
+                    float ss = max(scl, 0.0001);
+                    float e  = max(0.12, 0.35 / ss);
+                    return vec3(
+                        malievVNoise((p + vec3(e,   0.0, 0.0)) * ss) - malievVNoise((p - vec3(e,   0.0, 0.0)) * ss),
+                        malievVNoise((p + vec3(0.0, e,   0.0)) * ss) - malievVNoise((p - vec3(0.0, e,   0.0)) * ss),
+                        malievVNoise((p + vec3(0.0, 0.0, e  )) * ss) - malievVNoise((p - vec3(0.0, 0.0, e  )) * ss)
+                    ) / (2.0 * e);
+                }
                 #endif
             `,
                 CUSTOM_FRAGMENT_BEFORE_LIGHTS: `
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
-                    float _isBead = 1.0 - step(1.5, surfaceEffectKind);
+                    // Classify surface type (uniform-driven, GPU short-circuits these branches).
+                    float _isBead   = 1.0 - step(1.5, surfaceEffectKind);
                     float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
-                    float _isMachined = step(3.5, surfaceEffectKind);
+                    float _isMach   = step(3.5, surfaceEffectKind);
+                    malievMseIsBead   = _isBead;
+                    malievMseIsPowder = _isPowder;
+                    malievMseIsMach   = _isMach;
+
+                    vec3 _baseN = normalize(normalW);
+                    vec3 _geomN = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
+                    _geomN *= gl_FrontFacing ? 1.0 : -1.0;
+
+                    // Cache AA and powder-texture values once (cheap dFdx/dFdy + 4 VNoise total).
+                    malievMsePowAa    = malievPowderBedAa(vPositionW, surfaceEffectScale);
+                    malievMsePowFine  = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
+                    malievMsePowPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
+
+                    // Height and speckle shared across all finish types (kind-dispatched internally).
+                    malievMseH       = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _geomN);
+                    malievMseSpeckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
+
+                    vec3 _keyLight = normalize(vec3(-0.38, -0.58, 0.72));
+
                     if (_isBead > 0.5) {
-                        vec3 _beadBaseNormal = normalize(normalW);
-                        vec3 _beadCraterGradient = malievBeadCraterGradient(
-                            vPositionW,
-                            _beadBaseNormal,
-                            surfaceEffectScale);
-                        float _beadCraterFootprint = malievBeadCraterFootprint(
-                            vPositionW,
-                            _beadBaseNormal,
-                            surfaceEffectScale);
-                        float _beadCraterAa = 1.0 - smoothstep(0.25, 0.75, _beadCraterFootprint);
-                        normalW = normalize(_beadBaseNormal - _beadCraterGradient * surfaceEffectBump * 2.0 * _beadCraterAa);
+                        vec3  _beadGrad = malievBeadCraterGradient(vPositionW, _baseN, surfaceEffectScale);
+                        float _beadFp   = malievBeadCraterFootprint(vPositionW, _baseN, surfaceEffectScale);
+                        float _beadAa   = 1.0 - smoothstep(0.25, 0.75, _beadFp);
+                        normalW = normalize(_baseN - _beadGrad * surfaceEffectBump * 2.0 * _beadAa);
+                        // Cache crater height and relief once for later hooks.
+                        malievMseBeadH = malievBeadCraterHeight(vPositionW, _baseN, surfaceEffectScale);
+                        vec3 _hGrad    = malievHeightGradient(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _geomN);
+                        vec3 _relN     = normalize(_geomN - _hGrad * surfaceEffectBump * 3.2);
+                        malievMseRelief = clamp(dot(_relN, _keyLight) - dot(_geomN, _keyLight), -0.35, 0.35);
                     } else if (_isPowder > 0.5) {
-                        vec3 _powderBaseNormal = normalize(normalW);
-                        vec3 _powderGradient = malievHeightGradient(
-                            vPositionW,
-                            surfaceEffectKind,
-                            surfaceEffectScale,
-                            surfaceEffectStripeScale,
-                            _powderBaseNormal);
-                        float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
-                        normalW = normalize(_powderBaseNormal - _powderGradient * surfaceEffectBump * 0.72 * _powderAa);
-                    } else if (_isMachined > 0.5) {
-                        vec3 _machinedBaseNormal = normalize(normalW);
-                        vec3 _machinedGradient = malievHeightGradient(
-                            vPositionW,
-                            surfaceEffectKind,
-                            surfaceEffectScale,
-                            surfaceEffectStripeScale,
-                            _machinedBaseNormal);
-                        float _machinedFootprint = max(
-                            length(dFdx(vPositionW * surfaceEffectStripeScale)),
-                            length(dFdy(vPositionW * surfaceEffectStripeScale)));
-                        float _machinedAa = 1.0 - smoothstep(0.75, 1.65, _machinedFootprint);
-                        normalW = normalize(_machinedBaseNormal - _machinedGradient * surfaceEffectBump * 0.44 * _machinedAa);
+                        // Fast single-octave gradient (6 VNoise) vs full powder gradient (36 VNoise).
+                        vec3 _powGrad = malievPowFastGrad(vPositionW, surfaceEffectScale);
+                        normalW = normalize(_baseN - _powGrad * surfaceEffectBump * 0.72 * malievMsePowAa);
+                        vec3 _relN    = normalize(_geomN - _powGrad * surfaceEffectBump * 3.2);
+                        malievMseRelief = clamp(dot(_relN, _keyLight) - dot(_geomN, _keyLight), -0.35, 0.35);
+                    } else if (_isMach > 0.5) {
+                        vec3  _machGrad = malievHeightGradient(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _baseN);
+                        float _machFp   = max(length(dFdx(vPositionW * surfaceEffectStripeScale)), length(dFdy(vPositionW * surfaceEffectStripeScale)));
+                        float _machAa   = 1.0 - smoothstep(0.75, 1.65, _machFp);
+                        normalW = normalize(_baseN - _machGrad * surfaceEffectBump * 0.44 * _machAa);
+                        vec3 _relN      = normalize(_geomN - _machGrad * surfaceEffectBump * 3.2);
+                        malievMseRelief = clamp(dot(_relN, _keyLight) - dot(_geomN, _keyLight), -0.35, 0.35);
                     }
                 }
                 #endif
@@ -4148,129 +4271,71 @@ function getSurfaceEffectPluginClass() {
                 CUSTOM_FRAGMENT_UPDATE_ALBEDO: `
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
-                    // Subtle albedo variation supports the bump map without making bead blast look painted on.
-                    vec3 _surfaceNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
-                    _surfaceNormal *= gl_FrontFacing ? 1.0 : -1.0;
-                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _surfaceNormal);
-                    float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
-                    float _isBead = 1.0 - step(1.5, surfaceEffectKind);
-                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
-                    float _isMachined = step(3.5, surfaceEffectKind);
-                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
-                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
-                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
-                    float _relief = malievSurfaceRelief(
-                        vPositionW,
-                        surfaceEffectKind,
-                        surfaceEffectScale,
-                        surfaceEffectStripeScale,
-                        surfaceEffectBump,
-                        _surfaceNormal);
-                    float _grainAmplitude = mix(surfaceEffectBump, surfaceEffectStrength, _isBead);
-                    float _standardGrain = (_h - 0.5) * _grainAmplitude * mix(0.72, 0.04, _isBead)
-                        + (_speckle - 0.5) * _grainAmplitude * mix(0.24, 0.03, _isBead);
-                    float _powderGrain = ((_h - 0.5) * 0.55
-                            + (_powderFine - 0.5) * 1.15
-                            - _powderPores * 0.85)
-                        * surfaceEffectStrength * _powderAa;
-                    float _grain = mix(_standardGrain, _powderGrain, _isPowder);
-                    float _machinedGrain = (_h - 0.5) * surfaceEffectStripeStrength * 0.42
-                        + _relief * 0.08;
-                    _grain = mix(_grain, _machinedGrain, _isMachined);
+                    // All values from BEFORE_LIGHTS cache — zero additional VNoise calls.
+                    float _grainAmp  = mix(surfaceEffectBump, surfaceEffectStrength, malievMseIsBead);
+                    float _stdGrain  = (malievMseH       - 0.5) * _grainAmp * mix(0.72, 0.04, malievMseIsBead)
+                                     + (malievMseSpeckle - 0.5) * _grainAmp * mix(0.24, 0.03, malievMseIsBead);
+                    float _powGrain  = ((malievMseH       - 0.5) * 0.55
+                                      + (malievMsePowFine - 0.5) * 1.15
+                                      - malievMsePowPores * 0.85)
+                                     * surfaceEffectStrength * malievMsePowAa;
+                    float _machGrain = (malievMseH - 0.5) * surfaceEffectStripeStrength * 0.42
+                                     + malievMseRelief * 0.08;
+                    float _grain     = mix(_stdGrain, _powGrain, malievMseIsPowder);
+                    _grain           = mix(_grain, _machGrain, malievMseIsMach);
                     surfaceAlbedo *= clamp(
-                        1.0 + _grain + _relief * mix(mix(0.22, 0.035, _isBead), 0.18, _isPowder),
-                        mix(mix(0.75, 0.97, _isBead), 0.58, _isPowder),
-                        mix(mix(1.20, 1.03, _isBead), 1.24, _isPowder));
+                        1.0 + _grain + malievMseRelief * mix(mix(0.22, 0.035, malievMseIsBead), 0.18, malievMseIsPowder),
+                        mix(mix(0.75, 0.97, malievMseIsBead), 0.58, malievMseIsPowder),
+                        mix(mix(1.20, 1.03, malievMseIsBead), 1.24, malievMseIsPowder));
                 }
                 #endif
             `,
                 CUSTOM_FRAGMENT_UPDATE_METALLICROUGHNESS: `
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
-                    // Roughness grain: view-dependent light/dark micro-scatter that reads like relief and
-                    // (because it feeds reflection blur) shows on metals too.
-                    vec3 _surfaceNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
-                    _surfaceNormal *= gl_FrontFacing ? 1.0 : -1.0;
-                    float _h = malievHeight(vPositionW, surfaceEffectKind, surfaceEffectScale, surfaceEffectStripeScale, _surfaceNormal);
-                    float _speckle = malievSurfaceSpeckle(vPositionW, surfaceEffectKind, surfaceEffectScale);
-                    float _ra = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
-                    float _isBead = 1.0 - step(1.5, surfaceEffectKind);
-                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
-                    float _isMachined = step(3.5, surfaceEffectKind);
-                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
-                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
-                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
-                    float _standardRoughness = clamp(
+                    // All values from BEFORE_LIGHTS cache — zero additional VNoise calls.
+                    float _ra            = surfaceEffectStrength + surfaceEffectStripeStrength + surfaceEffectBump * 0.35;
+                    float _stdRoughness  = clamp(
                         metallicRoughness.g
-                            + ((_h - 0.5) * mix(0.72, 0.10, _isBead)
-                                + (_speckle - 0.5) * mix(0.45, 0.08, _isBead))
-                                * _ra * mix(1.6, 0.45, _isBead),
-                        0.06,
-                        1.0);
-                    float _powderRoughness = clamp(
-                        metallicRoughness.g + 0.03 + (_powderFine * 0.08 + _powderPores * 0.12) * _powderAa,
-                        0.82,
-                        1.0);
-                    float _machinedRoughness = clamp(
-                        metallicRoughness.g + (_h - 0.5) * surfaceEffectStripeStrength * 0.68,
-                        0.06,
-                        1.0);
-                    metallicRoughness.g = mix(_standardRoughness, _powderRoughness, _isPowder);
-                    metallicRoughness.g = mix(metallicRoughness.g, _machinedRoughness, _isMachined);
-                    metallicRoughness.g = max(metallicRoughness.g, mix(0.0, 0.88, _isBead));
+                            + ((malievMseH       - 0.5) * mix(0.72, 0.10, malievMseIsBead)
+                            +  (malievMseSpeckle - 0.5) * mix(0.45, 0.08, malievMseIsBead))
+                              * _ra * mix(1.6, 0.45, malievMseIsBead),
+                        0.06, 1.0);
+                    float _powRoughness  = clamp(
+                        metallicRoughness.g + 0.03 + (malievMsePowFine * 0.08 + malievMsePowPores * 0.12) * malievMsePowAa,
+                        0.82, 1.0);
+                    float _machRoughness = clamp(
+                        metallicRoughness.g + (malievMseH - 0.5) * surfaceEffectStripeStrength * 0.68,
+                        0.06, 1.0);
+                    metallicRoughness.g = mix(_stdRoughness, _powRoughness, malievMseIsPowder);
+                    metallicRoughness.g = mix(metallicRoughness.g, _machRoughness, malievMseIsMach);
+                    metallicRoughness.g = max(metallicRoughness.g, mix(0.0, 0.88, malievMseIsBead));
                 }
                 #endif
             `,
                 CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
                 #ifdef MALIEV_SURFACE_EFFECT
                 {
-                    // Final lit-color relief makes bead blasting read as surface texture instead of only
-                    // as a flatter roughness preset.
-                    vec3 _finalNormal = normalize(cross(dFdx(vPositionW), dFdy(vPositionW)));
-                    _finalNormal *= gl_FrontFacing ? 1.0 : -1.0;
-                    float _finalH = malievHeight(
-                        vPositionW,
-                        surfaceEffectKind,
-                        surfaceEffectScale,
-                        surfaceEffectStripeScale,
-                        _finalNormal);
-                    float _finalSpeckle = malievSurfaceSpeckle(
-                        vPositionW,
-                        surfaceEffectKind,
-                        surfaceEffectScale);
-                    float _isBead = 1.0 - step(1.5, surfaceEffectKind);
-                    float _isPowder = step(2.5, surfaceEffectKind) * (1.0 - step(3.5, surfaceEffectKind));
-                    float _isMachined = step(3.5, surfaceEffectKind);
-                    float _powderAa = malievPowderBedAa(vPositionW, surfaceEffectScale);
-                    float _powderFine = malievPowderFineSpeckle(vPositionW, surfaceEffectScale);
-                    float _powderPores = malievPowderBedPores(vPositionW, surfaceEffectScale);
-                    float _powderPoreShadow = _powderPores * surfaceEffectStrength * 1.15 * _powderAa;
-                    float _finalBeadH = malievBeadCraterHeight(vPositionW, normalize(normalW), surfaceEffectScale);
-                    float _finalSurfaceH = mix(_finalH, _finalBeadH, _isBead);
-                    float _finalRelief = malievSurfaceRelief(
-                        vPositionW,
-                        surfaceEffectKind,
-                        surfaceEffectScale,
-                        surfaceEffectStripeScale,
-                        surfaceEffectBump,
-                        _finalNormal);
-                    float _standardLight =
-                        (_finalSurfaceH - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.55, 0.02, _isBead)
-                        + (_finalSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, _isBead) * mix(0.24, 0.015, _isBead)
-                        + _finalRelief * mix(0.18, 0.05, _isBead);
-                    float _powderLight =
-                        (_powderFine - 0.5) * surfaceEffectStrength * 0.85 * _powderAa
-                        - _powderPoreShadow
-                        + _finalRelief * 0.34 * _powderAa;
-                    float _machinedLight =
-                        (_finalSurfaceH - 0.5) * surfaceEffectStripeStrength * 0.48
-                        + _finalRelief * 0.12;
-                    float _surfaceLight = mix(_standardLight, _powderLight, _isPowder);
-                    _surfaceLight = mix(_surfaceLight, _machinedLight, _isMachined);
+                    // All values from BEFORE_LIGHTS cache — zero additional VNoise calls.
+                    float _finalSurfH    = mix(malievMseH, malievMseBeadH, malievMseIsBead);
+                    float _powPoreShadow = malievMsePowPores * surfaceEffectStrength * 1.15 * malievMsePowAa;
+                    float _stdLight      =
+                        (_finalSurfH      - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, malievMseIsBead) * mix(0.55, 0.02, malievMseIsBead)
+                      + (malievMseSpeckle - 0.5) * mix(surfaceEffectBump, surfaceEffectStrength, malievMseIsBead) * mix(0.24, 0.015, malievMseIsBead)
+                      + malievMseRelief * mix(0.18, 0.05, malievMseIsBead);
+                    float _powLight      =
+                        (malievMsePowFine - 0.5) * surfaceEffectStrength * 0.85 * malievMsePowAa
+                      - _powPoreShadow
+                      + malievMseRelief * 0.34 * malievMsePowAa;
+                    float _machLight     =
+                        (_finalSurfH - 0.5) * surfaceEffectStripeStrength * 0.48
+                      + malievMseRelief * 0.12;
+                    float _surfLight     = mix(_stdLight, _powLight, malievMseIsPowder);
+                    _surfLight           = mix(_surfLight, _machLight, malievMseIsMach);
                     finalColor.rgb *= clamp(
-                        1.0 + _surfaceLight,
-                        mix(mix(0.78, 0.97, _isBead), 0.62, _isPowder),
-                        mix(mix(1.18, 1.03, _isBead), 1.16, _isPowder));
+                        1.0 + _surfLight,
+                        mix(mix(0.78, 0.97, malievMseIsBead), 0.62, malievMseIsPowder),
+                        mix(mix(1.18, 1.03, malievMseIsBead), 1.16, malievMseIsPowder));
                 }
                 #endif
             `,
@@ -4740,6 +4805,30 @@ function shouldSkipRealisticDeferredUpgrade(canvasId) {
     return false;
 }
 
+function prewarmRealisticShaders(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const targetMesh = scene.meshes.find(m => !isSystemMesh(m) && typeof m.getTotalVertices === 'function');
+    if (!targetMesh) return;
+
+    // Pre-compile all 4 shader variants (FDMLAYER on/off × MALIEV_SURFACE_EFFECT on/off)
+    // so that finish switching no longer triggers a synchronous WebGL compile stall.
+    const presets = [[false, null], [true, null], [false, 'bead-blast'], [true, 'bead-blast']];
+    presets.forEach(([useFdm, effectKey]) => {
+        try {
+            const mat = new BABYLON.PBRMaterial(`__prewarm_${useFdm}_${effectKey}__`, scene);
+            configureRealisticPbrQuality(mat);
+            const basePreset = CONFIG.MATERIAL_REALISTIC['aluminum'] || Object.values(CONFIG.MATERIAL_REALISTIC)[0];
+            syncRealisticMaterialProperties(mat, basePreset, null, { roughnessOffset: 0, metallicOffset: 0 }, {});
+            if (useFdm) {
+                new (getFdmLayerPluginClass())(mat, FDM_LAYER_HEIGHT_MM);
+            }
+            new (getSurfaceEffectPluginClass())(mat, effectKey ? getSurfaceEffect(effectKey) : null);
+            mat.forceCompilation?.(targetMesh, () => { try { mat.dispose?.(); } catch (_) {} });
+        } catch (_) {}
+    });
+}
+
 function scheduleRealisticQualityUpgrade(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
@@ -4747,26 +4836,57 @@ function scheduleRealisticQualityUpgrade(canvasId) {
     const token = (realisticQualityTaskTokens[canvasId] || 0) + 1;
     realisticQualityTaskTokens[canvasId] = token;
 
+    // Notify Blazor that upgrade is starting
+    const dotNetRef = getDotNetRef(canvasId);
+    if (dotNetRef) {
+        try { dotNetRef.invokeMethodAsync('NotifyRealisticUpgradeStart'); } catch (_) {}
+    }
+
     scheduleIdleWork(() => {
         if (realisticQualityTaskTokens[canvasId] !== token
             || scenes[canvasId] !== scene
             || currentRenderModes[canvasId] !== 'realistic') {
+            // Notify Blazor that upgrade is complete (cancelled)
+            if (dotNetRef) {
+                try { dotNetRef.invokeMethodAsync('NotifyRealisticUpgradeComplete'); } catch (_) {}
+            }
             return;
         }
 
         if (shouldSkipRealisticDeferredUpgrade(canvasId)) {
+            if (dotNetRef) {
+                try { dotNetRef.invokeMethodAsync('NotifyRealisticUpgradeComplete'); } catch (_) {}
+            }
             return;
         }
 
         try {
+            prewarmRealisticShaders(canvasId);
             getOrCreateEnvironmentTexture(scene, canvasId, 'high');
-            applySmoothNormals(canvasId, getRealisticNormalSmoothingOptions(canvasId));
-            try { scene.render?.(); } catch (_) {}
+            applySmoothNormalsChunked(canvasId, getRealisticNormalSmoothingOptions(canvasId), () => {
+                try { scene.render?.(); } catch (_) {}
+                // Notify Blazor that upgrade is complete
+                if (dotNetRef) {
+                    try { dotNetRef.invokeMethodAsync('NotifyRealisticUpgradeComplete'); } catch (_) {}
+                }
+            });
         } catch (err) {
             console.error('[BabylonViewer] Deferred realistic quality upgrade failed:', err);
+            if (dotNetRef) {
+                try { dotNetRef.invokeMethodAsync('NotifyRealisticUpgradeComplete'); } catch (_) {}
+            }
         }
     });
 }
+
+// Get the DotNetObjectReference for a canvas (stored during initialize)
+function getDotNetRef(canvasId) {
+    // The dotNetRef is passed to initialize and we need to store it per canvas
+    return dotNetRefs[canvasId] ?? null;
+}
+
+// Store dotNetRef per canvas during initialize
+const dotNetRefs = {};
 
 /**
  * Schedules a fallback transition to realistic mode after a delay.
@@ -4852,6 +4972,7 @@ function transitionToRealistic(canvasId, transitionMs = 250) {
     scheduleRealisticQualityUpgrade(canvasId);
     _syncCuttingMatRenderMode(canvasId);
     syncSceneShadowParticipation(canvasId);
+    extendShadowFrustum(canvasId);
 }
 
 function refreshRealisticNormalSmoothing(canvasId) {
@@ -5192,14 +5313,122 @@ function normalizeNormalVector(normals, offset, fallback) {
 // ── Smooth normals for realistic edge softening ───────────────────────────────
 
 /**
+ * Per-mesh smooth-normal computation shared by the chunked and synchronous paths.
  * Recomputes per-vertex normals with angle-based smoothing to visually soften
  * faceted CAD edges — approximating a 0.2 mm fillet without tessellating geometry.
  * Original hard normals are saved so they can be restored on mode switch.
- * @param {string} canvasId
+ * @param {BABYLON.Mesh} mesh
+ * @param {Map<number, Float32Array>} saved
+ * @param {Map<number, string>} profiles
+ * @param {object} options
+ * @param {number} cosThreshold
+ * @param {string} profileKey
  */
-function applySmoothNormals(canvasId, options = getRealisticNormalSmoothingOptions(canvasId)) {
+function applySmoothNormalsForMesh(mesh, saved, profiles, options, cosThreshold, profileKey) {
+    if (isSystemMesh(mesh)) return false;
+    if (typeof mesh.getVerticesData !== 'function'
+        || typeof mesh.getIndices !== 'function'
+        || typeof mesh.setVerticesData !== 'function') {
+        return false;
+    }
+
+    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const indices   = mesh.getIndices();
+    const currentNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
+    // Do not synthesize normals here. Some GLBs intentionally render from
+    // position/color only; feeding generated face normals into this smoothing
+    // pass can average unrelated triangles and create broken black facets.
+    if (!positions || !indices || !currentNorms) return false;
+
+    let origNorms = saved.get(mesh.uniqueId);
+    if (!origNorms) {
+        origNorms = new Float32Array(currentNorms);
+        saved.set(mesh.uniqueId, origNorms);
+    } else if (profiles.get(mesh.uniqueId) === profileKey) {
+        return false;
+    }
+
+    const vertCount = positions.length / 3;
+    const maxVertices = CONFIG.REALISTIC.maxSmoothNormalsVerticesPerMesh ?? 120000;
+    const maxIndices = CONFIG.REALISTIC.maxSmoothNormalsIndicesPerMesh ?? 360000;
+    if (vertCount > maxVertices || indices.length > maxIndices) {
+        return false;
+    }
+
+    const faceNormals = [];
+    const positionFaceMap = new Map();
+    const smoothNormals = new Float32Array(vertCount * 3);
+    const positionTolerance = getSmoothNormalPositionTolerance(positions, options);
+
+    // Pass 1 — compute face normals
+    for (let i = 0; i < indices.length; i += 3) {
+        const v0 = indices[i], v1 = indices[i + 1], v2 = indices[i + 2];
+        const i0 = v0 * 3, i1 = v1 * 3, i2 = v2 * 3;
+        const ax = positions[i1] - positions[i0], ay = positions[i1 + 1] - positions[i0 + 1], az = positions[i1 + 2] - positions[i0 + 2];
+        const bx = positions[i2] - positions[i0], by = positions[i2 + 1] - positions[i0 + 1], bz = positions[i2 + 2] - positions[i0 + 2];
+        const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        const area = len * 0.5;
+        const fn = len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len, weight: area } : { x: 0, y: 0, z: 1, weight: 1 };
+        faceNormals.push(fn);
+
+        [v0, v1, v2].forEach(v => {
+            if (v >= vertCount) return;
+            const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
+            const faces = positionFaceMap.get(key) || [];
+            faces.push(fn);
+            positionFaceMap.set(key, faces);
+        });
+    }
+
+    // Pass 2 — average normals by position, discarding faces beyond angle threshold.
+    // CAD/STL imports commonly duplicate vertices per triangle, so index-only
+    // adjacency leaves round surfaces faceted and causes jagged PBR reflections.
+    for (let v = 0; v < vertCount; v++) {
+        const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
+        const faces = positionFaceMap.get(key) || [];
+        if (faces.length === 0) { smoothNormals[v * 3 + 2] = 1; continue; }
+
+        let sx = 0, sy = 0, sz = 0;
+        const refNormal = normalizeNormalVector(origNorms, v * 3, faces[0]);
+        for (let j = 0; j < faces.length; j++) {
+            const f = faces[j];
+            const dot = refNormal.x * f.x + refNormal.y * f.y + refNormal.z * f.z;
+            if (dot >= cosThreshold) {
+                const weight = f.weight || 1;
+                sx += f.x * weight;
+                sy += f.y * weight;
+                sz += f.z * weight;
+            }
+        }
+        const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
+        if (slen > 1e-10) { sx /= slen; sy /= slen; sz /= slen; }
+        smoothNormals[v * 3]     = slen > 1e-10 ? sx : refNormal.x;
+        smoothNormals[v * 3 + 1] = slen > 1e-10 ? sy : refNormal.y;
+        smoothNormals[v * 3 + 2] = slen > 1e-10 ? sz : refNormal.z;
+    }
+
+    mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, smoothNormals);
+    profiles.set(mesh.uniqueId, profileKey);
+    return true;
+}
+
+/**
+ * Recomputes per-vertex normals with angle-based smoothing across all meshes in
+ * the scene. Yields the main thread between meshes via requestIdleCallback so
+ * that switching to realistic mode on a heavy part (e.g. CNC machined brass)
+ * does not freeze the canvas for several seconds. Original hard normals are
+ * saved so they can be restored on mode switch.
+ * @param {string} canvasId
+ * @param {object} [options]
+ * @param {() => void} [onComplete] - Called once all meshes are processed (or
+ *   immediately if there is nothing to do / the work is cancelled).
+ */
+function applySmoothNormalsChunked(canvasId, options = getRealisticNormalSmoothingOptions(canvasId), onComplete) {
     const scene = scenes[canvasId];
-    if (!scene) return;
+    const finish = () => { try { onComplete?.(); } catch (_) {} };
+
+    if (!scene) { finish(); return; }
 
     const angleDeg = clamp(options?.angleDeg ?? CONFIG.REALISTIC.smoothAngleDeg, 0, 180);
     const thresholdRad = (angleDeg * Math.PI) / 180;
@@ -5211,93 +5440,51 @@ function applySmoothNormals(canvasId, options = getRealisticNormalSmoothingOptio
     const saved = originalNormalData[canvasId];
     const profiles = normalSmoothingProfiles[canvasId];
 
-    scene.meshes.forEach(mesh => {
-        if (isSystemMesh(mesh)) return;
-        if (typeof mesh.getVerticesData !== 'function'
-            || typeof mesh.getIndices !== 'function'
-            || typeof mesh.setVerticesData !== 'function') {
+    // Snapshot the mesh list up front so the iteration is stable even if the
+    // scene mutates mid-upgrade (e.g. user re-loads a GLB).
+    const meshes = scene.meshes.slice();
+    const startToken = (realisticQualityTaskTokens[canvasId] || 0);
+
+    const runChunk = (deadline) => {
+        // Cancel if the upgrade was superseded, the scene changed, or the user
+        // switched out of realistic mode.
+        if (realisticQualityTaskTokens[canvasId] !== startToken
+            || scenes[canvasId] !== scene
+            || currentRenderModes[canvasId] !== 'realistic') {
+            finish();
             return;
         }
 
-        const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-        const indices   = mesh.getIndices();
-        const currentNorms = mesh.getVerticesData(BABYLON.VertexBuffer.NormalKind);
-        // Do not synthesize normals here. Some GLBs intentionally render from
-        // position/color only; feeding generated face normals into this smoothing
-        // pass can average unrelated triangles and create broken black facets.
-        if (!positions || !indices || !currentNorms) return;
+        const timeBudgetMs = CONFIG.REALISTIC.smoothNormalsChunkBudgetMs ?? 6;
 
-        let origNorms = saved.get(mesh.uniqueId);
-        if (!origNorms) {
-            origNorms = new Float32Array(currentNorms);
-            saved.set(mesh.uniqueId, origNorms);
-        } else if (profiles.get(mesh.uniqueId) === profileKey) {
-            return;
-        }
-
-        const vertCount = positions.length / 3;
-        const maxVertices = CONFIG.REALISTIC.maxSmoothNormalsVerticesPerMesh ?? 120000;
-        const maxIndices = CONFIG.REALISTIC.maxSmoothNormalsIndicesPerMesh ?? 360000;
-        if (vertCount > maxVertices || indices.length > maxIndices) {
-            return;
-        }
-
-        const faceNormals = [];
-        const positionFaceMap = new Map();
-        const smoothNormals = new Float32Array(vertCount * 3);
-        const positionTolerance = getSmoothNormalPositionTolerance(positions, options);
-
-        // Pass 1 — compute face normals
-        for (let i = 0; i < indices.length; i += 3) {
-            const v0 = indices[i], v1 = indices[i + 1], v2 = indices[i + 2];
-            const i0 = v0 * 3, i1 = v1 * 3, i2 = v2 * 3;
-            const ax = positions[i1] - positions[i0], ay = positions[i1 + 1] - positions[i0 + 1], az = positions[i1 + 2] - positions[i0 + 2];
-            const bx = positions[i2] - positions[i0], by = positions[i2 + 1] - positions[i0 + 1], bz = positions[i2 + 2] - positions[i0 + 2];
-            const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-            const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-            const area = len * 0.5;
-            const fn = len > 1e-10 ? { x: nx / len, y: ny / len, z: nz / len, weight: area } : { x: 0, y: 0, z: 1, weight: 1 };
-            faceNormals.push(fn);
-
-            [v0, v1, v2].forEach(v => {
-                if (v >= vertCount) return;
-                const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
-                const faces = positionFaceMap.get(key) || [];
-                faces.push(fn);
-                positionFaceMap.set(key, faces);
-            });
-        }
-
-        // Pass 2 — average normals by position, discarding faces beyond angle threshold.
-        // CAD/STL imports commonly duplicate vertices per triangle, so index-only
-        // adjacency leaves round surfaces faceted and causes jagged PBR reflections.
-        for (let v = 0; v < vertCount; v++) {
-            const key = getSmoothNormalPositionKey(positions, v * 3, positionTolerance);
-            const faces = positionFaceMap.get(key) || [];
-            if (faces.length === 0) { smoothNormals[v * 3 + 2] = 1; continue; }
-
-            let sx = 0, sy = 0, sz = 0;
-            const refNormal = normalizeNormalVector(origNorms, v * 3, faces[0]);
-            for (let j = 0; j < faces.length; j++) {
-                const f = faces[j];
-                const dot = refNormal.x * f.x + refNormal.y * f.y + refNormal.z * f.z;
-                if (dot >= cosThreshold) {
-                    const weight = f.weight || 1;
-                    sx += f.x * weight;
-                    sy += f.y * weight;
-                    sz += f.z * weight;
-                }
+        while (meshes.length > 0) {
+            const mesh = meshes.shift();
+            try {
+                applySmoothNormalsForMesh(mesh, saved, profiles, options, cosThreshold, profileKey);
+            } catch (err) {
+                console.error('[BabylonViewer] applySmoothNormalsChunked mesh failed:', err);
             }
-            const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
-            if (slen > 1e-10) { sx /= slen; sy /= slen; sz /= slen; }
-            smoothNormals[v * 3]     = slen > 1e-10 ? sx : refNormal.x;
-            smoothNormals[v * 3 + 1] = slen > 1e-10 ? sy : refNormal.y;
-            smoothNormals[v * 3 + 2] = slen > 1e-10 ? sz : refNormal.z;
+
+            // Stop when we have used most of the idle budget so the browser can
+            // paint and process input. Skip the budget check on the last mesh.
+            if (meshes.length === 0) break;
+            const remaining = typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : timeBudgetMs;
+            if (remaining <= timeBudgetMs) break;
         }
 
-        mesh.setVerticesData(BABYLON.VertexBuffer.NormalKind, smoothNormals);
-        profiles.set(mesh.uniqueId, profileKey);
-    });
+        if (meshes.length > 0) {
+            scheduleIdleWork(runChunk);
+        } else {
+            finish();
+        }
+    };
+
+    if (meshes.length === 0) {
+        finish();
+        return;
+    }
+
+    scheduleIdleWork(runChunk);
 }
 
 /**
@@ -6546,6 +6733,7 @@ export function applyStudioLighting(canvasId, isDark) {
     }
 
     syncSceneShadowParticipation(canvasId);
+    extendShadowFrustum(canvasId);
 }
 
 // ── setRenderMode ─────────────────────────────────────────────────────────────
@@ -6662,6 +6850,7 @@ export function setRenderMode(canvasId, mode) {
     }
     _syncCuttingMatRenderMode(canvasId);
     syncSceneShadowParticipation(canvasId);
+    extendShadowFrustum(canvasId);
 }
 
 // ── setCameraPreset ───────────────────────────────────────────────────────────
@@ -7127,8 +7316,9 @@ function _syncShadowCatcherVisibility(canvasId) {
     if (catcher.position) {
         const bb = sceneBoundingBoxes[canvasId];
         const baseZ = bb ? bb.min.z : 0;
-        // Raise catcher 0.1mm above mat top to prevent z-fighting when mat is active.
-        catcher.position.z = matOn ? baseZ + 0.1 : baseZ;
+        // Align catcher with cutting mat top surface (Z=0) so shadows reach the part contact point.
+        // The cutting mat top mesh (__cutting_mat__) receives shadows directly at Z=0.
+        catcher.position.z = baseZ;
     }
 }
 
@@ -7397,6 +7587,7 @@ export function showCuttingMat(canvasId) {
     cuttingMatActiveFlags[canvasId] = true;
     _syncShadowCatcherVisibility(canvasId);
     syncSceneShadowParticipation(canvasId);
+    extendShadowFrustum(canvasId);
 
     _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
         fromZ: -slideOffset,
@@ -7861,6 +8052,7 @@ export function hideCuttingMat(canvasId) {
 
     if (meshes.length === 0) {
         syncSceneShadowParticipation(canvasId);
+        extendShadowFrustum(canvasId);
         _restoreModelCameraFit(canvasId);
         _restoreCuttingMatCameraClipping(canvasId);
         return;
@@ -7880,6 +8072,7 @@ export function hideCuttingMat(canvasId) {
         onComplete: () => {
             meshes.forEach(mesh => mesh.dispose(false, true));
             syncSceneShadowParticipation(canvasId);
+            extendShadowFrustum(canvasId);
             _restoreModelCameraFit(canvasId);
             _restoreCuttingMatCameraClipping(canvasId);
         },

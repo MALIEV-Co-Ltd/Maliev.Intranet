@@ -80,7 +80,7 @@ public class ThumbnailGenerationServiceTests
     }
 
     [Fact]
-    public void Unsubscribe_RemovesCallback()
+    public async Task Unsubscribe_RemovesCallback()
     {
         var service = new ThumbnailGenerationService(
             jsRuntime: null!,
@@ -92,7 +92,7 @@ public class ThumbnailGenerationServiceTests
 
         service.Subscribe(callback);
         service.Unsubscribe(callback);
-        service.NotifyAsync(new ThumbnailProgress("path", ThumbnailGenerationStage.Queued, 0, null)).Wait();
+        await service.NotifyAsync(new ThumbnailProgress("path", ThumbnailGenerationStage.Queued, 0, null));
 
         Assert.Empty(received);
     }

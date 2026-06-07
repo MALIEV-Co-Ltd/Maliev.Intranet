@@ -208,9 +208,28 @@
                      Class="topbar-theme-toggle"
                     aria-label="@GetThemeLabel()"
                     @onclick="OnToggleTheme">
-                <MudIcon Icon="@GetThemeIcon()"
-                         Class="topbar-theme-icon"
-                         Size="Size.Small" />
+                @if (LayoutService.IsDarkMode)
+                {
+                    <svg class="topbar-theme-icon"
+                         width="20"
+                         height="20"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true"
+                         focusable="false">
+                        <path d="@ThemeIcons.Dark" />
+                    </svg>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Outlined.LightMode"
+                             Class="topbar-theme-icon"
+                             Size="Size.Small" />
+                }
             </button>
         </MudTooltip>
 
@@ -318,16 +337,61 @@
 
     private string MobileNavButtonLabel => _mobileNavOpen ? "Close navigation menu" : "Open navigation menu";
 
-    private string GetThemeIcon() => LayoutService.IsDarkMode
-        ? ThemeIcons.Dark
-        : Icons.Material.Outlined.LightMode;
-
     private string GetThemeLabel() => LayoutService.IsDarkMode
         ? "Dark Theme"
         : "Light Theme";
 
-    private static string? GetProfileImageUrl(System.Security.Claims.ClaimsPrincipal user) =>
-        FirstNonBlank(user.FindFirst("picture")?.Value);
+    private static readonly string[] PictureClaimTypes =
+    [
+        "picture",
+        "urn:google:picture",
+        "urn:google:avatar",
+        "http://schemas.openid.net/claims/picture",
+        "profile_image_url"
+    ];
+
+    private static readonly string[] ProxyHosts =
+    [
+        "lh3.googleusercontent.com",
+        "lh4.googleusercontent.com",
+        "lh5.googleusercontent.com",
+        "lh6.googleusercontent.com",
+        "avatars.githubusercontent.com",
+        "platform-lookaside.fbsbx.com"
+    ];
+
+    private static string? GetProfileImageUrl(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (user is null) return null;
+
+        foreach (var claimType in PictureClaimTypes)
+        {
+            var value = user.FindFirst(claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return user.Claims
+            .Where(c => !string.IsNullOrWhiteSpace(c.Value))
+            .FirstOrDefault(c =>
+                c.Type.EndsWith("/picture", StringComparison.OrdinalIgnoreCase) ||
+                c.Type.EndsWith(":picture", StringComparison.OrdinalIgnoreCase) ||
+                c.Type.Equals("profile_image_url", StringComparison.OrdinalIgnoreCase))
+            ?.Value;
+    }
+
+    private static string? GetProxiedProfileImageUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            return url;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return url;
+
+        return ProxyHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
+            ? $"/api/v1/auth/avatar?url={Uri.EscapeDataString(url)}"
+            : url;
+    }
 
     private void HandleProfileImageError() => _profileImageFailed = true;
 

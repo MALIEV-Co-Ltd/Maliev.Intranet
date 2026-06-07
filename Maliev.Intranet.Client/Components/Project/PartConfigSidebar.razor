@@ -33,45 +33,92 @@
     </div>
 
     <div class="pcs-scroll">
-        @* ── Manufacturing Process ─────────────────────────────────────── *@
-        <section class="pcs-section"
-                 data-config-section="manufacturing-process"
-                 data-horizontal-wheel="true"
-                 onwheel="const row = this.querySelector('.pcs-process-row'); if (row && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) { row.scrollLeft += event.deltaY; event.preventDefault(); }">
+         @* ── Manufacturing Process ─────────────────────────────────────── *@
+         <section class="pcs-section"
+                  data-config-section="manufacturing-process">
             <div class="pcs-section-header">
                 <span class="pcs-section-title">Manufacturing Process</span>
             </div>
-            <div class="pcs-process-row" @ref="_processRowElement">
-                @foreach (var proc in Processes)
-                {
-                    var active = SelectedProcess?.Code == proc.Code;
-                    var cardClass = active
-                        ? "pcs-process-card pcs-process-card--active"
-                        : HasSelectedProcess ? "pcs-process-card pcs-process-card--dimmed" : "pcs-process-card";
-                    var name = GetProcessCardName(proc);
-                    var description = GetProcessDescription(proc);
-                    <button class="@cardClass"
-                            data-process-code="@proc.Code"
-                            aria-pressed="@active"
-                            title="@proc.Name"
-                            @onclick="@(() => OnProcessChanged(proc))">
-                        @if (active)
-                        {
-                            <div class="pcs-process-check">
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
-                            </div>
-                        }
+
+            @if (!_isChangingProcess && HasSelectedProcess && SelectedProcess != null)
+            {
+                @* ── Selected process view with Change button ──────────── *@
+                var sp = SelectedProcess;
+                var name = GetProcessCardName(sp);
+                var description = GetProcessDescription(sp);
+                var category = GetProcessCategory(sp);
+                <div class="pcs-process-selected">
+                    <div class="pcs-process-card pcs-process-card--active pcs-process-card--selected">
+                        <div class="pcs-process-check">
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                        </div>
                         <div class="pcs-process-photo"
-                             style="background-image:url('/images/processes/@(proc.Code.ToLowerInvariant()).jpg')"
+                             style="background-image:url('/images/processes/@(sp.Code.ToLowerInvariant()).jpg')"
                              role="img"
-                             aria-label="@proc.Name"></div>
+                             aria-label="@sp.Name"></div>
                         <div class="pcs-process-copy">
+                            <div class="pcs-process-category">@category</div>
                             <div class="pcs-process-name">@name</div>
                             <div class="pcs-process-description">@description</div>
+                            <button class="pcs-process-change-btn"
+                                    @onclick="StartChangingProcess"
+                                    type="button">
+                                Change
+                            </button>
                         </div>
-                    </button>
-                }
-            </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @* ── Process selection list ──────────────────────────── *@
+                <div class="pcs-process-search">
+                    <input @ref="_processSearchInput"
+                           type="search"
+                           class="pcs-process-search-input"
+                           placeholder="Search processes…"
+                           autocomplete="off"
+                           @bind="_processSearch"
+                           @bind:event="oninput" />
+                </div>
+                <div class="pcs-process-row" @ref="_processRowElement">
+                    @foreach (var proc in FilteredProcesses)
+                    {
+                        var active = SelectedProcess?.Code == proc.Code;
+                        var cardClass = active
+                            ? "pcs-process-card pcs-process-card--active"
+                            : HasSelectedProcess ? "pcs-process-card pcs-process-card--dimmed" : "pcs-process-card";
+                        var pname = GetProcessCardName(proc);
+                        var pdescription = GetProcessDescription(proc);
+                        var pcategory = GetProcessCategory(proc);
+                        <button class="@cardClass"
+                                data-process-code="@proc.Code"
+                                aria-pressed="@active"
+                                title="@proc.Name"
+                                @onclick="@(() => OnProcessChanged(proc))">
+                            @if (active)
+                            {
+                                <div class="pcs-process-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                </div>
+                            }
+                            <div class="pcs-process-photo"
+                                 style="background-image:url('/images/processes/@(proc.Code.ToLowerInvariant()).jpg')"
+                                 role="img"
+                                 aria-label="@proc.Name"></div>
+                            <div class="pcs-process-copy">
+                                <div class="pcs-process-category">@pcategory</div>
+                                <div class="pcs-process-name">@pname</div>
+                                <div class="pcs-process-description">@pdescription</div>
+                            </div>
+                        </button>
+                    }
+                    @if (!FilteredProcesses.Any())
+                    {
+                        <div class="pcs-process-no-results">No processes match "@_processSearch"</div>
+                    }
+                </div>
+            }
 
         </section>
 
@@ -177,101 +224,125 @@
                 </div>
             </section>
 
-            var finishColorOptions = VisibleFinishColorOptions;
-            if (finishColorOptions.Count > 0)
-            {
-                <section class="pcs-section" data-config-section="finish-options">
-                    <div class="pcs-section-header">
-                        <span class="pcs-section-title">Finish Options</span>
-                        <span class="pcs-section-count">@FormatOptionCount(finishColorOptions.Count)</span>
-                    </div>
-                    <div class="pcs-options-stack">
-                        @foreach (var opt in finishColorOptions)
-                        {
-                            <div class="pcs-option-row">
-                                @if (IsPaintColorOption(opt))
+        @* ── Color (Finish Options / Material Color) ───────────────────── *@
+        @if (ShowColorSection)
+        {
+            <section class="pcs-section" data-config-section="color-options">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Color</span>
+                    <span class="pcs-section-count">@FormatOptionCount(VisibleFinishColorOptions.Count + (ShowMaterialColorForFdm ? MaterialColorOptions.Count : 0))</span>
+                </div>
+                <div class="pcs-options-stack">
+                    @if (ShowMaterialColorForFdm)
+                    {
+                        <div class="pcs-option-row">
+                            <div class="pcs-option-label">Material Color</div>
+                            <div class="pcs-color-choice-grid">
+                                @foreach (var color in MaterialColorOptions)
                                 {
-                                    var paintHex = GetProcessOptionValue(PaintColorHexKey, string.Empty);
-                                    var paintReference = GetProcessOptionValue(PaintColorReferenceKey, string.Empty);
-                                    var customPaintSelected = IsCustomPaintColorSelected(paintHex, paintReference);
-                                    <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
-                                    <div class="pcs-color-choice-grid">
-                                        @foreach (var paint in StandardPaintColors)
+                                    var currentColor = GetProcessOptionValue(MaterialColorKey, MaterialColorOptions[0]);
+                                    var active = string.Equals(currentColor, color, StringComparison.OrdinalIgnoreCase);
+                                    <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                            @onclick="@(() => OnMaterialColorChanged(color))">
+                                        <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                          ImageUrl="@GetMaterialColorImageUrl(color)"
+                                                          FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                        <span>@color</span>
+                                        @if (active)
                                         {
-                                            var active = IsPaintColorSelected(paint, paintHex, paintReference);
-                                            <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
-                                                    @onclick="@(() => OnStandardPaintColorChanged(opt.ConfigKey, paint))">
-                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
-                                                                  ImageUrl="@GetPaintColorImageUrl(paint)"
-                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
-                                                <span>@paint.Name</span>
-                                                @if (active)
-                                                {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
-                                                }
-                                            </button>
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                                         }
-                                        <button class="pcs-color-choice @(customPaintSelected ? "pcs-color-choice--active" : "")"
-                                                @onclick="@(() => OnCustomPaintColorSelected(opt.ConfigKey))">
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                    @foreach (var opt in VisibleFinishColorOptions)
+                    {
+                        <div class="pcs-option-row">
+                            @if (IsPaintColorOption(opt))
+                            {
+                                var paintHex = GetProcessOptionValue(PaintColorHexKey, string.Empty);
+                                var paintReference = GetProcessOptionValue(PaintColorReferenceKey, string.Empty);
+                                var customPaintSelected = IsCustomPaintColorSelected(paintHex, paintReference);
+                                <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
+                                <div class="pcs-color-choice-grid">
+                                    @foreach (var paint in StandardPaintColors)
+                                    {
+                                        var active = IsPaintColorSelected(paint, paintHex, paintReference);
+                                        <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                                @onclick="@(() => OnStandardPaintColorChanged(opt.ConfigKey, paint))">
                                             <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
-                                                              ImageUrl="@GetCustomPaintImageUrl()"
+                                                              ImageUrl="@GetPaintColorImageUrl(paint)"
                                                               FallbackIcon="@Icons.Material.Outlined.Palette" />
-                                            <span>Custom</span>
-                                            @if (customPaintSelected)
+                                            <span>@paint.Name</span>
+                                            @if (active)
                                             {
                                                 <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                                             }
                                         </button>
-                                    </div>
-                                    @if (customPaintSelected)
-                                    {
-                                        <div class="pcs-color-picker-row">
-                                            <label class="pcs-native-color">
-                                                <span>Custom color</span>
-                                                <input type="color"
-                                                       value="@GetProcessOptionValue(PaintColorHexKey, "#111111")"
-                                                       @onchange="@(e => OnPaintColorHexChanged(opt.ConfigKey, e.Value?.ToString()))" />
-                                            </label>
-                                            <MudTextField T="string"
-                                                          Label="Custom color name/code"
-                                                          Value="@paintReference"
-                                                          ValueChanged="@(val => OnPaintColorReferenceChanged(opt.ConfigKey, val))"
-                                                          Placeholder="RAL 9005, Pantone Black C..."
-                                                          Variant="Variant.Outlined"
-                                                          Margin="Margin.Dense"
-                                                          Immediate="true"
-                                                          FullWidth="true" />
-                                        </div>
                                     }
-                                }
-                                else if (IsColorChoiceOption(opt))
-                                {
-                                    var options = GetOptionChoices(opt).ToList();
-                                    var currentValue = GetCurrentOptionChoiceValue(opt, options);
-                                    <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
-                                    <div class="pcs-color-choice-grid">
-                                        @foreach (var o in options)
+                                    <button class="pcs-color-choice @(customPaintSelected ? "pcs-color-choice--active" : "")"
+                                            @onclick="@(() => OnCustomPaintColorSelected(opt.ConfigKey))">
+                                        <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                          ImageUrl="@GetCustomPaintImageUrl()"
+                                                          FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                        <span>Custom</span>
+                                        @if (customPaintSelected)
                                         {
-                                            var active = string.Equals(currentValue, o, StringComparison.OrdinalIgnoreCase);
-                                            <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
-                                                    @onclick="@(() => OnProcessOptionValueChanged(opt.ConfigKey, o))">
-                                                <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
-                                                                  ImageUrl="@GetColorChoiceImageUrl(opt, o)"
-                                                                  FallbackIcon="@Icons.Material.Outlined.Palette" />
-                                                <span>@FormatOptionLabel(o)</span>
-                                                @if (active)
-                                                {
-                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
-                                                }
-                                            </button>
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                                         }
+                                    </button>
+                                </div>
+                                @if (customPaintSelected)
+                                {
+                                    <div class="pcs-color-picker-row">
+                                        <label class="pcs-native-color">
+                                            <span>Custom color</span>
+                                            <input type="color"
+                                                   value="@GetProcessOptionValue(PaintColorHexKey, "#111111")"
+                                                   @onchange="@(e => OnPaintColorHexChanged(opt.ConfigKey, e.Value?.ToString()))" />
+                                        </label>
+                                        <MudTextField T="string"
+                                                      Label="Custom color name/code"
+                                                      Value="@paintReference"
+                                                      ValueChanged="@(val => OnPaintColorReferenceChanged(opt.ConfigKey, val))"
+                                                      Placeholder="RAL 9005, Pantone Black C..."
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true"
+                                                      FullWidth="true" />
                                     </div>
                                 }
-                            </div>
-                        }
-                    </div>
-                </section>
-            }
+                            }
+                            else if (IsColorChoiceOption(opt))
+                            {
+                                var options = GetOptionChoices(opt).ToList();
+                                var currentValue = GetCurrentOptionChoiceValue(opt, options);
+                                <div class="pcs-option-label">@GetFinishColorOptionLabel(opt)</div>
+                                <div class="pcs-color-choice-grid">
+                                    @foreach (var o in options)
+                                    {
+                                        var active = string.Equals(currentValue, o, StringComparison.OrdinalIgnoreCase);
+                                        <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                                @onclick="@(() => OnProcessOptionValueChanged(opt.ConfigKey, o))">
+                                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                                              ImageUrl="@GetColorChoiceImageUrl(opt, o)"
+                                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
+                                            <span>@FormatOptionLabel(o)</span>
+                                            @if (active)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
 
             @* ── Tolerance ─────────────────────────────────────────────────── *@
             <section class="pcs-section" data-config-section="tolerance">
@@ -894,12 +965,12 @@
                 gap: 4px;
             }
 
-            /* ── Process Row (horizontal scroll) ──────────────────────────────── */
+            /* ── Process Row (vertical stack) ─────────────────────────────────── */
             .pcs-process-row {
                 display: flex;
-                flex-flow: row nowrap;
+                flex-direction: column;
                 gap: 7px;
-                overflow-x: auto;
+                overflow-y: auto;
                 padding: 0 0 6px;
                 scrollbar-width: thin;
                 scrollbar-color: var(--maliev-border) transparent;
@@ -907,14 +978,15 @@
             }
 
             .pcs-process-card {
-                flex: 0 0 128px;
-                width: 128px;
+                flex: 0 0 auto;
+                width: 100%;
                 border: 0;
                 background: var(--maliev-panel);
                 border-radius: 7px;
                 cursor: pointer;
                 display: flex;
-                flex-direction: column;
+                flex-direction: row;
+                align-items: stretch;
                 font-size: var(--mud-typography-caption-size);
                 font-weight: 500;
                 color: var(--maliev-muted);
@@ -960,9 +1032,67 @@
                 z-index: 3;
             }
 
-            .pcs-process-photo {
+            /* ── Selected process wrapper + Change button ─────────────────── */
+            .pcs-process-selected {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 0;
+            }
+
+            .pcs-process-card--selected {
+                flex: 0 0 auto;
                 width: 100%;
-                height: 88px;
+                min-height: 100px;
+            }
+
+            .pcs-process-card--selected .pcs-process-photo {
+                width: 120px;
+                height: auto;
+                min-height: 80px;
+                flex-shrink: 0;
+            }
+
+            .pcs-process-card--selected .pcs-process-copy {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 10px 12px;
+            }
+
+            .pcs-process-card--selected .pcs-process-name {
+                white-space: normal;
+                overflow: visible;
+            }
+
+            .pcs-process-change-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                align-self: flex-end;
+                margin-top: auto;
+                padding: 4px 12px;
+                border: 0;
+                border-radius: var(--maliev-radius-md);
+                background: var(--maliev-panel-3);
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.15s ease, color 0.15s ease;
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
+            }
+
+            .pcs-process-change-btn:hover {
+                background: var(--maliev-panel);
+                color: var(--mud-palette-primary);
+            }
+
+            .pcs-process-photo {
+                width: 80px;
+                height: auto;
+                min-height: 60px;
                 flex-shrink: 0;
                 background: var(--maliev-panel-3) center / cover no-repeat;
                 display: block;
@@ -993,11 +1123,14 @@
             }
 
             .pcs-process-copy {
-                width: 100%;
+                flex: 1;
                 min-width: 0;
                 box-sizing: border-box;
                 padding: 7px 8px 8px;
                 text-align: left;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
 
             .pcs-process-name {
@@ -1010,15 +1143,69 @@
                 text-overflow: ellipsis;
             }
 
+            .pcs-process-category {
+                font-size: 9px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: var(--pcs-process-active);
+                opacity: 0.72;
+                margin-bottom: 1px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
             .pcs-process-description {
-                margin-top: 2px;
+                margin-top: 3px;
                 color: var(--maliev-muted);
                 font-size: var(--mud-typography-caption-size);
                 font-weight: 400;
-                line-height: 1.2;
-                white-space: nowrap;
-                text-overflow: ellipsis;
+                line-height: 1.35;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
                 overflow: hidden;
+            }
+
+            .pcs-process-search {
+                flex-shrink: 0;
+                padding: 0 0 6px;
+            }
+
+            .pcs-process-search-input {
+                width: 100%;
+                box-sizing: border-box;
+                background: var(--maliev-panel-3);
+                border: 1px solid var(--maliev-border);
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: var(--mud-typography-caption-size);
+                font-family: inherit;
+                color: var(--maliev-text);
+                outline: none;
+                transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            }
+
+            .pcs-process-search-input::placeholder {
+                color: var(--maliev-muted);
+                opacity: 0.6;
+            }
+
+            .pcs-process-search-input:focus {
+                border-color: var(--pcs-process-active);
+                box-shadow: 0 0 0 2px color-mix(in oklch, var(--pcs-process-active) 18%, transparent);
+            }
+
+            .pcs-process-search-input::-webkit-search-cancel-button { display: none; }
+            .pcs-process-search-input::-ms-clear { display: none; }
+
+            .pcs-process-no-results {
+                text-align: center;
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                padding: 24px 8px;
+                opacity: 0.7;
             }
 
             /* ── Material / Finish Cards ───────────────────────────────────────── */
@@ -1787,14 +1974,16 @@
                 }
 
                 .pcs-process-card {
-                    flex: 0 0 112px;
-                    width: 112px;
+                    flex: 0 0 auto;
+                    width: 100%;
                     border-radius: 7px;
                     font-size: var(--mud-typography-caption-size);
                 }
 
                 .pcs-process-photo {
-                    height: 78px;
+                    width: 70px;
+                    height: auto;
+                    min-height: 52px;
                     background-size: cover;
                 }
 

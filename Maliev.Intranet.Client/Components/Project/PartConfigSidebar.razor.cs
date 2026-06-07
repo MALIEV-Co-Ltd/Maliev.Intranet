@@ -72,6 +72,12 @@ public partial class PartConfigSidebar : ComponentBase
     private ElementReference _processRowElement;
     // Finish id → absolute additional unit cost in THB.
     private Dictionary<Guid, decimal> _finishPrices = new();
+    // ── Process search ───────────────────────────────────────────────────
+    private string _processSearch = "";
+    private ElementReference _processSearchInput;
+    private bool _isChangingProcess;
+    private bool _shouldFocusSearch;
+    private Guid? _lastPartFileId;
 
     // ── Two-phase DFM analysis state ─────────────────────────────────────
     private readonly Dictionary<string, DfmAnalysisResponse> _dfmReports = new(StringComparer.OrdinalIgnoreCase);
@@ -359,8 +365,8 @@ public partial class PartConfigSidebar : ComponentBase
     [
         new("Black", "#111111", "RAL 9005"),
         new("White", "#f7f7f2", "RAL 9010"),
-        new("Signal Red", "#c8333a", "RAL 3001"),
-        new("Traffic Blue", "#2f6fd6", "RAL 5017"),
+        new("Red", "#c8333a", "RAL 3001"),
+        new("Blue", "#2f6fd6", "RAL 5017"),
         new("Reseda Green", "#2f8f5b", "RAL 6011"),
         new("Light Gray", "#9ba3af", "RAL 7035"),
     ];
@@ -450,6 +456,34 @@ public partial class PartConfigSidebar : ComponentBase
     private bool IsFdmProcess =>
         IsProcess("FDM") || IsProcess("FDM_3D_PRINTING");
 
+    private bool ShowMaterialColorForFdm =>
+        IsFdmProcess && !RequiresDedicatedMaterialColorSelection && MaterialColorOptions.Count > 0;
+
+    private bool ShowColorSection =>
+        VisibleFinishColorOptions.Count > 0 || ShowMaterialColorForFdm;
+
+    private bool IsMjfProcess =>
+        IsProcess("MJF");
+
+    private bool IsSlsProcess =>
+        IsProcess("SLS");
+
+    private bool IsSlaProcess =>
+        IsProcess("SLA") || IsProcess("SLA_DLP") || IsProcess("DLP");
+
+    private bool IsMaterialJetProcess =>
+        IsProcess("MJ") || IsProcess("MATERIAL_JETTING");
+
+    private bool IsBinderJettingProcess =>
+        IsProcess("BJ") || IsProcess("BINDER_JETTING");
+
+    private bool IsDmlsProcess =>
+        IsProcess("DMLS");
+
+    private bool IsAdditiveManufacturingProcess =>
+        IsFdmProcess || IsMjfProcess || IsSlsProcess || IsSlaProcess
+        || IsMaterialJetProcess || IsBinderJettingProcess || IsDmlsProcess;
+
     private bool IsCncProcess =>
         IsProcess("CNC") || IsProcess("CNC_MILL") || IsProcess("CNC_TURN");
 
@@ -488,6 +522,18 @@ public partial class PartConfigSidebar : ComponentBase
         }
 
         ResetDfmAnalysisCache(Part.FileId);
+
+        // When a new file is uploaded and no process is selected yet, focus the search input.
+        if (Part.FileId != _lastPartFileId)
+        {
+            _lastPartFileId = Part.FileId;
+            if (!HasSelectedProcess && Part.FileId != Guid.Empty)
+            {
+                _processSearch = "";
+                _shouldFocusSearch = true;
+                _isChangingProcess = true;
+            }
+        }
 
         var features = new List<string>();
         if (Part.HasThreadedHoles) features.Add("ThreadedHoles");
@@ -531,6 +577,17 @@ public partial class PartConfigSidebar : ComponentBase
         }
     }
 
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldFocusSearch)
+        {
+            _shouldFocusSearch = false;
+            try { await _processSearchInput.FocusAsync(); }
+            catch { /* element not yet in DOM — safe to ignore */ }
+        }
+    }
+
     private async Task FetchBulkTiersAsync()
     {
         var fileId = Part!.FileId;
@@ -562,6 +619,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null || p == null) return;
 
         var processChanged = ProjectPartBulkEdit.ApplyProcess(Part, p);
+        _isChangingProcess = false;
         await ScrollProcessIntoStartAsync(p.Code);
         if (!processChanged)
         {
@@ -598,6 +656,13 @@ public partial class PartConfigSidebar : ComponentBase
 
         // DFM runs after materials are already loading. finally block fires OnPartChanged again with DFM state.
         await AnalyzeProcessForDfm(p);
+    }
+
+    private async Task StartChangingProcess()
+    {
+        _isChangingProcess = true;
+        _processSearch = "";
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task ScrollProcessIntoStartAsync(string processCode)
@@ -917,20 +982,51 @@ public partial class PartConfigSidebar : ComponentBase
 
     private static string GetProcessDescription(ProcessDto process)
     {
+        // Prefer the catalog description from the API
+        if (!string.IsNullOrWhiteSpace(process.Description))
+            return process.Description;
+
         return NormalizeOptionText(process.Code) switch
         {
-            "cnc" or "cncmill" or "cncmilling" => "Milled parts",
-            "cncturn" or "cncturning" => "Turned parts",
-            "fdm" or "fdm3dprinting" => "3D print",
-            "sla" or "sladlp" or "dlp" => "Resin print",
-            "sls" => "Nylon powder",
-            "mjf" => "Powder fusion",
-            "mj" or "materialjetting" => "Fine detail",
-            "bj" or "binderjetting" => "Binder jet",
-            "dmls" => "Metal print",
-            _ => "Process",
+            "cnc" or "cncmill" or "cncmilling" => "Multi-axis subtractive milling from solid billet",
+            "cncturn" or "cncturning" => "Lathe turning for rotationally symmetric parts",
+            "fdm" or "fdm3dprinting" => "Fused Deposition Modeling — thermoplastic filament",
+            "sla" or "sladlp" or "dlp" => "Stereolithography — UV-cured resin",
+            "sls" => "Selective Laser Sintering — powder bed nylon",
+            "mjf" => "Multi Jet Fusion — powder bed fusing agent",
+            "mj" or "materialjetting" => "Material Jetting — inkjet photopolymer droplets",
+            "bj" or "binderjetting" => "Binder Jetting — powder bed with liquid binder",
+            "dmls" => "Direct Metal Laser Sintering — metal powder bed fusion",
+            _ => "Manufacturing process",
         };
     }
+
+    private static string GetProcessCategory(ProcessDto process) =>
+        NormalizeOptionText(process.Code) switch
+        {
+            "cnc" or "cncmill" or "cncmilling" => "CNC Machining",
+            "cncturn" or "cncturning" => "CNC Machining",
+            "fdm" or "fdm3dprinting" => "3D Printing · FDM",
+            "sla" or "sladlp" or "dlp" => "3D Printing · Resin",
+            "sls" => "3D Printing · SLS",
+            "mjf" => "3D Printing · MJF",
+            "mj" or "materialjetting" => "3D Printing · Material Jet",
+            "bj" or "binderjetting" => "3D Printing · Binder Jet",
+            "dmls" => "Metal AM · DMLS",
+            "sheetmetal" or "sheet" or "sheetmetalfabrication" => "Sheet Metal",
+            "injectionmold" or "injectionmolding" or "im" => "Injection Molding",
+            _ => "Manufacturing",
+        };
+
+    /// <summary>Processes filtered by the current search query.</summary>
+    private IEnumerable<ProcessDto> FilteredProcesses =>
+        string.IsNullOrWhiteSpace(_processSearch)
+            ? Processes
+            : Processes.Where(p =>
+                p.Name.Contains(_processSearch, StringComparison.OrdinalIgnoreCase)
+                || p.Code.Contains(_processSearch, StringComparison.OrdinalIgnoreCase)
+                || GetProcessCategory(p).Contains(_processSearch, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrEmpty(p.Description) && p.Description.Contains(_processSearch, StringComparison.OrdinalIgnoreCase)));
 
     private static string CompactProcessCardText(string? preferred, string fallback)
     {
@@ -944,16 +1040,68 @@ public partial class PartConfigSidebar : ComponentBase
 
     private bool IsVisibleTolerance(CatalogToleranceDto tolerance)
     {
-        if (!IsFdmProcess)
-            return true;
+        if (IsFdmProcess)
+        {
+            var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
+            return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
+                && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
+        }
 
+        if (IsAdditiveManufacturingProcess)
+        {
+            return IsAdditiveProcessSpecificTolerance(tolerance);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// For 3D printing / additive manufacturing processes, only show process-specific tolerances,
+    /// not generic ISO 2768 tolerances (which are designed for machined parts).
+    /// </summary>
+    private bool IsAdditiveProcessSpecificTolerance(CatalogToleranceDto tolerance)
+    {
         var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
-        return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
-            && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
-            && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
-            && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
-            && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
-            && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
+        var normalized = NormalizeOptionText(combined);
+
+        if (IsMjfProcess)
+        {
+            return normalized.Contains("mjfstandard") || normalized.Contains("mjf_standard");
+        }
+
+        if (IsSlsProcess)
+        {
+            return normalized.Contains("slsstandard") || normalized.Contains("sls_standard");
+        }
+
+        if (IsSlaProcess)
+        {
+            return normalized.Contains("slastandard") || normalized.Contains("sla_standard")
+                || normalized.Contains("dlpstandard") || normalized.Contains("dlp_standard");
+        }
+
+        if (IsDmlsProcess)
+        {
+            return normalized.Contains("dmlsstandard") || normalized.Contains("dmls_standard");
+        }
+
+        if (IsMaterialJetProcess)
+        {
+            return normalized.Contains("mjstandard") || normalized.Contains("mj_standard")
+                || normalized.Contains("materialjetstandard") || normalized.Contains("material_jet_standard");
+        }
+
+        if (IsBinderJettingProcess)
+        {
+            return normalized.Contains("bjstandard") || normalized.Contains("bj_standard")
+                || normalized.Contains("binderjettingstandard") || normalized.Contains("binder_jetting_standard");
+        }
+
+        return false;
     }
 
     private static ToleranceGroupKind GetToleranceGroupKind(CatalogToleranceDto tolerance)
@@ -1026,7 +1174,13 @@ public partial class PartConfigSidebar : ComponentBase
             return false;
 
         if (IsMaterialColorOption(option) || IsGenericColorOption(option))
+        {
+            // For FDM processes, material colors are shown in the dedicated Color section after Surface Finish
+            if (IsFdmProcess)
+                return false;
+
             return !RequiresDedicatedMaterialColorSelection && !IsCoatedColorFinish();
+        }
 
         return true;
     }
@@ -1785,7 +1939,7 @@ public partial class PartConfigSidebar : ComponentBase
         var part = Part!;
         // Capture the token that was created for this invocation in OnProcessChanged.
         var token = _dfmCts?.Token ?? CancellationToken.None;
-        var runInteractiveServerDfmFallback = ShouldRunInteractiveServerDfmFallback(part);
+        var runInteractiveServerDfmFallback = ShouldRunInteractiveServerDfmFallback(part, process.Code, BrowserPrimaryServerDfmFallbackEnabled);
         if (runInteractiveServerDfmFallback)
             BrowserDfmReportSync.ClearTerminalLocalAttempt(part, process.Code);
 
@@ -1802,7 +1956,11 @@ public partial class PartConfigSidebar : ComponentBase
                 return;
             }
 
-            if (!runInteractiveServerDfmFallback)
+            // Re-check the fallback policy after the wait. A browser-local terminal
+            // attempt may have been recorded during the grace period, which grants
+            // the server fallback even when the static policy says otherwise.
+            if (!runInteractiveServerDfmFallback
+                && !ShouldRunInteractiveServerDfmFallback(part, process.Code, BrowserPrimaryServerDfmFallbackEnabled))
             {
                 MarkBrowserPrimaryLocalDfmUnavailable(part, process.Code, "interactive_server_dfm_fallback_disabled");
                 await OnPartChanged.InvokeAsync(part);
@@ -1919,8 +2077,10 @@ public partial class PartConfigSidebar : ComponentBase
         }
     }
 
-    private bool ShouldRunInteractiveServerDfmFallback(PartViewModel part)
-        => BrowserPrimaryServerDfmFallbackEnabled || !IsBrowserPrimaryDfmPart(part);
+    private static bool ShouldRunInteractiveServerDfmFallback(PartViewModel part, string? processCode, bool browserPrimaryServerDfmFallbackEnabled)
+        => browserPrimaryServerDfmFallbackEnabled
+        || !IsBrowserPrimaryDfmPart(part)
+        || (!string.IsNullOrWhiteSpace(processCode) && BrowserDfmReportSync.HasTerminalLocalAttempt(part, processCode));
 
     private static bool IsBrowserPrimaryDfmPart(PartViewModel part)
         => !string.IsNullOrWhiteSpace(part.ClientUploadId)

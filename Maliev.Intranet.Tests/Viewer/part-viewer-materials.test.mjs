@@ -676,7 +676,7 @@ test('studio lighting keeps shadows soft enough for dark studio mode', () => {
     assert.equal(result.generator.darkness, result.light);
     assert.ok(result.generator.bias > 0 && result.generator.bias < 0.001);
     assert.ok(result.generator.normalBias > 0 && result.generator.normalBias < 0.1);
-    assert.equal(result.generator.contactHardening, true);
+    assert.equal(result.generator.contactHardening, false);
     assert.ok(result.generator.contactSize > 0 && result.generator.contactSize < 0.2);
 });
 
@@ -1064,12 +1064,12 @@ test('polished finish refreshes glossy normal smoothing for low-tessellation ref
         scenes.viewer = scene;
         configureMaterialFromConfigurator('viewer', 'aluminum', null, 'AS_MACHINED', null, 'CNC_MILL');
         setRenderMode('viewer', 'realistic');
-        scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 });
+        while (scheduledIdleCallbacks.length > 0) { scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 }); }
         const defaultNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
         const defaultX = defaultNormals[0];
         const defaultY = defaultNormals[1];
         configureMaterialFromConfigurator('viewer', 'aluminum', null, 'POLISHED', 'RA_1_6', 'CNC_MILL');
-        scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 });
+        while (scheduledIdleCallbacks.length > 0) { scheduledIdleCallbacks.shift()({ didTimeout: false, timeRemaining: () => 16 }); }
         const material = scene.meshes[0].material;
         const polishedNormals = scene.meshes[0].getVerticesData(BABYLON.VertexBuffer.NormalKind);
         ({
@@ -1453,8 +1453,8 @@ test('brushed surface shader projects strokes along each face tangent instead of
     assert.match(result.definitions, /malievBrushedSurfaceUv/);
     assert.match(result.definitions, /malievBrushedHeight/);
     assert.doesNotMatch(result.definitions, /float\s+lines\s*=\s*sin\(p\.y\s*\*\s*sScl\)/);
-    assert.match(result.updateAlbedo, /malievHeight\(/);
-    assert.match(result.beforeFragColor, /malievSurfaceRelief/);
+    assert.match(result.updateAlbedo, /malievMseH/);
+    assert.match(result.beforeFragColor, /malievMseRelief/);
 });
 
 test('realistic configurator applies CNC machining surface effect when no finish hides tool marks', () => {
@@ -1597,7 +1597,7 @@ test('realistic configurator renders raw steel and stainless as bright machined 
         assert.ok(material.effectBump >= 0.016 && material.effectBump <= 0.022, `${name} machining bump should be visible without gouging, got ${material.effectBump}`);
         assert.equal(material.profile?.surfaceEffectKey, 'machining', `${name} profile should carry machining`);
         assert.ok(material.profile?.stripeStrength >= 0.012, `${name} should keep visible directional tool marks`);
-        assert.match(material.beforeLights, /_isMachined/);
+        assert.match(material.beforeLights, /_isMach/);
         assert.match(material.beforeLights, /malievHeightGradient/);
         assert.match(material.beforeLights, /normalW\s*=\s*normalize/);
     }
@@ -1693,11 +1693,11 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.match(result.mjf.layerBeforeFragColor, /malievFdmLayerRelief/);
     assert.match(result.mjf.beforeLights, /_isPowder/);
     assert.match(result.mjf.beforeLights, /normalW\s*=\s*normalize/);
-    assert.match(result.mjf.updateAlbedo, /malievPowderFineSpeckle/);
-    assert.match(result.mjf.updateAlbedo, /malievPowderBedPores/);
-    assert.match(result.mjf.updateMetallicRoughness, /_powderPores/);
-    assert.match(result.mjf.beforeFragColor, /_powderPoreShadow/);
-    assert.match(result.mjf.beforeFragColor, /_powderFine/);
+    assert.match(result.mjf.updateAlbedo, /malievMsePowFine/);
+    assert.match(result.mjf.updateAlbedo, /malievMsePowPores/);
+    assert.match(result.mjf.updateMetallicRoughness, /malievMsePowPores/);
+    assert.match(result.mjf.beforeFragColor, /_powPoreShadow/);
+    assert.match(result.mjf.beforeFragColor, /malievMsePowFine/);
     assert.equal(result.slsEffect.effectKey, 'powder-grain');
     assert.ok(Math.abs(result.slsEffect.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm SLS layer height, got ${result.slsEffect.layerHeightMm}`);
 });
@@ -1898,11 +1898,11 @@ test('FDM layer shader keeps close-up line contrast while dampening moire', () =
     assert.match(result.definitions, /mix\(\s*0\.[4-6][0-9]*\s*,\s*1\.0\s*,\s*_fdmCloseDetail\s*\)/);
     assert.match(result.definitions, /mix\(\s*1\.0\s*,\s*0\.[3-5][0-9]*\s*,\s*_fdmAliasRisk\s*\)/);
     assert.match(result.definitions, /malievFdmLayerFilteredGroove/);
-    assert.match(result.beforeLights, /_fdmVisibility/);
-    assert.match(result.beforeLights, /_fdmMoireDampening/);
-    assert.match(result.updateMetallicRoughness, /_fdmVisibility/);
-    assert.match(result.beforeFragColor, /_fdmVisibility/);
-    assert.match(result.beforeFragColor, /_fdmMoireDampening/);
+    assert.match(result.beforeLights, /malievFdmVis/);
+    assert.match(result.beforeLights, /malievFdmMoire/);
+    assert.match(result.updateMetallicRoughness, /malievFdmVis/);
+    assert.match(result.beforeFragColor, /malievFdmVis/);
+    assert.match(result.beforeFragColor, /malievFdmMoire/);
     assert.doesNotMatch(result.beforeFragColor, /_fdmFinalAa/);
 });
 
@@ -1996,17 +1996,17 @@ test('bead blasted surface shader renders visible satin aluminum micrograin with
     assert.match(result.definitions, /malievBeadCraterFootprint/);
     assert.match(result.beforeLights, /normalW\s*=\s*normalize/);
     assert.match(result.beforeLights, /malievBeadCraterGradient/);
-    assert.match(result.beforeLights, /_beadCraterAa/);
+    assert.match(result.beforeLights, /_beadAa/);
     assert.match(result.beforeLights, /smoothstep/);
     assert.match(result.beforeLights, /surfaceEffectBump/);
-    assert.match(result.updateAlbedo, /_isBead/);
-    assert.match(result.updateAlbedo, /malievSurfaceRelief/);
-    assert.match(result.updateMetallicRoughness, /surfaceEffectBump/);
-    assert.match(result.updateMetallicRoughness, /max\(metallicRoughness\.g,\s*mix\(0\.0,\s*0\.88,\s*_isBead\)\)/);
-    assert.match(result.beforeFragColor, /_isBead/);
-    assert.match(result.beforeFragColor, /malievSurfaceSpeckle/);
-    assert.match(result.beforeFragColor, /malievSurfaceRelief/);
-    assert.match(result.beforeFragColor, /mix\(0\.18,\s*0\.05,\s*_isBead\)/);
+    assert.match(result.updateAlbedo, /malievMseIsBead/);
+    assert.match(result.updateAlbedo, /malievMseRelief/);
+    assert.match(result.updateMetallicRoughness, /surfaceEffectBump\s*\*\s*0\.35/);
+    assert.match(result.updateMetallicRoughness, /max\(metallicRoughness\.g,\s*mix\(0\.0,\s*0\.88,\s*malievMseIsBead\)\)/);
+    assert.match(result.beforeFragColor, /malievMseIsBead/);
+    assert.match(result.beforeFragColor, /malievMseSpeckle/);
+    assert.match(result.beforeFragColor, /malievMseRelief/);
+    assert.match(result.beforeFragColor, /mix\(0\.18,\s*0\.05,\s*malievMseIsBead\)/);
     assert.match(result.beforeFragColor, /finalColor\.rgb/);
     assert.doesNotMatch(result.beforeFragColor, /\bcolor\.rgb\b/);
 });
