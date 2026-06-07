@@ -22,7 +22,6 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
-    <PackageReference Include="BabylonJS" Version="2.3.1" />
   </ItemGroup>
 
   <ItemGroup>
