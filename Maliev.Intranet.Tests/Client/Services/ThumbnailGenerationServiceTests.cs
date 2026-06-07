@@ -15,7 +15,7 @@ public class ThumbnailGenerationServiceTests
             httpClient: new HttpClient(),
             logger: NullLogger<ThumbnailGenerationService>.Instance);
 
-        var result = service.TryGetCached("path/file.stl", out var set);
+        var result = service.TryGetCached("path/file.stl", null, out var set);
 
         Assert.False(result);
         Assert.Null(set);
