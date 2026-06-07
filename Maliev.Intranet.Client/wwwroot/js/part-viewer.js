@@ -260,8 +260,8 @@ const CONFIG = {
         environmentIntensity: 1.0,   // raised from 0.8 — strengthens smooth-normals specular highlights
         contrast: 1.15,
         exposure: 1.1,
-        fastEnvironmentTextureSize: 64,
-        environmentTextureSize: 128,
+        fastEnvironmentTextureSize: 128,
+        environmentTextureSize: 256,
         /** Edge angle threshold in degrees for normal smoothing. Edges sharper
          *  than this stay hard; gentler creases get blended. 0 = no smoothing,
          *  180 = fully smooth all edges. Raised from 55 to 75 to handle coarse
@@ -277,7 +277,7 @@ const CONFIG = {
         normalPositionToleranceRatio: 0.00012,
         polishedNormalPositionToleranceMin: 0.12,
         polishedNormalPositionToleranceRatio: 0.00024,
-        ssaoEnabled: false,
+        ssaoEnabled: true,
         ssaoRatio: 0.5,
         ssaoBlurRatio: 0.5,
         ssaoRadius: 3.2,
@@ -549,6 +549,15 @@ const perCanvasPipelines = {};
 /** Per-canvas current render mode for transition detection */
 const currentRenderModes = {};
 
+/** Per-canvas target render mode for staged transition */
+const targetRenderModes = {};
+
+/** Per-canvas render mode transition timer handle */
+const renderModeTransitionTimers = {};
+
+/** Per-canvas render mode transition state */
+const renderModeTransitionState = {};
+
 function isViewerDebugEnabled() {
     try {
         return globalThis.localStorage?.getItem('malievViewerDebug') === 'true';
@@ -606,16 +615,40 @@ function toVector3(vector) {
     return new BABYLON.Vector3(vector.x, vector.y, vector.z);
 }
 
+/**
+ * Compute the world-space position for a key directional light so that the
+ * shadow-frustum camera sits on the "incoming" side of the light (opposite of
+ * the travel direction) and looks toward the model center.
+ *
+ * Placing the light on the wrong side of the scene (as the old hardcoded
+ * (-dist,-dist,maxZ+dist) formula did) causes the frustum to be oriented away
+ * from the model, which makes shadow projections land in incorrect positions.
+ *
+ * @param {{x:number,y:number,z:number}} dirConfig   Raw direction vector from CONFIG
+ * @param {{x:number,y:number,z:number}} modelCenter Scene center of the loaded model
+ * @param {number}                       dist         Largest model dimension (mm)
+ * @returns {BABYLON.Vector3}
+ */
+function _computeKeyLightPosition(dirConfig, modelCenter, dist) {
+    const mag = Math.sqrt(dirConfig.x * dirConfig.x + dirConfig.y * dirConfig.y + dirConfig.z * dirConfig.z);
+    const ld  = dist * 2;   // place light 2× the largest model dimension from center
+    return new BABYLON.Vector3(
+        modelCenter.x - (dirConfig.x / mag) * ld,
+        modelCenter.y - (dirConfig.y / mag) * ld,
+        modelCenter.z - (dirConfig.z / mag) * ld
+    );
+}
+
 function configureSoftShadowGenerator(shadowGenerator, keyConfig) {
     if (!shadowGenerator) return;
 
     shadowGenerator.usePercentageCloserFiltering = true;
-    shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_MEDIUM ?? shadowGenerator.filteringQuality;
+    shadowGenerator.filteringQuality = BABYLON.ShadowGenerator?.QUALITY_HIGH ?? shadowGenerator.filteringQuality;
     shadowGenerator.setDarkness?.(keyConfig?.shadowDarkness ?? 0.10);
     shadowGenerator.transparencyShadow = true;
     shadowGenerator.bias = keyConfig?.shadowBias ?? 0.00008;
     shadowGenerator.normalBias = keyConfig?.shadowNormalBias ?? 0.018;
-    shadowGenerator.useContactHardeningShadow = false;
+    shadowGenerator.useContactHardeningShadow = true;
     shadowGenerator.contactHardeningLightSizeUVRatio = keyConfig?.contactHardeningLightSizeUVRatio ?? 0.08;
 }
 
@@ -663,7 +696,7 @@ function syncSceneShadowParticipation(canvasId) {
     scene.meshes.forEach(mesh => {
         if (!mesh) return;
 
-        if (mesh.name === '__shadow_catcher__' || mesh.name === '__grid__' || isCuttingMatTopMesh(mesh)) {
+        if (mesh.name === '__shadow_catcher__' || mesh.name === '__grid__') {
             mesh.receiveShadows = true;
             return;
         }
@@ -844,6 +877,8 @@ const perCanvasBodyMap      = {};   // canvasId → Map<bodyIndex, {rootNode, me
 const selectedBodyIndices   = {};   // canvasId → currently selected body index (null = none selected)
 const loadGenerations       = {};   // canvasId → number (incremented on each initialize, checked in retry callbacks to cancel stale loads)
 const shadowGenerators      = {};   // canvasId → BABYLON.ShadowGenerator
+const gridActiveFlags       = {};   // canvasId → boolean — true while grid floor is visible
+const cuttingMatActiveFlags = {};   // canvasId → boolean — true while cutting mat is visible
 const analysisModelMeshIds  = {};   // canvasId → Set<mesh.uniqueId> for real model geometry
 const analysisCameraButtons = {};   // canvasId → previous ArcRotate pointer buttons while analysis tools are active
 const localAdvisoryRuns     = {};   // canvasId → latest local advisory run id
@@ -957,12 +992,30 @@ function toWorldPoint(point) {
 function normalizeViewerSettings(viewerSettings) {
     const settings = viewerSettings && typeof viewerSettings === 'object' ? viewerSettings : {};
     const firstString = (...values) => values.find(value => typeof value === 'string' && value.trim()) ?? null;
-    const renderMode = settings.renderMode === 'solid'
-        || settings.renderMode === 'wireframe'
-        || settings.renderMode === 'transparent'
-        || settings.renderMode === 'realistic'
-        ? settings.renderMode
-        : 'realistic';
+
+    const normalizeMode = (mode) =>
+        mode === 'solid' || mode === 'wireframe' || mode === 'transparent' || mode === 'realistic'
+            ? mode
+            : 'realistic';
+
+    const renderMode = normalizeMode(settings.renderMode);
+    const initialRenderMode = normalizeMode(settings.initialRenderMode);
+    const targetRenderMode = normalizeMode(settings.targetRenderMode);
+
+    const transition = settings.renderModeTransition && typeof settings.renderModeTransition === 'object'
+        ? settings.renderModeTransition
+        : {};
+    const transitionEnabled = transition.enabled !== false;
+    const transitionTrigger = typeof transition.trigger === 'string' && transition.trigger.trim()
+        ? transition.trigger.trim()
+        : 'runtime_complete';
+    const fallbackDelayMs = Number.isFinite(Number(transition.fallbackDelayMs))
+        ? Number(transition.fallbackDelayMs)
+        : 1200;
+    const transitionMs = Number.isFinite(Number(transition.transitionMs))
+        ? Number(transition.transitionMs)
+        : 250;
+
     const cameraMode = settings.cameraProjection === 'perspective'
         ? 'perspective'
         : 'orthographic';
@@ -975,6 +1028,14 @@ function normalizeViewerSettings(viewerSettings) {
 
     return {
         renderMode,
+        initialRenderMode,
+        targetRenderMode,
+        renderModeTransition: {
+            enabled: transitionEnabled,
+            trigger: transitionTrigger,
+            fallbackDelayMs,
+            transitionMs
+        },
         cameraProjection: cameraMode,
         edgesEnabled: !!settings.edgesEnabled && renderMode !== 'wireframe',
         gridEnabled: !!settings.gridEnabled,
@@ -2454,11 +2515,16 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 catcher.position.z = finalBb.min.z;  // sit at model base
                 catcher.receiveShadows = true;
                 catcher.isPickable = false;
-                // Prefer ShadowOnlyMaterial (visually invisible but catches shadows)
+                catcher.isVisible = false; // hidden until showGrid/showCuttingMat activates a floor
+                // Prefer ShadowOnlyMaterial (visually invisible but catches shadows).
+                // activeLight must point at the key light so BabylonJS picks the correct
+                // shadow generator — without it the material falls back to the first scene
+                // light (hemi), which has no shadow generator and renders no shadow.
                 if (BABYLON.ShadowOnlyMaterial) {
                     const mat = new BABYLON.ShadowOnlyMaterial('shadowOnly', _scene);
-                    mat.shadowColor = new BABYLON.Color3(0, 0, 0);
-                    mat.alpha = 0.35;
+                    mat.activeLight  = key;
+                    mat.shadowColor  = new BABYLON.Color3(0, 0, 0);
+                    mat.alpha        = 0.35;
                     catcher.material = mat;
                 } else {
                     // Fallback: transparent StandardMaterial
@@ -2584,13 +2650,17 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // ── Store material type for setRenderMode below ──
                 materialTypes[canvasId] = viewerSettings.materialType || 'aluminum';
 
-                // Position directional light to correctly cast shadows from the top, front-left
+                // Position the key light opposite to its travel direction so the shadow
+                // frustum camera looks FROM the light source TOWARD the model.
+                // Previously the position was hardcoded to (-dist,-dist,maxZ+dist) which
+                // did not align with either studio's light direction, placing the shadow
+                // frustum on the wrong side of the scene.
                 const dist = Math.max(
                     finalBb.max.x - finalBb.min.x,
                     finalBb.max.y - finalBb.min.y,
                     finalBb.max.z - finalBb.min.z
                 );
-                key.position = new BABYLON.Vector3(meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist);
+                key.position = _computeKeyLightPosition(_lc.key.direction, meshCenters[canvasId], dist);
 
                 // ── Configure camera ──
                 const cam = mainCameras[canvasId];
@@ -2652,7 +2722,28 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
                 revealCanvasAfterInitialFit(canvasId, _scene, canvas, currentGen);
                 scheduleAfterFirstPaint(canvasId, _scene, currentGen, () => {
-                    setRenderMode(canvasId, viewerSettings.renderMode);
+                    // Staged rendering: apply initialRenderMode immediately if target is realistic
+                    // This ensures fast first paint (CAD-style solid) before realistic upgrade
+                    const initialMode = viewerSettings.initialRenderMode;
+                    const targetMode = viewerSettings.targetRenderMode;
+                    const transition = viewerSettings.renderModeTransition;
+
+                    targetRenderModes[canvasId] = targetMode;
+                    renderModeTransitionState[canvasId] = {
+                        enabled: transition.enabled,
+                        trigger: transition.trigger,
+                        fallbackDelayMs: transition.fallbackDelayMs,
+                        transitionMs: transition.transitionMs,
+                        completed: false,
+                        fallbackTimer: null
+                    };
+
+                    // If target is realistic but initial is not, start with solid for fast first paint
+                    const effectiveInitialMode = (targetMode === 'realistic' && initialMode !== 'realistic')
+                        ? initialMode
+                        : initialMode;
+                    setRenderMode(canvasId, effectiveInitialMode);
+
                     toggleEdges(canvasId, !!viewerSettings.edgesEnabled);
                     toggleBoundingBox(canvasId, !!viewerSettings.boundingBoxEnabled);
                     viewerSettings.gridEnabled ? showGrid(canvasId) : hideGrid(canvasId);
@@ -2663,6 +2754,12 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                         viewerSettings.sectionOffsetMm,
                         !!viewerSettings.sectionInverted
                     );
+
+                    // Schedule fallback transition if enabled and target is realistic
+                    if (transition.enabled && targetMode === 'realistic' && effectiveInitialMode !== 'realistic') {
+                        scheduleRenderModeFallback(canvasId, transition.fallbackDelayMs, transition.transitionMs);
+                    }
+
                     runLocalAdvisoryGeometry(canvasId, {
                         processCode: viewerSettings.processCode,
                         storagePath: viewerSettings.storagePath,
@@ -3404,9 +3501,7 @@ function getOrCreateEnvironmentTexture(scene, canvasId, quality = 'fast') {
 const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'carbon-fiber']);
 const ADDITIVE_LAYER_PRESET_KEYS = new Set([
     ...FDM_LAYER_PRESET_KEYS,
-    'petg-clear',
     'resin',
-    'resin-clear',
     'nylon-powder',
 ]);
 const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'peek', 'petg-clear', 'acrylic-clear', 'resin-clear']);
@@ -3730,8 +3825,12 @@ function getSurfaceEffectPluginClass() {
         constructor(material, effect) {
             super(material, 'MalievSurfaceEffect', 210, { MALIEV_SURFACE_EFFECT: false });
             this._targetMaterial = material;
-            this.setEffect(effect);
-            this._enable(this._isEnabled);
+            // Initialise state without calling _enable — syncRealisticMaterialProperties
+            // will call setEffect() once, which is the single authoritative enable.
+            const resolved = getSurfaceEffect(effect?.key);
+            this._effect = resolved;
+            this._targetMaterial._malievSurfaceEffect = resolved.kind > 0 ? resolved : null;
+            this._isEnabled = resolved.kind > 0;
         }
 
         getClassName() { return 'SurfaceEffectPlugin'; }
@@ -4202,10 +4301,8 @@ function getTransparentTranslucencyIntensity(preset) {
 function configureRealisticPbrQuality(pbr) {
     if (!pbr) return;
 
-    // Geometric specular anti-aliasing plus forceIrradianceInFragment are
-    // intentionally kept off for office-class GPUs to reduce fragment cost.
-    pbr.enableSpecularAntiAliasing = false;
-    pbr.forceIrradianceInFragment = false;
+    pbr.enableSpecularAntiAliasing = true;
+    pbr.forceIrradianceInFragment = true;
 }
 
 function isFdmProcess(processCode) {
@@ -4359,11 +4456,8 @@ function applyRealisticTransparencySettings(material, preset) {
     if (preset.alpha != null && preset.alpha < 1.0) {
         material.alpha = clamp(preset.alpha, 0.2, 1);
         material.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
-        // Depth pre-pass + separate culling for transparent materials can trigger a
-        // driver-dependent MRT draw-call failure path on some GPUs. Keep the
-        // transparent render path stable by using the simpler blended pass here.
-        material.needDepthPrePass = false;
-        material.separateCullingPass = false;
+        material.needDepthPrePass = true;
+        material.separateCullingPass = true;
         material.backFaceCulling = false;
         material.useAlphaFromAlbedoTexture = false;
         material.useRadianceOverAlpha = true;
@@ -4442,9 +4536,21 @@ function refreshRealisticRefractionTextures(canvasId, scene) {
 
         material.subSurface.refractionTexture = refractionTexture;
         material.subSurface.isRefractionEnabled = !!refractionTexture;
+        material.subSurface.isTranslucencyEnabled = !!refractionTexture;
         material.subSurface.refractionIntensity = refractionTexture
             ? getTransparentRefractionIntensity(preset)
             : 0;
+        material.subSurface.translucencyIntensity = refractionTexture
+            ? getTransparentTranslucencyIntensity(preset)
+            : 0;
+
+        if (refractionTexture) {
+            material.linkRefractionWithTransparency = true;
+            material.useRadianceOverAlpha = true;
+            material.useSpecularOverAlpha = true;
+            material.emissiveColor = new BABYLON.Color3(0, 0, 0);
+            material.alpha = clamp(preset.alpha, 0.2, 1);
+        }
     });
 }
 
@@ -4660,6 +4766,92 @@ function scheduleRealisticQualityUpgrade(canvasId) {
             console.error('[BabylonViewer] Deferred realistic quality upgrade failed:', err);
         }
     });
+}
+
+/**
+ * Schedules a fallback transition to realistic mode after a delay.
+ * This ensures the viewer transitions to realistic even if local advisory never completes.
+ * @param {string} canvasId
+ * @param {number} delayMs - Delay before transition (default: 1200ms)
+ * @param {number} transitionMs - Transition animation duration (default: 250ms)
+ */
+function scheduleRenderModeFallback(canvasId, delayMs = 1200, transitionMs = 250) {
+    const state = renderModeTransitionState[canvasId];
+    if (!state || state.completed) return;
+
+    // Clear any existing fallback timer
+    if (state.fallbackTimer) {
+        clearTimeout(state.fallbackTimer);
+    }
+
+    state.fallbackTimer = setTimeout(() => {
+        const currentState = renderModeTransitionState[canvasId];
+        if (!currentState || currentState.completed) return;
+
+        // Only transition if we're still in initial mode (not already realistic)
+        const currentMode = currentRenderModes[canvasId];
+        const targetMode = targetRenderModes[canvasId];
+        if (currentMode !== 'realistic' && targetMode === 'realistic') {
+            debugLog('[BabylonViewer] Fallback transition to realistic mode', { canvasId, delayMs });
+            transitionToRealistic(canvasId, transitionMs);
+        }
+        currentState.completed = true;
+    }, delayMs);
+}
+
+/**
+ * Transitions from current render mode to realistic with a smooth fade.
+ * @param {string} canvasId
+ * @param {number} transitionMs - Transition animation duration
+ */
+function transitionToRealistic(canvasId, transitionMs = 250) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const currentMode = currentRenderModes[canvasId];
+    if (currentMode === 'realistic') return;
+
+    debugLog('[BabylonViewer] Transitioning to realistic mode', { canvasId, from: currentMode, transitionMs });
+
+    // Apply realistic materials with alpha fade transition
+    const materialType = materialTypes[canvasId] || 'aluminum';
+    const preset = CONFIG.MATERIAL_REALISTIC[materialType] || CONFIG.MATERIAL_REALISTIC['aluminum'];
+    const finishMod = perCanvasFinishModifiers[canvasId] || { roughnessOffset: 0, metallicOffset: 0 };
+    const sharedRealisticMaterial = getRealisticMaterial(scene, canvasId, materialType);
+    syncRealisticMaterialProperties(
+        sharedRealisticMaterial,
+        preset,
+        customAlbedoColors[canvasId],
+        finishMod,
+        resolveRealisticNodeMaterialProfile(canvasId, materialType));
+
+    // If transition duration > 0, animate alpha from current to 1.0
+    if (transitionMs > 0) {
+        // Set initial alpha to 0 for fade-in
+        sharedRealisticMaterial.alpha = 0;
+        sharedRealisticMaterial.needDepthPrePass = true;
+
+        // Animate alpha
+        animateMaterialAlpha(sharedRealisticMaterial, 0, 1, scene, transitionMs);
+    }
+
+    // Apply to all model meshes
+    scene.meshes.forEach(mesh => {
+        if (isSystemMesh(mesh)) return;
+        mesh.material = sharedRealisticMaterial;
+        safeDisableEdges(mesh);
+    });
+
+    // Re-apply edges if they were enabled
+    if (edgesEnabled[canvasId]) {
+        toggleEdges(canvasId, true);
+    }
+
+    currentRenderModes[canvasId] = 'realistic';
+    syncRealisticSsao(canvasId);
+    scheduleRealisticQualityUpgrade(canvasId);
+    _syncCuttingMatRenderMode(canvasId);
+    syncSceneShadowParticipation(canvasId);
 }
 
 function refreshRealisticNormalSmoothing(canvasId) {
@@ -6095,6 +6287,23 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
         if (accepted) {
             clearLocalAdvisoryPanel(canvasId);
         }
+
+        // Trigger render mode transition if configured (trigger: runtime_complete)
+        const transitionState = renderModeTransitionState[canvasId];
+        if (transitionState && transitionState.enabled && !transitionState.completed) {
+            const targetMode = targetRenderModes[canvasId];
+            if (transitionState.trigger === 'runtime_complete' && targetMode === 'realistic') {
+                // Clear fallback timer since runtime completed
+                if (transitionState.fallbackTimer) {
+                    clearTimeout(transitionState.fallbackTimer);
+                    transitionState.fallbackTimer = null;
+                }
+                debugLog('[BabylonViewer] Runtime complete - transitioning to realistic', { canvasId });
+                transitionToRealistic(canvasId, transitionState.transitionMs);
+                transitionState.completed = true;
+            }
+        }
+
         return result;
     } catch (_) {
         if (localAdvisoryRuns[canvasId] === runId) {
@@ -6327,7 +6536,13 @@ export function applyStudioLighting(canvasId, isDark) {
     const mc = meshCenters[canvasId];
     if (bb && mc) {
         const dist = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
-        key.position = new BABYLON.Vector3(mc.x - dist, mc.y - dist, bb.max.z + dist);
+        key.position = _computeKeyLightPosition(_lc.key.direction, mc, dist);
+    }
+
+    // Update the shadow catcher's activeLight to the new key after re-lighting.
+    const catcherOnSwitch = scene.getMeshByName('__shadow_catcher__');
+    if (catcherOnSwitch?.material?.getClassName?.() === 'ShadowOnlyMaterial') {
+        catcherOnSwitch.material.activeLight = key;
     }
 
     syncSceneShadowParticipation(canvasId);
@@ -6421,6 +6636,21 @@ export function setRenderMode(canvasId, mode) {
 
     currentRenderModes[canvasId] = mode;
     syncRealisticSsao(canvasId);
+
+    // Handle render mode transition state
+    const transitionState = renderModeTransitionState[canvasId];
+    if (transitionState && transitionState.enabled && !transitionState.completed) {
+        // If user manually switches to realistic, mark transition as completed
+        if (mode === 'realistic') {
+            if (transitionState.fallbackTimer) {
+                clearTimeout(transitionState.fallbackTimer);
+                transitionState.fallbackTimer = null;
+            }
+            transitionState.completed = true;
+        }
+        // If user switches away from initial mode before transition, update target
+        targetRenderModes[canvasId] = mode;
+    }
 
     // Smooth normals transition — queue the realistic quality pass so first
     // paint is not blocked by normal recomputation on large CAD/STL meshes.
@@ -6880,6 +7110,29 @@ function _animateGridOpacity(canvasId, scene, grid, fromOpacity, toOpacity, onCo
 }
 
 /**
+ * Shows / hides the shadow catcher based on whether a floor (grid or cutting mat)
+ * is currently active. When the cutting mat is on, the catcher is raised slightly
+ * above the mat top surface (z + 0.1mm) to avoid z-fighting.
+ */
+function _syncShadowCatcherVisibility(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const catcher = scene.getMeshByName('__shadow_catcher__');
+    if (!catcher) return;
+
+    const gridOn = !!gridActiveFlags[canvasId];
+    const matOn  = !!cuttingMatActiveFlags[canvasId];
+    catcher.isVisible = gridOn || matOn;
+
+    if (catcher.position) {
+        const bb = sceneBoundingBoxes[canvasId];
+        const baseZ = bb ? bb.min.z : 0;
+        // Raise catcher 0.1mm above mat top to prevent z-fighting when mat is active.
+        catcher.position.z = matOn ? baseZ + 0.1 : baseZ;
+    }
+}
+
+/**
  * Shows a grid floor at the model's base (Z=0 after centering) to visualise
  * the print bed / machine table. Uses a 10mm-spaced GridMaterial.
  * The mesh is named '__grid__' so existing exclusion guards skip it in all
@@ -6888,6 +7141,9 @@ function _animateGridOpacity(canvasId, scene, grid, fromOpacity, toOpacity, onCo
 export function showGrid(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
+
+    gridActiveFlags[canvasId] = true;
+    _syncShadowCatcherVisibility(canvasId);
 
     const existing = scene.getMeshByName('__grid__');
     if (existing) {
@@ -6948,6 +7204,10 @@ export function showGrid(canvasId) {
 export function hideGrid(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
+
+    gridActiveFlags[canvasId] = false;
+    _syncShadowCatcherVisibility(canvasId);
+
     const grid = scene.getMeshByName('__grid__');
     if (!grid) return;
 
@@ -7131,13 +7391,11 @@ export function showCuttingMat(canvasId) {
     slabMesh.metadata = { ...(slabMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
     disableSectionClippingForMesh(slabMesh);
 
-    // ── Hide the shadow catcher ───────────────────────────────────────────────
-    // The __shadow_catcher__ mesh sits at z=0 — the same plane as the mat top
-    // surface.  Leaving it visible causes z-fighting that makes the model shadow
-    // appear shifted / "ghosted" on the mat and can leak through the slab when
-    // viewed from below. The mat top becomes the shadow receiver while visible.
-    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
-    if (shadowCatcher) shadowCatcher.isVisible = false;
+    // ── Update shadow catcher for cutting-mat mode ────────────────────────────
+    // Raise the catcher 0.1mm above the mat top to avoid z-fighting, and keep
+    // it visible so the model shadow is still cast onto it.
+    cuttingMatActiveFlags[canvasId] = true;
+    _syncShadowCatcherVisibility(canvasId);
     syncSceneShadowParticipation(canvasId);
 
     _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
@@ -7593,14 +7851,15 @@ export function hideCuttingMat(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
 
+    cuttingMatActiveFlags[canvasId] = false;
+    _syncShadowCatcherVisibility(canvasId);
+
     _cancelCuttingMatAnimation(canvasId);
     const meshes = ['__cutting_mat__', '__cutting_mat_slab__']
         .map(n => scene.getMeshByName(n))
         .filter(Boolean);
-    const shadowCatcher = scene.getMeshByName('__shadow_catcher__');
 
     if (meshes.length === 0) {
-        if (shadowCatcher) shadowCatcher.isVisible = true;
         syncSceneShadowParticipation(canvasId);
         _restoreModelCameraFit(canvasId);
         _restoreCuttingMatCameraClipping(canvasId);
@@ -7620,7 +7879,6 @@ export function hideCuttingMat(canvasId) {
         toAlpha: 0,
         onComplete: () => {
             meshes.forEach(mesh => mesh.dispose(false, true));
-            if (shadowCatcher) shadowCatcher.isVisible = true;
             syncSceneShadowParticipation(canvasId);
             _restoreModelCameraFit(canvasId);
             _restoreCuttingMatCameraClipping(canvasId);

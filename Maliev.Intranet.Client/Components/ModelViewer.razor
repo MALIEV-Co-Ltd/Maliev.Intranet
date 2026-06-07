@@ -380,6 +380,9 @@
         return new
         {
             settings.RenderMode,
+            settings.InitialRenderMode,
+            settings.TargetRenderMode,
+            settings.RenderModeTransition,
             settings.MaterialType,
             settings.CameraProjection,
             settings.EdgesEnabled,
@@ -409,6 +412,11 @@
         string.Join(
             "|",
             NormalizeRenderMode(settings.RenderMode),
+            NormalizeRenderMode(settings.InitialRenderMode),
+            NormalizeRenderMode(settings.TargetRenderMode),
+            settings.RenderModeTransition?.Enabled ?? false,
+            settings.RenderModeTransition?.FallbackDelayMs ?? 1200,
+            settings.RenderModeTransition?.TransitionMs ?? 250,
             NormalizeMaterialType(settings.MaterialType),
             NormalizeProjection(settings.CameraProjection),
             settings.EdgesEnabled,

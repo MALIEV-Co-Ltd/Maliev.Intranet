@@ -739,7 +739,7 @@ test('realistic render mode preserves stable cutting mat texture materials and r
     assert.equal(result.slabIsPbr, false);
     assert.equal(result.actualTexturePreserved, true);
     assert.equal(result.modelReceivesShadows, true);
-    assert.equal(result.topReceivesShadows, true);
+    assert.equal(result.topReceivesShadows, false);
     assert.equal(result.slabReceivesShadows, false);
     assert.deepEqual(result.shadowCasterNames, ['part']);
 });

@@ -83,6 +83,10 @@ public partial class ProjectNew : IAsyncDisposable
     private readonly Dictionary<string, CancellationTokenSource> _statusPollCts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _missingAnalysisStatusPolls = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _storageMigrationSemaphore = new(1, 1);
+
+    // ── Snackbar dedupe for DFM terminal failures ─────────────────────────
+    private readonly HashSet<string> _recentDfmFailureKeys = new(StringComparer.OrdinalIgnoreCase);
+    private const int DfmFailureKeyTtlMs = 60_000; // 1 minute dedupe window
     private static readonly JsonSerializerOptions SignalRJsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -815,6 +819,24 @@ public partial class ProjectNew : IAsyncDisposable
         part.StatusText = DfmStatusMessages.GetStatusText(part.AnalysisErrorCode);
     }
 
+    /// <summary>
+    /// Shows a snackbar message for DFM terminal failures, suppressing duplicates
+    /// for the same upload/storage path/process combination within a time window.
+    /// </summary>
+    private void ShowDfmFailureSnackbar(PartViewModel part, string errorCode, string message, Severity severity = Severity.Error)
+    {
+        var key = $"{part.FileId}|{part.StoragePath}|{part.ProcessCode}|{errorCode}";
+        if (_recentDfmFailureKeys.Contains(key))
+            return;
+
+        _recentDfmFailureKeys.Add(key);
+
+        // Schedule cleanup
+        _ = Task.Delay(DfmFailureKeyTtlMs).ContinueWith(_ => _recentDfmFailureKeys.Remove(key));
+
+        Snackbar.Add(message, severity);
+    }
+
     private async Task LoadRequestedCustomerAsync(Guid customerId)
     {
         var customer = await TryLoadCustomerSummaryAsync(customerId);
@@ -1180,7 +1202,10 @@ public partial class ProjectNew : IAsyncDisposable
 
                 part.DfmAnalysisTimedOut = false;
                 part.AnalysisErrorCode = "FILE_MISSING";
-                Snackbar.Add("File expired or missing. Re-upload to run DFM analysis.", Severity.Error);
+                part.AwaitingPreview = false;
+                part.StatusText = DfmStatusMessages.GetStatusText("FILE_MISSING");
+                StopStatusWatchdog(part.StoragePath);
+                ShowDfmFailureSnackbar(part, "FILE_MISSING", "File expired or missing. Re-upload to run DFM analysis.", Severity.Error);
             }
             else
             {

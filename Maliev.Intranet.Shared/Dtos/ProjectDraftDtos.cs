@@ -291,6 +291,15 @@ public sealed class PartViewerSettings
     /// <summary>The active render mode: solid, wireframe, transparent, or realistic.</summary>
     public string RenderMode { get; set; } = "realistic";
 
+    /// <summary>The initial render mode applied immediately when geometry loads.</summary>
+    public string InitialRenderMode { get; set; } = "realistic";
+
+    /// <summary>The target render mode for upgrade after local advisory/runtime processing.</summary>
+    public string TargetRenderMode { get; set; } = "realistic";
+
+    /// <summary>Options controlling deferred transition into realistic mode.</summary>
+    public RenderModeTransitionSettings RenderModeTransition { get; set; } = new();
+
     /// <summary>The material type key for realistic rendering (e.g. aluminum, steel, black-pom).</summary>
     public string MaterialType { get; set; } = "aluminum";
 
@@ -322,6 +331,9 @@ public sealed class PartViewerSettings
     public PartViewerSettings Clone() => new()
     {
         RenderMode = RenderMode,
+        InitialRenderMode = InitialRenderMode,
+        TargetRenderMode = TargetRenderMode,
+        RenderModeTransition = RenderModeTransition.Clone(),
         MaterialType = MaterialType,
         CameraProjection = CameraProjection,
         EdgesEnabled = EdgesEnabled,
@@ -332,6 +344,34 @@ public sealed class PartViewerSettings
         SectionOffsetMm = SectionOffsetMm,
         SectionInverted = SectionInverted,
     };
+}
+
+/// <summary>Settings that control the deferred render-mode transition behaviour on the Project New page.</summary>
+public sealed class RenderModeTransitionSettings
+{
+    /// <summary>Whether deferred transition behavior is enabled.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Event that should trigger transition. Supported: runtime_complete (default).</summary>
+    public string Trigger { get; set; } = "runtime_complete";
+
+    /// <summary>Fallback delay before forcing transition when runtime never confirms (ms).</summary>
+    public int FallbackDelayMs { get; set; } = 1200;
+
+    /// <summary>Duration of the visual transition animation in ms.</summary>
+    public int TransitionMs { get; set; } = 250;
+
+    /// <summary>Returns a shallow clone of the current settings.</summary>
+    public RenderModeTransitionSettings Clone()
+    {
+        return new RenderModeTransitionSettings
+        {
+            Enabled = Enabled,
+            Trigger = Trigger,
+            FallbackDelayMs = FallbackDelayMs,
+            TransitionMs = TransitionMs
+        };
+    }
 }
 
 /// <summary>

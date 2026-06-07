@@ -59,7 +59,7 @@ public sealed class ModelViewerRenderingSourceTests
 
         Assert.Contains("string.Equals(mode, \"solid\", StringComparison.OrdinalIgnoreCase)", csharpNormalizer, StringComparison.Ordinal);
         Assert.Contains("? \"solid\"", csharpNormalizer, StringComparison.Ordinal);
-        Assert.Contains("settings.renderMode === 'solid'", javascriptNormalizer, StringComparison.Ordinal);
+        Assert.Contains("normalizeMode(settings.renderMode)", javascriptNormalizer, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -67,7 +67,9 @@ public sealed class ModelViewerRenderingSourceTests
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
 
-        Assert.Contains(": 'realistic';", ExtractJavascriptRenderModeNormalizer(source), StringComparison.Ordinal);
+        Assert.Contains("normalizeMode(settings.renderMode)", ExtractJavascriptRenderModeNormalizer(source), StringComparison.Ordinal);
+        Assert.Contains("normalizeMode(settings.initialRenderMode)", ExtractJavascriptRenderModeNormalizer(source), StringComparison.Ordinal);
+        Assert.Contains("normalizeMode(settings.targetRenderMode)", ExtractJavascriptRenderModeNormalizer(source), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -98,6 +100,113 @@ public sealed class ModelViewerRenderingSourceTests
         // instability source (the realistic-mode flicker). Lock the regression out.
         Assert.DoesNotContain("pbr.realTimeFiltering", source, StringComparison.Ordinal);
         Assert.DoesNotContain("realTimeFilteringQuality", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_NormalizeViewerSettings_IncludesInitialRenderModeAndTransition()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify normalizeViewerSettings parses initialRenderMode, targetRenderMode, and renderModeTransition
+        Assert.Contains("const initialRenderMode = normalizeMode(settings.initialRenderMode);", source, StringComparison.Ordinal);
+        Assert.Contains("const targetRenderMode = normalizeMode(settings.targetRenderMode);", source, StringComparison.Ordinal);
+        Assert.Contains("const transition = settings.renderModeTransition", source, StringComparison.Ordinal);
+        Assert.Contains("transitionEnabled", source, StringComparison.Ordinal);
+        Assert.Contains("fallbackDelayMs", source, StringComparison.Ordinal);
+        Assert.Contains("transitionMs", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_InitialRenderModeDefaultsToSolidWhenTargetIsRealistic()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify that when target is realistic and initial is not realistic, solid is used for first paint
+        Assert.Contains("const effectiveInitialMode = (targetMode === 'realistic' && initialMode !== 'realistic')", source, StringComparison.Ordinal);
+        Assert.Contains("setRenderMode(canvasId, effectiveInitialMode);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_ScheduleFallbackTransition_UsesConfiguredDelayAndDuration()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify fallback scheduling with configurable delay and transition duration
+        Assert.Contains("function scheduleRenderModeFallback(canvasId, delayMs = 1200, transitionMs = 250)", source, StringComparison.Ordinal);
+        Assert.Contains("clearTimeout(state.fallbackTimer);", source, StringComparison.Ordinal);
+        Assert.Contains("state.fallbackTimer = setTimeout(() =>", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_TransitionToRealistic_AnimatesAlphaFade()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify transition animates material alpha from 0 to 1
+        Assert.Contains("function transitionToRealistic(canvasId, transitionMs = 250)", source, StringComparison.Ordinal);
+        Assert.Contains("sharedRealisticMaterial.alpha = 0;", source, StringComparison.Ordinal);
+        Assert.Contains("animateMaterialAlpha(sharedRealisticMaterial, 0, 1, scene, transitionMs);", source, StringComparison.Ordinal);
+        Assert.Contains("currentRenderModes[canvasId] = 'realistic';", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_RuntimeComplete_CancelsFallbackAndTransitions()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify that on runtime complete, fallback timer is cleared and transition occurs
+        Assert.Contains("if (transitionState.fallbackTimer) {", source, StringComparison.Ordinal);
+        Assert.Contains("clearTimeout(transitionState.fallbackTimer);", source, StringComparison.Ordinal);
+        Assert.Contains("transitionState.fallbackTimer = null;", source, StringComparison.Ordinal);
+        Assert.Contains("transitionToRealistic(canvasId, transitionState.transitionMs);", source, StringComparison.Ordinal);
+        Assert.Contains("transitionState.completed = true;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StagedRender_ManualModeChange_UpdatesTransitionState()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // Verify that manual render mode change updates transition state
+        Assert.Contains("const transitionState = renderModeTransitionState[canvasId];", source, StringComparison.Ordinal);
+        Assert.Contains("if (mode === 'realistic') {", source, StringComparison.Ordinal);
+        Assert.Contains("targetRenderModes[canvasId] = mode;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PartViewerSettings_DtoIncludesRenderModeTransitionFields()
+    {
+        var dtoSource = ReadRepoFile("Maliev.Intranet.Shared", "Dtos", "ProjectDraftDtos.cs");
+
+        Assert.Contains("public string InitialRenderMode", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public string TargetRenderMode", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public RenderModeTransitionSettings RenderModeTransition", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public bool Enabled", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public string Trigger", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public int FallbackDelayMs", dtoSource, StringComparison.Ordinal);
+        Assert.Contains("public int TransitionMs", dtoSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModelViewer_CaptureViewerRuntimeSettings_IncludesNewFields()
+    {
+        var source = ModelViewer.ReplaceLineEndings("\n");
+
+        Assert.Contains("settings.InitialRenderMode,", source, StringComparison.Ordinal);
+        Assert.Contains("settings.TargetRenderMode,", source, StringComparison.Ordinal);
+        Assert.Contains("settings.RenderModeTransition,", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModelViewer_GetViewerSettingsKey_IncludesNewFields()
+    {
+        var source = ModelViewer.ReplaceLineEndings("\n");
+
+        Assert.Contains("NormalizeRenderMode(settings.InitialRenderMode)", source, StringComparison.Ordinal);
+        Assert.Contains("NormalizeRenderMode(settings.TargetRenderMode)", source, StringComparison.Ordinal);
+        Assert.Contains("settings.RenderModeTransition?.Enabled", source, StringComparison.Ordinal);
+        Assert.Contains("settings.RenderModeTransition?.FallbackDelayMs", source, StringComparison.Ordinal);
+        Assert.Contains("settings.RenderModeTransition?.TransitionMs", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -319,6 +428,46 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("'worker_failed'", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void KeyLight_PositionDerivedFromDirectionNotHardcoded()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // The helper function must exist and compute position from direction vector.
+        Assert.Contains("function _computeKeyLightPosition(dirConfig, modelCenter, dist)", source, StringComparison.Ordinal);
+        Assert.Contains("dirConfig.x / mag", source, StringComparison.Ordinal);
+        Assert.Contains("dirConfig.y / mag", source, StringComparison.Ordinal);
+        Assert.Contains("dirConfig.z / mag", source, StringComparison.Ordinal);
+
+        // Both the initial-load and the theme-switch path must delegate to it.
+        Assert.Contains("key.position = _computeKeyLightPosition(_lc.key.direction, meshCenters[canvasId], dist);", source, StringComparison.Ordinal);
+        Assert.Contains("key.position = _computeKeyLightPosition(_lc.key.direction, mc, dist);", source, StringComparison.Ordinal);
+
+        // The old hardcoded formula that ignored the light direction must be gone.
+        Assert.DoesNotContain("mc.x - dist, mc.y - dist, bb.max.z + dist", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("meshCenters[canvasId].x - dist, meshCenters[canvasId].y - dist, finalBb.max.z + dist", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ShadowCatcher_ActiveLightSetToKeyOnInitialLoad()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // ShadowOnlyMaterial must name the key light so it picks the correct shadow
+        // generator instead of falling through to the first scene light (hemi, no shadows).
+        Assert.Contains("mat.activeLight  = key;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ShadowCatcher_ActiveLightUpdatedAfterThemeSwitch()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+
+        // After a theme switch the old key light is disposed and a new one created.
+        // The shadow catcher material must be updated to reference the new key light.
+        Assert.Contains("catcherOnSwitch.material.activeLight = key;", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);
@@ -344,7 +493,7 @@ public sealed class ModelViewerRenderingSourceTests
         => ExtractExpression(source, "private static string NormalizeRenderMode(string? mode) =>", "private static string NormalizeProjection");
 
     private static string ExtractJavascriptRenderModeNormalizer(string source)
-        => ExtractExpression(source, "const renderMode =", "const cameraMode = settings.cameraProjection");
+        => ExtractExpression(source, "const renderMode =", "const cameraMode =");
 
     private static string ExtractExpression(string source, string start, string end)
     {

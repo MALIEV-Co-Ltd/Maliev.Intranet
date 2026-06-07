@@ -1485,7 +1485,7 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.ok(Math.abs(result.firstOutlineUv[0] + 0.002) < 1e-12);
     assert.ok(result.topVertexCount > 12);
     assert.ok(result.slabVertexCount > 24);
-    assert.equal(result.shadowVisible, false);
+    assert.equal(result.shadowVisible, true);
 
     const drawCalls = createdCanvasContexts.at(-1)?.calls ?? [];
     const mirroredTextCalls = drawCalls.filter(call => call[0] === 'scale' && call[1] < 0);
@@ -1665,7 +1665,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(start.topAlpha, 0);
     assert.equal(start.slabAlpha, 0);
     assert.equal(start.cameraMinZ, 0.001);
-    assert.equal(start.shadowVisible, false);
+    assert.equal(start.shadowVisible, true);
     assert.equal(renderTicks.length, 2);
 
     now += 120;
@@ -1744,7 +1744,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(hidden.topExists, false);
     assert.equal(hidden.slabExists, false);
     assert.equal(hidden.cameraMinZ, 0.1);
-    assert.equal(hidden.shadowVisible, true);
+    assert.equal(hidden.shadowVisible, false);
     assert.equal(removedTicks.length, 3);
 });
 
