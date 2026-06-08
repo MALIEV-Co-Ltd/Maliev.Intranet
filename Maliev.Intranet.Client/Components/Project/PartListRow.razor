@@ -16,27 +16,10 @@
         @* Thumbnail *@
         <div class="plr-cell plr-cell--thumb"
              @onclick="@(async () => await OnViewIn3D.InvokeAsync())">
-            @if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
-            {
-                <img src="@Part.ThumbnailSmallUrl"
-                     class="plr-thumb-img"
-                     onerror="this.style.display='none'"
-                     alt="@Part.Name" />
-            }
-            else if (Part.Uploading)
-            {
-                <MudProgressCircular Indeterminate="false" Value="@Part.ProgressPercent" Size="Size.Small" />
-            }
-            else if (Part.QueuedUpload || Part.AwaitingPreview)
-            {
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-            }
-            else
-            {
-                <MudIcon Icon="@Icons.Material.Outlined.ViewInAr"
-                         Size="Size.Small"
-                         Color="Color.Tertiary" />
-            }
+            <ThumbnailImage StoragePath="@Part.StoragePath"
+                            Version="@Part.ThumbnailVersion"
+                            SignedDownloadUrl="@Part.SignedDownloadUrl"
+                            Alt="@Part.Name" />
         </div>
 
         @* File info: name + dims + DFM badge *@

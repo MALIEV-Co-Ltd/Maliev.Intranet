@@ -141,6 +141,12 @@ public class PartViewModel
     /// <summary>Pre-resolved signed URL for the GLB file, delivered by the GlbReady SignalR event. Bypasses API round-trip on cube click.</summary>
     public string? GlbSignedUrl { get; set; }
 
+    /// <summary>Content version hash for thumbnail cache invalidation. Changes when file content changes.</summary>
+    public string? ThumbnailVersion { get; set; }
+
+    /// <summary>Signed download URL for the source file. Used by client-side thumbnail generation.</summary>
+    public string? SignedDownloadUrl { get; set; }
+
     /// <summary>True when the preview image failed to load.</summary>
     public bool PreviewLoadFailed { get; set; }
 
