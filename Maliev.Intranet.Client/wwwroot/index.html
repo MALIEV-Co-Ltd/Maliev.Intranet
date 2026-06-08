@@ -51,7 +51,8 @@
         (function () {
             var patchWebGL = function (proto) {
                 try {
-                    if (Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle')) return;
+                    var descriptor = Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle');
+                    if (descriptor && descriptor.set) return; // Already has a setter
                     var internal = null;
                     Object.defineProperty(proto, 'backbufferColorTextureHandle', {
                         get: function () { return internal; },
@@ -61,10 +62,31 @@
                     });
                 } catch (_) { /* proto may be frozen in some browsers */ }
             };
-            if (typeof WebGLRenderingContext !== 'undefined')
-                patchWebGL(WebGLRenderingContext.prototype);
-            if (typeof WebGL2RenderingContext !== 'undefined')
-                patchWebGL(WebGL2RenderingContext.prototype);
+
+            // Patch all possible WebGL prototypes that Babylon.js might use
+            var prototypes = [];
+            if (typeof WebGLRenderingContext !== 'undefined') prototypes.push(WebGLRenderingContext.prototype);
+            if (typeof WebGL2RenderingContext !== 'undefined') prototypes.push(WebGL2RenderingContext.prototype);
+            if (typeof WebGLTexture !== 'undefined') prototypes.push(WebGLTexture.prototype);
+            if (typeof WebGLFramebuffer !== 'undefined') prototypes.push(WebGLFramebuffer.prototype);
+            if (typeof WebGLRenderbuffer !== 'undefined') prototypes.push(WebGLRenderbuffer.prototype);
+
+            // Also patch any object that might be used as a render target
+            prototypes.forEach(patchWebGL);
+
+            // Patch Object.prototype as last resort for any dynamic objects
+            try {
+                var descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'backbufferColorTextureHandle');
+                if (!descriptor || !descriptor.set) {
+                    var internal = null;
+                    Object.defineProperty(Object.prototype, 'backbufferColorTextureHandle', {
+                        get: function () { return internal; },
+                        set: function (v) { internal = v; },
+                        enumerable: false,
+                        configurable: true,
+                    });
+                }
+            } catch (_) { }
         })();
     </script>
 </head>

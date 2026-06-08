@@ -180,18 +180,18 @@ public class PartConfigSidebarTests
                 "PartConfigSidebar.razor")
             .ReplaceLineEndings("\n");
 
-        Assert.Contains(".pcs-process-row {\n                display: flex;\n                flex-flow: row nowrap;\n                gap: 7px;\n                overflow-x: auto;\n                padding: 0 0 6px;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-card {\n                flex: 0 0 128px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-row {\n                display: flex;\n                flex-direction: column;\n                gap: 7px;\n                overflow-y: auto;\n                padding: 0 0 6px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card {\n                flex: 0 0 auto;\n                width: 100%;", source, StringComparison.Ordinal);
         Assert.Contains("box-shadow: inset 0 0 0 1px var(--maliev-border);", source, StringComparison.Ordinal);
         Assert.Contains("border: 2px solid var(--pcs-process-active);", source, StringComparison.Ordinal);
         Assert.DoesNotContain("border-width: 2px;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 88px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-photo {\n                width: 80px;\n                height: auto;\n                min-height: 60px;", source, StringComparison.Ordinal);
         Assert.Contains("background: var(--maliev-panel-3) center / cover no-repeat;", source, StringComparison.Ordinal);
         Assert.Contains("display: block;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-copy {\n                width: 100%;\n                min-width: 0;\n                box-sizing: border-box;\n                padding: 7px 8px 8px;\n                text-align: left;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-copy {\n                flex: 1;\n                min-width: 0;\n                box-sizing: border-box;\n                padding: 7px 8px 8px;\n                text-align: left;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;", source, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-name {\n                line-height: 1.2;\n                text-align: left;\n                font-weight: 700;\n                color: var(--maliev-text);\n                white-space: nowrap;\n                overflow: hidden;\n                text-overflow: ellipsis;", source, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-description {\n                margin-top: 2px;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-description {\n                margin-top: 3px;\n                color: var(--maliev-muted);\n                font-size: var(--mud-typography-caption-size);\n                font-weight: 400;\n                line-height: 1.35;", source, StringComparison.Ordinal);
         Assert.Contains("white-space: nowrap;", source, StringComparison.Ordinal);
         Assert.Contains("text-overflow: ellipsis;", source, StringComparison.Ordinal);
     }

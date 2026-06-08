@@ -8,6 +8,7 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// <param name="Category">Issue category key (e.g. "thin_wall") matching the overlay GLB key "{PROCESS}__{category}".</param>
 /// <param name="OverlayKey">Full overlay key "{PROCESS}__{category}" used to load and toggle the overlay GLB.</param>
 /// <param name="OverlayUrl">Signed GCS URL to the overlay GLB, or null if none was generated.</param>
+/// <param name="Source">Source of the DFM analysis: "local" (browser advisory) or "server" (GeometryService).</param>
 public record DfmIssue(
     string Icon,
     string Title,
@@ -15,7 +16,8 @@ public record DfmIssue(
     DfmIssueSeverity Severity,
     string? Category = null,
     string? OverlayKey = null,
-    string? OverlayUrl = null);
+    string? OverlayUrl = null,
+    string? Source = null);
 
 /// <summary>Severity level of a DFM issue.</summary>
 public enum DfmIssueSeverity

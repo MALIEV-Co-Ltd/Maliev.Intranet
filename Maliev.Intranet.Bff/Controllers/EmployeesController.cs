@@ -185,19 +185,39 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
             ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     }
 
-    private async Task EnrichCurrentUserProfileAsync(EmployeeDetailDto? profile, Guid principalId, CancellationToken ct)
+private async Task EnrichCurrentUserProfileAsync(EmployeeDetailDto? profile, Guid principalId, CancellationToken ct)
     {
         if (profile is null)
         {
             return;
         }
 
+        var cookieProfileImageUrl = User.GetProfileImageUrl();
         profile.Email = FirstNonBlank(profile.Email, User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)?.Value, User.FindFirst("email")?.Value);
-        profile.ProfileImageUrl = FirstNonBlank(profile.ProfileImageUrl, User.GetProfileImageUrl());
+        profile.ProfileImageUrl = FirstNonBlank(profile.ProfileImageUrl, cookieProfileImageUrl);
         profile.Status = FirstNonBlank(profile.Status, "Active");
         profile.EmployeeType = FirstNonBlank(profile.EmployeeType, "FullTime");
         profile.HireDate ??= profile.CreatedAt == DateTime.MinValue ? null : profile.CreatedAt;
         profile.HireDate ??= await ResolvePrincipalCreatedAtAsync(principalId, ct);
+
+        // Persist profile image to Employee service if it came from cookie but not from employee record
+        if (!string.IsNullOrEmpty(cookieProfileImageUrl) && string.IsNullOrEmpty(profile.ProfileImageUrl))
+        {
+            try
+            {
+                await client.UpdateSelfServiceProfileAsync(profile.Id, new UpdateEmployeeSelfProfileRequest
+                {
+                    ProfileImageUrl = cookieProfileImageUrl
+                }, ct);
+                profile.ProfileImageUrl = cookieProfileImageUrl;
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail the request if profile image persistence fails
+                var logger = HttpContext.RequestServices.GetRequiredService<ILogger<EmployeesController>>();
+                logger.LogWarning(ex, "Failed to persist profile image for employee {EmployeeId}", profile.Id);
+            }
+        }
     }
 
     private async Task<DateTime?> ResolvePrincipalCreatedAtAsync(Guid principalId, CancellationToken ct)

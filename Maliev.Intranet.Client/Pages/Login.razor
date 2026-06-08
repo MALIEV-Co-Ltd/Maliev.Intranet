@@ -16,7 +16,26 @@
                 <img src="@LogoUrl" alt="MALIEV Logo" class="header-logo-img" />
             </div>
             <button class="theme-toggle-btn" @onclick="ToggleThemeAsync" title="@GetThemeTooltip()" aria-label="@GetThemeTooltip()">
-                <MudIcon Icon="@GetThemeIcon()" Size="Size.Small" />
+                @if (_isDarkMode)
+                {
+                    <svg class="theme-toggle-icon"
+                         width="20"
+                         height="20"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true"
+                         focusable="false">
+                        <path d="@GetThemeIcon()" />
+                    </svg>
+                }
+                else
+                {
+                    <MudIcon Icon="@GetThemeIcon()" Size="Size.Small" />
+                }
             </button>
         </div>
     </header>

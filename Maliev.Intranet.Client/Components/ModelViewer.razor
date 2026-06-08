@@ -10,6 +10,17 @@
 <div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisPanels">
     <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
 
+    @if (_isRealisticUpgrading)
+    {
+        <div class="realistic-upgrade-overlay" style="position: absolute; inset: 0; background: rgba(10, 10, 14, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; pointer-events: none;">
+            <MudSkeleton SkeletonType="SkeletonType.Circle" Width="56px" Height="56px" Animation="Animation.Wave" />
+            <MudSkeleton SkeletonType="SkeletonType.Text" Width="200px" Height="14px" Animation="Animation.Wave" Class="mt-3" />
+            <MudSkeleton SkeletonType="SkeletonType.Text" Width="260px" Height="12px" Animation="Animation.Wave" Class="mt-1" />
+            <MudText Typo="Typo.body2" Class="mt-3 text-white" Style="opacity: 0.9;">Applying realistic materials...</MudText>
+            <MudText Typo="Typo.caption" Class="mt-1 text-white" Style="opacity: 0.7;">This may take a moment for complex parts</MudText>
+        </div>
+    }
+
     @if (Model != null)
     {
         <div class="overlay-info" style="position: absolute; top: 12px; left: 12px; background: var(--mud-palette-overlay-dark); color: var(--mud-palette-white); padding: 12px; border-radius: var(--maliev-radius-sm); backdrop-filter: blur(4px); pointer-events: none;">
@@ -277,6 +288,7 @@
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
     private string? _lastMeasurement;     // Display last measurement result in overlay
     private string? _lastViewerSettingsKey;
+    private bool _isRealisticUpgrading;
 
     // ── Section view ─────────────────────────────────────────────────────────
     private bool   _sectionEnabled;
@@ -775,6 +787,11 @@
 
         if (_module != null)
         {
+            if (target == "realistic")
+            {
+                _isRealisticUpgrading = true;
+                await InvokeAsync(StateHasChanged);
+            }
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
             if (target == "wireframe")
                 await _module.InvokeVoidAsync("toggleEdges", _canvasId, false);
@@ -784,6 +801,22 @@
         }
 
         await NotifyViewerSettingsChangedAsync();
+    }
+
+    /// <summary>JSInvokable callback when realistic quality upgrade starts.</summary>
+    [JSInvokable]
+    public async Task NotifyRealisticUpgradeStart()
+    {
+        _isRealisticUpgrading = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>JSInvokable callback when realistic quality upgrade completes.</summary>
+    [JSInvokable]
+    public async Task NotifyRealisticUpgradeComplete()
+    {
+        _isRealisticUpgrading = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -801,6 +834,10 @@
         if (_module == null) return;
         try
         {
+            // The realistic upgrade overlay is driven by JSInvokable callbacks
+            // (NotifyRealisticUpgradeStart/Complete) fired from the JS deferred
+            // smooth-normal pipeline. We do NOT toggle the overlay here — that
+            // would hide it before the requestIdleCallback work has even started.
             await _module.InvokeVoidAsync("configureMaterialFromConfigurator",
                 _canvasId, _materialType, colorHex, finishCode ?? string.Empty, roughnessCode, processCode);
             await NotifyViewerSettingsChangedAsync();
@@ -1192,11 +1229,11 @@
     public async Task RunLocalGeometryRuntimeAsync(string? processCode = null)
     {
         if (_module == null) return;
+        var runtimeProcessCode = string.IsNullOrWhiteSpace(processCode)
+            ? ProcessCode
+            : processCode;
         try
         {
-            var runtimeProcessCode = string.IsNullOrWhiteSpace(processCode)
-                ? ProcessCode
-                : processCode;
             await _module.InvokeVoidAsync("runLocalAdvisoryGeometry", _canvasId, new
             {
                 processCode = runtimeProcessCode,
@@ -1210,6 +1247,15 @@
         catch (Exception ex)
         {
             Console.WriteLine($"[ModelViewer] local geometry runtime error: {ex.Message}");
+            // Report unavailability so the DFM analysis path can fall back to the server.
+            if (OnLocalGeometryRuntimeUnavailable is not null)
+            {
+                _ = OnLocalGeometryRuntimeUnavailable(new LocalGeometryRuntimeUnavailable
+                {
+                    ProcessCode = runtimeProcessCode,
+                    Reason = "js_interop_failed",
+                });
+            }
         }
     }
 

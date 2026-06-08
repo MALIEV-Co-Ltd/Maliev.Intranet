@@ -277,6 +277,12 @@ public class DfmIssue
     /// Centroid coordinates [x, y, z] in millimeters (for visualization)
     /// </summary>
     public List<double> Centroid { get; set; } = new();
+
+    /// <summary>
+    /// Source of the DFM analysis that produced this issue.
+    /// "local" = browser-local advisory runtime, "server" = authoritative GeometryService.
+    /// </summary>
+    public string? Source { get; set; }
 }
 
 /// <summary>

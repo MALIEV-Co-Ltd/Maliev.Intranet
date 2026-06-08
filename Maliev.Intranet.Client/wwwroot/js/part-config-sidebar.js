@@ -21,18 +21,18 @@
 
         var rowRect = row.getBoundingClientRect();
         var targetRect = target.getBoundingClientRect();
-        var left = Math.max(0, row.scrollLeft + targetRect.left - rowRect.left);
+        var top = Math.max(0, row.scrollTop + targetRect.top - rowRect.top);
         var prefersReducedMotion = window.matchMedia
             && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
         if (typeof row.scrollTo === "function") {
             row.scrollTo({
-                left: left,
+                top: top,
                 behavior: prefersReducedMotion ? "auto" : "smooth"
             });
             return;
         }
 
-        row.scrollLeft = left;
+        row.scrollTop = top;
     };
 })();

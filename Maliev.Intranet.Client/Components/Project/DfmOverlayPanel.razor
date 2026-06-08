@@ -1,5 +1,13 @@
 @namespace Maliev.Intranet.Client.Components.Project
 
+@{
+    var dfmSource = DfmIssues.Count > 0 ? DfmIssues[0].Source : null;
+    var isLocalSource = string.Equals(dfmSource, "local", StringComparison.OrdinalIgnoreCase);
+    var sourceIcon = isLocalSource ? Icons.Material.Outlined.Computer : Icons.Material.Outlined.Cloud;
+    var sourceLabel = isLocalSource ? "Local" : "Server";
+    var sourceColor = isLocalSource ? Color.Info : Color.Primary;
+}
+
 @if (TimedOut)
 {
     <div class="dfm-overlay dfm-overlay--timed-out">
@@ -33,6 +41,14 @@ else if (_allClearShown)
                          Size="Size.Small"
                          Color="Color.Success" />
                 <span>All Clear &mdash; No Issues Found</span>
+                @if (!string.IsNullOrWhiteSpace(dfmSource))
+                {
+                    <MudIcon Icon="@sourceIcon"
+                             Size="Size.Small"
+                             Color="@sourceColor"
+                             Class="dfm-source-icon"
+                             Title="@($"DFM analysis: {sourceLabel}")" />
+                }
             </div>
         </div>
     </div>
@@ -46,6 +62,14 @@ else if (IsVisible && DfmIssues.Count > 0)
                          Size="Size.Small"
                          Color="@(_acknowledged ? Color.Success : Color.Warning)" />
                 <span>@(_acknowledged ? "Issues acknowledged" : $"{DfmIssues.Count} DFM issue{(DfmIssues.Count > 1 ? "s" : "")}")</span>
+                @if (!string.IsNullOrWhiteSpace(dfmSource))
+                {
+                    <MudIcon Icon="@sourceIcon"
+                             Size="Size.Small"
+                             Color="@sourceColor"
+                             Class="dfm-source-icon"
+                             Title="@($"DFM analysis: {sourceLabel}")" />
+                }
             </div>
             <MudIcon Icon="@(_expanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
                      Size="Size.Small" />

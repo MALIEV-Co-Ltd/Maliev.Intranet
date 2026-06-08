@@ -381,7 +381,8 @@ public class GeometryController(
                             Title = "Service Error",
                             Description = "GeometryService returned null response",
                             Value = 0,
-                            Threshold = 0
+                            Threshold = 0,
+                            Source = "server"
                         }
                     }
                 }
@@ -419,7 +420,8 @@ public class GeometryController(
                         Title = "File no longer in storage",
                         Description = "The uploaded CAD file is no longer available. Please re-upload the file to run DFM analysis.",
                         Value = 0,
-                        Threshold = 0
+                        Threshold = 0,
+                        Source = "server"
                     }
                 ]
             }

@@ -900,10 +900,20 @@
         var processCode = Part.ProcessCode.ToUpperInvariant();
         // "CNC" is the legacy alias for "CNC_MILL" — overlay GLBs are keyed under CNC_MILL.
         var overlayProcessCode = processCode == "CNC" ? "CNC_MILL" : processCode;
+
+        // Extract source information from the DFM report if available
+        var reportIssues = GetDfmReportIssues(Part.DfmReport);
+        var sourceByCategory = reportIssues
+            .GroupBy(i => i.Category ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.First().Source ?? "server", StringComparer.OrdinalIgnoreCase);
+
         var issues = raw.Select(t =>
         {
             var overlayKey = t.Category != null ? $"{overlayProcessCode}__{t.Category}" : null;
             var overlayUrl = overlayKey != null ? Part.OverlayUrls?.GetValueOrDefault(overlayKey) : null;
+            var source = !string.IsNullOrWhiteSpace(t.Category) && sourceByCategory.TryGetValue(t.Category, out var src)
+                ? src
+                : "server";
             return new DfmIssue(
                 Icon: t.Icon,
                 Title: t.Text,
@@ -911,18 +921,42 @@
                 Severity: DfmIssueSeverity.Warning,
                 Category: t.Category,
                 OverlayKey: overlayKey,
-                OverlayUrl: overlayUrl);
+                OverlayUrl: overlayUrl,
+                Source: source);
         }).ToList();
+
         // Always append general mesh issues (non-manifold, multi-body) regardless of process.
-        issues.AddRange(BuildGeneralMeshIssues());
+        // These are derived from server-populated Part properties.
+        issues.AddRange(BuildGeneralMeshIssues("server"));
         return issues;
+    }
+
+    private static List<Maliev.Intranet.Shared.Dtos.DfmIssue> GetDfmReportIssues(object? dfmReport)
+    {
+        return dfmReport switch
+        {
+            FdmDfmReportPayload fdm => [],
+            SlaDfmReportPayload sla => [],
+            CncDfmReportPayload cnc => (cnc.Issues ?? []).Select(i => new Maliev.Intranet.Shared.Dtos.DfmIssue
+            {
+                Category = i.Category,
+                Severity = i.Severity,
+                Title = i.Title,
+                Description = i.Description,
+                Value = i.Value,
+                Threshold = i.Threshold,
+                Source = "server"
+            }).ToList(),
+            Maliev.Intranet.Shared.Dtos.DfmReport dto => dto.Issues ?? [],
+            _ => []
+        };
     }
 
     /// <summary>
     /// Returns mesh-quality issues that are process-agnostic.
     /// Shown when no manufacturing process is selected yet.
     /// </summary>
-    private List<DfmIssue> BuildGeneralMeshIssues()
+    private List<DfmIssue> BuildGeneralMeshIssues(string source = "server")
     {
         var issues = new List<DfmIssue>();
 
@@ -937,7 +971,8 @@
                 Icon: Icons.Material.Filled.WarningAmber,
                 Title: "Non-manifold mesh",
                 Description: nmDesc,
-                Severity: DfmIssueSeverity.Warning));
+                Severity: DfmIssueSeverity.Warning,
+                Source: source));
         }
 
         if (Part.BodyCount > 1)
@@ -951,7 +986,8 @@
                 Severity: DfmIssueSeverity.Warning,
                 Category: "multi_body",
                 OverlayKey: overlayKey,
-                OverlayUrl: resolvedOverlayUrl));
+                OverlayUrl: resolvedOverlayUrl,
+                Source: source));
         }
 
         return issues;

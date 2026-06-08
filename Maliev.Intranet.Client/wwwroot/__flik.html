@@ -3,96 +3,349 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Realistic finish harness</title>
+<title>Realistic render harness — Maliev</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #20242b; color: #e6e6e6; font: 12px/1.4 monospace; }
-  #wrap { display: flex; height: 100%; }
-  #left { flex: 1; position: relative; }
-  #c1 { width: 100%; height: 100%; display: block; background: #20242b; }
-  #right { width: 360px; padding: 8px; overflow: auto; background: #14171c; }
-  pre { white-space: pre-wrap; word-break: break-word; }
-  button { font: inherit; margin: 1px; padding: 3px 6px; background:#2d333b; color:#e6e6e6; border:1px solid #444; cursor:pointer; }
-  .grp { margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom: 4px; }
-  #log.err { color:#ff6b6b; } #log.ok { color:#6bd66b; }
+html, body { margin: 0; height: 100%; background: #1a1d24; color: #d8dce6; font: 11px/1.4 'SF Mono', 'Fira Code', monospace; }
+#wrap { display: flex; height: 100%; }
+#left { flex: 1; position: relative; min-width: 0; }
+#c1 { width: 100%; height: 100%; display: block; background: #1a1d24; }
+#right { width: 400px; display: flex; flex-direction: column; background: #12151b; border-left: 1px solid #2a2e3a; overflow: hidden; }
+#diag-bar { padding: 6px 8px; background: #0e1016; border-bottom: 1px solid #2a2e3a; font-size: 10px; line-height: 1.5; }
+#panels { flex: 1; overflow-y: auto; padding: 6px 8px; }
+pre { white-space: pre-wrap; word-break: break-all; margin: 0; }
+.sec { margin-bottom: 8px; }
+.sec-title { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin: 6px 0 3px; border-bottom: 1px solid #2a2e3a; padding-bottom: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 2px; }
+button {
+  font: 10px/1 inherit; padding: 3px 7px; background: #1e2330;
+  color: #c8cdd8; border: 1px solid #353a48; border-radius: 3px;
+  cursor: pointer; white-space: nowrap;
+}
+button:hover { background: #2a3048; border-color: #4a5168; }
+button.active { background: #1f3a6e; border-color: #3a6fd0; color: #7ab8ff; }
+button.metal { border-color: #6a5a30; }
+button.metal:hover { background: #2a2518; }
+button.plastic { border-color: #2a4a2a; }
+button.plastic:hover { background: #182218; }
+button.additive { border-color: #3a2a4a; }
+button.additive:hover { background: #1e1828; }
+button.transp { border-color: #1a3a4a; font-style: italic; }
+button.transp:hover { background: #101e28; }
+button.finish { border-color: #3a3040; font-size: 9px; padding: 2px 5px; }
+button.finish:hover { background: #201828; }
+button.mode { background: #0f1218; border-color: #404858; }
+button.mode:hover { background: #1a2030; }
+.label { font-size: 9px; color: #6b7280; align-self: center; margin-right: 2px; }
+#log { font-size: 10px; color: #4ade80; padding: 2px 0; }
+#log.err { color: #f87171; }
+.warn-row { color: #fbbf24; font-size: 9px; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="left"><canvas id="c1" touch-action="none"></canvas></div>
   <div id="right">
-    <div class="grp">
-      <button onclick="__mode('realistic')">realistic</button>
-      <button onclick="__mode('solid')">solid</button>
-      <button onclick="__v().stopAutoRotation('c1')">stop rot</button>
-      <button onclick="__reset()">reset</button>
-    </div>
-    <div class="grp">
-      <div>CNC aluminum:</div>
-      <button onclick="__cfg('aluminum',null,'as_machined','RA_1_6','CNC_MILL')">as-machined</button>
-      <button onclick="__cfg('aluminum',null,'bead_blasted','RA_3_2','CNC_MILL')">bead-blast</button>
-      <button onclick="__cfg('aluminum',null,'brushed','RA_1_6','CNC_MILL')">brushed</button>
-      <button onclick="__cfg('aluminum',null,'mirror_polished','RA_0_8','CNC_MILL')">polished</button>
-      <button onclick="__cfg('aluminum',null,'anodized','RA_1_6','CNC_MILL')">anodized</button>
-    </div>
-    <div class="grp">
-      <button onclick="__cfg('steel',null,'RAW','RA_1_6','CNC_MILL')">steel raw</button>
-      <button onclick="__cfg('stainless-steel',null,'RAW','RA_1_6','CNC_MILL')">SS raw</button>
-      <button onclick="__cfg('stainless-steel',null,'as_machined','RA_1_6','CNC_MILL')">SS machined</button>
-      <button onclick="__cfg('stainless-steel',null,'bead_blasted','RA_3_2','CNC_MILL')">SS bead</button>
-      <button onclick="__cfg('nylon-powder',null,'','','MJF')">MJF nylon</button>
-      <button onclick="__cfg('pla','#cc3333','as_printed',null,'FDM')">FDM PLA</button>
-      <button onclick="__cfg('black-pom','#111111','as_machined','RA_1_6','CNC_MILL')">POM</button>
-    </div>
-    <pre id="diag">starting…</pre>
-    <pre id="log"></pre>
-  </div>
-</div>
+    <div id="diag-bar"><pre id="diag">initialising…</pre></div>
+    <div id="panels">
+
+      <!-- ── Viewer controls ─────────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">Viewer</div>
+        <div class="row">
+          <button class="mode" onclick="__mode('realistic')">realistic</button>
+          <button class="mode" onclick="__mode('solid')">solid</button>
+          <button class="mode" onclick="__mode('wireframe')">wireframe</button>
+          <button class="mode" onclick="__mode('transparent')">transparent</button>
+          <button class="mode" onclick="__v().stopAutoRotation('c1')">stop rot</button>
+          <button class="mode" onclick="__reset()">reset stats</button>
+        </div>
+        <div class="row">
+          <button class="mode" onclick="__v().showGrid('c1')">grid on</button>
+          <button class="mode" onclick="__v().hideGrid('c1')">grid off</button>
+          <button class="mode" onclick="__v().showCuttingMat('c1')">mat on</button>
+          <button class="mode" onclick="__v().hideCuttingMat('c1')">mat off</button>
+        </div>
+      </div>
+
+      <!-- ── CNC Metals ─────────────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">CNC Metals — CNC_MILL</div>
+        <div class="row">
+          <span class="label">material:</span>
+          <button class="metal" onclick="__cfg('aluminum',null,'','RA_1_6','CNC_MILL')">aluminum</button>
+          <button class="metal" onclick="__cfg('steel',null,'','RA_1_6','CNC_MILL')">steel</button>
+          <button class="metal" onclick="__cfg('stainless-steel',null,'','RA_1_6','CNC_MILL')">SS</button>
+          <button class="metal" onclick="__cfg('brass',null,'','RA_1_6','CNC_MILL')">brass</button>
+          <button class="metal" onclick="__cfg('copper',null,'','RA_1_6','CNC_MILL')">copper</button>
+          <button class="metal" onclick="__cfg('bronze',null,'','RA_1_6','CNC_MILL')">bronze</button>
+          <button class="metal" onclick="__cfg('titanium',null,'','RA_1_6','CNC_MILL')">titanium</button>
+        </div>
+        <div class="row">
+          <span class="label">Ra:</span>
+          <button class="finish" onclick="__raOnly('RA_3_2')">Ra 3.2</button>
+          <button class="finish" onclick="__raOnly('RA_1_6')">Ra 1.6</button>
+          <button class="finish" onclick="__raOnly('RA_0_8')">Ra 0.8</button>
+          <button class="finish" onclick="__raOnly('RA_0_4')">Ra 0.4</button>
+        </div>
+        <div class="row">
+          <span class="label">finish:</span>
+          <button class="finish" onclick="__fin('as_machined')">as-machined</button>
+          <button class="finish" onclick="__fin('bead_blasted')">bead blast</button>
+          <button class="finish" onclick="__fin('sandblasted')">sandblasted</button>
+          <button class="finish" onclick="__fin('brushed')">brushed</button>
+          <button class="finish" onclick="__fin('polished')">polished</button>
+          <button class="finish" onclick="__fin('mirror_polished')">mirror</button>
+          <button class="finish" onclick="__fin('electropolished')">electropol.</button>
+          <button class="finish" onclick="__fin('anodized')">anodized II</button>
+          <button class="finish" onclick="__fin('hard_anodized')">anodized III</button>
+          <button class="finish" onclick="__fin('painted')">painted</button>
+          <button class="finish" onclick="__fin('powder_coated')">powder coat</button>
+          <button class="finish" onclick="__fin('plated')">plated</button>
+        </div>
+        <div class="row">
+          <span class="label">anodize colors:</span>
+          <button class="finish" onclick="__cfgFull('aluminum','#2f6fd6','anodized','RA_1_6','CNC_MILL')">Al blue anod.</button>
+          <button class="finish" onclick="__cfgFull('aluminum','#111111','anodized','RA_1_6','CNC_MILL')">Al black anod.</button>
+          <button class="finish" onclick="__cfgFull('aluminum','#b22020','anodized','RA_1_6','CNC_MILL')">Al red anod.</button>
+          <button class="finish" onclick="__cfgFull('aluminum','#2a7a2a','anodized','RA_1_6','CNC_MILL')">Al green anod.</button>
+        </div>
+        <div class="row">
+          <button class="finish" onclick="__cfgFull('aluminum','#4a90d9','powder_coated','','CNC_MILL')">Al powder blue</button>
+          <button class="finish" onclick="__cfgFull('aluminum','#e8e0d0','powder_coated','','CNC_MILL')">Al powder cream</button>
+          <button class="finish" onclick="__cfgFull('aluminum','#111111','painted','','CNC_MILL')">Al painted black</button>
+          <button class="finish" onclick="__cfgFull('stainless-steel',null,'electropolished','RA_0_4','CNC_MILL')">SS electropol.</button>
+        </div>
+      </div>
+
+      <!-- ── CNC Turning ─────────────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">CNC Turning — CNC_TURN</div>
+        <div class="row">
+          <button class="metal" onclick="__cfg('aluminum',null,'as_machined','RA_1_6','CNC_TURN')">Al turn raw</button>
+          <button class="metal" onclick="__cfg('aluminum',null,'polished','RA_0_4','CNC_TURN')">Al turn polished</button>
+          <button class="metal" onclick="__cfg('stainless-steel',null,'as_machined','RA_1_6','CNC_TURN')">SS turn raw</button>
+          <button class="metal" onclick="__cfg('brass',null,'mirror_polished','RA_0_4','CNC_TURN')">Brass mirror</button>
+        </div>
+      </div>
+
+      <!-- ── CNC Plastics ────────────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">CNC Plastics — CNC_MILL</div>
+        <div class="row">
+          <button class="plastic" onclick="__cfg('black-pom','#111111','as_machined','RA_1_6','CNC_MILL')">POM black</button>
+          <button class="plastic" onclick="__cfg('white-pom',null,'as_machined','RA_1_6','CNC_MILL')">POM white</button>
+          <button class="plastic" onclick="__cfg('blue-pom','#2f6fd6','as_machined','RA_1_6','CNC_MILL')">POM blue</button>
+          <button class="plastic" onclick="__cfg('peek',null,'as_machined','RA_1_6','CNC_MILL')">PEEK</button>
+          <button class="transp" onclick="__cfg('acrylic-clear',null,'polished','RA_0_4','CNC_MILL')">Acrylic clear</button>
+        </div>
+        <div class="row">
+          <button class="finish" onclick="__cfgFull('black-pom','#111111','polished','RA_0_4','CNC_MILL')">POM black polished</button>
+          <button class="finish" onclick="__cfgFull('white-pom',null,'bead_blasted','','CNC_MILL')">POM white bead</button>
+          <button class="finish" onclick="__cfgFull('acrylic-clear',null,'mirror_polished','RA_0_4','CNC_MILL')">Acrylic mirror</button>
+        </div>
+      </div>
+
+      <!-- ── FDM ────────────────────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">FDM — all filaments</div>
+        <div class="row">
+          <span class="label">opaque:</span>
+          <button class="additive" onclick="__cfg('pla','#cc3333','as_printed',null,'FDM')">PLA red</button>
+          <button class="additive" onclick="__cfg('pla','#1a5fa8','as_printed',null,'FDM')">PLA blue</button>
+          <button class="additive" onclick="__cfg('pla','#111111','as_printed',null,'FDM')">PLA black</button>
+          <button class="additive" onclick="__cfg('pla','#f0f0e8','as_printed',null,'FDM')">PLA white</button>
+          <button class="additive" onclick="__cfg('abs','#e8a020','as_printed',null,'FDM')">ABS yellow</button>
+          <button class="additive" onclick="__cfg('abs','#111111','as_printed',null,'FDM')">ABS black</button>
+          <button class="additive" onclick="__cfg('petg','#2a6a2a','as_printed',null,'FDM')">PETG green</button>
+          <button class="additive" onclick="__cfg('nylon',null,'as_printed',null,'FDM')">Nylon</button>
+          <button class="additive" onclick="__cfg('peek',null,'as_printed',null,'FDM')">PEEK</button>
+          <button class="additive" onclick="__cfg('carbon-fiber',null,'as_printed',null,'FDM')">Carbon fiber</button>
+        </div>
+        <div class="row">
+          <span class="label">transp:</span>
+          <button class="transp" onclick="__cfg('petg-clear','#f6fbff','as_printed',null,'FDM')">PETG clear</button>
+          <button class="transp" onclick="__cfg('petg-clear','#dceeff','as_printed',null,'FDM')">PETG tinted blue</button>
+        </div>
+      </div>
+
+      <!-- ── Powder Bed (SLS / MJF) ─────────────────── -->
+      <div class="sec">
+        <div class="sec-title">Powder Bed — SLS / MJF</div>
+        <div class="row">
+          <button class="additive" onclick="__cfg('nylon-powder',null,'','','MJF')">MJF nylon (grey)</button>
+          <button class="additive" onclick="__cfgFull('nylon-powder','#111111','','','MJF')">MJF nylon black</button>
+          <button class="additive" onclick="__cfgFull('nylon-powder','#2f6fd6','','','MJF')">MJF nylon blue</button>
+          <button class="additive" onclick="__cfg('nylon-powder',null,'','','SLS')">SLS nylon</button>
+          <button class="additive" onclick="__cfg('nylon-powder',null,'','','SLS_PA')">SLS PA12</button>
+          <button class="additive" onclick="__cfg('nylon-powder',null,'','','SJS')">SJS</button>
+        </div>
+      </div>
+
+      <!-- ── Resin (SLA / DLP) ─────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">Resin — SLA / DLP</div>
+        <div class="row">
+          <button class="additive" onclick="__cfg('resin',null,'as_printed',null,'SLA')">resin opaque</button>
+          <button class="additive" onclick="__cfgFull('resin','#cc3333','as_printed',null,'SLA')">resin red</button>
+          <button class="additive" onclick="__cfgFull('resin','#111111','as_printed',null,'SLA')">resin black</button>
+          <button class="transp" onclick="__cfg('resin-clear','#f6fbff','as_printed',null,'SLA')">resin clear</button>
+          <button class="transp" onclick="__cfgFull('resin-clear','#93c7ff','as_printed',null,'SLA_DLP')">resin blue tint</button>
+          <button class="transp" onclick="__cfgFull('resin-clear','#f6fbff','as_printed',null,'DLP')">resin DLP clear</button>
+        </div>
+      </div>
+
+      <!-- ── Transparent / Translucent deep-dives ─── -->
+      <div class="sec">
+        <div class="sec-title">Transparent / Translucent — finish variants</div>
+        <div class="row">
+          <button class="transp" onclick="__cfgFull('acrylic-clear',null,'mirror_polished','RA_0_4','CNC_MILL')">Acrylic mirror</button>
+          <button class="transp" onclick="__cfgFull('acrylic-clear',null,'polished','RA_0_8','CNC_MILL')">Acrylic polished</button>
+          <button class="transp" onclick="__cfgFull('acrylic-clear',null,'as_machined','RA_1_6','CNC_MILL')">Acrylic machined</button>
+          <button class="transp" onclick="__cfgFull('petg-clear','#f6fbff','as_printed',null,'FDM')">PETG-clear printed</button>
+          <button class="transp" onclick="__cfgFull('resin-clear','#f6fbff','as_printed',null,'SLA')">Resin-clear SLA</button>
+        </div>
+      </div>
+
+      <!-- ── Surface effects focus (for perf testing) -->
+      <div class="sec">
+        <div class="sec-title">Surface effects focus (shader perf)</div>
+        <div class="row">
+          <button onclick="__cfg('aluminum',null,'bead_blasted','','CNC_MILL')">Al bead-blast (bead)</button>
+          <button onclick="__cfg('aluminum',null,'brushed','','CNC_MILL')">Al brushed</button>
+          <button onclick="__cfg('aluminum',null,'as_machined','RA_1_6','CNC_MILL')">Al machined</button>
+          <button onclick="__cfg('nylon-powder',null,'','','MJF')">MJF powder-grain</button>
+          <button onclick="__cfgFull('aluminum','#111111','powder_coated','','CNC_MILL')">Al powder-coat</button>
+        </div>
+        <div class="row">
+          <span class="label">FdmLayer combos:</span>
+          <button onclick="__cfg('pla','#cc3333','as_printed',null,'FDM')">FDM PLA</button>
+          <button onclick="__cfg('carbon-fiber',null,'as_printed',null,'FDM')">FDM carbon</button>
+          <button onclick="__cfg('nylon',null,'as_printed',null,'FDM')">FDM nylon</button>
+          <button onclick="__cfg('resin',null,'as_printed',null,'SLA')">SLA resin</button>
+        </div>
+      </div>
+
+      <!-- ── Ra roughness matrix ────────────────────── -->
+      <div class="sec">
+        <div class="sec-title">Ra roughness spectrum — aluminum CNC_MILL as-machined</div>
+        <div class="row">
+          <button onclick="__cfgFull('aluminum',null,'as_machined','RA_3_2','CNC_MILL')">Ra 3.2 coarse</button>
+          <button onclick="__cfgFull('aluminum',null,'as_machined','RA_1_6','CNC_MILL')">Ra 1.6 standard</button>
+          <button onclick="__cfgFull('aluminum',null,'as_machined','RA_0_8','CNC_MILL')">Ra 0.8 fine</button>
+          <button onclick="__cfgFull('aluminum',null,'as_machined','RA_0_4','CNC_MILL')">Ra 0.4 very fine</button>
+        </div>
+      </div>
+
+      <!-- ── Log ───────────────────────────────────── -->
+      <div class="sec">
+        <pre id="log">…</pre>
+      </div>
+
+    </div><!-- /panels -->
+  </div><!-- /right -->
+</div><!-- /wrap -->
+
 <script type="module">
 import * as viewer from './js/part-viewer.js';
-window.__viewer = viewer; window.__v = () => viewer;
-const logEl = document.getElementById('log'), diagEl = document.getElementById('diag');
+window.__viewer = viewer;
+window.__v = () => viewer;
+
+const logEl = document.getElementById('log');
+const diagEl = document.getElementById('diag');
 const errs = [];
+
+// Intercept console errors/warnings
 const oe = console.error.bind(console), ow = console.warn.bind(console);
-console.error = (...a)=>{errs.push('ERR '+a.map(String).join(' '));oe(...a);};
-console.warn = (...a)=>{errs.push('WARN '+a.map(String).join(' '));ow(...a);};
-window.addEventListener('error', e=>errs.push('WINERR '+(e.message||e.error)));
-const st = { frames:0, blinkFrames:0, maxOpaque:0, lastOpaque:0, lumaJumpFrames:0, lumaHist:[], attached:false, startedAt:performance.now() };
+console.error = (...a) => { errs.push('ERR ' + a.map(String).join(' ')); oe(...a); };
+console.warn  = (...a) => { errs.push('WRN ' + a.map(String).join(' ')); ow(...a); };
+window.addEventListener('error', e => errs.push('WIN ' + (e.message || e.error)));
+
+// Frame / luma tracking
+const st = {
+  frames: 0, blinkFrames: 0, maxOpaque: 0, lastOpaque: 0,
+  lumaJumpFrames: 0, lumaHist: [], attached: false, startedAt: performance.now()
+};
 window.__state = st;
-function attach(scene, engine){
-  scene.onAfterRenderObservable.add(()=>{
-    st.frames++;
-  });
-  st.attached=true;
+
+function attach(scene, engine) {
+  scene.onAfterRenderObservable.add(() => { st.frames++; });
+  st.attached = true;
 }
-setInterval(()=>{const b=window.BABYLON,e=b?.EngineStore?.Instances?.[0]||b?.EngineStore?.LastCreatedEngine,s=b?.EngineStore?.LastCreatedScene;if(e&&s&&!st.attached){window.__scene=s;window.__engine=e;try{attach(s,e);}catch(x){errs.push('probe '+x.message);}}},120);
-window.__reset=()=>{st.frames=0;st.blinkFrames=0;st.maxOpaque=0;st.lumaJumpFrames=0;st.lumaHist.length=0;st.startedAt=performance.now();errs.length=0;};
-window.__mode=(m)=>{try{viewer.setRenderMode('c1',m);}catch(e){errs.push(e.message);}};
-window.__cfg=(mat,col,fin,ra,proc)=>{try{viewer.configureMaterialFromConfigurator('c1',mat,col,fin,ra,proc);viewer.setRenderMode('c1','realistic');}catch(e){errs.push(e.message);}};
-function fmt(){
-  const sc=window.__scene,e=window.__engine;
-  const m=sc?(sc.meshes.find(x=>x.material?.name&&x.material.name.indexOf('__realistic_')===0)?.material||sc.materials.find(x=>x.name&&x.name.indexOf('__realistic_')===0)):null;
-  const mesh=sc?.meshes?.find?.(x=>x.material===m)||null;
-  const sub=mesh?.subMeshes?.find?.(x=>x?._drawWrapper||x?._drawWrappers||x?.effect)||null;
-  const subDraw=sub?._drawWrapper||sub?._drawWrappers?.[0]||null;
-  const subEffect=sub?.effect||sub?.getEffect?.()||subDraw?.effect||subDraw?._effect||null;
-  const surf=m?._malievSurfaceEffect;
-  const plug=m?._pluginInstances?.find?.(p=>p.name==='MalievSurfaceEffect')||m?.pluginManager?._plugins?.find?.(p=>p.name==='MalievSurfaceEffect');
-  const defines={}; try{plug?.prepareDefines?.(defines);}catch{}
-  const shader=subEffect?._fragmentSource||subEffect?._fragmentSourceCode||(m?.getEffect?.()?._fragmentSource)||m?._drawWrapper?._effect?._fragmentSource||'';
+setInterval(() => {
+  const b = window.BABYLON;
+  const e = b?.EngineStore?.Instances?.[0] || b?.EngineStore?.LastCreatedEngine;
+  const s = b?.EngineStore?.LastCreatedScene;
+  if (e && s && !st.attached) {
+    window.__scene = s; window.__engine = e;
+    try { attach(s, e); } catch (x) { errs.push('probe ' + x.message); }
+  }
+}, 120);
+
+window.__reset = () => {
+  st.frames = 0; st.blinkFrames = 0; st.maxOpaque = 0;
+  st.lumaJumpFrames = 0; st.lumaHist.length = 0;
+  st.startedAt = performance.now(); errs.length = 0;
+  logEl.className = ''; logEl.textContent = 'stats reset';
+};
+
+// Track active config for "re-apply finish" helpers
+let _curMat = 'aluminum', _curColor = null, _curFin = '', _curRa = 'RA_1_6', _curProc = 'CNC_MILL';
+
+window.__mode = m => { try { viewer.setRenderMode('c1', m); } catch (e) { errs.push(e.message); } };
+
+window.__cfgFull = (mat, col, fin, ra, proc) => {
+  _curMat = mat; _curColor = col; _curFin = fin; _curRa = ra || null; _curProc = proc;
+  try {
+    viewer.configureMaterialFromConfigurator('c1', mat, col, fin, ra || null, proc);
+    viewer.setRenderMode('c1', 'realistic');
+    logEl.className = 'ok';
+    logEl.textContent = `${mat} | ${fin||'(no finish)'} | Ra ${ra||'–'} | ${proc}${col ? ' | '+col : ''}`;
+  } catch (e) { errs.push(e.message); logEl.className = 'err'; logEl.textContent = e.message; }
+};
+
+// __cfg: convenience alias — ra='' means pass null
+window.__cfg = (mat, col, fin, ra, proc) => __cfgFull(mat, col, fin, ra || null, proc);
+
+// Re-apply finish only (keep current material, color, process)
+window.__fin = fin => __cfgFull(_curMat, _curColor, fin, _curRa, _curProc);
+
+// Re-apply Ra only (keep current material, color, finish, process)
+window.__raOnly = ra => __cfgFull(_curMat, _curColor, _curFin, ra, _curProc);
+
+function fmt() {
+  const sc = window.__scene, e = window.__engine;
+  const elapsed = ((performance.now() - st.startedAt) / 1000).toFixed(1);
+  const mats = sc?.materials?.filter(x => x.name?.startsWith('__realistic_')).map(m => {
+    const plug = m?.pluginManager?._plugins?.filter(p => p._isEnabled).map(p => p.name).join(',') || '–';
+    const surf = m?._malievSurfaceEffect;
+    return `  ${m.name.replace('__realistic_', '')}` +
+      ` M=${m?.metallic?.toFixed(2)} R=${m?.roughness?.toFixed(2)}` +
+      `${surf && surf.kind > 0 ? ' surf=' + surf.key : ''}` +
+      `\n   plugins: ${plug}`;
+  }) ?? [];
+  const fps = e ? e.getFps().toFixed(0) : '?';
+  const fpsColor = fps >= 50 ? '🟢' : fps >= 20 ? '🟡' : '🔴';
   return [
-    `probe:${st.attached?'on':'…'} fps=${e?e.getFps().toFixed(0):'?'} frames=${st.frames}`,
-    `mat: ${m?m.getClassName()+' '+m.name:'(none)'}`,
-    `metallic=${m?.metallic?.toFixed?.(2)} rough=${m?.roughness?.toFixed?.(2)} rtf=${m?.realTimeFiltering}`,
-    `plugins=${m&&m.pluginManager?m.pluginManager._plugins.map(p=>p.name).join(','):'?'}`,
-    `surface=${surf?`${surf.key} kind=${surf.kind} scale=${surf.scale} bump=${surf.bump}`:'(none)'} plug=${plug?`${plug._effect?.key}/${plug._effect?.kind} enabled=${plug._isEnabled}`:'(none)'} define=${defines.MALIEV_SURFACE_EFFECT}`,
-    `shader surface=${shader.includes('MALIEV_SURFACE_EFFECT')} bead=${shader.includes('_beadCraterAa')} mach=${shader.includes('_machinedAa')}`,
-    `BLINK ${st.blinkFrames}/${st.frames} (${st.frames?(100*st.blinkFrames/st.frames).toFixed(1):0}%) maxOpaque=${st.maxOpaque}`,
-    `LUMAjump ${(st.frames?(100*st.lumaJumpFrames/st.frames).toFixed(1):0)}%`,
-    `--- console ---`, errs.slice(-8).join('\n')||'(none)'
+    `${fpsColor} fps=${fps}  frames=${st.frames}  t=${elapsed}s  probe=${st.attached?'on':'…'}`,
+    `active mats (${mats.length}):`,
+    mats.length ? mats.join('\n') : '  (none)',
+    `errs: ${errs.slice(-4).join(' | ') || 'none'}`,
   ].join('\n');
 }
-setInterval(()=>{diagEl.textContent=fmt();},400);
-(async()=>{try{await viewer.initialize('c1','./__fliktest/sample.glb','.glb',false,null,null,{renderMode:'realistic'});logEl.className='ok';logEl.textContent='init ok';}catch(e){logEl.className='err';logEl.textContent='init threw: '+(e&&e.message);errs.push('init '+(e&&(e.stack||e)));}})();
+setInterval(() => { diagEl.textContent = fmt(); }, 400);
+
+// Initialise with aluminum/realistic as default
+(async () => {
+  try {
+    await viewer.initialize('c1', './__fliktest/sample.glb', '.glb', false, null, null, { renderMode: 'realistic' });
+    logEl.className = 'ok';
+    logEl.textContent = 'ready — pick a material above';
+  } catch (e) {
+    logEl.className = 'err';
+    logEl.textContent = 'init error: ' + (e?.message ?? e);
+    errs.push('init ' + (e?.stack || e));
+  }
+})();
 </script>
 </body>
 </html>

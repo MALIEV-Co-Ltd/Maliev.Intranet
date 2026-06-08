@@ -264,3 +264,61 @@ code {
         transform: translateX(220px);
     }
 }
+
+/* ── Process picker: fill available vertical space (sidebar mode) ──────────── */
+
+/* Make pcs-scroll a flex column so child sections can be flex items */
+.pcs-root:not(.pcs-root--inline) .pcs-scroll {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* When manufacturing process is the only section (no process selected yet),
+   grow it to fill all available space in the scroll area */
+.pcs-section[data-config-section="manufacturing-process"]:only-child {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+}
+
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-section-header {
+    flex-shrink: 0 !important;
+}
+
+/* Search input sits between header and row — must not grow */
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-process-search {
+    flex-shrink: 0 !important;
+}
+
+/* Process row takes all remaining height; scrolls if more cards than space */
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-process-row {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+
+/* Cards fill full width, capped at 220px height */
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-process-card {
+    width: 100% !important;
+    max-height: 220px !important;
+}
+
+/* Photo fills the full card height (not fixed height) */
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-process-photo {
+    height: auto !important;
+    width: 80px !important;
+}
+
+/* Text copy is vertically centred in taller cards */
+.pcs-section[data-config-section="manufacturing-process"]:only-child .pcs-process-copy {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+}
+
+/* Allow description to show up to 3 lines in sidebar mode */
+.pcs-root:not(.pcs-root--inline) .pcs-process-description {
+    -webkit-line-clamp: 3 !important;
+}

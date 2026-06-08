@@ -2,6 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -198,13 +200,38 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             var newToken = result.GetProperty("access_token").GetString();
             if (string.IsNullOrEmpty(newToken)) return null;
 
+            // Read profile_image_url from exchange response to keep cookie and Employee service in sync
+            var responseProfileImageUrl = result.TryGetProperty("user", out var userObj)
+                && userObj.TryGetProperty("profile_image_url", out var picProp)
+                && picProp.ValueKind == System.Text.Json.JsonValueKind.String
+                ? picProp.GetString()
+                : null;
+
             // Persist the new token back into the auth cookie so subsequent requests use it
             var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             if (authResult?.Properties != null)
             {
                 authResult.Properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = newToken }]);
+
+                // Update user claims with fresh profile image if available and different
+                var identity = context.User.Identity as ClaimsIdentity;
+                if (!string.IsNullOrEmpty(responseProfileImageUrl) && identity != null)
+                {
+                    var existingPictureClaim = identity.FindFirst("picture");
+                    if (existingPictureClaim == null || existingPictureClaim.Value != responseProfileImageUrl)
+                    {
+                        if (existingPictureClaim != null)
+                            identity.RemoveClaim(existingPictureClaim);
+                        identity.AddClaim(new Claim("picture", responseProfileImageUrl));
+                        logger.LogInformation("Updated profile picture from exchange response for user {UserId}", userId);
+                    }
+                }
+
                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, context.User, authResult.Properties);
             }
+
+            // Persist profile image to Employee service if it changed
+            await SyncProfileImageToEmployeeServiceAsync(context, userId, responseProfileImageUrl);
 
             logger.LogInformation("Platform JWT refreshed via re-exchange for user {UserId}", userId);
             return newToken;
@@ -213,6 +240,39 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         {
             logger.LogError(ex, "Platform JWT re-exchange failed for user {UserId}", userId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Persists the profile image URL to the Employee service if it differs from the cookie value.
+    /// </summary>
+    private static async Task SyncProfileImageToEmployeeServiceAsync(HttpContext context, string? userId, string? profileImageUrl)
+    {
+        if (string.IsNullOrEmpty(profileImageUrl))
+            return;
+
+        try
+        {
+            var employeeClient = context.RequestServices.GetRequiredService<EmployeeServiceClient>();
+            var user = context.User;
+            var principalIdClaim = user.FindFirst("sub") ?? user.FindFirst("user_id");
+            if (principalIdClaim != null && Guid.TryParse(principalIdClaim.Value, out var principalId))
+            {
+                var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
+                if (employee != null && employee.ProfileImageUrl != profileImageUrl)
+                {
+                    await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
+                    {
+                        ProfileImageUrl = profileImageUrl
+                    }, ct: default);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger(nameof(UserContextHandler));
+            logger.LogWarning(ex, "Failed to sync profile image to Employee service for user {UserId}", userId);
         }
     }
 

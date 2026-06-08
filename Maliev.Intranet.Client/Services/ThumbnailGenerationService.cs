@@ -1,3 +1,4 @@
+// Maliev.Intranet.Client/Services/ThumbnailGenerationService.cs
 using System.Collections.Concurrent;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
@@ -16,6 +17,7 @@ public sealed class ThumbnailGenerationService
     private readonly ILogger<ThumbnailGenerationService> _logger;
     private readonly ConcurrentDictionary<string, ThumbnailSetDto> _cache = new();
     private readonly ConcurrentDictionary<string, Task<ThumbnailSetDto>> _inflight = new();
+    private readonly object _subscribersLock = new();
     private readonly List<EventCallback<ThumbnailProgress>> _subscribers = new();
 
     /// <summary>
@@ -34,10 +36,6 @@ public sealed class ThumbnailGenerationService
     /// <summary>
     /// Attempts to retrieve a cached thumbnail set for the given storage path and version.
     /// </summary>
-    /// <param name="storagePath">GCS storage path of the source file.</param>
-    /// <param name="version">Content version hash (for cache invalidation).</param>
-    /// <param name="set">The cached thumbnail set, or null if not cached.</param>
-    /// <returns>True if a cached set was found for the given version.</returns>
     public bool TryGetCached(string storagePath, string? version, out ThumbnailSetDto? set)
     {
         var key = BuildCacheKey(storagePath, version);
@@ -47,13 +45,56 @@ public sealed class ThumbnailGenerationService
     /// <summary>
     /// Stores a thumbnail set in the cache.
     /// </summary>
-    /// <param name="storagePath">GCS storage path of the source file.</param>
-    /// <param name="version">Content version hash.</param>
-    /// <param name="set">The thumbnail set to cache.</param>
     public void SetCached(string storagePath, string? version, ThumbnailSetDto set)
     {
         var key = BuildCacheKey(storagePath, version);
         _cache[key] = set;
+    }
+
+    /// <summary>
+    /// Subscribes a callback to receive thumbnail progress events.
+    /// </summary>
+    public void Subscribe(EventCallback<ThumbnailProgress> callback)
+    {
+        lock (_subscribersLock)
+        {
+            _subscribers.Add(callback);
+        }
+    }
+
+    /// <summary>
+    /// Unsubscribes a callback from receiving thumbnail progress events.
+    /// </summary>
+    public void Unsubscribe(EventCallback<ThumbnailProgress> callback)
+    {
+        lock (_subscribersLock)
+        {
+            _subscribers.Remove(callback);
+        }
+    }
+
+    /// <summary>
+    /// Notifies all subscribers of a progress event.
+    /// </summary>
+    public async Task NotifyAsync(ThumbnailProgress progress)
+    {
+        EventCallback<ThumbnailProgress>[] snapshot;
+        lock (_subscribersLock)
+        {
+            snapshot = _subscribers.ToArray();
+        }
+
+        foreach (var callback in snapshot)
+        {
+            try
+            {
+                await callback.InvokeAsync(progress);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error invoking thumbnail progress subscriber");
+            }
+        }
     }
 
     private static string BuildCacheKey(string storagePath, string? version) =>

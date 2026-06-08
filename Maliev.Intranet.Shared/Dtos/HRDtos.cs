@@ -152,6 +152,11 @@ public sealed class UpdateEmployeeSelfProfileRequest
     /// <summary>The employee's preferred name or nickname.</summary>
     [StringLength(100)]
     public string? PreferredName { get; set; }
+
+    /// <summary>The employee's profile image URL from the identity provider.</summary>
+    [Url]
+    [StringLength(500)]
+    public string? ProfileImageUrl { get; set; }
 }
 
 /// <summary>

@@ -312,4 +312,45 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         InvalidCredentials,
         InvalidWorkspaceEmail
     }
+
+    /// <summary>
+    /// Proxies a profile image URL to avoid CORS/auth issues with external providers (e.g., Google).
+    /// </summary>
+    [HttpGet("avatar")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAvatar([FromQuery] string url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            return NotFound();
+
+        // Only allow known safe domains
+        var allowedHosts = new[] { "lh3.googleusercontent.com", "lh4.googleusercontent.com", "lh5.googleusercontent.com", "lh6.googleusercontent.com", "avatars.githubusercontent.com", "platform-lookaside.fbsbx.com" };
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !allowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+            return BadRequest("Unsupported image host");
+
+        try
+        {
+            var httpClient = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Maliev-Intranet/1.0");
+
+            var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode);
+
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+            var stream = await response.Content.ReadAsStreamAsync(HttpContext.RequestAborted);
+
+            // Cache for 1 hour
+            Response.Headers.CacheControl = "public, max-age=3600";
+            return File(stream, contentType);
+        }
+        catch (OperationCanceledException)
+        {
+            return StatusCode(499);
+        }
+        catch
+        {
+            return StatusCode(502);
+        }
+    }
 }

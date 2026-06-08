@@ -426,6 +426,22 @@
     color: var(--mud-palette-primary);
 }
 
+.theme-toggle-icon {
+    color: var(--mud-palette-text-primary);
+}
+
+.theme-toggle-btn:hover .theme-toggle-icon {
+    color: var(--mud-palette-primary);
+}
+
+.theme-toggle-icon path[d^="M21 14.5"] {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 @media (max-width: 640px) {
     .login-header,
     .login-footer {

@@ -51,6 +51,20 @@ try
     builder.AddServiceDefaults();
     builder.Services.AddDefaultApiVersioning();
     builder.AddServiceMeters("intranet-meter", "intranet-portal");
+
+    // Configure CORS for development - allows client running on different ports
+    var corsAllowedOrigins = builder.Configuration["CORS:AllowedOrigins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        ?? ["https://localhost:7237", "http://localhost:5244", "https://localhost:7002", "http://localhost:7003"];
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(corsAllowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
+    });
     var useIntranetDatabase = !builder.Environment.IsEnvironment("Testing") ||
         !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IntranetDbContext"));
     if (useIntranetDatabase)
@@ -243,6 +257,14 @@ try
                 {
                     var authResult = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
                     var accessToken = authResult.GetProperty("access_token").GetString();
+
+                    // Read profile_image_url from AuthService response (authoritative source)
+                    var responseProfileImageUrl = authResult.TryGetProperty("user", out var userObj)
+                        && userObj.TryGetProperty("profile_image_url", out var picProp)
+                        && picProp.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? picProp.GetString()
+                        : null;
+                    var effectivePicture = responseProfileImageUrl ?? picture;
                     if (!string.IsNullOrEmpty(accessToken) && context.Properties != null)
                     {
                         // Store access_token in AuthenticationProperties instead of claims to reduce cookie size
@@ -267,10 +289,10 @@ try
                             identity.AddClaim(new System.Security.Claims.Claim("google_user_id", googleUserId));
                         }
 
-                        // Store profile picture URL from Google BEFORE removing the old NameIdentifier
-                        if (!string.IsNullOrEmpty(picture) && identity != null)
+                        // Store profile picture URL from AuthService response (authoritative source)
+                        if (!string.IsNullOrEmpty(effectivePicture) && identity != null)
                         {
-                            identity.AddClaim(new System.Security.Claims.Claim("picture", picture));
+                            identity.AddClaim(new System.Security.Claims.Claim("picture", effectivePicture));
                         }
 
                         // Remove the old Google NameIdentifier (numeric sub) before adding platform claims
@@ -324,7 +346,7 @@ try
                                 {
                                     // Re-exchange to get a JWT that reflects the new role
                                     var refreshResp = await authClient.PostAsJsonAsync("/auth/v1/exchange/google",
-                                        new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture });
+                                        new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = effectivePicture });
                                     if (refreshResp.IsSuccessStatusCode)
                                     {
                                         var refreshResult = await refreshResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -344,6 +366,33 @@ try
                                 }
                             }
                             catch { /* Bootstrap is best-effort */ }
+                        }
+
+                        // Persist profile image to Employee service if available
+                        if (!string.IsNullOrEmpty(effectivePicture))
+                        {
+                            try
+                            {
+                                var employeeClient = context.HttpContext.RequestServices.GetRequiredService<EmployeeServiceClient>();
+                                var principalIdClaim = identity?.FindFirst("sub") ?? identity?.FindFirst("user_id");
+                                if (principalIdClaim != null && Guid.TryParse(principalIdClaim.Value, out var principalId))
+                                {
+                                    var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
+                                    if (employee != null)
+                                    {
+                                        await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
+                                        {
+                                            ProfileImageUrl = effectivePicture
+                                        }, ct: default);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log but don't fail authentication if profile image persistence fails
+                                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                                logger.LogWarning(ex, "Failed to persist profile image for user {Email}", email);
+                            }
                         }
                     }
                 }
@@ -680,6 +729,7 @@ try
     app.UseStaticFiles();
     app.MapStaticAssets();
     app.UseAntiforgery();
+    app.UseCors();
 
     app.MapDefaultEndpoints("intranet");
 

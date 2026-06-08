@@ -468,6 +468,34 @@ public sealed class ModelViewerRenderingSourceTests
         Assert.Contains("catcherOnSwitch.material.activeLight = key;", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ShadowGenerator_UsesPcfNotPcss()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var block  = ExtractBlock(source, "function configureSoftShadowGenerator(");
+
+        // PCF (Percentage Closer Filtering) must be enabled and PCSS
+        // (Contact Hardening Shadow) must be explicitly disabled.
+        // These two modes are mutually exclusive in BabylonJS — the last
+        // assignment wins — so both lines must be present and PCF must come
+        // first (PCSS override is impossible when PCSS is explicitly false).
+        Assert.Contains("shadowGenerator.usePercentageCloserFiltering   = true;", block, StringComparison.Ordinal);
+        Assert.Contains("shadowGenerator.useContactHardeningShadow      = false;", block, StringComparison.Ordinal);
+
+        // Guard against PCSS being silently re-enabled anywhere in the function
+        // (check assignment forms only, not comment mentions of the property name).
+        Assert.DoesNotContain("shadowGenerator.useContactHardeningShadow      = true", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("shadowGenerator.useContactHardeningShadow = true", block, StringComparison.Ordinal);
+
+        // PCF assignment must appear BEFORE the PCSS-disable assignment so the ordering
+        // is self-documenting and no future edit can swap them accidentally.
+        // Search for "shadowGenerator.useX" to skip any comment lines that mention the property names.
+        var pcfIndex  = block.IndexOf("shadowGenerator.usePercentageCloserFiltering", StringComparison.Ordinal);
+        var pcssIndex = block.IndexOf("shadowGenerator.useContactHardeningShadow", StringComparison.Ordinal);
+        Assert.True(pcfIndex < pcssIndex,
+            "usePercentageCloserFiltering must appear before useContactHardeningShadow in configureSoftShadowGenerator");
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);

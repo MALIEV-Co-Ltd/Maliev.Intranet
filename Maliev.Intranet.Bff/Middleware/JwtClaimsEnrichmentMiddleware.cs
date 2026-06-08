@@ -1,5 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -179,21 +181,67 @@ public class JwtClaimsEnrichmentMiddleware
                 return null;
             }
 
+            // Read profile_image_url from exchange response
+            var responseProfileImageUrl = result.TryGetProperty("user", out var userObj)
+                && userObj.TryGetProperty("profile_image_url", out var picProp)
+                && picProp.ValueKind == System.Text.Json.JsonValueKind.String
+                ? picProp.GetString()
+                : null;
+
             var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             if (authResult?.Properties is not null)
             {
                 authResult.Properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = newToken }]);
+
+                // Update picture claim if profile image changed
+                var identity = context.User.Identity as ClaimsIdentity;
+                if (!string.IsNullOrEmpty(responseProfileImageUrl) && identity is not null)
+                {
+                    var existingPictureClaim = identity.FindFirst("picture");
+                    if (existingPictureClaim is null || existingPictureClaim.Value != responseProfileImageUrl)
+                    {
+                        if (existingPictureClaim is not null)
+                            identity.RemoveClaim(existingPictureClaim);
+                        identity.AddClaim(new Claim("picture", responseProfileImageUrl));
+                    }
+                }
+
                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, context.User, authResult.Properties);
             }
 
-            var identity = context.User.Identity as ClaimsIdentity;
-            var oldTokenClaim = identity?.FindFirst("access_token");
-            if (oldTokenClaim is not null)
+            // Sync profile image to Employee service
+            if (!string.IsNullOrEmpty(responseProfileImageUrl))
             {
-                identity?.RemoveClaim(oldTokenClaim);
+                try
+                {
+                    var employeeClient = context.RequestServices.GetRequiredService<EmployeeServiceClient>();
+                    var principalIdClaim = context.User.FindFirst("sub") ?? context.User.FindFirst("user_id");
+                    if (principalIdClaim is not null && Guid.TryParse(principalIdClaim.Value, out var principalId))
+                    {
+                        var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
+                        if (employee is not null && employee.ProfileImageUrl != responseProfileImageUrl)
+                        {
+                            await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
+                            {
+                                ProfileImageUrl = responseProfileImageUrl
+                            }, ct: default);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to sync profile image to Employee service for user {UserId}", userId);
+                }
             }
 
-            identity?.AddClaim(new Claim("access_token", newToken));
+            var identity2 = context.User.Identity as ClaimsIdentity;
+            var oldTokenClaim = identity2?.FindFirst("access_token");
+            if (oldTokenClaim is not null)
+            {
+                identity2?.RemoveClaim(oldTokenClaim);
+            }
+
+            identity2?.AddClaim(new Claim("access_token", newToken));
             _logger.LogInformation("Platform JWT refreshed before authorization for user {UserId}.", userId);
             return newToken;
         }

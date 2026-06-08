@@ -244,10 +244,10 @@ public sealed class BrowserDfmRaceSourceTests
         var analyzeBlock = ExtractBlock(source, "private async Task RunProcessDfmAnalysisAsync");
 
         Assert.Contains("interactiveServerDfmFallbackForBrowserPrimaryUploads", source, StringComparison.Ordinal);
-        Assert.Contains("ShouldRunInteractiveServerDfmFallbackAsync(part)", analyzeBlock, StringComparison.Ordinal);
+        Assert.Contains("ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)", analyzeBlock, StringComparison.Ordinal);
         Assert.Contains("MarkBrowserPrimaryLocalDfmUnavailable(part, processCode", analyzeBlock, StringComparison.Ordinal);
         Assert.True(
-            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallbackAsync(part)", StringComparison.Ordinal)
+            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)", StringComparison.Ordinal) 
             < analyzeBlock.IndexOf("Http.PostAsJsonAsync", StringComparison.Ordinal),
             "ProjectNew must honor browser-primary runtime policy before posting to the GeometryService server DFM fallback endpoint.");
     }
@@ -279,10 +279,10 @@ public sealed class BrowserDfmRaceSourceTests
         var analyzeBlock = ExtractBlock(source, "private async Task AnalyzeProcessForDfm");
 
         Assert.Contains("[Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; }", source, StringComparison.Ordinal);
-        Assert.Contains("ShouldRunInteractiveServerDfmFallback(part)", analyzeBlock, StringComparison.Ordinal);
+        Assert.Contains("ShouldRunInteractiveServerDfmFallback(part, process.Code, BrowserPrimaryServerDfmFallbackEnabled)", analyzeBlock, StringComparison.Ordinal);
         Assert.Contains("MarkBrowserPrimaryLocalDfmUnavailable(part, process.Code", analyzeBlock, StringComparison.Ordinal);
         Assert.True(
-            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallback(part)", StringComparison.Ordinal)
+            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallback(part, process.Code, BrowserPrimaryServerDfmFallbackEnabled)", StringComparison.Ordinal)
             < analyzeBlock.IndexOf("Http.PostAsJsonAsync", StringComparison.Ordinal),
             "PartConfigSidebar must honor browser-primary runtime policy before posting to the GeometryService server DFM fallback endpoint.");
     }

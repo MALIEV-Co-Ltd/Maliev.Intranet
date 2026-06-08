@@ -776,7 +776,7 @@ function buildIssues(metrics, processCode) {
 }
 
 function issue(category, severity, title, description, value, threshold, faceIndices = [], centroid = []) {
-  return { category, severity, title, description, value, threshold, faceIndices, centroid };
+  return { category, severity, title, description, value, threshold, faceIndices, centroid, source: "local" };
 }
 
 function buildLocalOverlayHints(issues) {

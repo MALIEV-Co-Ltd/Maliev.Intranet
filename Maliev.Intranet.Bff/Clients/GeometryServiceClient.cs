@@ -74,7 +74,8 @@ public class GeometryServiceClient(HttpClient httpClient)
                             Title = "Unexpected Error",
                             Description = $"Unexpected HTTP status code: {response.StatusCode}",
                             Value = 0,
-                            Threshold = 0
+                            Threshold = 0,
+                            Source = "server"
                         }
                     }
                 }
@@ -100,7 +101,8 @@ public class GeometryServiceClient(HttpClient httpClient)
                             Title = "Network Error",
                             Description = $"Failed to reach GeometryService: {ex.Message}",
                             Value = 0,
-                            Threshold = 0
+                            Threshold = 0,
+                            Source = "server"
                         }
                     }
                 }
@@ -126,7 +128,8 @@ public class GeometryServiceClient(HttpClient httpClient)
                             Title = "Request Timeout",
                             Description = "The request to GeometryService timed out",
                             Value = 0,
-                            Threshold = 0
+                            Threshold = 0,
+                            Source = "server"
                         }
                     }
                 }

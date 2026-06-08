@@ -2135,11 +2135,11 @@ public class ModuleRegressionSourceTests
         Assert.Contains(".pn-mode-icon-button {\n        width: 44px;\n        height: 44px;", mobileProjectNew, StringComparison.Ordinal);
 
         Assert.Contains("@@media (max-width: 640px)", sidebar, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-card {\n                flex: 0 0 128px;", sidebar, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-photo {\n                width: 100%;\n                height: 88px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card {\n                flex: 0 0 auto;\n                width: 100%;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-photo {\n                width: 80px;\n                height: auto;\n                min-height: 60px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-process-row {\n                    gap: 10px;", sidebar, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-card {\n                    flex: 0 0 112px;", sidebar, StringComparison.Ordinal);
-        Assert.Contains(".pcs-process-photo {\n                    height: 78px;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-card {\n                    flex: 0 0 auto;\n                    width: 100%;", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".pcs-process-photo {\n                    width: 70px;\n                    height: auto;\n                    min-height: 52px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-mat-swatch,\n            .pcs-fin-swatch,\n            .pcs-choice-swatch,\n            .pcs-color-chip {\n                width: 58px;\n                height: 58px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-mat-card,\n                .pcs-fin-card,\n                .pcs-choice-card {\n                    min-height: 56px;", sidebar, StringComparison.Ordinal);
         Assert.Contains(".pcs-qty-btn {\n                    width: 44px;", sidebar, StringComparison.Ordinal);

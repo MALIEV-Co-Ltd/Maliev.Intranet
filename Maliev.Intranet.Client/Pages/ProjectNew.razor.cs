@@ -1154,14 +1154,18 @@ public partial class ProjectNew : IAsyncDisposable
         var processCode = process.Code;
         try
         {
-            var runInteractiveServerDfmFallback = await ShouldRunInteractiveServerDfmFallbackAsync(part);
+            var runInteractiveServerDfmFallback = await ShouldRunInteractiveServerDfmFallbackAsync(part, processCode);
             ResetProcessDfmStateForRetry(part, processCode, clearLocalAttempts: runInteractiveServerDfmFallback);
             await InvokeAsync(StateHasChanged);
 
             if (await BrowserDfmReportSync.WaitForCurrentReportAsync(part, processCode, CancellationToken.None))
                 return;
 
-            if (!runInteractiveServerDfmFallback)
+            // Re-check the fallback policy after the wait. A browser-local terminal
+            // attempt may have been recorded during the grace period, which grants
+            // the server fallback even when the static policy says otherwise.
+            if (!runInteractiveServerDfmFallback
+                && !(await ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)))
             {
                 MarkBrowserPrimaryLocalDfmUnavailable(part, processCode, "interactive_server_dfm_fallback_disabled");
                 return;
@@ -1262,9 +1266,12 @@ public partial class ProjectNew : IAsyncDisposable
         part.AnalysisErrorCode = null;
     }
 
-    private async Task<bool> ShouldRunInteractiveServerDfmFallbackAsync(PartViewModel part)
+    private async Task<bool> ShouldRunInteractiveServerDfmFallbackAsync(PartViewModel part, string? processCode = null)
     {
         if (!IsBrowserPrimaryDfmPart(part, _runtimeBrowserViewerExtensions ?? DefaultBrowserViewerExtensions))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(processCode) && BrowserDfmReportSync.HasTerminalLocalAttempt(part, processCode))
             return true;
 
         var enabled = await GetBrowserPrimaryServerDfmFallbackEnabledAsync();
@@ -1468,6 +1475,7 @@ public partial class ProjectNew : IAsyncDisposable
                 Threshold = issue.Threshold.GetValueOrDefault(),
                 FaceIndices = issue.FaceIndices,
                 Centroid = issue.Centroid,
+                Source = "local"
             })
             .ToList();
 
@@ -2421,22 +2429,96 @@ public partial class ProjectNew : IAsyncDisposable
         string? processCode,
         IEnumerable<CatalogToleranceDto> tolerances)
     {
-        if (!string.Equals(processCode, "FDM", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(processCode, "FDM_3D_PRINTING", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(processCode, "FDM", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "FDM_3D_PRINTING", StringComparison.OrdinalIgnoreCase))
         {
-            return tolerances;
+            return tolerances.Where(t =>
+            {
+                var combined = $"{t.Code} {t.Name} {t.IsoStandard} {t.Grade}";
+                return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
+                    && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
+                    && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
+                    && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
+                    && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
+                    && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
+            });
         }
 
-        return tolerances.Where(t =>
+        if (IsAdditiveManufacturingProcessCode(processCode))
         {
-            var combined = $"{t.Code} {t.Name} {t.IsoStandard} {t.Grade}";
-            return !combined.Contains("ISO 2768-c", StringComparison.OrdinalIgnoreCase)
-                && !combined.Contains("ISO 2768_C", StringComparison.OrdinalIgnoreCase)
-                && !combined.Contains("ISO2768_C", StringComparison.OrdinalIgnoreCase)
-                && !combined.Contains("ISO 2768-v", StringComparison.OrdinalIgnoreCase)
-                && !combined.Contains("ISO 2768_V", StringComparison.OrdinalIgnoreCase)
-                && !combined.Contains("ISO2768_V", StringComparison.OrdinalIgnoreCase);
-        });
+            return tolerances.Where(t => IsAdditiveProcessSpecificTolerance(processCode, t));
+        }
+
+        return tolerances;
+    }
+
+    private static bool IsAdditiveManufacturingProcessCode(string? processCode)
+    {
+        if (string.IsNullOrEmpty(processCode))
+        {
+            return false;
+        }
+
+        return string.Equals(processCode, "MJF", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "SLS", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "SLA", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "SLA_DLP", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "DLP", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "MJ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "MATERIAL_JETTING", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "BJ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "BINDER_JETTING", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "DMLS", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAdditiveProcessSpecificTolerance(string? processCode, CatalogToleranceDto tolerance)
+    {
+        var combined = $"{tolerance.Code} {tolerance.Name} {tolerance.IsoStandard} {tolerance.Grade}";
+        var normalized = NormalizeForComparison(combined);
+
+        if (string.Equals(processCode, "MJF", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("mjfstandard") || normalized.Contains("mjf_standard");
+        }
+
+        if (string.Equals(processCode, "SLS", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("slsstandard") || normalized.Contains("sls_standard");
+        }
+
+        if (string.Equals(processCode, "SLA", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "SLA_DLP", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "DLP", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("slastandard") || normalized.Contains("sla_standard")
+                || normalized.Contains("dlpstandard") || normalized.Contains("dlp_standard");
+        }
+
+        if (string.Equals(processCode, "DMLS", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("dmlsstandard") || normalized.Contains("dmls_standard");
+        }
+
+        if (string.Equals(processCode, "MJ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "MATERIAL_JETTING", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("mjstandard") || normalized.Contains("mj_standard")
+                || normalized.Contains("materialjetstandard") || normalized.Contains("material_jet_standard");
+        }
+
+        if (string.Equals(processCode, "BJ", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processCode, "BINDER_JETTING", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized.Contains("bjstandard") || normalized.Contains("bj_standard")
+                || normalized.Contains("binderjettingstandard") || normalized.Contains("binder_jetting_standard");
+        }
+
+        return false;
+    }
+
+    private static string NormalizeForComparison(string value)
+    {
+        return new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     }
 
     // ── Task 13: Pricing ───────────────────────────────────────────────
