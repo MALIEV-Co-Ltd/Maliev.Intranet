@@ -137,6 +137,7 @@ public partial class ProjectNew : IAsyncDisposable
     [Inject] private UploadSettings UploadSettings { get; set; } = null!;
     [Inject] private CookieProvider CookieProvider { get; set; } = null!;
     [Inject] private ILogger<ProjectNew> Logger { get; set; } = null!;
+    [Inject] private ThumbnailGenerationService ThumbnailService { get; set; } = null!;
 
     /// <summary>
     /// Optional customer identifier used to preselect the customer when starting
@@ -546,6 +547,29 @@ public partial class ProjectNew : IAsyncDisposable
             part.AwaitingPreview = true;
             part.StatusText = "Processing geometry...";
             var completedLocally = await TryCompleteBrowserPrimaryViewerLocallyAsync(part);
+
+            // Trigger client-side thumbnail generation
+            if (!string.IsNullOrEmpty(completedUpload.StoragePath))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var signedUrl = await GetSignedDownloadUrlAsync(completedUpload.StoragePath);
+                        if (!string.IsNullOrEmpty(signedUrl))
+                        {
+                            await ThumbnailService.GenerateAsync(
+                                completedUpload.StoragePath,
+                                part.ThumbnailVersion,
+                                signedUrl);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Thumbnail generation failed for {StoragePath}", completedUpload.StoragePath);
+                    }
+                });
+            }
 
             await JoinPartFileGroupsAsync(part);
             if (!completedLocally)
@@ -4265,6 +4289,35 @@ public partial class ProjectNew : IAsyncDisposable
 
         await InvokeAsync(StateHasChanged);
     }
+
+    private async Task<string?> GetSignedDownloadUrlAsync(string storagePath)
+    {
+        try
+        {
+            // Call BFF to get signed download URL for the storage path
+            // The BFF proxies the UploadService's /upload/v1/files/by-path/signed-url endpoint
+            var response = await Http.PostAsJsonAsync(
+                "api/v1/uploads/by-path/signed-url",
+                new { storagePath },
+                CancellationToken.None);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogWarning("Failed to get signed URL for {StoragePath}: {StatusCode}", storagePath, response.StatusCode);
+                return null;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<SignedUrlResponse>();
+            return result?.SignedUrl;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error getting signed URL for {StoragePath}", storagePath);
+            return null;
+        }
+    }
+
+    private sealed record SignedUrlResponse(string? SignedUrl);
 
     /// <summary>
     /// JS Interop callback for upload progress. Created per-file and kept alive via DotNetObjectReference
