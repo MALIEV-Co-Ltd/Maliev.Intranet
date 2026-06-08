@@ -1,0 +1,133 @@
+@* Maliev.Intranet.Client/Components/Project/ThumbnailImage.razor *@
+@using Maliev.Intranet.Client.Services
+@using Maliev.Intranet.Shared.Dtos
+@inject ThumbnailGenerationService ThumbnailService
+@implements IAsyncDisposable
+
+<div class="thumbnail-image @CssClass" style="@Style">
+    @if (_thumbnails != null && !string.IsNullOrEmpty(_thumbnails.ThumbnailSmall))
+    {
+        <img src="@_thumbnails.ThumbnailSmall" alt="@Alt" class="thumbnail-img" />
+    }
+    else if (_progress?.Stage == ThumbnailGenerationStage.Fallback)
+    {
+        <div class="thumbnail-fallback">
+            <MudIcon Icon="@Icons.Material.Outlined.CloudSync" Size="Size.Small" />
+        </div>
+    }
+    else if (_progress?.Stage == ThumbnailGenerationStage.Failed)
+    {
+        <div class="thumbnail-failed">
+            <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Small" />
+        </div>
+    }
+    else if (_progress != null)
+    {
+        <div class="thumbnail-loading">
+            <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@_progress.Percent" />
+            <span class="thumbnail-stage">@_progress.Stage</span>
+        </div>
+    }
+    else
+    {
+        <div class="thumbnail-pending">
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="42px" Width="56px" Animation="Animation.Wave" />
+        </div>
+    }
+</div>
+
+<style>
+    .thumbnail-image {
+        display: inline-block;
+        position: relative;
+    }
+    .thumbnail-img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
+    .thumbnail-loading,
+    .thumbnail-fallback,
+    .thumbnail-failed,
+    .thumbnail-pending {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 56px;
+        min-height: 42px;
+    }
+    .thumbnail-stage {
+        font-size: var(--mud-typography-caption-size);
+        color: var(--mud-palette-text-secondary);
+        margin-left: 4px;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public string StoragePath { get; set; } = string.Empty;
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? SignedDownloadUrl { get; set; }
+    [Parameter] public string Alt { get; set; } = "Thumbnail";
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    [Parameter] public string Style { get; set; } = string.Empty;
+
+    private ThumbnailSetDto? _thumbnails;
+    private ThumbnailProgress? _progress;
+    private EventCallback<ThumbnailProgress> _progressHandler;
+    private bool _subscribed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(StoragePath)) return;
+
+        // Check cache first
+        if (ThumbnailService.TryGetCached(StoragePath, Version, out var cached))
+        {
+            _thumbnails = cached;
+            return;
+        }
+
+        // Subscribe to progress events
+        _progressHandler = EventCallback.Factory.Create<ThumbnailProgress>(this, OnProgress);
+        ThumbnailService.Subscribe(_progressHandler);
+        _subscribed = true;
+
+        // Trigger generation in background (implemented in Task 1.12)
+        // _ = Task.Run(async () =>
+        // {
+        //     try
+        //     {
+        //         if (string.IsNullOrEmpty(SignedDownloadUrl))
+        //         {
+        //             // TODO Phase 2: Trigger fallback if no signed URL
+        //             return;
+        //         }
+        //         _thumbnails = await ThumbnailService.GenerateAsync(StoragePath, Version, SignedDownloadUrl);
+        //         await InvokeAsync(StateHasChanged);
+        //     }
+        //     catch
+        //     {
+        //         // Error already handled by service
+        //     }
+        // });
+    }
+
+    private void OnProgress(ThumbnailProgress progress)
+    {
+        if (progress.StoragePath == StoragePath)
+        {
+            _progress = progress;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_subscribed)
+        {
+            ThumbnailService.Unsubscribe(_progressHandler);
+            _subscribed = false;
+        }
+        await ValueTask.CompletedTask;
+    }
+}
