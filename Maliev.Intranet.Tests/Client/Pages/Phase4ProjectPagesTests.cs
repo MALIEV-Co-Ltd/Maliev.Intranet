@@ -97,6 +97,7 @@ public class Phase4ProjectPagesTests : BunitContext, IAsyncLifetime
         Services.AddScoped<CurrencyService>();
         Services.AddScoped<ShippingService>();
         Services.AddScoped<AlertService>();
+        Services.AddSingleton<ThumbnailGenerationService>();
 
         Render<MudPopoverProvider>();
     }

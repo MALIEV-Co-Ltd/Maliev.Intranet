@@ -22,6 +22,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
         Services.AddSingleton(new UploadSettings());
         Services.AddSingleton(CreateFileTypesSettings());
         Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, NullLogger<LayoutService>.Instance));
+        Services.AddSingleton<ThumbnailGenerationService>();
         JSInterop.Mode = JSRuntimeMode.Loose;
         Render<MudPopoverProvider>();
     }

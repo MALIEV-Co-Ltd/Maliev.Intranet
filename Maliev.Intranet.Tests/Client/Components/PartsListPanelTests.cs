@@ -18,6 +18,7 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
         Services.AddSingleton<CurrencyService>();
         Services.AddSingleton(CreateFileTypesSettings());
         Services.AddSingleton(new UploadSettings());
+        Services.AddSingleton<ThumbnailGenerationService>();
 
         JSInterop.Mode = JSRuntimeMode.Loose;
         Render<MudPopoverProvider>();

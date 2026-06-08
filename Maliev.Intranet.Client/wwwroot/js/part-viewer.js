@@ -7330,13 +7330,13 @@ function _syncShadowCatcherVisibility(canvasId) {
 
     const gridOn = !!gridActiveFlags[canvasId];
     const matOn  = !!cuttingMatActiveFlags[canvasId];
+
     catcher.isVisible = gridOn || matOn;
+    catcher.receiveShadows = gridOn || matOn;
 
     if (catcher.position) {
         const bb = sceneBoundingBoxes[canvasId];
         const baseZ = bb ? bb.min.z : 0;
-        // Align catcher with cutting mat top surface (Z=0) so shadows reach the part contact point.
-        // The cutting mat top mesh (__cutting_mat__) receives shadows directly at Z=0.
         catcher.position.z = baseZ;
     }
 }

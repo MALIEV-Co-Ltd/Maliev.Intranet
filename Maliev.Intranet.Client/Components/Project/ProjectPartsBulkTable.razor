@@ -190,10 +190,13 @@
                         <td>
                             <div class="pbt-part-cell">
                                 <div class="pbt-part-thumb">
-                                    <ThumbnailImage StoragePath="@part.StoragePath"
-                                                    Version="@part.ThumbnailVersion"
-                                                    SignedDownloadUrl="@part.SignedDownloadUrl"
-                                                    Alt="@part.Name" />
+                                    <button class="pbt-part-thumb-button" @onclick="@(() => OpenThumbnailPreview(part))" aria-label="@($"Preview {part.Name}")">
+                                        <ThumbnailImage StoragePath="@part.StoragePath"
+                                                        Version="@part.ThumbnailVersion"
+                                                        SignedDownloadUrl="@part.SignedDownloadUrl"
+                                                        Alt="@part.Name"
+                                                        CssClass="pbt-part-thumb-img" />
+                                    </button>
                                 </div>
                                 <div class="pbt-part-copy">
                                     <div class="pbt-part-name">@part.Name</div>
@@ -359,7 +362,8 @@
                         <ThumbnailImage StoragePath="@part.StoragePath"
                                         Version="@part.ThumbnailVersion"
                                         SignedDownloadUrl="@part.SignedDownloadUrl"
-                                        Alt="@part.Name" />
+                                        Alt="@part.Name"
+                                        CssClass="pbt-part-thumb-img" />
                     </span>
                     <label class="pbt-card-select">
                         <input type="checkbox"
