@@ -4,32 +4,10 @@
      @onclick="@OnClick">
     @* Thumbnail *@
     <div class="pmc-thumb">
-        @if (Part.QueuedUpload)
-        {
-            <MudProgressCircular Size="Size.Small"
-                                 Indeterminate="true"
-                                 Color="Color.Secondary" />
-        }
-        else if (Part.Uploading)
-        {
-            <MudProgressCircular Size="Size.Small"
-                                 Indeterminate="false"
-                                 Value="@Part.ProgressPercent"
-                                 Color="Color.Primary" />
-        }
-        else if (!string.IsNullOrEmpty(Part.ThumbnailSmallUrl))
-        {
-            <img src="@Part.ThumbnailSmallUrl"
-                 class="pmc-thumb-img"
-                 onerror="this.style.display='none'"
-                 alt="@Part.Name" />
-        }
-        else
-        {
-            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr"
-                     Size="Size.Small"
-                     Color="Color.Tertiary" />
-        }
+        <ThumbnailImage StoragePath="@Part.StoragePath"
+                        Version="@Part.ThumbnailVersion"
+                        SignedDownloadUrl="@Part.SignedDownloadUrl"
+                        Alt="@Part.Name" />
         @* DFM status indicator overlay *@
         @if (Part.RequiresDfmAcknowledgement)
         {

@@ -190,31 +190,10 @@
                         <td>
                             <div class="pbt-part-cell">
                                 <div class="pbt-part-thumb">
-                                    @if (part.QueuedUpload || part.AwaitingPreview)
-                                    {
-                                        <MudProgressCircular Color="Color.Default" Indeterminate="true" Size="Size.Small" />
-                                    }
-                                    else if (part.Uploading)
-                                    {
-                                        <MudProgressCircular Size="Size.Small"
-                                                             Indeterminate="false"
-                                                             Value="@part.ProgressPercent"
-                                                             Color="Color.Primary" />
-                                    }
-                                    else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
-                                    {
-                                        <button type="button"
-                                                class="pbt-part-thumb-button"
-                                                title="@($"Preview {part.Name}")"
-                                                aria-label="@($"Preview {part.Name}")"
-                                                @onclick="@(() => OpenThumbnailPreview(part))">
-                                            <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
-                                    }
+                                    <ThumbnailImage StoragePath="@part.StoragePath"
+                                                    Version="@part.ThumbnailVersion"
+                                                    SignedDownloadUrl="@part.SignedDownloadUrl"
+                                                    Alt="@part.Name" />
                                 </div>
                                 <div class="pbt-part-copy">
                                     <div class="pbt-part-name">@part.Name</div>
@@ -377,20 +356,10 @@
                                                  Value="@part.ProgressPercent"
                                                  Color="Color.Primary" />
                         }
-                        else if (!string.IsNullOrEmpty(part.ThumbnailSmallUrl))
-                        {
-                            <button type="button"
-                                    class="pbt-part-thumb-button"
-                                    title="@($"Preview {part.Name}")"
-                                    aria-label="@($"Preview {part.Name}")"
-                                    @onclick="@(() => OpenThumbnailPreview(part))">
-                                <img src="@part.ThumbnailSmallUrl" alt="@part.Name" class="pbt-part-thumb-img" onerror="this.style.display='none'" />
-                            </button>
-                        }
-                        else
-                        {
-                            <MudIcon Icon="@Icons.Material.Outlined.ViewInAr" Size="Size.Small" Color="Color.Tertiary" />
-                        }
+                        <ThumbnailImage StoragePath="@part.StoragePath"
+                                        Version="@part.ThumbnailVersion"
+                                        SignedDownloadUrl="@part.SignedDownloadUrl"
+                                        Alt="@part.Name" />
                     </span>
                     <label class="pbt-card-select">
                         <input type="checkbox"
