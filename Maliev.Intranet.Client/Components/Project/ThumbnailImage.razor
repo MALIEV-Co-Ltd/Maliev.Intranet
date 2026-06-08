@@ -92,24 +92,24 @@
         ThumbnailService.Subscribe(_progressHandler);
         _subscribed = true;
 
-        // Trigger generation in background (implemented in Task 1.12)
-        // _ = Task.Run(async () =>
-        // {
-        //     try
-        //     {
-        //         if (string.IsNullOrEmpty(SignedDownloadUrl))
-        //         {
-        //             // TODO Phase 2: Trigger fallback if no signed URL
-        //             return;
-        //         }
-        //         _thumbnails = await ThumbnailService.GenerateAsync(StoragePath, Version, SignedDownloadUrl);
-        //         await InvokeAsync(StateHasChanged);
-        //     }
-        //     catch
-        //     {
-        //         // Error already handled by service
-        //     }
-        // });
+        // Trigger generation in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(SignedDownloadUrl))
+                {
+                    // TODO Phase 2: Trigger fallback if no signed URL
+                    return;
+                }
+                _thumbnails = await ThumbnailService.GenerateAsync(StoragePath, Version, SignedDownloadUrl);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch
+            {
+                // Error already handled by service
+            }
+        });
     }
 
     private void OnProgress(ThumbnailProgress progress)

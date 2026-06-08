@@ -99,4 +99,65 @@ public sealed class ThumbnailGenerationService
 
     private static string BuildCacheKey(string storagePath, string? version) =>
         $"{storagePath}:{version ?? "unknown"}";
+
+    /// <summary>
+    /// Generates all 8 thumbnail views for a file. Returns cached result if available.
+    /// </summary>
+    /// <param name="storagePath">GCS storage path of the source file.</param>
+    /// <param name="version">Content version hash for cache invalidation.</param>
+    /// <param name="signedDownloadUrl">Signed GCS download URL.</param>
+    /// <returns>ThumbnailSet with all 8 views, or empty set on fallback.</returns>
+    public async Task<ThumbnailSetDto> GenerateAsync(
+        string storagePath,
+        string? version,
+        string signedDownloadUrl)
+    {
+        if (TryGetCached(storagePath, version, out var cached) && cached != null)
+        {
+            return cached;
+        }
+
+        var cacheKey = $"{storagePath}:{version ?? "unknown"}";
+
+        return await _inflight.GetOrAdd(cacheKey, async _ =>
+        {
+            try
+            {
+                await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Downloading, 10, "Downloading mesh"));
+
+                var result = await _jsRuntime.InvokeAsync<ThumbnailSetDto>(
+                    "MalievGeometry.generateThumbnails",
+                    signedDownloadUrl,
+                    new { timeoutMs = 20000, jpegQuality = 0.85 });
+
+                result.Version = version ?? string.Empty;
+                SetCached(storagePath, version, result);
+
+                await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Complete, 100, "Complete"));
+                return result;
+            }
+            catch (JSException ex) when (IsRecoverableError(ex))
+            {
+                _logger.LogWarning(ex, "WASM thumbnail generation failed for {StoragePath}, requesting server fallback", storagePath);
+                await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
+                return new ThumbnailSetDto { Version = version ?? string.Empty };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Thumbnail generation failed for {StoragePath}", storagePath);
+                await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Failed, 0, ex.Message));
+                throw;
+            }
+            finally
+            {
+                _inflight.TryRemove(cacheKey, out Task<ThumbnailSetDto>? _);
+            }
+        });
+    }
+
+    private static bool IsRecoverableError(JSException ex) =>
+        ex.Message.Contains("OOM", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("memory", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("aborted", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase);
 }
