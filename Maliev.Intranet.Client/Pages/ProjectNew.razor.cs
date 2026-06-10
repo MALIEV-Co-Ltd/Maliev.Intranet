@@ -288,6 +288,16 @@ public partial class ProjectNew : IAsyncDisposable
                         part.GlbStoragePath = viewerStoragePath;
                     part.ViewerUrl = payload.GlbUrl;
 
+                    // Formats the browser cannot parse directly (e.g. STEP) get their
+                    // thumbnails generated locally from the server-exported viewer GLB.
+                    if (!CanGenerateThumbnailsLocally(part.StoragePath)
+                        && CanGenerateThumbnailsLocally(viewerStoragePath ?? part.ViewerFileExtension)
+                        && !string.IsNullOrEmpty(payload.GlbUrl))
+                    {
+                        part.SignedDownloadUrl = payload.GlbUrl;
+                        TriggerLocalThumbnailsFromViewer(part, payload.GlbUrl);
+                    }
+
                     if (payload.BodyCount.HasValue)
                     {
                         part.BodyCount = payload.BodyCount.Value;
@@ -552,8 +562,11 @@ public partial class ProjectNew : IAsyncDisposable
             part.StatusText = "Processing geometry...";
             var completedLocally = await TryCompleteBrowserPrimaryViewerLocallyAsync(part);
 
-            // Trigger client-side thumbnail generation
-            if (!string.IsNullOrEmpty(completedUpload.StoragePath))
+            // Trigger client-side thumbnail generation. Formats the browser cannot
+            // render directly (e.g. STEP) wait for the server viewer GLB instead —
+            // the GlbReady handler generates thumbnails from it.
+            if (!string.IsNullOrEmpty(completedUpload.StoragePath)
+                && CanGenerateThumbnailsLocally(completedUpload.StoragePath))
             {
                 _ = Task.Run(async () =>
                 {
@@ -562,6 +575,7 @@ public partial class ProjectNew : IAsyncDisposable
                         var signedUrl = await GetSignedDownloadUrlAsync(completedUpload.StoragePath);
                         if (!string.IsNullOrEmpty(signedUrl))
                         {
+                            part.SignedDownloadUrl = signedUrl;
                             await ThumbnailService.GenerateAsync(
                                 completedUpload.StoragePath,
                                 part.ThumbnailVersion,
@@ -579,7 +593,7 @@ public partial class ProjectNew : IAsyncDisposable
                         await InvokeAsync(() =>
                         {
                             part.AwaitingPreview = false;
-                            if (string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                            if (string.IsNullOrEmpty(part.ThumbnailSmallUrl) && !HasLocalThumbnails(part))
                             {
                                 part.StatusText = "Preview unavailable";
                             }
@@ -975,10 +989,59 @@ public partial class ProjectNew : IAsyncDisposable
 
         await ResolveViewerUrlAsync(part);
         await ResolveOverlayUrlsAsync(part);
+        EnsureLocalThumbnailSource(part);
 
         if (part.ProcessId.HasValue && part.MaterialId.HasValue
             && part.AvailableMaterials.Count > 0)
             TriggerPricingAsync(part);
+    }
+
+    private readonly HashSet<string> _thumbnailSourceRequests = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ensures a restored or resumed part has a browser-renderable source for local
+    /// thumbnail generation. Server previews are no longer published when a viewer
+    /// source exists, so a part restored from a draft has neither server preview URLs
+    /// nor a signed download URL — without this the thumbnail stays a spinner forever.
+    /// </summary>
+    private void EnsureLocalThumbnailSource(PartViewModel part)
+    {
+        var storagePath = part.StoragePath;
+        if (string.IsNullOrEmpty(storagePath)
+            || !string.IsNullOrEmpty(part.SignedDownloadUrl)
+            || !string.IsNullOrEmpty(part.ThumbnailSmallUrl)
+            || HasLocalThumbnails(part)
+            || !_thumbnailSourceRequests.Add(storagePath))
+        {
+            return;
+        }
+
+        if (CanGenerateThumbnailsLocally(storagePath))
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var signedUrl = await GetSignedDownloadUrlAsync(storagePath);
+                    if (string.IsNullOrEmpty(signedUrl)) return;
+                    part.SignedDownloadUrl = signedUrl;
+                    await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogDebug(ex, "Local thumbnail source recovery failed for {StoragePath}", storagePath);
+                }
+            });
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(part.ViewerUrl)
+            && CanGenerateThumbnailsLocally(part.ViewerStoragePath ?? part.ViewerFileExtension))
+        {
+            part.SignedDownloadUrl = part.ViewerUrl;
+            TriggerLocalThumbnailsFromViewer(part, part.ViewerUrl);
+        }
     }
 
     private async Task ApplyFileAnalysisCompletedPayloadAsync(SignalRFileAnalysisPayload payload)
@@ -1098,26 +1161,91 @@ public partial class ProjectNew : IAsyncDisposable
     {
         if (status.PreviewUrls != null)
         {
-            if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailSmall))
-                part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall;
-            else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
-                part.ThumbnailSmallUrl = status.ThumbnailUrl;
+            // Locally generated thumbnails are authoritative for display — never let
+            // late server preview URLs replace them. GCS paths are still recorded
+            // below for storage-migration bookkeeping.
+            var keepLocalThumbnails = HasLocalThumbnails(part);
 
-            if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailLargeUrl))
-                part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
-            else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
-                part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
+            if (!keepLocalThumbnails)
+            {
+                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailSmall))
+                    part.ThumbnailSmallUrl = status.PreviewUrls.ThumbnailSmall;
+                else if (!string.IsNullOrEmpty(status.ThumbnailUrl))
+                    part.ThumbnailSmallUrl = status.ThumbnailUrl;
+
+                if (!string.IsNullOrEmpty(status.PreviewUrls.ThumbnailLargeUrl))
+                    part.ThumbnailLargeUrl = status.PreviewUrls.ThumbnailLargeUrl;
+                else if (!string.IsNullOrEmpty(status.HiResThumbnailUrl))
+                    part.ThumbnailLargeUrl = status.HiResThumbnailUrl;
+            }
 
             part.ThumbnailSmallGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailSmallGcsPath);
             part.ThumbnailLargeGcsPath = NormalizeMigratedArtifactPath(part, status.PreviewUrls.ThumbnailLargeGcsPath);
             return;
         }
 
-        if (!string.IsNullOrEmpty(status.ThumbnailUrl))
+        if (!string.IsNullOrEmpty(status.ThumbnailUrl) && !HasLocalThumbnails(part))
         {
             part.ThumbnailSmallUrl = status.ThumbnailUrl;
             part.ThumbnailLargeUrl = status.HiResThumbnailUrl ?? status.ThumbnailUrl;
         }
+    }
+
+    /// <summary>
+    /// File extensions the in-browser thumbnail generator can render
+    /// (BabylonJS loaders plus the GeometryService runtime worker for 3MF).
+    /// Must stay in sync with GeometryInterop.js SUPPORTED_EXTENSIONS.
+    /// </summary>
+    private static readonly string[] LocallyRenderableThumbnailExtensions =
+        [".stl", ".obj", ".glb", ".gltf", ".3mf"];
+
+    private static bool CanGenerateThumbnailsLocally(string? fileNameOrPath)
+    {
+        if (string.IsNullOrWhiteSpace(fileNameOrPath))
+            return false;
+        var ext = Path.GetExtension(fileNameOrPath);
+        return !string.IsNullOrEmpty(ext)
+            && LocallyRenderableThumbnailExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private bool HasLocalThumbnails(PartViewModel part) =>
+        !string.IsNullOrEmpty(part.StoragePath)
+        && ThumbnailService.TryGetCached(part.StoragePath, part.ThumbnailVersion, out var localSet)
+        && localSet is { HasAny: true };
+
+    /// <summary>
+    /// Generates the part's thumbnail set locally from a browser-renderable viewer
+    /// source (the server-exported GLB). Marks the part Ready on success so the
+    /// status watchdog does not wait for server previews that will never arrive.
+    /// </summary>
+    private void TriggerLocalThumbnailsFromViewer(PartViewModel part, string viewerUrl)
+    {
+        var storagePath = part.StoragePath;
+        if (string.IsNullOrEmpty(storagePath) || HasLocalThumbnails(part))
+            return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var result = await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, viewerUrl);
+                await InvokeAsync(() =>
+                {
+                    part.AwaitingPreview = false;
+                    if (result is { HasAny: true })
+                    {
+                        part.StatusText = "Ready";
+                        StopStatusWatchdog(storagePath);
+                        TriggerAutoSave();
+                    }
+                    StateHasChanged();
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Local viewer thumbnail generation failed for {StoragePath}", storagePath);
+            }
+        });
     }
 
     private void ApplyDfmStatus(PartViewModel part, object? dfmReport)

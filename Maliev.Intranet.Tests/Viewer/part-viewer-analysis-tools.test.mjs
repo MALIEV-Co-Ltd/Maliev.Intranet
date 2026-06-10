@@ -98,7 +98,10 @@ class Ray {
 const createdCanvasContexts = [];
 
 function readLogoSvgPath() {
-    const svg = fs.readFileSync('Maliev.Intranet.Client/wwwroot/images/logo.svg', 'utf8');
+    const logoUrl = new URL(
+        '../../Maliev.Intranet.Client/wwwroot/images/logo.svg',
+        import.meta.url);
+    const svg = fs.readFileSync(logoUrl, 'utf8');
     return /<path[\s\S]*?\sd="([^"]+)"/.exec(svg)?.[1] ?? '';
 }
 

@@ -2944,12 +2944,15 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             scene.activeCamera = cam;
             scene.render();
 
-            // Render axis gizmo camera in the top-right viewport.
-            // Use WebGL scissor test to clear ONLY the gizmo viewport area (both color and
-            // depth), then render with autoClear=false. engine.clear() ignores the current
-            // viewport and clears the entire framebuffer; scissor restricts it correctly.
+            // Render the axis gizmo scene into the top-right viewport.
+            // The gizmo lives in its OWN scene (created by createAxisGizmo) so
+            // main-scene pipelines — SSAO2's prePass renderer in realistic mode,
+            // tone mapping, etc. — can never intercept or recolor it.
+            // Use the WebGL scissor test to clear ONLY the gizmo viewport area
+            // (color + depth); engine.clear() ignores the viewport and would
+            // wipe the whole framebuffer.
             const gizmo = axisGizmoLayer[canvasId];
-            if (gizmo && gizmo.axesCam && !gizmo.axesCam.isDisposed()) {
+            if (gizmo && gizmo.gizmoScene && gizmo.axesCam && !gizmo.axesCam.isDisposed()) {
                 try {
                     const axesCam = gizmo.axesCam;
                     const vp = axesCam.viewport;
@@ -2965,15 +2968,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     const sh = Math.ceil(vp.height * rh);
                     const cc = scene.clearColor;
 
-                    // SSAO2 creates a scene-level PrePassRenderer that intercepts every
-                    // scene.render() call — even for cameras not in the SSAO camera list —
-                    // and redirects rendering into its geometry-buffer render targets.
-                    // Disable it for the gizmo pass so the render goes straight to the
-                    // canvas framebuffer we restore below. Re-enabled in the finally block.
-                    // Guard: BabylonJS ≥7 makes PrePassRenderer.enabled getter-only.
-                    const prePass = scene.prePassRenderer;
-                    if (prePass) { try { prePass.enabled = false; } catch {} }
-
                     // Restore the default framebuffer (canvas) before clearing so the
                     // scissor operation targets the correct buffer.
                     engine.restoreDefaultFramebuffer();
@@ -2983,28 +2977,13 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
                     gl.disable(gl.SCISSOR_TEST);
 
-                    scene.autoClear              = false;
-                    scene.autoClearDepthAndStencil = false;
-
-                    scene.activeCamera = axesCam;
-                    scene.render();
-
+                    gizmo.gizmoScene.render();
                 } catch (err) {
                     console.error('[BabylonViewer] Gizmo render error:', err);
                 } finally {
-                    // Always restore pre-pass, camera, clear flags, and viewport.
-                    // Guard: BabylonJS ≥7 makes PrePassRenderer.enabled getter-only.
-                    const prePass = scene.prePassRenderer;
-                    if (prePass) { try { prePass.enabled = true; } catch {} }
-                    scene.activeCamera = cam;
-                    scene.autoClear              = true;
-                    scene.autoClearDepthAndStencil = true;
                     engine.setViewport(new BABYLON.Viewport(0, 0, 1, 1));
                 }
             }
-
-            // Restore main camera as active for next frame
-            scene.activeCamera = cam;
         });
 
         const resizeHandler = () => {
@@ -3276,13 +3255,29 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     const LAYER = CONFIG.AXIS_GIZMO.layerMask;
     const LEN   = CONFIG.AXIS_GIZMO.length;
 
+    // The gizmo renders in its OWN scene so main-scene pipelines can never
+    // intercept it. Realistic mode attaches an SSAO2 prePass renderer whose
+    // `enabled` flag is getter-only in current BabylonJS — it cannot be paused
+    // for a manual second-camera pass and swallows the render into its
+    // geometry buffer, leaving a blank box. A dedicated scene also keeps the
+    // gizmo exempt from realistic image processing (tone mapping/exposure).
+    const engine = scene.getEngine();
+    const gizmoScene = new BABYLON.Scene(engine);
+    gizmoScene.autoClear = false;               // viewport region is scissor-cleared by the render loop
+    gizmoScene.autoClearDepthAndStencil = false;
+    gizmoScene.skipPointerMovePicking = true;
+
+    const gizmoLight = new BABYLON.HemisphericLight(
+        '__axesLight__', new BABYLON.Vector3(0.35, 0.35, 1), gizmoScene);
+    gizmoLight.intensity = 1.0;
+
     // Z-up CAD standard: X=red, Y=green, Z=blue
     const COL_X = toColor3(CONFIG.AXIS_GIZMO.colorX); // Red
     const COL_Y = toColor3(CONFIG.AXIS_GIZMO.colorY); // Green
     const COL_Z = toColor3(CONFIG.AXIS_GIZMO.colorZ); // Blue
 
     function makeAxisLine(name, pts, color) {
-        const l = BABYLON.MeshBuilder.CreateLines(name, { points: pts }, scene);
+        const l = BABYLON.MeshBuilder.CreateLines(name, { points: pts }, gizmoScene);
         l.color = color; l.isPickable = false; l.layerMask = LAYER;
         return l;
     }
@@ -3294,8 +3289,8 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     function makeCone(name, dir, color) {
         const d = dir.normalize();
         const cone = BABYLON.MeshBuilder.CreateCylinder(name,
-            { diameterTop: 0, diameterBottom: CONFIG.AXIS_GIZMO.coneDiameter, height: CONFIG.AXIS_GIZMO.coneHeight, tessellation: CONFIG.AXIS_GIZMO.coneTessellation }, scene);
-        const mat = new BABYLON.StandardMaterial(name + 'Mat', scene);
+            { diameterTop: 0, diameterBottom: CONFIG.AXIS_GIZMO.coneDiameter, height: CONFIG.AXIS_GIZMO.coneHeight, tessellation: CONFIG.AXIS_GIZMO.coneTessellation }, gizmoScene);
+        const mat = new BABYLON.StandardMaterial(name + 'Mat', gizmoScene);
         mat.diffuseColor = color; mat.emissiveColor = color.scale(0.4);
         mat.backFaceCulling = false;
         cone.material = mat; cone.isPickable = false; cone.layerMask = LAYER;
@@ -3318,7 +3313,7 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     // Gizmo camera — top-right corner, orthographic, renders only LAYER meshes
     const hw = 1.1;
     const axesCam = new BABYLON.ArcRotateCamera('__axesCam__',
-        mainCam.alpha, mainCam.beta, 3.5, BABYLON.Vector3.Zero(), scene);
+        mainCam.alpha, mainCam.beta, 3.5, BABYLON.Vector3.Zero(), gizmoScene);
     axesCam.mode        = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
     axesCam.orthoLeft   = -hw; axesCam.orthoRight = hw;
     axesCam.orthoTop    = hw;  axesCam.orthoBottom = -hw;
@@ -3331,6 +3326,7 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
     axesCam.layerMask   = LAYER;
     axesCam.minZ = 0.01; axesCam.maxZ = 100;
     axesCam.upVector = new BABYLON.Vector3(0, 0, 1);
+    gizmoScene.activeCamera = axesCam;
 
     const syncObs = scene.onBeforeRenderObservable.add(() => {
         // Sync the gizmo camera to match the main camera's view direction.
@@ -3343,9 +3339,9 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
         updateAxisLabels(canvasId, scene, axesCam);
     });
 
-    // NOTE: We do NOT use scene.activeCameras for the gizmo.
-    // The render loop will manually render the gizmo camera with depth cleared in its viewport.
-    // This avoids depth buffer conflicts between perspective (main) and orthographic (gizmo) cameras.
+    // NOTE: The render loop renders gizmoScene after the main scene each frame,
+    // scissor-clearing only the gizmo viewport. The separate scene avoids depth
+    // buffer conflicts and main-scene post-processing entirely.
 
     // ── Hover labels (X, Y, Z text that appear on mouseover) ──
     const labelDefs = [
@@ -3404,12 +3400,11 @@ function createAxisGizmo(canvasId, scene, mainCam, canvas) {
 
     axisGizmoLayer[canvasId] = {
         axesCam: axesCam,
+        gizmoScene: gizmoScene,
         dispose() {
             scene.onBeforeRenderObservable.remove(syncObs);
             scene.activeCamera = mainCam;
-            axesCam.dispose();
-            ['__axisX__','__axisY__','__axisZ__','__axisXArr__','__axisYArr__','__axisZArr__']
-                .forEach(n => { const m = scene.getMeshByName(n); if (m) m.dispose(); });
+            try { gizmoScene.dispose(); } catch (_) {}
             labelDivs.forEach(({ div }) => div.remove());
             canvas.removeEventListener('mousemove', onMouseMove);
             canvas.removeEventListener('mouseleave', onMouseLeave);

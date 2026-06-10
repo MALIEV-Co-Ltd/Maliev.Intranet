@@ -102,11 +102,20 @@
 
     private void OnProgress(ThumbnailProgress progress)
     {
-        if (progress.StoragePath == StoragePath)
+        if (progress.StoragePath != StoragePath) return;
+
+        _progress = progress;
+
+        // Another caller (e.g. the upload pipeline or the viewer-GLB path) may have
+        // produced the set — refresh from the shared cache when generation completes.
+        if (progress.Stage == ThumbnailGenerationStage.Complete
+            && _thumbnails is not { HasAny: true }
+            && ThumbnailService.TryGetCached(StoragePath, Version, out var cached))
         {
-            _progress = progress;
-            InvokeAsync(StateHasChanged);
+            _thumbnails = cached;
         }
+
+        InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()

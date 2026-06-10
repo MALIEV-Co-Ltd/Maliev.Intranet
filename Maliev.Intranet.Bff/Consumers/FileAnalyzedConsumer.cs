@@ -117,6 +117,17 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                     viewerStoragePath,
                     viewerFileExtension);
 
+                // Preview images are generated locally in the browser from the viewer
+                // source — GeometryService no longer publishes server-side previews when
+                // a viewer source exists. Mark preview processing terminal so polling
+                // clients reach the Ready state without waiting for a preview event.
+                if (!string.IsNullOrEmpty(viewerUrl)
+                    && existing?.PreviewProcessingStatus is not PreviewProcessingStatus.Completed)
+                {
+                    await _analysisStatusService.SetPreviewUrlsCompletedAsync(
+                        gcsStoragePath, context.CancellationToken);
+                }
+
                 _logger.LogInformation(
                     "FileAnalyzedConsumer: marked analysis completed for key={CacheKey}, GlbStoragePath={GlbStoragePath}, ViewerStoragePath={ViewerStoragePath}, ViewerSignedUrl={HasViewerSignedUrl}, hasDfmReport={HasDfmReport}",
                     gcsStoragePath, glbStoragePath, viewerStoragePath, !string.IsNullOrEmpty(viewerUrl), payload.DfmReport != null);
