@@ -1330,10 +1330,12 @@ test('showGrid uses a low-contrast grid floor in light mode', () => {
     `, context);
 
     assert.equal(result.receivesShadows, true);
-    assert.ok(result.gridOpacity <= 0.45);
-    assert.ok(result.minorUnitVisibility <= 0.35);
-    assert.ok(result.lineColor.r >= 0.72);
-    assert.ok(result.mainColor.r >= 0.93);
+    // Light theme: white fill is invisible on the white canvas background, so only
+    // medium-gray lines show. Opacity is raised so those lines stay readable.
+    assert.ok(result.gridOpacity <= 0.75);
+    assert.ok(result.minorUnitVisibility <= 0.5);
+    assert.ok(result.lineColor.r >= 0.5 && result.lineColor.r <= 0.75);
+    assert.ok(result.mainColor.r >= 0.99);
 });
 
 test('grid floor fades in and fades out before disposal', () => {
@@ -1480,7 +1482,8 @@ test('cutting mat creates an RGBA-textured rounded floor at the model base', () 
     assert.ok(result.rawTextureDataLength > 2048 * 256 * 4);
     assert.equal(result.topTextureHasAlpha, false);
     assert.equal(result.topTransparencyMode, 0);
-    assert.equal(result.topReceivesShadows, false);
+    // The mat top receives shadows so the model's soft shadow bakes into the green surface.
+    assert.equal(result.topReceivesShadows, true);
     assert.equal(result.slabReceivesShadows, false);
     assert.ok(Math.abs(result.firstOutlineUv[0] + 0.002) < 1e-12);
     assert.ok(result.topVertexCount > 12);
@@ -1694,7 +1697,8 @@ test('cutting mat fades in from below and fades out before disposal', () => {
         })();
     `, context);
 
-    assert.equal(shown.topZ, 0);
+    // The mat rests 0.5 mm below the model base (z=0 here) to prevent z-fighting.
+    assert.equal(shown.topZ, -0.5);
     assert.equal(shown.topAlpha, 1);
     assert.equal(shown.topTransparencyMode, 0);
     assert.equal(shown.cameraMinZ, 0.001);
@@ -1713,7 +1717,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     `, context);
 
     assert.equal(hideStart.topExists, true);
-    assert.equal(hideStart.topZ, 0);
+    assert.equal(hideStart.topZ, -0.5);
     assert.equal(hideStart.topAlpha, 1);
     assert.equal(renderTicks.length, 3);
 
@@ -1748,7 +1752,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     assert.equal(removedTicks.length, 3);
 });
 
-test('cutting mat keeps stable textured materials without receiving shadows when realistic render mode is active', () => {
+test('cutting mat keeps stable textured materials with a shadow-receiving top when realistic render mode is active', () => {
     const context = loadViewerContext();
     const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
     context.scene = {
@@ -1782,7 +1786,8 @@ test('cutting mat keeps stable textured materials without receiving shadows when
     assert.equal(result.topIsPbr, false);
     assert.equal(result.slabIsPbr, false);
     assert.equal(result.topHasDiffuseTexture, true);
-    assert.equal(result.topReceivesShadows, false);
+    // The mat top receives shadows so the model's soft shadow bakes into the green surface.
+    assert.equal(result.topReceivesShadows, true);
     assert.equal(result.slabReceivesShadows, false);
 });
 

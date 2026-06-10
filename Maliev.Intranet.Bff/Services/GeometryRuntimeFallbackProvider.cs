@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Bff.Services;
 public sealed class GeometryRuntimeFallbackProvider
 {
     private const int ManifestVersion = 1;
-    private const string RuntimeVersion = "1.0.0";
+    private const string RuntimeVersion = "1.1.0";
     private const string AlgorithmVersion = "browser-first-dfm-v1";
     private const string RuntimePrefix = "/geometry/client-runtime/assets/";
     private const string WorkerResourceSuffix = ".GeometryRuntimeFallback.client-geometry-runtime.worker.js";
@@ -94,7 +94,8 @@ public sealed class GeometryRuntimeFallbackProvider
                     "manifold_check",
                     "thin_feature_screening",
                     "process_dfm_screening",
-                    "local_overlay_hints"
+                    "local_overlay_hints",
+                    "local_preview_image_generation"
                 },
                 serverOperations = new[]
                 {

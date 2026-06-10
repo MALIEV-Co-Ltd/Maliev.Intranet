@@ -3,6 +3,7 @@
 @using Maliev.Intranet.Shared
 @using Maliev.Intranet.Shared.Dtos
 @using Maliev.Intranet.Client.Components.Shared
+@using Maliev.Intranet.Client.Components.Project
 @using Microsoft.AspNetCore.Components.Authorization
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -17,7 +18,7 @@
     <ErrorBoundary>
         <ChildContent>
             <div class="pn-body">
-                @* ── Left: Parts List ─────────────────────────────────────── *@
+                @* ── Left: Parts List Panel ──────────────────────────────── *@
                 @if (_layoutMode != LayoutMode.SummaryTable)
                 {
                     <div class="pn-desktop-parts">
@@ -27,15 +28,16 @@
                             Title="@_title"
                             OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
                             OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
-                            AutoSaving="@_autoSaving"
-                            LastSavedAt="@_lastSavedAt"
-                            HasCustomerSelected="@(_selectedCustomer != null)"
                             CanDuplicateProject="@(_parts.Count > 0)"
                             OnDuplicate="DuplicateProjectAsync"
                             OnSelectPart="SelectPartFromPanel"
                             OnAddPart="OpenFilePicker"
                             OnRemovePart="RemovePart"
-                            OnDuplicatePart="DuplicateSinglePart" />
+                            OnDuplicatePart="DuplicateSinglePart"
+                            SelectedCustomer="@_selectedCustomer"
+                            SearchCustomersFunc="@SearchCustomersAsync"
+                            OnChangeCustomer="@(() => _selectedCustomer = null)"
+                            OnCustomerSelected="@OnCustomerSelected" />
                     </div>
 
                     <MudDrawer @bind-Open="_partsDrawerOpen"
@@ -52,15 +54,16 @@
                             Title="@_title"
                             OnTitleChanged="@(v => { _title = v; ValidateTitle(); TriggerAutoSave(); })"
                             OnTitleCommit="@(() => { ValidateTitle(); TriggerAutoSave(); })"
-                            AutoSaving="@_autoSaving"
-                            LastSavedAt="@_lastSavedAt"
-                            HasCustomerSelected="@(_selectedCustomer != null)"
                             CanDuplicateProject="@(_parts.Count > 0)"
                             OnDuplicate="DuplicateProjectAsync"
                             OnSelectPart="SelectPartFromDrawer"
                             OnAddPart="OpenFilePicker"
                             OnRemovePart="RemovePart"
-                            OnDuplicatePart="DuplicateSinglePart" />
+                            OnDuplicatePart="DuplicateSinglePart"
+                            SelectedCustomer="@_selectedCustomer"
+                            SearchCustomersFunc="@SearchCustomersAsync"
+                            OnChangeCustomer="@(() => _selectedCustomer = null)"
+                            OnCustomerSelected="@OnCustomerSelected" />
                     </MudDrawer>
                 }
 
@@ -69,11 +72,6 @@
                     @if (_layoutMode != LayoutMode.SummaryTable)
                     {
                         <div class="pn-mobile-toolbar">
-                            <button class="pn-parts-toggle pn-parts-toggle--mobile" title="Open parts list" @onclick="@(() => _partsDrawerOpen = true)">
-                                <MudIcon Icon="@Icons.Material.Outlined.Menu" Size="Size.Small" />
-                                <span>Parts</span>
-                                <span class="pn-parts-count">@_parts.Count</span>
-                            </button>
                             <button type="button"
                                     class="pn-mode-icon-button"
                                     title="@LayoutToggleTitle"
@@ -130,48 +128,46 @@
                                 BrowserPrimaryServerDfmFallbackEnabled="@_browserPrimaryServerDfmFallbackEnabled.GetValueOrDefault(false)"
                                 OnPartChanged="OnPartChanged"
                                 LayoutMode="@_layoutMode"
-                                OnLayoutModeChanged="SetLayoutModeAsync" />
+                                OnLayoutModeChanged="SetLayoutModeAsync"
+                                LeadTimeOptions="@_leadTimeOptions"
+                                SelectedLeadTime="@_selectedLeadTime"
+                                OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { TriggerPricingAsync(p); await TriggerRoutingFetchAsync(p); } })"
+                                ShowQuoteFooter="true"
+                                SelectedCustomer="@_selectedCustomer"
+                                AllParts="@_parts"
+                                ShippingCost="@_shippingCost"
+                                ShippingCostChanged="@(value => { _shippingCost = Math.Max(0m, value); TriggerAutoSave(); })"
+                                ManualDiscountAmount="@_manualDiscountAmount"
+                                ManualDiscountAmountChanged="@(value => { _manualDiscountAmount = Math.Max(0m, value); TriggerAutoSave(); })"
+                                QuotationTerms="@_quotationTerms"
+                                QuotationTermsChanged="@(value => { _quotationTerms = value; TriggerAutoSave(); })"
+                                CanQuote="@CanSubmit"
+                                Saving="@_saving"
+                                OnQuote="CreateProjectAndQuoteAsync"
+                                OnGeneratePdf="GenerateDraftPdfAsync"
+                                ShippingDestinationCountry="@ShippingDestinationCountry"
+                                ShippingDestinationPostalCode="@ShippingDestinationPostalCode"
+                                TotalWeightKg="@TotalWeightKg" />
                         </div>
                     }
                     else
                     {
                         <div class="pn-empty-state">
-                            <FileUploadDropzone Icon="@Icons.Material.Outlined.CloudUpload"
-                                               Label="Drop files here or click to upload"
-                                               SubLabel="@FileTypes.ThreeDSubLabel"
-                                               MaxFileSizeLabel="max 100 MB"
-                                               Class="pn-empty-dropzone"
-                                               OnClick="OpenFilePicker"
-                                               OnFilesDropped="OpenFilePicker" />
+                            <div class="pn-empty-inner">
+                                <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Hero"
+                                                   Icon="@Icons.Material.Outlined.CloudUpload"
+                                                   Label="Upload 3D Models to Start"
+                                                   SubLabel="@FileTypes.ThreeDSubLabel"
+                                                   MaxFileSizeLabel="max 100 MB per file"
+                                                   OnClick="OpenFilePicker"
+                                                   OnFilesDropped="OpenFilePicker"
+                                                   Class="pn-empty-dropzone" />
+                            </div>
                         </div>
                     }
                 </div>
             </div>
 
-            @* ── Bottom: Quote Summary ───────────────────────────────────── *@
-            <ErrorBoundary>
-                <ChildContent>
-                    <QuoteSummaryBar
-                        SelectedCustomer="@_selectedCustomer"
-                        SearchCustomers="@SearchCustomersAsync"
-                        OnCustomerSelected="@OnCustomerSelected"
-                        Parts="@_parts"
-                        LeadTimeOptions="@_leadTimeOptions"
-                        SelectedLeadTime="@_selectedLeadTime"
-                        OnLeadTimeChanged="@(async lt => { _selectedLeadTime = lt; TriggerAutoSave(); foreach (var p in _parts) { TriggerPricingAsync(p); await TriggerRoutingFetchAsync(p); } })"
-                        ShippingCost="@_shippingCost"
-                        ShippingCostChanged="@(value => { _shippingCost = Math.Max(0m, value); TriggerAutoSave(); })"
-                        ManualDiscountAmount="@_manualDiscountAmount"
-                        ManualDiscountAmountChanged="@(value => { _manualDiscountAmount = Math.Max(0m, value); TriggerAutoSave(); })"
-                        QuotationTerms="@_quotationTerms"
-                        QuotationTermsChanged="@(value => { _quotationTerms = value; TriggerAutoSave(); })"
-                        CanQuote="@CanSubmit"
-                        Saving="@_saving"
-                        OnQuote="CreateProjectAndQuoteAsync"
-                        OnGeneratePdf="GenerateDraftPdfAsync" />
-                </ChildContent>
-                <ErrorContent><MudAlert Severity="Severity.Error" Class="ma-2">Quote panel error.</MudAlert></ErrorContent>
-            </ErrorBoundary>
         </ChildContent>
         <ErrorContent>
             <MudAlert Severity="Severity.Error" Class="ma-4">An unexpected error occurred. Please refresh.</MudAlert>

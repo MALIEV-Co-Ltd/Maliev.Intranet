@@ -41,8 +41,12 @@ public partial class ProjectNew : IAsyncDisposable
     private string? _quotationTerms;
     private List<ProcessDto> _processes = [];
     private bool _saving;
-    private bool _autoSaving;
     private DateTimeOffset? _lastSavedAt;
+
+    // Computed properties for QuoteSummaryBar
+    private string ShippingDestinationCountry => "US"; // default, will be overridden when user enters details
+    private string ShippingDestinationPostalCode => "90210"; // default
+    private decimal TotalWeightKg => _parts.Sum(p => (decimal)(p.VolumeMm3 ?? 0) * 0.000001m); // rough estimate from mm³ to kg
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
     private const string ProjectUploadContainerId = "project-new-file-upload";
@@ -567,6 +571,20 @@ public partial class ProjectNew : IAsyncDisposable
                     catch (Exception ex)
                     {
                         Logger.LogWarning(ex, "Thumbnail generation failed for {StoragePath}", completedUpload.StoragePath);
+                    }
+                    finally
+                    {
+                        // Ensure AwaitingPreview is cleared even if thumbnail generation fails
+                        // so the skeleton doesn't get stuck
+                        await InvokeAsync(() =>
+                        {
+                            part.AwaitingPreview = false;
+                            if (string.IsNullOrEmpty(part.ThumbnailSmallUrl))
+                            {
+                                part.StatusText = "Preview unavailable";
+                            }
+                            StateHasChanged();
+                        });
                     }
                 });
             }
@@ -1428,6 +1446,7 @@ public partial class ProjectNew : IAsyncDisposable
         ApplyLocalGeometryRuntimeMetrics(part, result.Metrics);
         BrowserDfmReportSync.ClearTerminalLocalAttempt(part, processCode);
         BrowserDfmReportSync.ClearActiveLocalAttempt(part, processCode);
+        part.LocalDfmRuntimeCompletedForProcessCode = processCode;
         part.DfmAnalysisTimedOut = false;
         part.AnalysisErrorCode = null;
         return true;
@@ -1442,6 +1461,9 @@ public partial class ProjectNew : IAsyncDisposable
 
         if (TryGetFiniteNonNegative(metrics.VolumeMm3, out var volumeMm3))
             part.VolumeMm3 = volumeMm3;
+
+        if (TryGetFiniteNonNegative(metrics.SurfaceAreaMm2, out var surfaceAreaMm2))
+            part.SurfaceAreaMm2 = surfaceAreaMm2;
 
         if (metrics.BoundingBox is { } boundingBox
             && TryGetFiniteNonNegative(boundingBox.X, out var x)
@@ -1469,7 +1491,7 @@ public partial class ProjectNew : IAsyncDisposable
             part.NonManifoldFaceCount = edgeCount;
             part.NonManifoldReason = string.Create(
                 CultureInfo.InvariantCulture,
-                $"Browser local DFM found {edgeCount:N0} non-manifold edge(s).");
+                $"Found {edgeCount:N0} non-manifold edge(s).");
         }
         else if (metrics.IsManifold == true)
         {
@@ -2072,14 +2094,12 @@ public partial class ProjectNew : IAsyncDisposable
     private void SelectPartFromDrawer(int index)
     {
         _selectedPartIndex = index;
-        _partsDrawerOpen = false;
         StateHasChanged();
     }
 
     private void SetLayoutMode(LayoutMode mode)
     {
         _layoutMode = mode;
-        _partsDrawerOpen = false;
         PruneBulkSelection();
     }
 
@@ -2599,24 +2619,45 @@ public partial class ProjectNew : IAsyncDisposable
             return;
         }
 
+        // Wait for geometry analysis to complete (VolumeMm3 available) before pricing.
+        // For STEP/IGES files, analysis happens asynchronously on the server.
+        if (!part.VolumeMm3.HasValue)
+        {
+            // Wait up to 30 seconds for geometry analysis to complete
+            var timeout = TimeSpan.FromSeconds(30);
+            var startTime = DateTime.UtcNow;
+            while (!part.VolumeMm3.HasValue && DateTime.UtcNow - startTime < timeout && !ct.IsCancellationRequested)
+            {
+                await Task.Delay(500, ct);
+            }
+
+            // If still no geometry data after timeout, skip pricing for now
+            // It will be retried when SignalR analysis status updates arrive
+            if (!part.VolumeMm3.HasValue)
+            {
+                part.PricingLoading = false;
+                part.PricingFailed = false;
+                RefreshLeadTimeOptionsFromPricing();
+                return;
+            }
+        }
+
         part.PricingLoading = true;
         part.PricingFailed = false;
 
         try
         {
-            var geometry = part.VolumeMm3.HasValue
-                ? new GeometryMetricsDto
-                {
-                    VolumeCm3 = (decimal)part.VolumeMm3.Value / 1_000m,
-                    SupportVolumeCm3 = 0m,
-                    SurfaceAreaCm2 = 0m,
-                    BoundingBoxX = (decimal)(part.Dimensions?.X ?? 0),
-                    BoundingBoxY = (decimal)(part.Dimensions?.Y ?? 0),
-                    BoundingBoxZ = (decimal)(part.Dimensions?.Z ?? 0),
-                    IsManifold = part.IsManifold ?? false,
-                    TriangleCount = 0,
-                }
-                : null;
+            var geometry = new GeometryMetricsDto
+            {
+                VolumeCm3 = (decimal)part.VolumeMm3.Value / 1_000m,
+                SupportVolumeCm3 = 0m,
+                SurfaceAreaCm2 = 0m,
+                BoundingBoxX = (decimal)(part.Dimensions?.X ?? 0),
+                BoundingBoxY = (decimal)(part.Dimensions?.Y ?? 0),
+                BoundingBoxZ = (decimal)(part.Dimensions?.Z ?? 0),
+                IsManifold = part.IsManifold ?? false,
+                TriangleCount = 0,
+            };
 
             var process = _processes.FirstOrDefault(p => p.Id == part.ProcessId);
             var processCode = part.ProcessCode ?? process?.Code ?? string.Empty;
@@ -2631,7 +2672,7 @@ public partial class ProjectNew : IAsyncDisposable
                 ManufacturingProcessName = processCode,
                 ManufacturingProcessCode = processCode,
                 Quantity = part.Quantity,
-                Geometry = geometry!,
+                Geometry = geometry,
                 StoragePath = part.StoragePath,
                 LeadTimeCode = _selectedLeadTime?.Code,
                 FinishId = part.FinishId,
@@ -2927,9 +2968,6 @@ public partial class ProjectNew : IAsyncDisposable
 
     private async Task SaveDraftAsync()
     {
-        _autoSaving = true;
-        await InvokeAsync(StateHasChanged);
-
         try
         {
             var draft = new DraftProjectState
@@ -2978,7 +3016,6 @@ public partial class ProjectNew : IAsyncDisposable
         {
             if (!_serverSaveInProgress && !_serverSavePending)
             {
-                _autoSaving = false;
                 StateHasChanged();
             }
         }
@@ -3145,12 +3182,11 @@ public partial class ProjectNew : IAsyncDisposable
             // Server save failure is non-fatal; sessionStorage draft is the fallback
             saved = false;
         }
-        finally
-        {
-            _serverSaveInProgress = false;
-            _autoSaving = false;
+finally
+            {
+                _serverSaveInProgress = false;
 
-            if (_serverSavePending && _selectedCustomerId.HasValue && !_storageMigrationInProgress)
+                if (_serverSavePending && _selectedCustomerId.HasValue && !_storageMigrationInProgress)
             {
                 _serverSavePending = false;
                 _ = InvokeAsync(SaveDraftAsync);
@@ -4059,6 +4095,26 @@ public partial class ProjectNew : IAsyncDisposable
 
         TriggerDeferredStorageMigration();
         await MigrateTempProjectFilesAsync();
+    }
+
+    private async Task<List<ProjectSummaryDto>> LoadRecentProjectsAsync(Guid customerId)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<PagedResponse<ProjectSummaryDto>>(
+                $"api/v1/projects?customerId={customerId}&page=1&pageSize=5");
+            return result?.Data?.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load recent projects for customer {CustomerId}", customerId);
+            return [];
+        }
+    }
+
+    private async Task OnRecentProjectClicked(Guid projectId)
+    {
+        Navigation.NavigateTo($"/sales/projects/{projectId}");
     }
 
     private async Task MigrateTempProjectFilesAsync()

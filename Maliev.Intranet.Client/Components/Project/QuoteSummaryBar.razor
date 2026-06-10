@@ -8,58 +8,11 @@
 @inject ISnackbar Snackbar
 @implements IDisposable
 
-<div class="qsb-root">
-    @* ── Zone 0: Customer ─────────────────────────────────────────────────── *@
-    <div class="qsb-zone-customer">
-        <div class="qsb-zone-label">Bill To</div>
-        <CustomerPicker SelectedCustomer="@SelectedCustomer"
-                        SearchCustomers="@SearchCustomers"
-                        OnCustomerSelected="@OnCustomerSelected" />
-    </div>
-
-    <div class="qsb-divider" />
-
-    @* ── Zone 1: Lead Time ────────────────────────────────────────────────── *@
-    <div class="qsb-zone-lead">
-        <div class="qsb-zone-label">
-            <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" />
-            Lead Time
-        </div>
-        <div class="qsb-lead-options">
-            @if (LeadTimeOptions.Count == 0 && IsLeadTimeLoading)
-            {
-                @for (var i = 0; i < 3; i++)
-                {
-                    <div class="qsb-lead-skeleton">
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="52px" Class="rounded" />
-                    </div>
-                }
-            }
-            else if (LeadTimeOptions.Count == 0)
-            {
-                <div class="qsb-lead-empty">@LeadTimeEmptyText</div>
-            }
-            @foreach (var lt in LeadTimeOptions)
-            {
-                var active = SelectedLeadTime?.Code == lt.Code;
-                <button class="qsb-lead-btn @(active ? "qsb-lead-btn--active" : "")"
-                        @onclick="@(() => OnLeadTimeChanged.InvokeAsync(lt))">
-                    <div class="qsb-lead-row">
-                        <span class="qsb-lead-name">@lt.Name</span>
-                        <span class="qsb-lead-mult">@(lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%" : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%" : "base")</span>
-                    </div>
-                    <div class="qsb-lead-days">
-                        @FormatLeadTimeDays(lt) <span class="qsb-bd-full">business days</span><span class="qsb-bd-short">days</span>
-                    </div>
-                </button>
-            }
-        </div>
-    </div>
-
-    <div class="qsb-divider" />
-
-    @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
-    <div class="qsb-zone-total">
+<div class="qsb-root @(SelectedCustomer != null ? "qsb-root--has-customer" : "qsb-root--no-customer")">
+    @if (SelectedCustomer != null)
+    {
+        @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
+        <div class="qsb-zone-total">
         <div class="qsb-total-top">
             <div class="qsb-total-ships">
                 <div class="qsb-zone-label">Quote Total</div>
@@ -247,6 +200,7 @@
             </div>
         }
     </div>
+}
 </div>
 
 <style>
@@ -257,6 +211,35 @@
         border-top: 1px solid var(--maliev-border);
         flex-shrink: 0;
         overflow: visible;
+    }
+
+    /* ── No customer: empty/hidden state ─────────────────────────────────── */
+    .qsb-root--no-customer {
+        min-height: 0;
+        padding: 0;
+        border-top: none;
+        background: transparent;
+    }
+
+    .qsb-root--no-customer .qsb-zone-total {
+        display: none;
+    }
+
+    /* ── Has customer: show quote total ───────────────────────────────────── */
+    .qsb-root--has-customer {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .qsb-root--has-customer .qsb-zone-total {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+        gap: 4px;
+        width: 340px;
+        padding: 8px 16px 10px;
+        position: relative;
     }
 
     .qsb-divider {
@@ -276,19 +259,6 @@
         gap: 5px;
         margin-bottom: 6px;
         font-family: 'Inter', sans-serif;
-    }
-
-    /* ── Zone 0: Customer ─────────────────────────────────────────────────── */
-    .qsb-zone-customer {
-        position: relative;
-        z-index: 5;
-        flex: 1 1 220px;
-        max-width: 270px;
-        padding: 10px 16px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        flex-shrink: 0;
     }
 
     /* ── Zone 1: Lead Time ────────────────────────────────────────────────── */

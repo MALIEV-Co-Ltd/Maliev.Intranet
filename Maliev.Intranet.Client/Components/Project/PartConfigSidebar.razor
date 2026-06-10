@@ -4,17 +4,19 @@
 @using Maliev.Intranet.Client.Components.Shared
 @using Maliev.Intranet.Client.Services
 @using Maliev.Intranet.Client.Helpers
+@using Maliev.Intranet.Client.Pages
 @inject CurrencyService CurrencyService
+@inject ShippingService ShippingService
 
+<div class="@RootClass">
 @if (Part == null)
 {
     <div class="pcs-empty-state">
         <MudText Typo="Typo.body2" Color="Color.Secondary">Select a part to configure</MudText>
     </div>
-    return;
 }
-
-<div class="@RootClass">
+else
+{
     <div class="pcs-header">
         <div class="pcs-header-label">Configure</div>
         <div class="pcs-header-name" title="@Part!.Name">@Part!.Name</div>
@@ -128,33 +130,68 @@
         <section class="pcs-section" data-config-section="material">
             <div class="pcs-section-header">
                 <span class="pcs-section-title">Material</span>
-                <span class="pcs-section-count">@Part!.AvailableMaterials.Count options</span>
-            </div>
-            <div class="pcs-cards">
-                @foreach (var mat in Part!.AvailableMaterials)
+                @if (_isChangingMaterial || SelectedMaterial == null)
                 {
-                    var active = SelectedMaterial?.Id == mat.Id;
-                    <button class="pcs-mat-card @(active ? "pcs-mat-card--active" : "")"
-                            @onclick="@(() => OnMaterialChanged(mat))">
+                    <span class="pcs-section-count">@Part!.AvailableMaterials.Count options</span>
+                }
+            </div>
+            @if (!_isChangingMaterial && SelectedMaterial != null)
+            {
+                @* ── Selected material view with Change button ──────────── *@
+                var sm = SelectedMaterial;
+                <div class="pcs-process-selected">
+                    <div class="pcs-mat-card pcs-mat-card--active pcs-mat-card--selected">
                         <OptionImageFrame Class="pcs-mat-swatch"
-                                          ImageUrl="@GetMaterialImageUrl(mat)"
+                                          ImageUrl="@GetMaterialImageUrl(sm)"
                                           FallbackIcon="@Icons.Material.Outlined.Category" />
-                        <div class="pcs-mat-info">
-                            <div class="pcs-mat-name">@mat.Name</div>
-                            @if (!string.IsNullOrEmpty(mat.Description))
+                        <div class="pcs-mat-info pcs-mat-info--selected">
+                            <div class="pcs-mat-name">@sm.Name</div>
+                            @if (!string.IsNullOrEmpty(sm.Description))
                             {
-                                <div class="pcs-mat-sub">@mat.Description</div>
+                                <div class="pcs-mat-sub">@sm.Description</div>
                             }
                         </div>
-                        @if (active)
-                        {
+                        <div class="pcs-card-right">
                             <div class="pcs-card-check">
                                 <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                             </div>
-                        }
-                    </button>
-                }
-            </div>
+                            <button class="pcs-process-change-btn"
+                                    @onclick="@(() => _isChangingMaterial = true)"
+                                    type="button">
+                                Change
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="pcs-cards">
+                    @foreach (var mat in Part!.AvailableMaterials)
+                    {
+                        var active = SelectedMaterial?.Id == mat.Id;
+                        <button class="pcs-mat-card @(active ? "pcs-mat-card--active" : "")"
+                                @onclick="@(() => OnMaterialChanged(mat))">
+                            <OptionImageFrame Class="pcs-mat-swatch"
+                                              ImageUrl="@GetMaterialImageUrl(mat)"
+                                              FallbackIcon="@Icons.Material.Outlined.Category" />
+                            <div class="pcs-mat-info">
+                                <div class="pcs-mat-name">@mat.Name</div>
+                                @if (!string.IsNullOrEmpty(mat.Description))
+                                {
+                                    <div class="pcs-mat-sub">@mat.Description</div>
+                                }
+                            </div>
+                            @if (active)
+                            {
+                                <div class="pcs-card-check">
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                </div>
+                            }
+                        </button>
+                    }
+                </div>
+            }
         </section>
 
         @if (RequiresDedicatedMaterialColorSelection)
@@ -191,28 +228,63 @@
         <section class="pcs-section" data-config-section="surface-finish">
             @{
                 var visibleFinishes = GetVisibleFinishes(Part!.AvailableFinishes);
+                var selectedFinish = SelectedFinish;
             }
             <div class="pcs-section-header">
                 <span class="pcs-section-title">Surface Finish</span>
-                <span class="pcs-section-count">@visibleFinishes.Count options</span>
-            </div>
-            <div class="pcs-cards">
-                @foreach (var fin in visibleFinishes)
+                @if (_isChangingFinish || selectedFinish == null)
                 {
-                    var active = IsSelectedFinishGroup(fin);
-                    <button class="pcs-fin-card @(active ? "pcs-fin-card--active" : "")"
-                            @onclick="@(() => OnFinishChanged(fin))">
+                    <span class="pcs-section-count">@visibleFinishes.Count options</span>
+                }
+            </div>
+            @if (!_isChangingFinish && selectedFinish != null)
+            {
+                @* ── Selected finish view with Change button ──────────── *@
+                <div class="pcs-process-selected">
+                    <div class="pcs-fin-card pcs-fin-card--active pcs-fin-card--selected">
                         <OptionImageFrame Class="pcs-fin-swatch"
-                                          ImageUrl="@GetSurfaceFinishImageUrl(fin)"
+                                          ImageUrl="@GetSurfaceFinishImageUrl(selectedFinish)"
                                           FallbackIcon="@Icons.Material.Outlined.AutoFixHigh" />
-                        <div class="pcs-fin-info">
-                            <div class="pcs-fin-name">@GetSurfaceFinishDisplayName(fin)</div>
-                            @if (!string.IsNullOrEmpty(fin.Description))
+                        <div class="pcs-fin-info pcs-fin-info--selected">
+                            <div class="pcs-fin-name">@GetSurfaceFinishDisplayName(selectedFinish)</div>
+                            @if (!string.IsNullOrEmpty(selectedFinish.Description))
                             {
-                                <div class="pcs-fin-sub">@fin.Description</div>
+                                <div class="pcs-fin-sub">@selectedFinish.Description</div>
                             }
                         </div>
-                        <div class="pcs-fin-price">@FormatFinishPrice(fin)</div>
+                        <div class="pcs-card-right">
+                            <div class="pcs-fin-price">@FormatFinishPrice(selectedFinish)</div>
+                            <div class="pcs-card-check">
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            </div>
+                            <button class="pcs-process-change-btn"
+                                    @onclick="@(() => _isChangingFinish = true)"
+                                    type="button">
+                                Change
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="pcs-cards">
+                    @foreach (var fin in visibleFinishes)
+                    {
+                        var active = IsSelectedFinishGroup(fin);
+                        <button class="pcs-fin-card @(active ? "pcs-fin-card--active" : "")"
+                                @onclick="@(() => OnFinishChanged(fin))">
+                            <OptionImageFrame Class="pcs-fin-swatch"
+                                              ImageUrl="@GetSurfaceFinishImageUrl(fin)"
+                                              FallbackIcon="@Icons.Material.Outlined.AutoFixHigh" />
+                            <div class="pcs-fin-info">
+                                <div class="pcs-fin-name">@GetSurfaceFinishDisplayName(fin)</div>
+                                @if (!string.IsNullOrEmpty(fin.Description))
+                                {
+                                    <div class="pcs-fin-sub">@fin.Description</div>
+                                }
+                            </div>
+                            <div class="pcs-fin-price">@FormatFinishPrice(fin)</div>
                             @if (active)
                             {
                                 <div class="pcs-card-check">
@@ -222,7 +294,8 @@
                         </button>
                     }
                 </div>
-            </section>
+            }
+        </section>
 
         @* ── Color (Finish Options / Material Color) ───────────────────── *@
         @if (ShowColorSection)
@@ -348,84 +421,146 @@
             <section class="pcs-section" data-config-section="tolerance">
                 @{
                     var toleranceGroups = VisibleToleranceGroups;
+                    var selectedTol = SelectedTolerance;
                 }
                 <div class="pcs-section-header">
                     <span class="pcs-section-title">Tolerance</span>
-                    <div class="pcs-section-meta">
-                        <span class="pcs-section-count">@FormatOptionCount(toleranceGroups.Sum(group => group.Options.Count))</span>
-                    </div>
-                </div>
-                <div class="pcs-tolerance-groups">
-                    @foreach (var group in toleranceGroups)
+                    @if (_isChangingTolerance || selectedTol == null)
                     {
-                        <div class="pcs-tolerance-group @group.CssClass">
-                            <div class="pcs-tolerance-group-header">
-                                <div>
-                                    <div class="pcs-tolerance-group-title">@group.Title</div>
-                                    <div class="pcs-tolerance-group-standard">@group.Standard</div>
-                                </div>
-                                <span class="pcs-tolerance-group-count">@group.Options.Count</span>
-                            </div>
-                            <div class="pcs-tol-grid">
-                                @foreach (var tol in group.Options)
+                        <div class="pcs-section-meta">
+                            <span class="pcs-section-count">@FormatOptionCount(toleranceGroups.Sum(group => group.Options.Count))</span>
+                        </div>
+                    }
+                </div>
+                @if (!_isChangingTolerance && selectedTol != null)
+                {
+                    @* ── Selected tolerance view with Change button ──────── *@
+                    var (tolHead, tolTail) = ToleranceNameHelper.Split(selectedTol.Name);
+                    <div class="pcs-selected-single">
+                        <div class="pcs-tol-selected-card">
+                            <div class="pcs-tol-selected-info">
+                                <span class="pcs-tol-name">@tolHead</span>
+                                <span class="pcs-tol-grade pcs-tol-grade--selected">@(string.IsNullOrEmpty(tolTail) ? selectedTol.Grade : tolTail)</span>
+                                @if (!string.IsNullOrEmpty(GetToleranceRange(selectedTol)))
                                 {
-                                    var active = SelectedTolerance?.Id == tol.Id;
-                                    var (tolHead, tolTail) = ToleranceNameHelper.Split(tol.Name);
-                                    <button class="pcs-tol-card @(active ? "pcs-tol-card--active" : "")"
-                                            @onclick="@(() => OnToleranceChanged(tol))">
-                                        <div class="pcs-tol-name">@tolHead</div>
-                                        <div class="pcs-tol-grade">@(string.IsNullOrEmpty(tolTail) ? tol.Grade : tolTail)</div>
-                                        <div class="pcs-tol-range">@GetToleranceRange(tol)</div>
-                                        @if (active)
-                                        {
-                                            <div class="pcs-tol-check">
-                                                <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:10px;width:10px;height:10px;" />
-                                            </div>
-                                        }
-                                    </button>
+                                    <span class="pcs-tol-range pcs-tol-range--selected">@GetToleranceRange(selectedTol)</span>
                                 }
                             </div>
+                            <button class="pcs-process-change-btn"
+                                    @onclick="@(() => _isChangingTolerance = true)"
+                                    type="button">
+                                Change
+                            </button>
                         </div>
-                    }
-                    @if (toleranceGroups.Count == 0)
-                    {
-                        <div class="pcs-tolerance-empty">
-                            No tolerance options available for this process.
-                        </div>
-                    }
-                </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="pcs-tolerance-groups">
+                        @foreach (var group in toleranceGroups)
+                        {
+                            <div class="pcs-tolerance-group @group.CssClass">
+                                <div class="pcs-tolerance-group-header">
+                                    <div>
+                                        <div class="pcs-tolerance-group-title">@group.Title</div>
+                                        <div class="pcs-tolerance-group-standard">@group.Standard</div>
+                                    </div>
+                                    <span class="pcs-tolerance-group-count">@group.Options.Count</span>
+                                </div>
+                                <div class="pcs-tol-grid">
+                                    @foreach (var tol in group.Options)
+                                    {
+                                        var active = SelectedTolerance?.Id == tol.Id;
+                                        var (tolHead, tolTail) = ToleranceNameHelper.Split(tol.Name);
+                                        <button class="pcs-tol-card @(active ? "pcs-tol-card--active" : "")"
+                                                @onclick="@(() => OnToleranceChanged(tol))">
+                                            <div class="pcs-tol-name">@tolHead</div>
+                                            <div class="pcs-tol-grade">@(string.IsNullOrEmpty(tolTail) ? tol.Grade : tolTail)</div>
+                                            <div class="pcs-tol-range">@GetToleranceRange(tol)</div>
+                                            @if (active)
+                                            {
+                                                <div class="pcs-tol-check">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:10px;width:10px;height:10px;" />
+                                                </div>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        @if (toleranceGroups.Count == 0)
+                        {
+                            <div class="pcs-tolerance-empty">
+                                No tolerance options available for this process.
+                            </div>
+                        }
+                    </div>
+                }
             </section>
 
             @if (IsCncProcess)
             {
                 @* ── CNC Surface Roughness ─────────────────────────────────────── *@
                 <section class="pcs-section">
+                    @{
+                        var selectedRoughness = RoughnessOptions.FirstOrDefault(r => string.Equals(Part!.RoughnessCode, r.Code, StringComparison.OrdinalIgnoreCase));
+                    }
                     <div class="pcs-section-header">
                         <span class="pcs-section-title">Surface Roughness</span>
-                        <span class="pcs-section-count">@RoughnessOptions.Count options</span>
-                    </div>
-                    <div class="pcs-cards">
-                        @foreach (var roughness in RoughnessOptions)
+                        @if (_isChangingRoughness || selectedRoughness == null)
                         {
-                            var active = string.Equals(Part!.RoughnessCode, roughness.Code, StringComparison.OrdinalIgnoreCase);
-                            <button class="pcs-choice-card pcs-roughness-card @(active ? "pcs-choice-card--active" : "")"
-                                    @onclick="@(() => OnRoughnessChanged(roughness.Code))">
+                            <span class="pcs-section-count">@RoughnessOptions.Count options</span>
+                        }
+                    </div>
+                    @if (!_isChangingRoughness && selectedRoughness != null)
+                    {
+                        <div class="pcs-process-selected">
+                            <div class="pcs-choice-card pcs-roughness-card pcs-choice-card--active pcs-choice-card--selected">
                                 <OptionImageFrame Class="pcs-choice-swatch"
-                                                  ImageUrl="@GetRoughnessImageUrl(roughness.Code)"
+                                                  ImageUrl="@GetRoughnessImageUrl(selectedRoughness.Code)"
                                                   FallbackIcon="@Icons.Material.Outlined.Grain" />
-                                <div class="pcs-choice-info">
-                                    <div class="pcs-choice-name">@roughness.Name</div>
-                                    <div class="pcs-choice-sub">@roughness.Description</div>
+                                <div class="pcs-choice-info pcs-choice-info--selected">
+                                    <div class="pcs-choice-name">@selectedRoughness.Name</div>
+                                    <div class="pcs-choice-sub">@selectedRoughness.Description</div>
                                 </div>
-                                @if (active)
-                                {
+                                <div class="pcs-card-right">
                                     <div class="pcs-card-check">
                                         <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                                     </div>
-                                }
-                            </button>
-                        }
-                    </div>
+                                    <button class="pcs-process-change-btn"
+                                            @onclick="@(() => _isChangingRoughness = true)"
+                                            type="button">
+                                        Change
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="pcs-cards">
+                            @foreach (var roughness in RoughnessOptions)
+                            {
+                                var active = string.Equals(Part!.RoughnessCode, roughness.Code, StringComparison.OrdinalIgnoreCase);
+                                <button class="pcs-choice-card pcs-roughness-card @(active ? "pcs-choice-card--active" : "")"
+                                        @onclick="@(() => OnRoughnessChanged(roughness.Code))">
+                                    <OptionImageFrame Class="pcs-choice-swatch"
+                                                      ImageUrl="@GetRoughnessImageUrl(roughness.Code)"
+                                                      FallbackIcon="@Icons.Material.Outlined.Grain" />
+                                    <div class="pcs-choice-info">
+                                        <div class="pcs-choice-name">@roughness.Name</div>
+                                        <div class="pcs-choice-sub">@roughness.Description</div>
+                                    </div>
+                                    @if (active)
+                                    {
+                                        <div class="pcs-card-check">
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                        </div>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
                 </section>
             }
 
@@ -651,34 +786,133 @@
             {
                 @* ── Quality ─────────────────────────────────────────────────────── *@
                 <section class="pcs-section" data-config-section="inspection">
+                    @{
+                        var selectedInspection = InspectionOptions.FirstOrDefault(i => i.Level == Part!.InspectionLevel);
+                    }
                     <div class="pcs-section-header">
                         <span class="pcs-section-title">Inspection</span>
-                        <span class="pcs-section-count">@InspectionOptions.Count options</span>
-                    </div>
-                    <div class="pcs-cards">
-                        @foreach (var inspection in InspectionOptions)
+                        @if (_isChangingInspection || selectedInspection == null)
                         {
-                            var active = Part!.InspectionLevel == inspection.Level;
-                            <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "") @(!CanConfigurePartFeaturesAndInspection ? "pcs-choice-card--disabled" : "")"
-                                    disabled="@(!CanConfigurePartFeaturesAndInspection)"
-                                    aria-disabled="@GetDisabledAriaValue(!CanConfigurePartFeaturesAndInspection)"
-                                    @onclick="@(() => OnInspectionChanged(inspection.Level))">
+                            <span class="pcs-section-count">@InspectionOptions.Count options</span>
+                        }
+                    </div>
+                    @if (!_isChangingInspection && selectedInspection != null)
+                    {
+                        <div class="pcs-process-selected">
+                            <div class="pcs-choice-card pcs-choice-card--active pcs-choice-card--selected"
+                                 aria-disabled="false">
                                 <OptionImageFrame Class="pcs-choice-swatch"
-                                                  ImageUrl="@GetInspectionImageUrl(inspection.Level)"
-                                                  FallbackIcon="@inspection.Icon" />
-                                <div class="pcs-choice-info">
-                                    <div class="pcs-choice-name">@inspection.Name</div>
-                                    <div class="pcs-choice-sub">@inspection.Description</div>
+                                                  ImageUrl="@GetInspectionImageUrl(selectedInspection.Level)"
+                                                  FallbackIcon="@selectedInspection.Icon" />
+                                <div class="pcs-choice-info pcs-choice-info--selected">
+                                    <div class="pcs-choice-name">@selectedInspection.Name</div>
+                                    <div class="pcs-choice-sub">@selectedInspection.Description</div>
                                 </div>
-                                @if (active)
-                                {
+                                <div class="pcs-card-right">
                                     <div class="pcs-card-check">
                                         <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
                                     </div>
-                                }
-                            </button>
+                                    <button class="pcs-process-change-btn"
+                                            @onclick="@(() => _isChangingInspection = true)"
+                                            type="button">
+                                        Change
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="pcs-cards">
+                            @foreach (var inspection in InspectionOptions)
+                            {
+                                var active = Part!.InspectionLevel == inspection.Level;
+                                <button class="pcs-choice-card @(active ? "pcs-choice-card--active" : "") @(!CanConfigurePartFeaturesAndInspection ? "pcs-choice-card--disabled" : "")"
+                                        disabled="@(!CanConfigurePartFeaturesAndInspection)"
+                                        aria-disabled="@GetDisabledAriaValue(!CanConfigurePartFeaturesAndInspection)"
+                                        @onclick="@(() => OnInspectionChanged(inspection.Level))">
+                                    <OptionImageFrame Class="pcs-choice-swatch"
+                                                      ImageUrl="@GetInspectionImageUrl(inspection.Level)"
+                                                      FallbackIcon="@inspection.Icon" />
+                                    <div class="pcs-choice-info">
+                                        <div class="pcs-choice-name">@inspection.Name</div>
+                                        <div class="pcs-choice-sub">@inspection.Description</div>
+                                    </div>
+                                    @if (active)
+                                    {
+                                        <div class="pcs-card-check">
+                                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                        </div>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+
+            @* ── Lead Time ────────────────────────────────────────────────── *@
+            @if (LeadTimeOptions.Count > 0 || OnLeadTimeChanged.HasDelegate)
+            {
+                <section class="pcs-section" data-config-section="lead-time">
+                    <div class="pcs-section-header">
+                        <MudIcon Icon="@Icons.Material.Outlined.Schedule" Size="Size.Small" Class="pcs-section-icon" />
+                        <span class="pcs-section-title">Lead Time</span>
+                        @if (!(_isChangingLeadTime == false && SelectedLeadTime != null))
+                        {
+                            <span class="pcs-section-count">@LeadTimeOptions.Count options</span>
                         }
                     </div>
+                    @if (!_isChangingLeadTime && SelectedLeadTime != null)
+                    {
+                        @* ── Selected lead time with Change button ──────────── *@
+                        var lt = SelectedLeadTime;
+                        var ltMult = lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%"
+                                   : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%"
+                                   : "Base";
+                        <div class="pcs-process-selected">
+                            <div class="pcs-lead-card pcs-lead-card--active pcs-lead-card--selected">
+                                <div class="pcs-lead-copy">
+                                    <div class="pcs-lead-row">
+                                        <span class="pcs-lead-name">@lt.Name</span>
+                                        <span class="pcs-lead-mult">@ltMult</span>
+                                    </div>
+                                    <div class="pcs-lead-days">@lt.MinDays – @lt.MaxDays business days</div>
+                                    <button class="pcs-process-change-btn"
+                                            @onclick="@(() => _isChangingLeadTime = true)"
+                                            type="button">
+                                        Change
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else if (LeadTimeOptions.Count == 0)
+                    {
+                        <div class="pcs-lead-loading">
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="44px" Class="rounded" />
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="44px" Class="rounded" />
+                            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="44px" Class="rounded" />
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var lt in LeadTimeOptions)
+                        {
+                            var ltActive = SelectedLeadTime?.Code == lt.Code;
+                            var ltMult = lt.PriceMultiplier < 1 ? $"-{Math.Round((1 - lt.PriceMultiplier) * 100)}%"
+                                       : lt.PriceMultiplier > 1 ? $"+{Math.Round((lt.PriceMultiplier - 1) * 100)}%"
+                                       : "Base";
+                            <button class="pcs-lead-btn @(ltActive ? "pcs-lead-btn--active" : "")"
+                                    @onclick="@(async () => { await OnLeadTimeChanged.InvokeAsync(lt); _isChangingLeadTime = false; })">
+                                <div class="pcs-lead-row">
+                                    <span class="pcs-lead-name">@lt.Name</span>
+                                    <span class="pcs-lead-mult">@ltMult</span>
+                                </div>
+                                <div class="pcs-lead-days">@lt.MinDays – @lt.MaxDays business days</div>
+                            </button>
+                        }
+                    }
                 </section>
             }
 
@@ -768,7 +1002,191 @@
                     </div>
                 </div>
             }
-        </div>
+}
+
+@* ── Quote Total Footer ──────────────────────────────────────────────── *@
+@if (ShowQuoteFooter)
+{
+    <div class="pcs-quote-footer">
+        @* Total + action buttons *@
+        @if (SelectedCustomer != null)
+        {
+            <div class="pcs-qf-total-area">
+                <div class="pcs-qf-total-top">
+                    <div class="pcs-qf-ships">
+                        <div class="pcs-qf-total-label">Quote Total</div>
+                        <div class="pcs-qf-ships-by">
+                            Ships by&nbsp;
+                            @if (LeadTimeOptions.Count == 0 && AllParts.Any(p => p.PricingLoading))
+                            {
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Width="48px" Style="display:inline-block;" />
+                            }
+                            else
+                            {
+                                <span class="pcs-qf-ship-date">@ComputeQuoteShipDate()</span>
+                            }
+                        </div>
+                    </div>
+                    @if (AllParts.Any(p => p.PricingLoading))
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Width="90px" Height="28px" />
+                    }
+                    else
+                    {
+                        var total = ComputeQuoteTotal();
+                        <div class="pcs-qf-total-amount">
+                            @if (total == 0 && AllParts.Count == 0)
+                            {
+                                <span>—</span>
+                            }
+                            else if (CurrencyService.IsConverting)
+                            {
+                                <MudSkeleton SkeletonType="SkeletonType.Text" Width="80px" Height="18px" />
+                            }
+                            else
+                            {
+                                @($"{CurrencyService.Symbol} {total:N2}")
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="pcs-qf-actions">
+                    <button type="button"
+                            class="pcs-qf-btn-details @(_quoteDetailsOpen ? "pcs-qf-btn-details--active" : "")"
+                            @onclick="@(() => _quoteDetailsOpen = !_quoteDetailsOpen)">
+                        <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                        Details
+                    </button>
+                    <button type="button"
+                            class="pcs-qf-btn-pdf"
+                            disabled="@(!CanQuote || AllParts.Count == 0 || _quotePdfGenerating)"
+                            @onclick="HandleQuoteGeneratePdfAsync">
+                        @if (_quotePdfGenerating)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.PictureAsPdf" Size="Size.Small" />
+                        }
+                        PDF
+                    </button>
+                    <button type="button"
+                            class="pcs-qf-btn-quote"
+                            disabled="@(!CanQuote || AllParts.Count == 0 || Saving)"
+                            @onclick="@OnQuote">
+                        @if (Saving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        Quote
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                    </button>
+                </div>
+                @if (_quoteDetailsOpen)
+                {
+                    <button type="button"
+                            class="pcs-qf-click-away"
+                            aria-label="Close quote details"
+                            @onclick="@(() => _quoteDetailsOpen = false)"></button>
+                    <div class="pcs-qf-details-popover">
+                        <div class="pcs-qf-details-header">
+                            <div class="pcs-qf-details-title">
+                                <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" />
+                                Quote Details
+                            </div>
+                            <button type="button" class="pcs-qf-details-close" @onclick="@(() => _quoteDetailsOpen = false)">
+                                <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Small" />
+                            </button>
+                        </div>
+                        <div class="pcs-qf-adjustment-grid">
+                            <div class="pcs-qf-adj-card pcs-qf-adj-shipping">
+                                <div class="pcs-qf-adj-top">
+                                    <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
+                                    <div>
+                                        <div class="pcs-qf-adj-name">Shipping</div>
+                                        <div class="pcs-qf-adj-hint">Freight, courier, or delivery charge</div>
+                                    </div>
+                                </div>
+                                <CurrencyInput Label="Shipping"
+                                               HelperText="Freight, courier, or delivery charge"
+                                               @bind-ThbValue="ShippingCost"
+                                               Min="0m" />
+                                @if (!string.IsNullOrWhiteSpace(ShippingDestinationCountry) && TotalWeightKg > 0)
+                                {
+                                    <MudButton Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               Color="Color.Info"
+                                               StartIcon="@Icons.Material.Outlined.LocalShipping"
+                                               OnClick="FetchQuoteDhlRatesAsync"
+                                               Disabled="_quoteFetchingRates"
+                                               FullWidth="true">
+                                        @if (_quoteFetchingRates)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                        }
+                                        Get DHL Rate
+                                    </MudButton>
+                                    @if (_quoteRateOptions.Count > 0 && !_quoteFetchingRates)
+                                    {
+                                        <div class="pcs-qf-rate-options">
+                                            @foreach (var rate in _quoteRateOptions)
+                                            {
+                                                <button type="button"
+                                                        class="pcs-qf-rate-option"
+                                                        @onclick="@(() => SelectQuoteDhlRate(rate))">
+                                                    <span class="pcs-qf-rate-name">@rate.ProductName</span>
+                                                    <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                                    @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
+                                                    {
+                                                        <span class="pcs-qf-rate-edd">Est: @(DateTime.TryParse(rate.EstimatedDeliveryDate, out var d) ? d.ToString("MMM d") : rate.EstimatedDeliveryDate)</span>
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="pcs-qf-adj-card pcs-qf-adj-discount">
+                                <div class="pcs-qf-adj-top">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Payments" Size="Size.Small" />
+                                    <div>
+                                        <div class="pcs-qf-adj-name">Discount</div>
+                                        <div class="pcs-qf-adj-hint">Manual reduction before VAT</div>
+                                    </div>
+                                </div>
+                                <CurrencyInput Label="Discount"
+                                               HelperText="Manual reduction before VAT"
+                                               @bind-ThbValue="ManualDiscountAmount"
+                                               Min="0m" />
+                            </div>
+                        </div>
+                        <div class="pcs-qf-terms-panel">
+                            <div class="pcs-qf-terms-heading">
+                                <MudIcon Icon="@Icons.Material.Outlined.Description" Size="Size.Small" />
+                                <div>
+                                    <div class="pcs-qf-adj-name">Terms</div>
+                                    <div class="pcs-qf-adj-hint">Payment, validity, and delivery conditions</div>
+                                </div>
+                            </div>
+                            <MudTextField T="string"
+                                          Label="Terms"
+                                          Value="@QuotationTerms"
+                                          ValueChanged="@(async v => await QuotationTermsChanged.InvokeAsync(v))"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true"
+                                          Lines="3"
+                                          FullWidth="true" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+</div>
 
         <style>
             .pcs-root {
@@ -853,8 +1271,305 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                height: 100%;
+                flex: 1;
                 color: var(--maliev-muted);
+            }
+
+            /* ── Quote Footer ────────────────────────────────────────────────── */
+            .pcs-quote-footer {
+                border-top: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                flex-shrink: 0;
+                position: relative;
+                z-index: 190;
+            }
+
+            .pcs-qf-total-area {
+                padding: 8px 14px 10px;
+                position: relative;
+            }
+
+            .pcs-qf-total-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+            }
+
+            .pcs-qf-ships {
+                display: flex;
+                flex-direction: column;
+                gap: 1px;
+            }
+
+            .pcs-qf-total-label {
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-qf-ships-by {
+                font-size: 10.5px;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-qf-ship-date {
+                font-weight: 600;
+                color: var(--maliev-ink);
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            .pcs-qf-total-amount {
+                font-size: 22px;
+                font-weight: 700;
+                color: var(--maliev-ink);
+                font-family: 'JetBrains Mono', monospace;
+                letter-spacing: -0.02em;
+            }
+
+            .pcs-qf-actions {
+                display: flex;
+                gap: 5px;
+            }
+
+            .pcs-qf-btn-details,
+            .pcs-qf-btn-pdf,
+            .pcs-qf-btn-quote {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                height: 30px;
+                padding: 0 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background 0.12s, border-color 0.12s;
+                font-family: inherit;
+            }
+
+            .pcs-qf-btn-details {
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                color: var(--maliev-muted);
+                flex-shrink: 0;
+            }
+
+            .pcs-qf-btn-details:hover { background: var(--maliev-panel-3); }
+
+            .pcs-qf-btn-details--active {
+                border-color: var(--mud-palette-primary);
+                color: var(--mud-palette-primary);
+                background: color-mix(in oklch, var(--mud-palette-primary) 8%, transparent);
+            }
+
+            .pcs-qf-btn-pdf {
+                border: 1px solid var(--maliev-border);
+                background: var(--maliev-panel);
+                color: var(--maliev-muted);
+                flex-shrink: 0;
+            }
+
+            .pcs-qf-btn-pdf:hover:not(:disabled) { background: var(--maliev-panel-3); }
+            .pcs-qf-btn-pdf:disabled { opacity: 0.5; cursor: not-allowed; }
+
+            .pcs-qf-btn-quote {
+                flex: 1;
+                border: none;
+                background: var(--mud-palette-primary);
+                color: #fff;
+            }
+
+            .pcs-qf-btn-quote:hover:not(:disabled) {
+                background: color-mix(in oklch, var(--mud-palette-primary) 85%, #000);
+            }
+
+            .pcs-qf-btn-quote:disabled { opacity: 0.5; cursor: not-allowed; }
+
+            .pcs-qf-click-away {
+                position: fixed;
+                inset: 0;
+                z-index: 19;
+                border: 0;
+                padding: 0;
+                background: transparent;
+                cursor: default;
+            }
+
+            .pcs-qf-details-popover {
+                position: absolute;
+                right: 14px;
+                bottom: calc(100% + 6px);
+                z-index: 20;
+                width: min(340px, 100vw - 24px);
+                background: var(--maliev-panel);
+                border: 1px solid color-mix(in oklch, var(--mud-palette-primary) 24%, var(--maliev-border));
+                border-radius: 8px;
+                box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+                overflow: hidden;
+            }
+
+            .pcs-qf-details-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 12px 8px;
+                border-bottom: 1px solid var(--maliev-border);
+            }
+
+            .pcs-qf-details-title {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-qf-details-close {
+                width: 24px;
+                height: 24px;
+                display: grid;
+                place-items: center;
+                border: none;
+                border-radius: 4px;
+                background: transparent;
+                color: var(--maliev-muted);
+                cursor: pointer;
+            }
+
+            .pcs-qf-details-close:hover {
+                background: var(--maliev-panel-3);
+                color: var(--maliev-ink);
+            }
+
+            .pcs-qf-adjustment-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                padding: 10px 12px;
+            }
+
+            .pcs-qf-adj-card {
+                border: 1px solid var(--maliev-border);
+                border-radius: 6px;
+                padding: 8px;
+                background: var(--maliev-panel-2);
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .pcs-qf-adj-shipping {
+                border-color: color-mix(in oklch, var(--mud-palette-info) 28%, var(--maliev-border));
+                background: color-mix(in oklch, var(--mud-palette-info) 7%, var(--maliev-panel));
+            }
+
+            .pcs-qf-adj-discount {
+                border-color: color-mix(in oklch, var(--mud-palette-success) 26%, var(--maliev-border));
+                background: color-mix(in oklch, var(--mud-palette-success) 7%, var(--maliev-panel));
+            }
+
+            .pcs-qf-adj-top {
+                display: flex;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .pcs-qf-adj-name {
+                font-size: 12px;
+                font-weight: 700;
+                color: var(--maliev-ink);
+                line-height: 1.2;
+            }
+
+            .pcs-qf-adj-hint {
+                font-size: 10px;
+                color: var(--maliev-muted);
+                line-height: 1.25;
+            }
+
+            .pcs-qf-terms-panel {
+                margin: 0 12px 10px;
+                padding: 8px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-warning) 24%, var(--maliev-border));
+                border-radius: 6px;
+                background: color-mix(in oklch, var(--mud-palette-warning) 7%, var(--maliev-panel));
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .pcs-qf-terms-heading {
+                display: flex;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .pcs-qf-rate-options {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .pcs-qf-rate-option {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 4px;
+                padding: 5px 7px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
+                border-radius: 5px;
+                background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+                cursor: pointer;
+                font-family: inherit;
+                text-align: left;
+                transition: background 0.15s;
+                min-width: 0;
+            }
+
+            .pcs-qf-rate-option:hover {
+                background: color-mix(in oklch, var(--mud-palette-info) 10%, var(--maliev-panel));
+            }
+
+            .pcs-qf-rate-name {
+                flex: 0 0 auto;
+                font-size: 10px;
+                font-weight: 600;
+                color: var(--maliev-ink);
+            }
+
+            .pcs-qf-rate-price {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--mud-palette-primary);
+            }
+
+            .pcs-qf-rate-edd {
+                font-size: 10px;
+                color: var(--maliev-muted);
+                margin-left: auto;
+            }
+
+            .pcs-qf-details-popover ::deep .mud-input-control {
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+
+            .pcs-qf-details-popover ::deep .mud-input-slot {
+                font-size: 11px;
+            }
+
+            .pcs-qf-details-popover ::deep textarea {
+                min-height: 72px !important;
+                line-height: 1.35;
+                resize: vertical;
             }
 
             .pcs-header {
@@ -942,7 +1657,20 @@
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                gap: 6px;
                 margin-bottom: 8px;
+            }
+
+            .pcs-section-icon {
+                color: var(--maliev-muted);
+                flex-shrink: 0;
+                opacity: 0.7;
+            }
+
+            .pcs-section-icon .mud-icon-root {
+                font-size: 13px !important;
+                width: 13px !important;
+                height: 13px !important;
             }
 
             .pcs-section-title {
@@ -951,12 +1679,167 @@
                 letter-spacing: 0.06em;
                 text-transform: uppercase;
                 color: var(--maliev-muted);
+                flex: 1;
             }
 
             .pcs-section-count {
                 font-size: 10.5px;
                 color: var(--maliev-muted);
                 font-family: 'JetBrains Mono', monospace;
+            }
+
+            /* ── Selected single item (tolerance, etc.) ──────────────────── */
+            .pcs-selected-single {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .pcs-tol-selected-card {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding: 8px 10px;
+                border-radius: 6px;
+                box-shadow: inset 0 0 0 1.5px var(--pcs-process-active, var(--maliev-info, #3b82f6));
+                background: var(--maliev-accent-softer);
+            }
+
+            .pcs-tol-selected-info {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .pcs-tol-grade--selected {
+                font-size: var(--mud-typography-caption-size);
+                font-weight: 600;
+                color: var(--maliev-ink);
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            .pcs-tol-range--selected {
+                font-size: 10px;
+                color: var(--maliev-muted);
+                font-family: 'JetBrains Mono', monospace;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
+                flex-shrink: 1;
+            }
+
+            .pcs-tol-name {
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            /* ── Material / Finish selected state ────────────────────────── */
+            .pcs-mat-card--selected,
+            .pcs-fin-card--selected {
+                min-height: 64px;
+            }
+
+            .pcs-mat-info--selected,
+            .pcs-fin-info--selected,
+            .pcs-choice-info--selected {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            /* ── Lead Time buttons ───────────────────────────────────────── */
+            .pcs-lead-loading {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .pcs-lead-btn {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                padding: 8px 12px;
+                border: 0;
+                border-radius: 6px;
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
+                background: var(--maliev-panel);
+                cursor: pointer;
+                text-align: left;
+                transition: background 0.12s, box-shadow 0.12s;
+                margin-bottom: 6px;
+            }
+
+            .pcs-lead-btn:last-child { margin-bottom: 0; }
+
+            .pcs-lead-btn:hover {
+                background: var(--maliev-panel-3);
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
+            }
+
+            .pcs-lead-btn--active {
+                box-shadow: inset 0 0 0 1.5px var(--pcs-process-active, var(--maliev-info, #3b82f6));
+                background: var(--maliev-accent-softer);
+                color: var(--pcs-process-active, var(--maliev-info, #3b82f6));
+            }
+
+            .pcs-lead-card {
+                width: 100%;
+                border-radius: 6px;
+                box-shadow: inset 0 0 0 1px var(--maliev-border);
+                background: var(--maliev-panel);
+                overflow: hidden;
+            }
+
+            .pcs-lead-card--active {
+                box-shadow: inset 0 0 0 1.5px var(--pcs-process-active, var(--maliev-info, #3b82f6));
+            }
+
+            .pcs-lead-copy {
+                padding: 10px 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .pcs-lead-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .pcs-lead-name {
+                font-size: var(--maliev-font-base);
+                font-weight: 600;
+                color: var(--maliev-ink);
+            }
+
+            .pcs-lead-mult {
+                font-size: var(--maliev-font-small);
+                font-weight: 500;
+                color: var(--maliev-muted);
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            .pcs-lead-btn--active .pcs-lead-name,
+            .pcs-lead-card--active .pcs-lead-name {
+                color: var(--pcs-process-active, var(--maliev-info, #3b82f6));
+            }
+
+            .pcs-lead-btn--active .pcs-lead-mult {
+                color: var(--pcs-process-active, var(--maliev-info, #3b82f6));
+                opacity: 0.8;
+            }
+
+            .pcs-lead-days {
+                font-size: var(--maliev-font-micro);
+                color: var(--maliev-muted);
             }
 
             .pcs-section-meta {
@@ -1410,6 +2293,45 @@
                 flex-shrink: 0;
                 align-self: center;
                 justify-self: end;
+            }
+
+            /* ── Right action column: check + Change button for selected cards ── */
+            .pcs-card-right {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 6px;
+                align-self: stretch;
+                flex-shrink: 0;
+            }
+
+            .pcs-card-right .pcs-card-check {
+                align-self: auto;
+                justify-self: auto;
+            }
+
+            .pcs-card-right .pcs-process-change-btn {
+                align-self: auto;
+                margin-top: 0;
+            }
+
+            .pcs-card-right .pcs-fin-price {
+                grid-column: auto;
+                justify-self: auto;
+                white-space: nowrap;
+            }
+
+            /* Override grid for all selected cards to use auto last column */
+            .pcs-mat-card--selected,
+            .pcs-choice-card--selected {
+                grid-template-columns: 66px minmax(0, 1fr) auto;
+                align-items: stretch;
+            }
+
+            .pcs-fin-card--selected {
+                grid-template-columns: 66px minmax(0, 1fr) auto;
+                align-items: stretch;
             }
 
             /* ── Tolerance Grid ─────────────────────────────────────────────────── */

@@ -285,7 +285,7 @@ public class GeometryController(
             nonManifoldFaceCount = edgeCount;
             nonManifoldReason = string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"Browser local DFM found {edgeCount:N0} non-manifold edge(s).");
+                $"Found {edgeCount:N0} non-manifold edge(s).");
         }
 
         return true;

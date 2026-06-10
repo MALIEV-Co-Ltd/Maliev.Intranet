@@ -773,7 +773,7 @@ public sealed class LoginPageController : Controller
 
         if (string.Equals(normalized, WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage, StringComparison.Ordinal))
         {
-            return WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage;
+            return "Unauthorized.";
         }
 
         if (normalized.Contains("cancel", StringComparison.OrdinalIgnoreCase) ||

@@ -19,6 +19,8 @@ public sealed class ThumbnailGenerationService
     private readonly ConcurrentDictionary<string, Task<ThumbnailSetDto>> _inflight = new();
     private readonly object _subscribersLock = new();
     private readonly List<EventCallback<ThumbnailProgress>> _subscribers = new();
+    // Set to false on first "module not found" error so we never attempt again.
+    private bool _wasmModuleAvailable = true;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ThumbnailGenerationService"/>.
@@ -123,6 +125,13 @@ public sealed class ThumbnailGenerationService
         {
             try
             {
+                if (!_wasmModuleAvailable)
+                {
+                    // Module was previously not found — skip JS call entirely.
+                    await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
+                    return new ThumbnailSetDto { Version = version ?? string.Empty };
+                }
+
                 await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Downloading, 10, "Downloading mesh"));
 
                 var result = await _jsRuntime.InvokeAsync<ThumbnailSetDto>(
@@ -131,10 +140,25 @@ public sealed class ThumbnailGenerationService
                     new { timeoutMs = 20000, jpegQuality = 0.85 });
 
                 result.Version = version ?? string.Empty;
-                SetCached(storagePath, version, result);
 
+                if (!result.HasAny)
+                {
+                    _logger.LogWarning("WASM thumbnail generation returned empty result for {StoragePath}, requesting server fallback", storagePath);
+                    await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
+                    return result;
+                }
+
+                SetCached(storagePath, version, result);
                 await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Complete, 100, "Complete"));
                 return result;
+            }
+            catch (JSException ex) when (IsModuleNotFoundError(ex))
+            {
+                // WASM geometry module is not loaded (expected when client-side generation is not yet enabled).
+                _wasmModuleAvailable = false;
+                _logger.LogDebug("WASM thumbnail module not available for {StoragePath}, using server fallback", storagePath);
+                await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
+                return new ThumbnailSetDto { Version = version ?? string.Empty };
             }
             catch (JSException ex) when (IsRecoverableError(ex))
             {
@@ -155,9 +179,18 @@ public sealed class ThumbnailGenerationService
         });
     }
 
+    private static bool IsModuleNotFoundError(JSException ex) =>
+        ex.Message.Contains("MalievGeometry", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("was undefined", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("Could not find", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsRecoverableError(JSException ex) =>
         ex.Message.Contains("OOM", StringComparison.OrdinalIgnoreCase)
         || ex.Message.Contains("memory", StringComparison.OrdinalIgnoreCase)
         || ex.Message.Contains("aborted", StringComparison.OrdinalIgnoreCase)
-        || ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase);
+        || ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("WebGL", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("Unsupported format", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("Download failed", StringComparison.OrdinalIgnoreCase)
+        || ex.Message.Contains("No meshes", StringComparison.OrdinalIgnoreCase);
 }

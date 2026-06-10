@@ -20,6 +20,7 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Services.AddLogging();
         Services.AddSingleton(new HttpClient { BaseAddress = new Uri("http://localhost/") });
         Services.AddSingleton<CurrencyService>();
+        Services.AddSingleton<ShippingService>();
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 

@@ -341,7 +341,7 @@ const CONFIG = {
      */
     STUDIO_DARK: {
         key: {
-            direction:     { x: 0.65, y: -1.10, z: -0.60 },
+            direction:     { x: -0.50, y: -1.10, z: -0.80 },   // matches STUDIO_LIGHT direction so shadow angle is consistent
             diffuse:       { r: 1.00, g: 0.84, b: 0.65 },
             intensity:     2.60,
             shadowMapSize: 1024,
@@ -417,16 +417,16 @@ const CONFIG = {
         majorUnitFrequency: 10,      // Major line every 10 cells (gridRatio=10mm, so major every 100mm)
         gridRatio: 10,               // 10mm grid cells (minor lines every 10mm)
         light: {
-            minorUnitVisibility: 0.30,
-            mainColor: { r: 0.96, g: 0.97, b: 0.98 },
-            lineColor: { r: 0.78, g: 0.81, b: 0.86 },
-            opacity: 0.38,
+            minorUnitVisibility: 0.35,
+            mainColor: { r: 1.00, g: 1.00, b: 1.00 },   // white = invisible on white CSS canvas background; only lines show
+            lineColor: { r: 0.65, g: 0.65, b: 0.68 },   // medium gray lines visible on white
+            opacity: 0.65,
         },
         dark: {
-            minorUnitVisibility: 0.55,   // Raised for readable 10mm grid on dark backgrounds
-            mainColor: { r: 0.85, g: 0.85, b: 0.85 },
-            lineColor: { r: 0.55, g: 0.55, b: 0.55 },
-            opacity: 0.70,
+            minorUnitVisibility: 0.50,
+            mainColor: { r: 0.039, g: 0.039, b: 0.039 },   // matches #0a0a0a dark clearColor — fill invisible on dark bg
+            lineColor: { r: 0.42, g: 0.42, b: 0.46 },      // lighter gray lines visible on dark bg
+            opacity: 0.75,
         },
     },
 
@@ -711,6 +711,11 @@ function syncSceneShadowParticipation(canvasId) {
             return;
         }
 
+        if (isCuttingMatTopMesh(mesh)) {
+            // Preserve receiveShadows=true set at creation so shadow bakes into the green surface.
+            return;
+        }
+
         if (isCuttingMatSlabMesh(mesh) || isAnalysisHelperMesh(mesh)) {
             mesh.receiveShadows = false;
             return;
@@ -739,7 +744,10 @@ function extendShadowFrustum(canvasId) {
 
     const sizeX = bb.max.x - bb.min.x;
     const sizeY = bb.max.y - bb.min.y;
-    const extHalf = Math.max(sizeX, sizeY) * 4; // half of catcher (8x / 2)
+    const sizeZ = bb.max.z - bb.min.z;
+    // Include sizeZ: tall parts cast shadows that extend sizeZ * (lightXY/lightZ) ≈ 1.4× sizeZ
+    // beyond the model footprint, so the frustum extension must account for height, not just XY.
+    const extHalf = Math.max(sizeX, sizeY, sizeZ) * 4;
     const baseZ = bb.min.z;
 
     // Create 4 invisible boxes at catcher corners to extend shadow frustum.
@@ -2348,7 +2356,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         scenes[canvasId]  = scene;
         engine.resize();
 
-        scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+        scene.clearColor = getThemeClearColor(!!isDark);
 
         // Camera (upVector updated after model loads)
         const camera = new BABYLON.ArcRotateCamera('cam',
@@ -2420,8 +2428,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 modelLoadState[canvasId] = 'loaded';
 
 
-                // ── Re-affirm transparent background (append:true keeps existing scene) ──
-                _scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+                _scene.clearColor = getThemeClearColor(!!isDark);
 
                 // ── Remove placeholder lights, add studio lighting ──
                 _scene.lights.forEach(l => l.dispose());
@@ -2568,7 +2575,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 const bbSizeXY = Math.max(finalBb.max.x - finalBb.min.x, finalBb.max.y - finalBb.min.y) * 8;
                 const catcher = BABYLON.MeshBuilder.CreateGround('__shadow_catcher__', { width: bbSizeXY, height: bbSizeXY }, _scene);
                 catcher.rotation.x = Math.PI / 2;   // world XY plane (Z-up)
-                catcher.position.z = finalBb.min.z;  // sit at model base
+                catcher.position.z = finalBb.min.z - 0.5;  // sit just below model base to prevent z-fighting
                 catcher.receiveShadows = true;
                 catcher.isPickable = false;
                 catcher.isVisible = false; // hidden until showGrid/showCuttingMat activates a floor
@@ -2869,7 +2876,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
 
         if (_localRuntimeMesh) {
             modelLoadState[canvasId] = 'loaded';
-            scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+            scene.clearColor = getThemeClearColor(!!isDark);
             _localRuntimeMesh.computeWorldMatrix?.(true);
             const finalBb = computeSceneBounds(scene);
             if (finalBb) {
@@ -2937,47 +2944,62 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
             scene.activeCamera = cam;
             scene.render();
 
-            // Render axis gizmo camera on top with cleared depth buffer in its viewport.
-            // Clearing depth lets gizmo meshes always pass the depth test regardless of
-            // what the main scene wrote, so the axes are never occluded.
-            // BabylonJS engine.clear(color, backBuffer, depth, stencil):
-            //   null  = don't touch the color buffer (preserve main scene render)
-            //   false = don't clear back buffer
-            //   true  = clear depth buffer  ← essential; without this gizmo fails depth test
-            //   false = don't clear stencil
+            // Render axis gizmo camera in the top-right viewport.
+            // Use WebGL scissor test to clear ONLY the gizmo viewport area (both color and
+            // depth), then render with autoClear=false. engine.clear() ignores the current
+            // viewport and clears the entire framebuffer; scissor restricts it correctly.
             const gizmo = axisGizmoLayer[canvasId];
             if (gizmo && gizmo.axesCam && !gizmo.axesCam.isDisposed()) {
                 try {
                     const axesCam = gizmo.axesCam;
-                    engine.setViewport(axesCam.viewport);
-                    engine.clear(null, false, true, false);
+                    const vp = axesCam.viewport;
+                    const rw = engine.getRenderWidth();
+                    const rh = engine.getRenderHeight();
+                    const gl = engine._gl;
 
-                    // scene.autoClear MUST be false here: BabylonJS scene.render() calls
-                    // engine.clear() (autoClear) which issues WebGL glClear() — that call
-                    // ignores the current viewport and clears the ENTIRE framebuffer, erasing
-                    // the already-rendered main scene.  We clear depth manually above.
-                    // scene.prePassRenderer (SSAO G-Buffer) must also be disabled: in realistic
-                    // mode it re-runs for axesCam and sees only gizmo meshes (layerMask
-                    // mismatch), producing a near-empty G-Buffer that corrupts or blanks the
-                    // gizmo viewport output.
-                    const prevAutoClear   = scene.autoClear;
-                    const prevAutoClearDS = scene.autoClearDepthAndStencil;
+                    // Scissor-restrict clear to the gizmo viewport area only.
+                    // BabylonJS viewport.y is bottom-up (WebGL convention).
+                    const sx = Math.floor(vp.x * rw);
+                    const sy = Math.floor(vp.y * rh);
+                    const sw = Math.ceil(vp.width * rw);
+                    const sh = Math.ceil(vp.height * rh);
+                    const cc = scene.clearColor;
+
+                    // SSAO2 creates a scene-level PrePassRenderer that intercepts every
+                    // scene.render() call — even for cameras not in the SSAO camera list —
+                    // and redirects rendering into its geometry-buffer render targets.
+                    // Disable it for the gizmo pass so the render goes straight to the
+                    // canvas framebuffer we restore below. Re-enabled in the finally block.
+                    // Guard: BabylonJS ≥7 makes PrePassRenderer.enabled getter-only.
+                    const prePass = scene.prePassRenderer;
+                    if (prePass) { try { prePass.enabled = false; } catch {} }
+
+                    // Restore the default framebuffer (canvas) before clearing so the
+                    // scissor operation targets the correct buffer.
+                    engine.restoreDefaultFramebuffer();
+                    gl.enable(gl.SCISSOR_TEST);
+                    gl.scissor(sx, sy, sw, sh);
+                    gl.clearColor(cc.r, cc.g, cc.b, cc.a);
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                    gl.disable(gl.SCISSOR_TEST);
+
                     scene.autoClear              = false;
                     scene.autoClearDepthAndStencil = false;
-                    const prePass = scene.prePassRenderer;
-                    const prevPrePass = prePass ? prePass.enabled : false;
-                    if (prePass) prePass.enabled = false;
 
                     scene.activeCamera = axesCam;
                     scene.render();
 
-                    scene.autoClear              = prevAutoClear;
-                    scene.autoClearDepthAndStencil = prevAutoClearDS;
-                    if (prePass) prePass.enabled  = prevPrePass;
-                } catch (_) {
-                    // Gizmo render errors must not kill the main render loop
+                } catch (err) {
+                    console.error('[BabylonViewer] Gizmo render error:', err);
                 } finally {
+                    // Always restore pre-pass, camera, clear flags, and viewport.
+                    // Guard: BabylonJS ≥7 makes PrePassRenderer.enabled getter-only.
+                    const prePass = scene.prePassRenderer;
+                    if (prePass) { try { prePass.enabled = true; } catch {} }
                     scene.activeCamera = cam;
+                    scene.autoClear              = true;
+                    scene.autoClearDepthAndStencil = true;
+                    engine.setViewport(new BABYLON.Viewport(0, 0, 1, 1));
                 }
             }
 
@@ -6753,6 +6775,10 @@ export function applyStudioLighting(canvasId, isDark) {
 
     syncSceneShadowParticipation(canvasId);
     extendShadowFrustum(canvasId);
+
+    // Keep scene clearColor and grid material in sync with the new theme.
+    scene.clearColor = getThemeClearColor(!!isDark);
+    _updateGridMaterial(canvasId);
 }
 
 // ── setRenderMode ─────────────────────────────────────────────────────────────
@@ -7193,9 +7219,9 @@ export function toggleBoundingBox(canvasId, enabled) {
                 const mx = (bbLive.min.x + bbLive.max.x) / 2;
                 const my = (bbLive.min.y + bbLive.max.y) / 2;
                 const mz = (bbLive.min.z + bbLive.max.z) / 2;
-                labelEntries[0].worldPos.set(mx,      anchorY, anchorZ); // X dim label
-                labelEntries[1].worldPos.set(anchorX, my,      anchorZ); // Y dim label
-                labelEntries[2].worldPos.set(anchorX, anchorY, mz);      // Z dim label
+                labelEntries[0].worldPos.set(mx,      anchorY, mz);      // X dim: front/back face, mid-height
+                labelEntries[1].worldPos.set(anchorX, my,      mz);      // Y dim: left/right face, mid-height
+                labelEntries[2].worldPos.set(mx,      my,      anchorZ); // Z dim: top/bottom face, center
             }
 
             labelEntries.forEach(({ div, worldPos }) => {
@@ -7236,6 +7262,30 @@ const gridAnimationStates = {};
 
 function getGridThemeConfig(canvasId) {
     return isDarkMode(canvasId) ? CONFIG.GRID.dark : CONFIG.GRID.light;
+}
+
+/** Returns the opaque scene background Color4 matching the current theme. */
+function getThemeClearColor(isDark) {
+    // Light: #ffffff   Dark: #0a0a0a (matches --maliev-bg CSS design token)
+    return isDark
+        ? new BABYLON.Color4(0.039, 0.039, 0.039, 1.0)
+        : new BABYLON.Color4(1.0, 1.0, 1.0, 1.0);
+}
+
+/** Applies current grid theme colours to an existing grid material (called on theme switch). */
+function _updateGridMaterial(canvasId) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+    const grid = scene.getMeshByName('__grid__');
+    if (!grid?.material) return;
+    const cfg = getGridThemeConfig(canvasId);
+    const mat = grid.material;
+    if (mat.mainColor !== undefined) {
+        mat.mainColor           = toColor3(cfg.mainColor);
+        mat.lineColor           = toColor3(cfg.lineColor);
+        mat.minorUnitVisibility = cfg.minorUnitVisibility;
+        mat.opacity             = cfg.opacity;
+    }
 }
 
 function _gridNow() {
@@ -7337,7 +7387,10 @@ function _syncShadowCatcherVisibility(canvasId) {
     if (catcher.position) {
         const bb = sceneBoundingBoxes[canvasId];
         const baseZ = bb ? bb.min.z : 0;
-        catcher.position.z = baseZ;
+        // Both the grid and cutting mat top sit 0.5 mm below the model base (z=baseZ)
+        // to prevent z-fighting with the model's bottom face. The shadow catcher must
+        // stay below whichever floor surface is active so depth tests resolve correctly.
+        catcher.position.z = matOn ? baseZ - 0.6 : baseZ - 0.5;
     }
 }
 
@@ -7369,12 +7422,14 @@ export function showGrid(canvasId) {
     const gridSize = Math.max(sizeX, sizeY) * 3;
 
     // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
-    // BabylonJS ground lies in the XZ plane by default, so we rotate −90° around X to flip it.
+    // BabylonJS ground lies in the XZ plane by default, so we rotate +90° around X to flip it.
+    // +PI/2 (not -PI/2) gives the correct upward-facing normal (+Z), which is required for
+    // shadow reception — a downward normal means shadow map depth tests fail on the surface.
     const ground = BABYLON.MeshBuilder.CreateGround('__grid__', {
         width: gridSize, height: gridSize, subdivisions: 1
     }, scene);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.z = 0;
+    ground.rotation.x = Math.PI / 2;
+    ground.position.z = -0.5;  // 0.5 mm below model base to prevent z-fighting with bottom face
     ground.isPickable = false;
     ground.receiveShadows = true;
 
@@ -7610,7 +7665,7 @@ export function showCuttingMat(canvasId) {
 
     _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
         fromZ: -slideOffset,
-        toZ: 0,
+        toZ: -0.5,  // 0.5 mm below model base to prevent z-fighting with bottom face
         fromAlpha: 0,
         toAlpha: 1,
         onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),
@@ -8276,28 +8331,7 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
                 mat.emissiveColor   = new BABYLON.Color3(0, 0, 0);
                 mat.zOffset         = 0; // bodies sit on the model surface — no depth bias needed
             } else {
-                mat.backFaceCulling = true; // hide back faces to reduce noisy internal geometry
-                // Process-specific DFM issue: look up per-category style, fall back to red.
-                mat.useVertexColors = false;
-                const categorySuffix = overlayKey.includes('__')
-                    ? overlayKey.split('__').slice(1).join('__')
-                    : overlayKey;
-                const style = OVERLAY_STYLES[categorySuffix];
-                if (style) {
-                    mat.albedoColor  = style.albedo();
-                    mat.alpha        = style.alpha;
-                    mat.emissiveColor = style.emissive();
-                    mat.zOffset      = style.zOffset;
-                    if (categorySuffix === 'overhang_support' || categorySuffix === 'support_required') {
-                        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-                        mat.needDepthPrePass = false;
-                    }
-                } else {
-                    mat.albedoColor  = new BABYLON.Color3(0.95, 0.10, 0.05); // red
-                    mat.alpha        = 0.55;
-                    mat.emissiveColor = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
-                    mat.zOffset      = -2; // depth bias: overlay wins depth test against coplanar main mesh
-                }
+                applyDfmOverlayCategoryStyle(mat, overlayKey);
             }
             mesh.material = mat;
             mesh.isPickable = false;
@@ -8312,6 +8346,135 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
     } finally {
         overlayLoading[slot].delete(overlayKey);
     }
+}
+
+/**
+ * Applies the per-category DFM overlay style (or the red default) to a PBR material.
+ * Shared by server overlay GLBs and locally generated overlay meshes so both render
+ * identically.
+ * @param {BABYLON.PBRMaterial} mat
+ * @param {string} overlayKey  e.g. "FDM__overhang"
+ */
+function applyDfmOverlayCategoryStyle(mat, overlayKey) {
+    mat.backFaceCulling = true; // hide back faces to reduce noisy internal geometry
+    // Process-specific DFM issue: look up per-category style, fall back to red.
+    mat.useVertexColors = false;
+    const categorySuffix = overlayKey.includes('__')
+        ? overlayKey.split('__').slice(1).join('__')
+        : overlayKey;
+    const style = OVERLAY_STYLES[categorySuffix];
+    if (style) {
+        mat.albedoColor  = style.albedo();
+        mat.alpha        = style.alpha;
+        mat.emissiveColor = style.emissive();
+        mat.zOffset      = style.zOffset;
+        if (categorySuffix === 'overhang_support' || categorySuffix === 'support_required') {
+            mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+            mat.needDepthPrePass = false;
+        }
+    } else {
+        mat.albedoColor  = new BABYLON.Color3(0.95, 0.10, 0.05); // red
+        mat.alpha        = 0.55;
+        mat.emissiveColor = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
+        mat.zOffset      = -2; // depth bias: overlay wins depth test against coplanar main mesh
+    }
+}
+
+/**
+ * Toggles a locally generated DFM overlay built from browser-runtime face indices.
+ *
+ * Browser-first DFM issues reference triangles by index into the concatenated
+ * triangle list produced by collectAdvisoryMeshBuffers — the GeometryService
+ * browser runtime appends those buffers sequentially (meshFromBuffers), so the
+ * same concatenation here maps worker face indices 1:1 back onto world-space
+ * triangles. No server overlay GLB is required.
+ *
+ * @param {string} canvasId
+ * @param {string} partKey      Part identity for the overlay slot
+ * @param {string} overlayKey   e.g. "FDM__overhang"
+ * @param {number[]} faceIndices Triangle indices from the local DFM issue
+ * @param {boolean} visible     true = show, false = hide
+ */
+export function toggleLocalDfmOverlay(canvasId, partKey, overlayKey, faceIndices, visible) {
+    const scene = scenes[canvasId];
+    if (!scene) return;
+
+    const slot = `${canvasId}::${partKey}`;
+    overlayMeshes[slot]          ??= new Map();
+    overlayIntendedVisible[slot] ??= new Map();
+    overlayIntendedVisible[slot].set(overlayKey, visible);
+
+    const existing = overlayMeshes[slot].get(overlayKey);
+    if (existing) {
+        existing.forEach(m => { m.isVisible = visible; });
+        return;
+    }
+
+    if (!visible) return; // nothing to build for a hide request
+
+    const mesh = buildLocalDfmOverlayMesh(canvasId, scene, overlayKey, faceIndices);
+    if (!mesh) return;
+
+    overlayMeshes[slot].set(overlayKey, [mesh]);
+    const shouldShow = overlayIntendedVisible[slot].get(overlayKey) ?? true;
+    if (!shouldShow) mesh.isVisible = false;
+}
+
+/**
+ * Builds a world-space overlay mesh from advisory-runtime triangle face indices.
+ * Returns null when no referenced triangle exists in the current scene geometry.
+ */
+function buildLocalDfmOverlayMesh(canvasId, scene, overlayKey, faceIndices) {
+    if (!Array.isArray(faceIndices) || faceIndices.length === 0) return null;
+
+    const wanted = new Set(faceIndices
+        .map(Number)
+        .filter(index => Number.isInteger(index) && index >= 0));
+    if (wanted.size === 0) return null;
+
+    // Same buffer collection (and ordering) the local advisory analysis used,
+    // with world-space positions — so no model transforms are re-applied here.
+    const buffers = collectAdvisoryMeshBuffers(canvasId);
+    if (buffers.length === 0) return null;
+
+    const positions = [];
+    let triangleBase = 0;
+    for (const buffer of buffers) {
+        const triangleCount = Math.floor(buffer.indices.length / 3);
+        for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+            if (!wanted.has(triangleBase + triangle)) continue;
+            for (let vertex = 0; vertex < 3; vertex += 1) {
+                const offset = buffer.indices[triangle * 3 + vertex] * 3;
+                positions.push(
+                    buffer.positions[offset],
+                    buffer.positions[offset + 1],
+                    buffer.positions[offset + 2]);
+            }
+        }
+        triangleBase += triangleCount;
+    }
+    if (positions.length === 0) return null;
+
+    const indices = Array.from({ length: positions.length / 3 }, (_, index) => index);
+    const normals = [];
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+
+    const mesh = new BABYLON.Mesh(`__local_dfm_overlay__${overlayKey}`, scene);
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.normals = normals;
+    vertexData.applyToMesh(mesh);
+
+    const mat = new BABYLON.PBRMaterial(`dfm_${overlayKey}_local_mat`, scene);
+    mat.metallic  = 0;
+    mat.roughness = 0.8;
+    applyDfmOverlayCategoryStyle(mat, overlayKey);
+    mesh.material = mat;
+    mesh.isPickable = false;
+    // Never let the overlay itself feed back into a later advisory analysis pass.
+    mesh.metadata = { ...(mesh.metadata ?? {}), malievAnalysisHelper: true };
+    return mesh;
 }
 
 /**
@@ -10372,6 +10535,7 @@ window.babylonViewer = {
     toggleBoundingBox,
     setCameraProjection,
     toggleDfmOverlay,
+    toggleLocalDfmOverlay,
     clearDfmOverlays,
     setTurningAxis,
     clearTurningAxis,

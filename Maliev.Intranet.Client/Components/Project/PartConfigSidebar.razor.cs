@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Maliev.Intranet.Client.Components;
 using Maliev.Intranet.Client.Components.Shared;
+using Maliev.Intranet.Client.Pages;
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -62,6 +63,140 @@ public partial class PartConfigSidebar : ComponentBase
     /// <summary>True when browser-primary uploads may fall back to server DFM during interactive quoting.</summary>
     [Parameter] public bool BrowserPrimaryServerDfmFallbackEnabled { get; set; } = true;
 
+    /// <summary>Available lead time options to display in the lead time section.</summary>
+    [Parameter] public List<LeadTimeOptionDto> LeadTimeOptions { get; set; } = [];
+
+    /// <summary>The currently selected lead time option.</summary>
+    [Parameter] public LeadTimeOptionDto? SelectedLeadTime { get; set; }
+
+    /// <summary>Callback invoked when the user selects a different lead time.</summary>
+    [Parameter] public EventCallback<LeadTimeOptionDto> OnLeadTimeChanged { get; set; }
+
+    // ── Quote Footer Parameters ──────────────────────────────────────────────
+    /// <summary>When true, renders the quote total footer at the bottom of the sidebar.</summary>
+    [Parameter] public bool ShowQuoteFooter { get; set; }
+
+    /// <summary>The selected customer for billing, used to gate display of the quote total.</summary>
+    [Parameter] public CustomerSummaryDto? SelectedCustomer { get; set; }
+
+    /// <summary>All parts in the project, used to compute the quote total.</summary>
+    [Parameter] public List<PartViewModel> AllParts { get; set; } = [];
+
+    /// <summary>Manual shipping cost in THB.</summary>
+    [Parameter] public decimal ShippingCost { get; set; }
+
+    /// <summary>Callback when shipping cost changes.</summary>
+    [Parameter] public EventCallback<decimal> ShippingCostChanged { get; set; }
+
+    /// <summary>Manual discount amount in THB.</summary>
+    [Parameter] public decimal ManualDiscountAmount { get; set; }
+
+    /// <summary>Callback when manual discount changes.</summary>
+    [Parameter] public EventCallback<decimal> ManualDiscountAmountChanged { get; set; }
+
+    /// <summary>Quotation payment/delivery terms text.</summary>
+    [Parameter] public string? QuotationTerms { get; set; }
+
+    /// <summary>Callback when quotation terms change.</summary>
+    [Parameter] public EventCallback<string?> QuotationTermsChanged { get; set; }
+
+    /// <summary>Whether the quote can be submitted.</summary>
+    [Parameter] public bool CanQuote { get; set; }
+
+    /// <summary>True while the quote is being saved.</summary>
+    [Parameter] public bool Saving { get; set; }
+
+    /// <summary>Callback when the Quote button is clicked.</summary>
+    [Parameter] public EventCallback OnQuote { get; set; }
+
+    /// <summary>Callback when the PDF button is clicked.</summary>
+    [Parameter] public EventCallback OnGeneratePdf { get; set; }
+
+    /// <summary>Customer shipping destination country code (for DHL rate lookup).</summary>
+    [Parameter] public string? ShippingDestinationCountry { get; set; }
+
+    /// <summary>Customer shipping destination postal code (for DHL rate lookup).</summary>
+    [Parameter] public string? ShippingDestinationPostalCode { get; set; }
+
+    /// <summary>Total weight of all parts in kilograms (for DHL rate lookup).</summary>
+    [Parameter] public decimal TotalWeightKg { get; set; }
+
+    // ── Quote Footer Private State ───────────────────────────────────────────
+    private bool _quoteDetailsOpen;
+    private bool _quotePdfGenerating;
+    private bool _quoteFetchingRates;
+    private List<ShippingRateOptionDto> _quoteRateOptions = [];
+
+    private decimal ComputeQuoteTotal()
+    {
+        var lineSubtotal = AllParts.Sum(p => ProjectQuotationPdfMapper.ResolveBaseLineTotal(p) * CurrencyService.ExchangeRate);
+        var bulkDiscount = AllParts.Sum(p => ProjectQuotationPdfMapper.ResolveBulkDiscount(p) * CurrencyService.ExchangeRate);
+        var discount = Math.Min(bulkDiscount + Math.Max(0m, ManualDiscountAmount), lineSubtotal);
+        var taxableSubtotal = lineSubtotal - discount + Math.Max(0m, ShippingCost);
+        var vat = Math.Round(taxableSubtotal * 0.07m, 2, MidpointRounding.AwayFromZero);
+        return taxableSubtotal + vat;
+    }
+
+    private string ComputeQuoteShipDate()
+    {
+        if (SelectedLeadTime == null || SelectedLeadTime.MinDays <= 0) return "—";
+        var days = Math.Max(SelectedLeadTime.MinDays, SelectedLeadTime.MaxDays);
+        var shipDate = AddQuoteBusinessDays(DateTime.UtcNow.Date, days);
+        return shipDate.ToString("MMM d");
+    }
+
+    private static DateTime AddQuoteBusinessDays(DateTime date, int businessDays)
+    {
+        var result = date;
+        var remaining = businessDays;
+        while (remaining > 0)
+        {
+            result = result.AddDays(1);
+            if (result.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) continue;
+            remaining--;
+        }
+        return result;
+    }
+
+    private async Task HandleQuoteGeneratePdfAsync()
+    {
+        _quotePdfGenerating = true;
+        StateHasChanged();
+        try { await OnGeneratePdf.InvokeAsync(); }
+        finally { _quotePdfGenerating = false; StateHasChanged(); }
+    }
+
+    private async Task FetchQuoteDhlRatesAsync()
+    {
+        _quoteFetchingRates = true;
+        _quoteRateOptions = [];
+        StateHasChanged();
+        try
+        {
+            var request = new ShippingRateRequestDto
+            {
+                OriginCountryCode = "TH",
+                DestinationCountryCode = ShippingDestinationCountry ?? "US",
+                DestinationPostalCode = ShippingDestinationPostalCode,
+                WeightKg = TotalWeightKg
+            };
+            var result = await ShippingService.GetRatesAsync(request);
+            if (result?.Rates is { Count: > 0 })
+                _quoteRateOptions = result.Rates;
+            else
+                Snackbar.Add("No shipping rates available for this destination.", Severity.Warning);
+        }
+        catch { Snackbar.Add("Failed to fetch shipping rates. Please try again.", Severity.Error); }
+        finally { _quoteFetchingRates = false; StateHasChanged(); }
+    }
+
+    private async Task SelectQuoteDhlRate(ShippingRateOptionDto rate)
+    {
+        await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
+        _quoteRateOptions = [];
+        StateHasChanged();
+    }
+
     private bool _routingExpanded;
     private List<BulkPricingTable.BulkTier> _bulkTiers = [];
     private IReadOnlyCollection<string> _selectedFeatures = [];
@@ -76,6 +211,14 @@ public partial class PartConfigSidebar : ComponentBase
     private string _processSearch = "";
     private ElementReference _processSearchInput;
     private bool _isChangingProcess;
+#pragma warning disable CS0414
+    private bool _isChangingMaterial;
+    private bool _isChangingFinish;
+    private bool _isChangingTolerance;
+    private bool _isChangingRoughness;
+    private bool _isChangingLeadTime;
+    private bool _isChangingInspection;
+#pragma warning restore CS0414
     private bool _shouldFocusSearch;
     private Guid? _lastPartFileId;
 
@@ -527,6 +670,12 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part.FileId != _lastPartFileId)
         {
             _lastPartFileId = Part.FileId;
+            _isChangingMaterial = false;
+            _isChangingFinish = false;
+            _isChangingTolerance = false;
+            _isChangingRoughness = false;
+            _isChangingInspection = false;
+            _isChangingLeadTime = false;
             if (!HasSelectedProcess && Part.FileId != Guid.Empty)
             {
                 _processSearch = "";
@@ -723,6 +872,7 @@ public partial class PartConfigSidebar : ComponentBase
             Part.ProcessOptionValues.Remove(MaterialColorKey);
         }
 
+        _isChangingMaterial = false;
         await OnPartChanged.InvokeAsync(Part);
         _ = RefreshFinishPricesAsync();
     }
@@ -732,6 +882,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.FinishCode = f?.Code;
         Part.FinishId = f?.Id;
+        _isChangingFinish = false;
         RemoveFinishSpecificOptionValues();
         await OnPartChanged.InvokeAsync(Part);
     }
@@ -752,6 +903,7 @@ public partial class PartConfigSidebar : ComponentBase
         if (Part == null) return;
         Part.ToleranceCode = t?.Code;
         Part.ToleranceId = t?.Id;
+        _isChangingTolerance = false;
         await OnPartChanged.InvokeAsync(Part);
         _ = RefreshFinishPricesAsync();
     }
@@ -886,6 +1038,7 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null) return;
         Part.RoughnessCode = v;
+        _isChangingRoughness = false;
         await OnPartChanged.InvokeAsync(Part);
     }
 
@@ -957,6 +1110,7 @@ public partial class PartConfigSidebar : ComponentBase
     {
         if (Part == null || !CanConfigurePartFeaturesAndInspection) return;
         Part.InspectionLevel = level;
+        _isChangingInspection = false;
         await OnPartChanged.InvokeAsync(Part);
     }
 

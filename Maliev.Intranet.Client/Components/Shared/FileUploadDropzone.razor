@@ -1,6 +1,41 @@
 @namespace Maliev.Intranet.Client.Components.Shared
 
-@if (Variant == DropzoneVariant.Compact)
+@if (Variant == DropzoneVariant.Hero)
+{
+    <div class="fud-hero @(DragOver ? "fud-hero--active" : "") @Class"
+         @ondragenter:preventDefault="true"
+         @ondragover:preventDefault="true"
+         @ondragleave:preventDefault="true"
+         @ondrop:preventDefault="true"
+         @ondragenter="@OnDragEnter"
+         @ondragleave="@OnDragLeave"
+         @ondrop="@HandleDrop"
+         @onclick="@HandleClick">
+        <div class="fud-hero-content">
+            <MudIcon Icon="@Icon" Size="@Size.Large" Color="Color.Primary" Class="fud-hero-icon" />
+            <MudText Typo="Typo.h5" Class="fud-hero-title">@(DragOver ? "Drop files here" : Label)</MudText>
+            @if (!string.IsNullOrEmpty(SubLabel) || !string.IsNullOrEmpty(MaxFileSizeLabel))
+            {
+                <MudText Typo="Typo.body1" Class="fud-hero-sub">
+                    @if (!string.IsNullOrEmpty(SubLabel) && !string.IsNullOrEmpty(MaxFileSizeLabel))
+                    {
+                        @($"{SubLabel} · {MaxFileSizeLabel}")
+                    }
+                    else if (!string.IsNullOrEmpty(SubLabel))
+                    {
+                        @SubLabel
+                    }
+                    else
+                    {
+                        @MaxFileSizeLabel
+                    }
+                </MudText>
+            }
+            <MudText Typo="Typo.caption" Class="fud-hero-hint">Supports drag & drop or click to browse</MudText>
+        </div>
+    </div>
+}
+else if (Variant == DropzoneVariant.Compact)
 {
     <div class="fud-compact @(DragOver ? "fud-compact--active" : "") @Class"
          @ondragenter:preventDefault="true"
@@ -120,6 +155,88 @@ else
         margin-top: 2px;
     }
 
+    /* ── Hero variant ─────────────────────────────────────────────────── */
+    .fud-hero {
+        border: 2px dashed var(--mud-palette-lines-default);
+        border-radius: 16px;
+        padding: 64px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.3s, background 0.3s, transform 0.2s;
+        user-select: none;
+        background: linear-gradient(180deg, var(--mud-palette-background) 0%, var(--mud-palette-surface) 100%);
+        min-height: 320px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .fud-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(ellipse at center, var(--maliev-primary-soft) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }
+
+    .fud-hero:hover,
+    .fud-hero--active {
+        border-color: var(--mud-palette-primary);
+        background: var(--maliev-primary-soft);
+        transform: scale(1.01);
+    }
+
+    .fud-hero:hover::before,
+    .fud-hero--active::before {
+        opacity: 1;
+    }
+
+    .fud-hero-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        max-width: 480px;
+    }
+
+    .fud-hero-icon {
+        transition: transform 0.3s ease;
+        filter: drop-shadow(0 8px 24px rgba(var(--mud-palette-primary-rgb), 0.3));
+    }
+
+    .fud-hero:hover .fud-hero-icon,
+    .fud-hero--active .fud-hero-icon {
+        transform: translateY(-8px) scale(1.15);
+    }
+
+    .fud-hero-title {
+        font-weight: 600 !important;
+        color: var(--mud-palette-text-primary) !important;
+        margin: 0;
+    }
+
+    .fud-hero-sub {
+        color: var(--mud-palette-text-secondary) !important;
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .fud-hero-hint {
+        color: var(--mud-palette-text-tertiary) !important;
+        margin: 8px 0 0 0;
+        font-style: italic;
+    }
+
     /* ── Compact variant ─────────────────────────────────────────────── */
     .fud-compact {
         border: 1px dashed var(--mud-palette-lines-default);
@@ -209,5 +326,5 @@ else
     }
 
     /// <summary>Display variant for <see cref="FileUploadDropzone"/>.</summary>
-    public enum DropzoneVariant { Normal, Compact }
+    public enum DropzoneVariant { Normal, Compact, Hero }
 }

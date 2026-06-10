@@ -1824,7 +1824,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Assert.Equal(12500, part.Dimensions.VolumeMm3);
         Assert.False(part.IsManifold);
         Assert.Equal(8, part.NonManifoldFaceCount);
-        Assert.Equal("Browser local DFM found 8 non-manifold edge(s).", part.NonManifoldReason);
+        Assert.Equal("Found 8 non-manifold edge(s).", part.NonManifoldReason);
         Assert.False(part.DfmAnalysisTimedOut);
         Assert.Null(part.AnalysisErrorCode);
     }

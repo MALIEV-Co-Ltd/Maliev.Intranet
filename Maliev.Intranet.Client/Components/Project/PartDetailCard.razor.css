@@ -338,6 +338,40 @@
 .pdc-status--warn  { background: var(--maliev-warn-bg);  color: var(--maliev-warn);   }
 .pdc-status--error { background: var(--maliev-danger-bg); color: var(--maliev-danger); }
 .pdc-status--muted { background: var(--maliev-panel-3);  color: var(--maliev-muted);  }
+.pdc-local-dfm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--maliev-font-nano);
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: var(--maliev-radius-pill);
+    box-shadow: var(--maliev-shadow-ring);
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0;
+    cursor: default;
+}
+.pdc-local-dfm-chip--running {
+    background: var(--maliev-info-bg, #eff6ff);
+    color: var(--maliev-info, #3b82f6);
+}
+.pdc-local-dfm-chip--completed {
+    background: var(--maliev-ok-bg);
+    color: var(--maliev-ok);
+}
+.pdc-local-dfm-chip--unavailable {
+    background: var(--maliev-panel-3);
+    color: var(--maliev-muted);
+}
+.pdc-local-dfm-chip--error {
+    background: var(--maliev-warn-bg);
+    color: var(--maliev-warn);
+}
+.pdc-local-dfm-spinner {
+    width: 10px !important;
+    height: 10px !important;
+}
 .pdc-header-tabs {
     display: flex;
     gap: 2px;
@@ -417,20 +451,39 @@
 .pdc-footer {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    padding: 0 12px;
+    padding: 0 14px;
     height: 36px;
     background: var(--maliev-panel);
     border-top: 0;
     box-shadow: var(--maliev-shadow-ring);
     flex-shrink: 0;
     font-size: var(--maliev-font-small);
+    overflow: hidden;
 }
+.pdc-footer-config {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    min-width: 0;
+}
+.pdc-footer-geo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+}
+.pdc-footer-price-placeholder { flex-shrink: 0; }
 .pdc-footer-chips { display: flex; align-items: center; gap: 4px; }
 .pdc-chip {
     display: flex;
     align-items: center;
     gap: 4px;
+    white-space: nowrap;
 }
 .pdc-chip--process {
     color: var(--mud-palette-primary);
@@ -455,15 +508,27 @@
     font-weight: 400;
     color: var(--maliev-muted);
 }
+.pdc-chip--meta {
+    font-size: var(--maliev-font-micro);
+    font-weight: 400;
+    color: var(--maliev-muted);
+    font-family: 'JetBrains Mono', 'Geist Mono', monospace;
+    letter-spacing: 0;
+}
 .pdc-chip-sep {
     color: var(--maliev-muted-3);
     font-size: var(--maliev-font-micro);
-    margin: 0 2px;
+    margin: 0 1px;
+    flex-shrink: 0;
 }
-.pdc-footer-vdivider { width: 1px; height: 20px; background: var(--maliev-border); flex-shrink: 0; }
-.pdc-footer-price { display: flex; align-items: center; gap: 6px; }
-.pdc-footer-unit { font-size: var(--maliev-font-micro); color: var(--maliev-ink-2); }
-.pdc-footer-sep  { color: var(--maliev-muted-3); }
+.pdc-footer-sep {
+    color: var(--maliev-muted-3);
+    font-size: var(--maliev-font-micro);
+    flex-shrink: 0;
+}
+.pdc-footer-vdivider { width: 1px; height: 20px; background: var(--maliev-border); flex-shrink: 0; margin: 0 4px; }
+.pdc-footer-price { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0; }
+.pdc-footer-unit { font-size: var(--maliev-font-small); color: var(--mud-palette-primary); font-weight: 500; }
 .pdc-footer-total { font-size: var(--maliev-font-large); font-weight: 600; color: var(--maliev-ink); }
 
 @media (max-width: 600px) {
@@ -547,5 +612,29 @@
 
     .pdc-viewer-wrap ::deep .dfm-overlay-panel--analyzing {
         display: none;
+    }
+
+    .pdc-footer {
+        height: auto;
+        min-height: 36px;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        padding: 6px 12px;
+    }
+
+    .pdc-footer-geo {
+        justify-content: flex-start;
+        flex: 1 1 100%;
+        order: 3;
+    }
+
+    .pdc-footer-config { order: 1; }
+    .pdc-footer-price { order: 2; margin-left: auto; }
+    .pdc-footer-price-placeholder { display: none; }
+}
+
+@media (max-width: 900px) {
+    .pdc-footer-geo {
+        justify-content: flex-start;
     }
 }

@@ -146,7 +146,7 @@ public class AuthControllerTests
         var result = await _controller.LoginStandard(request);
 
         var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result);
-        Assert.Equal("Use your @maliev.com workspace email to sign in.", unauthorizedResult.Value);
+        Assert.Equal("Unauthorized.", unauthorizedResult.Value);
         authServiceMock.Verify(
             x => x.SignInAsync(It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()),
             Times.Never);

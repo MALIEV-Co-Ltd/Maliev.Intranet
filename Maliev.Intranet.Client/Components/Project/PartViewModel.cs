@@ -88,6 +88,9 @@ public class PartViewModel
     /// <summary>Machine-readable reason why the current local browser DFM attempt ended without a report.</summary>
     public string? LocalDfmRuntimeTerminalReason { get; set; }
 
+    /// <summary>Process code for which local browser DFM last completed successfully (issues or all-clear).</summary>
+    public string? LocalDfmRuntimeCompletedForProcessCode { get; set; }
+
     /// <summary>Original file size in bytes from the browser File API.</summary>
     public long? FileSizeBytes { get; set; }
 
@@ -158,6 +161,9 @@ public class PartViewModel
 
     /// <summary>The part volume in cubic millimeters, extracted during file analysis.</summary>
     public double? VolumeMm3 { get; set; }
+
+    /// <summary>The part surface area in square millimeters, extracted from the local geometry runtime.</summary>
+    public double? SurfaceAreaMm2 { get; set; }
 
     /// <summary>Whether the part mesh is manifold (watertight), populated after file analysis.</summary>
     public bool? IsManifold { get; set; }

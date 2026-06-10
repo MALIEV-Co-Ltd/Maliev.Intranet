@@ -19,6 +19,7 @@ public sealed class ProjectPartsBulkTableTests : BunitContext, IAsyncLifetime
         Services.AddLogging();
         Services.AddSingleton(new HttpClient { BaseAddress = new Uri("http://localhost/") });
         Services.AddSingleton<CurrencyService>();
+        Services.AddSingleton<ShippingService>();
         Services.AddSingleton(new UploadSettings());
         Services.AddSingleton(CreateFileTypesSettings());
         Services.AddSingleton<LayoutService>(new LayoutService(JSInterop.JSRuntime, NullLogger<LayoutService>.Instance));

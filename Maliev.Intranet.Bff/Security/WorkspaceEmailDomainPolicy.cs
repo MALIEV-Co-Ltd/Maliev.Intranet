@@ -4,7 +4,7 @@ namespace Maliev.Intranet.Bff.Security;
 
 internal static class WorkspaceEmailDomainPolicy
 {
-    internal const string UnauthorizedDomainMessage = "Use your @maliev.com workspace email to sign in.";
+    internal const string UnauthorizedDomainMessage = "Unauthorized.";
 
     private const string AllowedDomain = "maliev.com";
 

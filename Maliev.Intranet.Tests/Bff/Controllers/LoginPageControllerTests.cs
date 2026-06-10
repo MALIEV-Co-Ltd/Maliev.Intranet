@@ -81,7 +81,7 @@ public class LoginPageControllerTests
     }
 
     [Fact]
-    public void Login_WhenWorkspaceEmailIsRejected_ShowsWorkspaceEmailMessage()
+    public void Login_WhenWorkspaceEmailIsRejected_ShowsUnauthorizedMessage()
     {
         var controller = new LoginPageController
         {
@@ -91,10 +91,10 @@ public class LoginPageControllerTests
             }
         };
 
-        var result = controller.Login("/accounting", "Use your @maliev.com workspace email to sign in.");
+        var result = controller.Login("/accounting", "Unauthorized.");
 
         var content = Assert.IsType<ContentResult>(result);
         var decodedContent = WebUtility.HtmlDecode(content.Content);
-        Assert.Contains("Use your @maliev.com workspace email to sign in.", decodedContent);
+        Assert.Contains("Unauthorized.", decodedContent);
     }
 }

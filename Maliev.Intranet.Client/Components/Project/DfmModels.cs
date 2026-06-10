@@ -9,6 +9,7 @@ namespace Maliev.Intranet.Client.Components.Project;
 /// <param name="OverlayKey">Full overlay key "{PROCESS}__{category}" used to load and toggle the overlay GLB.</param>
 /// <param name="OverlayUrl">Signed GCS URL to the overlay GLB, or null if none was generated.</param>
 /// <param name="Source">Source of the DFM analysis: "local" (browser advisory) or "server" (GeometryService).</param>
+/// <param name="FaceIndices">Triangle face indices from the browser-local DFM runtime, used to build the overlay locally when no server overlay GLB exists.</param>
 public record DfmIssue(
     string Icon,
     string Title,
@@ -17,7 +18,8 @@ public record DfmIssue(
     string? Category = null,
     string? OverlayKey = null,
     string? OverlayUrl = null,
-    string? Source = null);
+    string? Source = null,
+    IReadOnlyList<int>? FaceIndices = null);
 
 /// <summary>Severity level of a DFM issue.</summary>
 public enum DfmIssueSeverity

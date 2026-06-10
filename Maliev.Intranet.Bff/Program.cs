@@ -373,17 +373,34 @@ try
                         {
                             try
                             {
-                                var employeeClient = context.HttpContext.RequestServices.GetRequiredService<EmployeeServiceClient>();
+                                var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
                                 var principalIdClaim = identity?.FindFirst("sub") ?? identity?.FindFirst("user_id");
                                 if (principalIdClaim != null && Guid.TryParse(principalIdClaim.Value, out var principalId))
                                 {
-                                    var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
-                                    if (employee != null)
+                                    // Use the accessToken we just received from AuthService exchange
+                                    // UserContextHandler doesn't work here because auth hasn't completed yet
+                                    using var employeeClient = httpClientFactory.CreateClient();
+                                    var baseUrl = config["Services:EmployeeService:BaseUrl"];
+                                    employeeClient.BaseAddress = !string.IsNullOrEmpty(baseUrl)
+                                        ? new Uri(baseUrl)
+                                        : new Uri("https+http://EmployeeService");
+                                    employeeClient.DefaultRequestHeaders.Authorization =
+                                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                                    // Get employee by principal ID
+                                    var getResponse = await employeeClient.GetAsync($"/employee/v1/employees/by-principal/{principalId}", CancellationToken.None);
+                                    if (getResponse.IsSuccessStatusCode)
                                     {
-                                        await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
+                                        var profile = await getResponse.Content.ReadFromJsonAsync<EmployeeSelfProfileDto>(cancellationToken: CancellationToken.None);
+                                        if (profile != null)
                                         {
-                                            ProfileImageUrl = effectivePicture
-                                        }, ct: default);
+                                            // Update profile image
+                                            var updateRequest = new UpdateEmployeeSelfProfileRequest
+                                            {
+                                                ProfileImageUrl = effectivePicture
+                                            };
+                                            await employeeClient.PutAsJsonAsync($"/employee/v1/profile/{profile.Id}/profile", updateRequest, CancellationToken.None);
+                                        }
                                     }
                                 }
                             }

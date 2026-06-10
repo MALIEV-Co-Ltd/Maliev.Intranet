@@ -21,45 +21,33 @@
             <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Small" />
         </div>
     }
-    else if (_progress != null)
-    {
-        <div class="thumbnail-loading">
-            <MudProgressCircular Size="Size.Small" Indeterminate="false" Value="@_progress.Percent" />
-            <span class="thumbnail-stage">@_progress.Stage</span>
-        </div>
-    }
     else
     {
         <div class="thumbnail-pending">
-            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="42px" Width="56px" Animation="Animation.Wave" />
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Default" />
         </div>
     }
 </div>
 
 <style>
     .thumbnail-image {
-        display: inline-block;
-        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
     }
     .thumbnail-img {
         max-width: 100%;
         height: auto;
         display: block;
     }
-    .thumbnail-loading,
     .thumbnail-fallback,
     .thumbnail-failed,
     .thumbnail-pending {
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 56px;
-        min-height: 42px;
-    }
-    .thumbnail-stage {
-        font-size: var(--mud-typography-caption-size);
-        color: var(--mud-palette-text-secondary);
-        margin-left: 4px;
     }
 </style>
 

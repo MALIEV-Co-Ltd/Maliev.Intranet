@@ -18,6 +18,10 @@
                          Color="Color.Default" />
                 <span>@(string.IsNullOrEmpty(ErrorMessage) ? "DFM analysis unavailable" : ErrorMessage)</span>
             </div>
+            @if (OnErrorAction.HasDelegate && !string.IsNullOrEmpty(ErrorActionLabel))
+            {
+                <button type="button" class="dfm-error-action-btn" @onclick="OnErrorAction">@ErrorActionLabel</button>
+            }
         </div>
     </div>
 }
@@ -84,7 +88,10 @@ else if (IsVisible && DfmIssues.Count > 0)
                 @foreach (var issue in DfmIssues)
                 {
                     var isActive = _selectedIssue == issue;
-                    var canToggle = issue.OverlayUrl != null && OnToggleOverlay.HasDelegate;
+                    // Server overlays need a GLB URL; local (browser-runtime) overlays are
+                    // rebuilt in the viewer from the issue's triangle face indices.
+                    var canToggle = OnToggleOverlay.HasDelegate
+                        && (issue.OverlayUrl != null || issue.FaceIndices is { Count: > 0 });
                     <MudListItem T="DfmIssue"
                                  Value="@issue"
                                  Disabled="@(!canToggle)"
@@ -162,6 +169,23 @@ else if (IsVisible && DfmIssues.Count > 0)
         align-items: center;
         gap: 8px;
     }
+    .dfm-error-action-btn {
+        padding: 4px 10px;
+        border: 1px solid var(--maliev-border);
+        border-radius: 4px;
+        background: var(--maliev-panel);
+        color: var(--maliev-ink);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .dfm-error-action-btn:hover {
+        background: var(--maliev-danger-soft, #fee2e2);
+        border-color: var(--maliev-danger, #ef4444);
+        color: var(--maliev-danger, #ef4444);
+    }
     .dfm-overlay-issues {
         margin-top: 12px;
         border-top: 1px solid var(--mud-palette-lines-default);
@@ -216,6 +240,12 @@ else if (IsVisible && DfmIssues.Count > 0)
 
     /// <summary>Invoked after the transient all-clear message has been dismissed.</summary>
     [Parameter] public EventCallback OnAllClearDismissed { get; set; }
+
+    /// <summary>Optional action callback shown as a button in the error/timed-out state.</summary>
+    [Parameter] public EventCallback OnErrorAction { get; set; }
+
+    /// <summary>Label for the optional error action button.</summary>
+    [Parameter] public string? ErrorActionLabel { get; set; }
 
     private bool _acknowledged;
     private bool _expanded;

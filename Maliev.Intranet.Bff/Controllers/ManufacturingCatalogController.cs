@@ -3,6 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -14,15 +15,23 @@ namespace Maliev.Intranet.Bff.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/catalog")]
-public class ManufacturingCatalogController(MaterialServiceClient client) : ControllerBase
+public class ManufacturingCatalogController(MaterialServiceClient client, ILogger<ManufacturingCatalogController> logger) : ControllerBase
 {
     /// <summary>Returns all active manufacturing processes.</summary>
     [RequirePermission(MalievPermissions.Material.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("processes")]
     public async Task<ActionResult<List<ProcessDto>>> GetProcesses(CancellationToken ct)
     {
-        var result = await client.GetProcessesAsync(ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetProcessesAsync(ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Returns materials available for the specified process code.</summary>
@@ -30,8 +39,16 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     [HttpGet("processes/{processCode}/materials")]
     public async Task<ActionResult<List<CatalogMaterialDto>>> GetMaterialsByProcess(string processCode, CancellationToken ct)
     {
-        var result = await client.GetMaterialsByProcessAsync(processCode, ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetMaterialsByProcessAsync(processCode, ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Returns surface finishes available for the specified process code.</summary>
@@ -39,8 +56,16 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     [HttpGet("processes/{processCode}/finishes")]
     public async Task<ActionResult<List<CatalogSurfaceFinishDto>>> GetFinishesByProcess(string processCode, CancellationToken ct)
     {
-        var result = await client.GetFinishesByProcessAsync(processCode, ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetFinishesByProcessAsync(processCode, ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Returns tolerance classes available for the specified process code.</summary>
@@ -48,8 +73,16 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     [HttpGet("processes/{processCode}/tolerances")]
     public async Task<ActionResult<List<CatalogToleranceDto>>> GetTolerancesByProcess(string processCode, CancellationToken ct)
     {
-        var result = await client.GetTolerancesByProcessAsync(processCode, ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetTolerancesByProcessAsync(processCode, ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Returns dynamic configuration options for the specified process code.</summary>
@@ -57,8 +90,16 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     [HttpGet("processes/{processCode}/config-options")]
     public async Task<ActionResult<List<ProcessConfigOptionDto>>> GetConfigOptionsByProcess(string processCode, CancellationToken ct)
     {
-        var result = await client.GetConfigOptionsByProcessAsync(processCode, ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetConfigOptionsByProcessAsync(processCode, ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Returns surface finishes compatible with a specific material.</summary>
@@ -66,7 +107,15 @@ public class ManufacturingCatalogController(MaterialServiceClient client) : Cont
     [HttpGet("materials/{materialId:guid}/finishes")]
     public async Task<ActionResult<List<CatalogSurfaceFinishDto>>> GetFinishesByMaterial(Guid materialId, CancellationToken ct)
     {
-        var result = await client.GetFinishesByMaterialAsync(materialId, ct);
-        return Ok(result ?? []);
+        try
+        {
+            var result = await client.GetFinishesByMaterialAsync(materialId, ct);
+            return Ok(result ?? []);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "MaterialService unavailable for GET {Path}", Request.Path);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
     }
 }

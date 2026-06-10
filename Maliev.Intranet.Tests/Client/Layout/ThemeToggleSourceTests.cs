@@ -44,6 +44,19 @@ public class ThemeToggleSourceTests
         Assert.Contains("var defaultThemeMode = LayoutService.IsDarkMode ? \"dark\" : \"light\";", profile, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TopBar_ProfileImage_UsesProxiedUrl()
+    {
+        var topBar = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
+
+        // The proxy wraps Google CDN URLs through the BFF avatar endpoint to avoid
+        // any network/browser policy issues with direct cross-origin image requests.
+        Assert.Contains("GetProxiedProfileImageUrl(GetProfileImageUrl(auth.User))", topBar, StringComparison.Ordinal);
+
+        // Make sure the raw (unproxied) form is gone.
+        Assert.DoesNotContain("GetProfileImageUrl(auth.User);", topBar, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

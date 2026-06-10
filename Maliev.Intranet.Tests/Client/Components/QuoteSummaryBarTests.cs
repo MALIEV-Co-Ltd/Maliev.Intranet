@@ -1,6 +1,7 @@
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
@@ -28,12 +29,14 @@ public sealed class QuoteSummaryBarTests : BunitContext, IAsyncLifetime
     [Fact]
     public async Task DetailsPopover_WhenOpened_RendersCommercialAdjustmentCards()
     {
+        var customer = new CustomerSummaryDto { Id = Guid.NewGuid(), Name = "Test Customer", Email = "test@example.com" };
         var cut = Render<QuoteSummaryBar>(parameters => parameters
             .Add(p => p.Parts, [])
             .Add(p => p.LeadTimeOptions, [])
             .Add(p => p.ShippingCost, 120m)
             .Add(p => p.ManualDiscountAmount, 25m)
-            .Add(p => p.QuotationTerms, "Net 30"));
+            .Add(p => p.QuotationTerms, "Net 30")
+            .Add(p => p.SelectedCustomer, customer));
 
         // MudButton OnClick dispatches on the component sync context;
         // InvokeAsync ensures the full render cycle runs before asserting.

@@ -2159,7 +2159,12 @@ public class ModuleRegressionSourceTests
         Assert.Contains(".pn-parts-drawer ::deep .plp-root {\n        width: min(270px, 100vw);", projectNew, StringComparison.Ordinal);
         Assert.Contains("flex: 1 1 auto;", ExtractCssBlock(projectNew, ".pn-parts-drawer ::deep .plp-root"), StringComparison.Ordinal);
         Assert.Contains("min-height: 0;", ExtractCssBlock(partsList, ".plp-root"), StringComparison.Ordinal);
-        Assert.Contains("margin-top: auto;", ExtractCssBlock(partsList, ".plp-footer"), StringComparison.Ordinal);
+        // Footer comes before customer section so plp-list flex:1 naturally pushes it down — no margin-top:auto needed
+        Assert.DoesNotContain("margin-top: auto;", ExtractCssBlock(partsList, ".plp-footer"), StringComparison.Ordinal);
+        // Footer appears before customer section in DOM (Total parts above Bill To)
+        var footerIdx = partsList.IndexOf("class=\"plp-footer\"", StringComparison.Ordinal);
+        var customerIdx = partsList.IndexOf("class=\"plp-customer-section\"", StringComparison.Ordinal);
+        Assert.True(footerIdx < customerIdx, "plp-footer must appear before plp-customer-section in DOM");
     }
 
     [Fact]

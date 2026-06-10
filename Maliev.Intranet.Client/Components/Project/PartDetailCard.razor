@@ -31,6 +31,32 @@
                 {
                     <span class="pdc-status-pill pdc-status--@GetStatusClass()">@GetStatusLabel()</span>
                 }
+                @{
+                    var localDfmStatus = GetLocalDfmEngineStatus();
+                }
+                @if (localDfmStatus != LocalDfmEngineStatus.None)
+                {
+                    <span class="pdc-local-dfm-chip pdc-local-dfm-chip--@localDfmStatus.ToString().ToLowerInvariant()"
+                          title="@GetLocalDfmEngineTooltip(localDfmStatus)">
+                        @if (localDfmStatus == LocalDfmEngineStatus.Running)
+                        {
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="pdc-local-dfm-spinner" />
+                        }
+                        else if (localDfmStatus == LocalDfmEngineStatus.Completed)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.Computer" Style="font-size:11px;width:11px;height:11px;" />
+                        }
+                        else if (localDfmStatus == LocalDfmEngineStatus.Unavailable)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.CloudOff" Style="font-size:11px;width:11px;height:11px;" />
+                        }
+                        else if (localDfmStatus == LocalDfmEngineStatus.Error)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.Warning" Style="font-size:11px;width:11px;height:11px;" />
+                        }
+                        <span>Local</span>
+                    </span>
+                }
             </div>
             <div class="pdc-header-subline">
                 @GetUploadedLabel()
@@ -257,7 +283,9 @@
                              AllClear="@ShouldShowAllClearOverlay()"
                              OnAcknowledged="@HandleDfmAcknowledged"
                              OnToggleOverlay="@HandleToggleOverlay"
-                             OnAllClearDismissed="@HandleAllClearDismissed" />
+                             OnAllClearDismissed="@HandleAllClearDismissed"
+                             OnErrorAction="@(Part.AnalysisErrorCode == "FILE_MISSING" ? EventCallback.Factory.Create(this, () => OnRemovePart.InvokeAsync(Part)) : default)"
+                             ErrorActionLabel="@(Part.AnalysisErrorCode == "FILE_MISSING" ? "Remove Part" : null)" />
         </div>
 
     </div>
@@ -269,29 +297,49 @@
 @if (!Part.Uploading && !Part.AwaitingPreview && !string.IsNullOrEmpty(Part.ProcessCode))
 {
     <div class="pdc-footer">
-        <div class="pdc-footer-chips">
-            @if (!string.IsNullOrEmpty(Part.ProcessCode))
-            {
-                <div class="pdc-chip pdc-chip--process">
-                    @((MarkupString)ProcessIconHelper.GetProcessSvg(Part.ProcessCode))
-                    <span class="pdc-chip-process-label">@GetProcessName(Part.ProcessCode)</span>
-                </div>
-            }
+        @* Config chips: process · material · finish *@
+        <div class="pdc-footer-config">
+            <div class="pdc-chip pdc-chip--process">
+                @((MarkupString)ProcessIconHelper.GetProcessSvg(Part.ProcessCode))
+                <span class="pdc-chip-process-label">@GetProcessName(Part.ProcessCode)</span>
+            </div>
+
             @if (!string.IsNullOrEmpty(Part.MaterialCode))
             {
-                <span class="pdc-chip-sep">·</span>
-                <span class="pdc-chip pdc-chip--material">@Part.MaterialCode</span>
+                <span class="pdc-footer-sep">·</span>
+                <span class="pdc-chip pdc-chip--material">@(GetMaterialDisplayName())</span>
             }
+
             @if (!string.IsNullOrEmpty(Part.FinishCode))
             {
-                <span class="pdc-chip-sep">·</span>
+                <span class="pdc-footer-sep">·</span>
                 <span class="pdc-chip pdc-chip--finish">@FinishDisplay.Humanize(Part.FinishCode)</span>
             }
         </div>
-        <div style="flex:1;" />
+
+        @* Geometry metrics *@
+        @{
+            var weightKg = GetEstimatedWeightKg();
+        }
+        <div class="pdc-footer-geo">
+            <span class="pdc-chip pdc-chip--meta">Units: mm</span>
+
+            @if (weightKg.HasValue)
+            {
+                <span class="pdc-footer-sep">·</span>
+                <span class="pdc-chip pdc-chip--meta">Weight: @(weightKg.Value.ToString("F3")) kg</span>
+            }
+
+            @if (Part.SurfaceAreaMm2.HasValue)
+            {
+                <span class="pdc-footer-sep">·</span>
+                <span class="pdc-chip pdc-chip--meta">Surface Area: @(Part.SurfaceAreaMm2.Value.ToString("N1")) mm²</span>
+            }
+        </div>
+
+        @* Price *@
         @if (Part.EstimatedUnitPrice.HasValue)
         {
-            <div class="pdc-footer-vdivider"></div>
             <span class="pdc-footer-price">
                 @if (CurrencyService.IsConverting)
                 {
@@ -308,6 +356,10 @@
         else if (Part.PricingLoading)
         {
             <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else
+        {
+            <div class="pdc-footer-price-placeholder"></div>
         }
     </div>
 }
@@ -396,9 +448,84 @@
         return "Processing part preview";
     }
 
+    private string GetMaterialDisplayName()
+    {
+        if (string.IsNullOrEmpty(Part.MaterialCode)) return string.Empty;
+        return Part.AvailableMaterials.FirstOrDefault(m => m.Id == Part.MaterialId)?.Name
+            ?? Part.MaterialCode;
+    }
+
+    private double? GetEstimatedWeightKg()
+    {
+        if (!Part.VolumeMm3.HasValue || Part.VolumeMm3.Value <= 0) return null;
+        var density = GetMaterialDensityGcm3(Part.MaterialCode);
+        return Part.VolumeMm3.Value * density / 1_000_000.0;
+    }
+
+    private static double GetMaterialDensityGcm3(string? materialCode)
+    {
+        if (string.IsNullOrEmpty(materialCode)) return 1.0;
+        var key = materialCode.ToLowerInvariant().Replace("-", "").Replace(" ", "").Replace("_", "");
+        if (key.Contains("al6061") || key.Contains("aluminum6061") || key.Contains("aluminium6061")) return 2.70;
+        if (key.Contains("al7075") || key.Contains("aluminum7075") || key.Contains("aluminium7075")) return 2.81;
+        if (key.Contains("aluminum") || key.Contains("aluminium") || key.StartsWith("al")) return 2.70;
+        if (key.Contains("ss304") || key.Contains("stainlesssteel304") || key.Contains("stainless304")) return 8.00;
+        if (key.Contains("ss316") || key.Contains("stainlesssteel316") || key.Contains("stainless316")) return 8.00;
+        if (key.Contains("stainless")) return 8.00;
+        if (key.Contains("steel") || key.Contains("mildsteel") || key.Contains("steelmild")) return 7.85;
+        if (key.Contains("brass")) return 8.50;
+        if (key.Contains("copper")) return 8.96;
+        if (key.Contains("titanium") || key.Contains("ti6al4v")) return 4.43;
+        if (key.Contains("pom") || key.Contains("delrin") || key.Contains("acetal")) return 1.41;
+        if (key.Contains("peek")) return 1.32;
+        if (key.Contains("pla")) return 1.24;
+        if (key.Contains("abs")) return 1.05;
+        if (key.Contains("petg")) return 1.27;
+        if (key.Contains("nylon") || key.Contains("pa12") || key.Contains("pa11") || key.Contains("pa6")) return 1.01;
+        if (key.Contains("resin") || key.Contains("tough") || key.Contains("sladlp")) return 1.15;
+        if (key.Contains("carbon") || key.StartsWith("cf")) return 1.55;
+        return 1.0;
+    }
+
     private bool DfmUnavailable =>
         Part.DfmAnalysisTimedOut
         || Part.AnalysisErrorCode == "FILE_MISSING";
+
+    private enum LocalDfmEngineStatus { None, Running, Completed, Unavailable, Error }
+
+    private LocalDfmEngineStatus GetLocalDfmEngineStatus()
+    {
+        var processCode = Part.ProcessCode;
+        if (string.IsNullOrEmpty(processCode)) return LocalDfmEngineStatus.None;
+        var norm = ProcessCodeNormalizer.Normalize(processCode) ?? processCode;
+
+        if (BrowserDfmReportSync.HasActiveLocalAttempt(Part, processCode))
+            return LocalDfmEngineStatus.Running;
+
+        if (Part.LocalDfmRuntimeTerminalProcessCode != null
+            && ProcessCodeNormalizer.Equals(Part.LocalDfmRuntimeTerminalProcessCode, norm))
+        {
+            var reason = Part.LocalDfmRuntimeTerminalReason;
+            return reason is "invalid_result" or "worker_failed"
+                ? LocalDfmEngineStatus.Error
+                : LocalDfmEngineStatus.Unavailable;
+        }
+
+        if (Part.LocalDfmRuntimeCompletedForProcessCode != null
+            && ProcessCodeNormalizer.Equals(Part.LocalDfmRuntimeCompletedForProcessCode, norm))
+            return LocalDfmEngineStatus.Completed;
+
+        return LocalDfmEngineStatus.None;
+    }
+
+    private static string GetLocalDfmEngineTooltip(LocalDfmEngineStatus status) => status switch
+    {
+        LocalDfmEngineStatus.Running     => "Local DFM engine is running on this device",
+        LocalDfmEngineStatus.Completed   => "DFM analysis ran locally on this device",
+        LocalDfmEngineStatus.Unavailable => "Local DFM engine unavailable — server will be used",
+        LocalDfmEngineStatus.Error       => "Local DFM engine encountered an error — server will be used",
+        _                                => string.Empty
+    };
 
     private bool IsDfmAnalyzing =>
         _dfmIssues.Count == 0
@@ -907,6 +1034,17 @@
             .GroupBy(i => i.Category ?? string.Empty)
             .ToDictionary(g => g.Key, g => g.First().Source ?? "server", StringComparer.OrdinalIgnoreCase);
 
+        // Browser-local DFM issues carry triangle face indices; the viewer rebuilds the
+        // overlay mesh locally from them when no server overlay GLB exists.
+        var localFaceIndicesByCategory = reportIssues
+            .Where(i => string.Equals(i.Source, "local", StringComparison.OrdinalIgnoreCase)
+                && i.FaceIndices is { Count: > 0 })
+            .GroupBy(i => i.Category ?? string.Empty)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<int>)g.SelectMany(i => i.FaceIndices).Distinct().ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
         var issues = raw.Select(t =>
         {
             var overlayKey = t.Category != null ? $"{overlayProcessCode}__{t.Category}" : null;
@@ -914,6 +1052,11 @@
             var source = !string.IsNullOrWhiteSpace(t.Category) && sourceByCategory.TryGetValue(t.Category, out var src)
                 ? src
                 : "server";
+            var faceIndices = overlayUrl == null
+                && t.Category != null
+                && localFaceIndicesByCategory.TryGetValue(t.Category, out var localFaces)
+                ? localFaces
+                : null;
             return new DfmIssue(
                 Icon: t.Icon,
                 Title: t.Text,
@@ -922,12 +1065,14 @@
                 Category: t.Category,
                 OverlayKey: overlayKey,
                 OverlayUrl: overlayUrl,
-                Source: source);
+                Source: source,
+                FaceIndices: faceIndices);
         }).ToList();
 
-        // Always append general mesh issues (non-manifold, multi-body) regardless of process.
-        // These are derived from server-populated Part properties.
-        issues.AddRange(BuildGeneralMeshIssues("server"));
+        // Append general mesh issues (multi-body always; non-manifold only when not already
+        // covered by a mesh_integrity issue from the DFM report — local analysis takes priority).
+        var hasLocalMeshIntegrity = issues.Any(i => string.Equals(i.Category, "mesh_integrity", StringComparison.OrdinalIgnoreCase));
+        issues.AddRange(BuildGeneralMeshIssues("server", skipNonManifold: hasLocalMeshIntegrity));
         return issues;
     }
 
@@ -956,16 +1101,14 @@
     /// Returns mesh-quality issues that are process-agnostic.
     /// Shown when no manufacturing process is selected yet.
     /// </summary>
-    private List<DfmIssue> BuildGeneralMeshIssues(string source = "server")
+    private List<DfmIssue> BuildGeneralMeshIssues(string source = "server", bool skipNonManifold = false)
     {
         var issues = new List<DfmIssue>();
 
-        if (Part.IsManifold == false)
+        if (!skipNonManifold && Part.IsManifold == false)
         {
             var nmDesc = Part.NonManifoldReason is { Length: > 0 } reason
-                ? $"Mesh geometry issue: {reason}."
-                  + (Part.NonManifoldFaceCount is { } fc ? $" Approximately {fc} affected face(s)." : string.Empty)
-                  + " This may cause problems during manufacturing."
+                ? $"{reason} This may cause problems during manufacturing."
                 : "The mesh has holes or overlapping geometry. This may cause issues during manufacturing regardless of process.";
             issues.Add(new DfmIssue(
                 Icon: Icons.Material.Filled.WarningAmber,
@@ -995,11 +1138,16 @@
 
     private async Task HandleToggleOverlay(DfmIssue issue)
     {
-        if (_modelViewer == null || issue.OverlayKey == null || issue.OverlayUrl == null) return;
+        if (_modelViewer == null || issue.OverlayKey == null) return;
+        var hasLocalFaces = issue.FaceIndices is { Count: > 0 };
+        if (issue.OverlayUrl == null && !hasLocalFaces) return;
         // _dfmPanel tracks active state; just check if the key is now active
         var isActive = _dfmPanel?._activeOverlays.Contains(issue.OverlayKey) ?? false;
         var fileId = Part.FileId.ToString();
-        await _modelViewer.ToggleDfmOverlayAsync(fileId, issue.OverlayKey, issue.OverlayUrl, isActive);
+        if (issue.OverlayUrl != null)
+            await _modelViewer.ToggleDfmOverlayAsync(fileId, issue.OverlayKey, issue.OverlayUrl, isActive);
+        else
+            await _modelViewer.ToggleLocalDfmOverlayAsync(fileId, issue.OverlayKey, issue.FaceIndices!, isActive);
 
         // Co-toggle the support-tower overlay whenever an overhang overlay is toggled.
         // Support key is the same key with "_support" appended to the "__overhang" suffix.

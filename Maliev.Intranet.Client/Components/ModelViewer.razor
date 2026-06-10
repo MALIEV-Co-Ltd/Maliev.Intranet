@@ -8,18 +8,7 @@
 @inject ILogger<ModelViewer> Logger
 
 <div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisPanels">
-    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
-
-    @if (_isRealisticUpgrading)
-    {
-        <div class="realistic-upgrade-overlay" style="position: absolute; inset: 0; background: rgba(10, 10, 14, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; pointer-events: none;">
-            <MudSkeleton SkeletonType="SkeletonType.Circle" Width="56px" Height="56px" Animation="Animation.Wave" />
-            <MudSkeleton SkeletonType="SkeletonType.Text" Width="200px" Height="14px" Animation="Animation.Wave" Class="mt-3" />
-            <MudSkeleton SkeletonType="SkeletonType.Text" Width="260px" Height="12px" Animation="Animation.Wave" Class="mt-1" />
-            <MudText Typo="Typo.body2" Class="mt-3 text-white" Style="opacity: 0.9;">Applying realistic materials...</MudText>
-            <MudText Typo="Typo.caption" Class="mt-1 text-white" Style="opacity: 0.7;">This may take a moment for complex parts</MudText>
-        </div>
-    }
+    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block; filter: @(_isRealisticUpgrading ? "blur(8px)" : "none"); transition: filter 0.4s ease;"></canvas>
 
     @if (Model != null)
     {
@@ -834,6 +823,17 @@
         if (_module == null) return;
         try
         {
+            // When a process or material is selected for the first time and the viewer is still
+            // in CAD (solid) mode, switch to realistic so the material renders correctly.
+            var hasSelection = !string.IsNullOrWhiteSpace(processCode) || !string.IsNullOrWhiteSpace(materialCode);
+            if (hasSelection && _renderMode == "solid")
+            {
+                _renderMode = "realistic";
+                _isRealisticUpgrading = true;
+                await InvokeAsync(StateHasChanged);
+                await _module.InvokeVoidAsync("setRenderMode", _canvasId, "realistic");
+            }
+
             // The realistic upgrade overlay is driven by JSInvokable callbacks
             // (NotifyRealisticUpgradeStart/Complete) fired from the JS deferred
             // smooth-normal pipeline. We do NOT toggle the overlay here — that
@@ -1153,6 +1153,23 @@
         catch (Exception ex)
         {
             Console.WriteLine($"[ModelViewer] toggleDfmOverlay error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Toggles a locally generated DFM overlay built in the browser from the
+    /// local DFM runtime's triangle face indices (no server overlay GLB needed).
+    /// </summary>
+    public async Task ToggleLocalDfmOverlayAsync(string partKey, string overlayKey, IReadOnlyList<int> faceIndices, bool visible)
+    {
+        if (_module == null) return;
+        try
+        {
+            await _module.InvokeVoidAsync("toggleLocalDfmOverlay", _canvasId, partKey, overlayKey, faceIndices, visible);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ModelViewer] toggleLocalDfmOverlay error: {ex.Message}");
         }
     }
 

@@ -183,7 +183,7 @@ public class GeometryControllerTests
                 && dimensions.Z == 30
                 && dimensions.VolumeMm3 == 12500),
             false,
-            "Browser local DFM found 4 non-manifold edge(s).",
+            "Found 4 non-manifold edge(s).",
             4,
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -414,7 +414,7 @@ public class GeometryControllerTests
         var content = Assert.IsType<ContentResult>(result);
         Assert.Equal(200, content.StatusCode);
         Assert.Equal("application/json; charset=utf-8", content.ContentType);
-        Assert.Contains("\"runtimeVersion\":\"1.0.0\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains("\"runtimeVersion\":\"1.1.0\"", content.Content, StringComparison.Ordinal);
         Assert.Contains("\"runtimeKind\":\"browser-first-geometry\"", content.Content, StringComparison.Ordinal);
         Assert.Contains(
             "\"directBrowserViewerExtensions\":[\".3mf\",\".glb\",\".gltf\",\".obj\",\".stl\"]",
@@ -440,7 +440,7 @@ public class GeometryControllerTests
         var content = Assert.IsType<ContentResult>(result);
         Assert.Equal(200, content.StatusCode);
         Assert.Equal("application/json; charset=utf-8", content.ContentType);
-        Assert.Contains("\"runtimeVersion\":\"1.0.0\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains("\"runtimeVersion\":\"1.1.0\"", content.Content, StringComparison.Ordinal);
         Assert.Contains("\"runtimeKind\":\"browser-first-geometry\"", content.Content, StringComparison.Ordinal);
         Assert.Equal("no-cache", controller.Response.Headers.CacheControl.ToString());
     }

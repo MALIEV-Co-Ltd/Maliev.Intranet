@@ -251,7 +251,7 @@
         <AuthorizeView Context="auth">
             <Authorized>
                 @{
-                    var profileImageUrl = GetProfileImageUrl(auth.User);
+                    var profileImageUrl = GetProxiedProfileImageUrl(GetProfileImageUrl(auth.User));
                     var showProfileImage = !_profileImageFailed && !string.IsNullOrWhiteSpace(profileImageUrl);
                 }
                 <div class="topbar-profile-menu">

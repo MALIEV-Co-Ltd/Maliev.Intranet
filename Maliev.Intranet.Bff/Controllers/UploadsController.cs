@@ -549,8 +549,8 @@ public class UploadsController(
         }
     }
 
-    /// <summary>
-    /// Gets a short-lived (60 min) signed GCS download URL for an uploaded file by its ID.
+/// <summary>
+    /// Returns a short-lived signed GCS download URL for an uploaded file by its ID.
     /// Used by the BabylonJS viewer to stream the original 3D file directly from GCS.
     /// </summary>
     /// <param name="fileId">The uploaded file GUID.</param>
@@ -564,6 +564,42 @@ public class UploadsController(
         if (string.IsNullOrEmpty(signedUrl)) return NotFound("Download URL not available");
         return Ok(new { Url = signedUrl });
     }
+
+    /// <summary>
+    /// Gets a temporary signed download URL for a file using its GCS storage path.
+    /// Used by the frontend for thumbnail generation and direct file access.
+    /// </summary>
+    /// <param name="request">Request containing the storage path and optional expiration.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>An object with a <c>signedUrl</c> property containing the signed URL, or 404.</returns>
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("by-path/signed-url")]
+    [ProducesResponseType(typeof(SignedUrlResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetSignedUrlByPathAsync(
+        [FromBody] GetSignedUrlByPathRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request?.StoragePath))
+            return BadRequest("storagePath is required.");
+
+        var signedUrl = await uploadClient.GetDownloadUrlByPathAsync(
+            request.StoragePath, ct, request.ExpirationMinutes ?? 60);
+
+        if (string.IsNullOrEmpty(signedUrl))
+            return NotFound("Signed URL not available for the given storage path.");
+
+        return Ok(new { SignedUrl = signedUrl });
+    }
+
+    /// <summary>Request DTO for getting a signed URL by storage path.</summary>
+    /// <param name="StoragePath">The GCS storage path of the file.</param>
+    /// <param name="ExpirationMinutes">Optional expiration in minutes (default 60).</param>
+    public sealed record GetSignedUrlByPathRequest(string StoragePath, int? ExpirationMinutes = 60);
+
+    /// <summary>Response DTO containing a signed URL.</summary>
+    /// <param name="SignedUrl">The signed download URL.</param>
+    public sealed record SignedUrlResponse(string SignedUrl);
 
     /// <summary>
     /// Migrates all files for a project from the temp bucket to the customer bucket.
