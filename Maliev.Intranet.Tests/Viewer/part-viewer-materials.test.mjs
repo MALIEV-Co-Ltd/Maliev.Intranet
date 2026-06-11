@@ -1667,7 +1667,8 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
                 const layerPlugin = material?._pluginInstances?.find(plugin => plugin.name === 'FdmLayer');
                 return {
                     effectKey: material?._malievSurfaceEffect?.key ?? null,
-                    layerHeightMm: layerPlugin?._layerHeightMm ?? null
+                    layerHeightMm: layerPlugin?._layerHeightMm ?? null,
+                    pluginNames: material?._pluginInstances?.map(plugin => plugin.name) ?? []
                 };
             })()
         });
@@ -1682,16 +1683,16 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.ok(result.mjf.effectScale >= 3.5 && result.mjf.effectScale <= 6.5, `expected fine powder grain scale, got ${result.mjf.effectScale}`);
     assert.ok(result.mjf.effectStrength >= 0.18, `expected visible powder speckle strength, got ${result.mjf.effectStrength}`);
     assert.ok(result.mjf.effectBump >= 0.20, `expected tactile powder bump, got ${result.mjf.effectBump}`);
-    assert.ok(result.mjf.layerLineStrength >= 0.016 && result.mjf.layerLineStrength <= 0.022, `expected visible powder-bed layer strength, got ${result.mjf.layerLineStrength}`);
-    assert.ok(Math.abs(result.mjf.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm MJF/SLS layer height, got ${result.mjf.layerHeightMm}`);
-    assert.ok(result.mjf.layerBump >= 0.10 && result.mjf.layerBump <= 0.14, `expected visible powder-bed layer bump mixed with grain, got ${result.mjf.layerBump}`);
-    assert.ok(result.mjf.pluginNames.includes('FdmLayer'), 'MJF/SLS powder texture should include additive layer-line relief');
+    assert.equal(result.mjf.layerLineStrength, 0);
+    assert.equal(result.mjf.layerHeightMm, null);
+    assert.equal(result.mjf.layerBump, null);
+    assert.ok(!result.mjf.pluginNames.includes('FdmLayer'), 'MJF/SLS powder texture should avoid additive layer-line shader topology');
     assert.match(result.mjf.definitions, /malievPowderFineSpeckle/);
     assert.match(result.mjf.definitions, /malievPowderBedPores/);
     assert.match(result.mjf.definitions, /malievPowderBedHeight/);
     assert.match(result.mjf.definitions, /malievPowderBedAa/);
-    assert.match(result.mjf.layerDefinitions, /malievFdmLayerStepRelief/);
-    assert.match(result.mjf.layerBeforeFragColor, /malievFdmLayerRelief/);
+    assert.equal(result.mjf.layerDefinitions, '');
+    assert.equal(result.mjf.layerBeforeFragColor, '');
     assert.match(result.mjf.beforeLights, /_isPowder/);
     assert.match(result.mjf.beforeLights, /normalW\s*=\s*normalize/);
     assert.match(result.mjf.updateAlbedo, /malievMsePowFine/);
@@ -1700,7 +1701,42 @@ test('realistic configurator applies powder-grain effect for MJF and SLS nylon p
     assert.match(result.mjf.beforeFragColor, /_powPoreShadow/);
     assert.match(result.mjf.beforeFragColor, /malievMsePowFine/);
     assert.equal(result.slsEffect.effectKey, 'powder-grain');
-    assert.ok(Math.abs(result.slsEffect.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm SLS layer height, got ${result.slsEffect.layerHeightMm}`);
+    assert.equal(result.slsEffect.layerHeightMm, null);
+    assert.ok(!result.slsEffect.pluginNames.includes('FdmLayer'), 'SLS powder texture should avoid additive layer-line shader topology');
+});
+
+test('powder-bed realistic rendering avoids the FDM layer plugin to keep process switching responsive', () => {
+    const context = loadViewerContext();
+    const mesh = {
+        name: 'part',
+        uniqueId: 101,
+        material: null,
+        metadata: {},
+        disableEdgesRendering: () => {},
+        getVerticesData: () => null,
+        getIndices: () => null,
+        setVerticesData: () => {},
+    };
+    const scene = makeScene(mesh);
+    context.scene = scene;
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        configureMaterialFromConfigurator('viewer', 'nylon-powder', null, 'AS_PRINTED', null, 'MJF');
+        setRenderMode('viewer', 'realistic');
+        const material = scene.meshes[0].material;
+        ({
+            effectKey: material?._malievSurfaceEffect?.key ?? null,
+            pluginNames: material?._pluginInstances?.map(plugin => plugin.name) ?? [],
+            layerLineStrength: material?._malievNodeMaterialProfile?.layerLineStrength ?? 0,
+            layerBump: material?._malievNodeMaterialProfile?.layerBump ?? 0
+        });
+    `, context);
+
+    assert.equal(result.effectKey, 'powder-grain');
+    assert.ok(!result.pluginNames.includes('FdmLayer'), 'MJF/SLS powder-bed rendering should not compile the FDM layer-line plugin');
+    assert.equal(result.layerLineStrength, 0);
+    assert.equal(result.layerBump, 0);
 });
 
 test('realistic configurator uses PBRMaterial + plugins carrying procedural surface profiles for textured finishes', () => {
@@ -1772,8 +1808,8 @@ test('realistic configurator uses PBRMaterial + plugins carrying procedural surf
     assert.equal(result.powder.isPbr, true);
     assert.equal(result.powder.effectKey, 'powder-grain');
     assert.equal(result.powder.nodeEffectKey, 'powder-grain');
-    assert.ok(result.powder.layerLineStrength > 0, 'MJF/SLS printing should include visible 0.3 mm layer stepping');
-    assert.ok(Math.abs(result.powder.layerHeightMm - 0.3) < 0.001, `expected 0.3 mm MJF/SLS layer height, got ${result.powder.layerHeightMm}`);
+    assert.equal(result.powder.layerLineStrength, 0);
+    assert.equal(result.powder.layerHeightMm, 0);
 });
 
 test('realistic material plugins enable Babylon shader defines through plugin API', () => {
@@ -2060,10 +2096,10 @@ test('realistic material profiles use smooth low-amplitude finish detail to avoi
     assert.ok(result.fdm.layerLineStrength >= 0.03, `expected readable FDM layer strength, got ${result.fdm.layerLineStrength}`);
     assert.ok(result.fdm.layerBump >= 0.20, `expected FDM protrusion/recess bump, got ${result.fdm.layerBump}`);
 
-    assert.equal(result.powder.layerWaveform, 'powder-bed-step');
-    assert.ok(Math.abs(result.powder.layerHeightMm - 0.3) < 0.001, `expected physical 0.3 mm MJF/SLS layer height, got ${result.powder.layerHeightMm}`);
-    assert.ok(result.powder.layerLineStrength >= 0.016 && result.powder.layerLineStrength <= 0.022, `expected MJF/SLS powder profile to carry visible layer stepping, got ${result.powder.layerLineStrength}`);
-    assert.ok(result.powder.layerBump >= 0.10 && result.powder.layerBump <= 0.14, `expected visible powder-bed layer bump, got ${result.powder.layerBump}`);
+    assert.equal(result.powder.layerWaveform, 'none');
+    assert.equal(result.powder.layerHeightMm, 0);
+    assert.equal(result.powder.layerLineStrength, 0);
+    assert.equal(result.powder.layerBump, 0);
 });
 
 test('realistic configurator updates visible material without temporary color mutation', () => {

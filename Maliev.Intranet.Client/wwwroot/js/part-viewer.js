@@ -3655,7 +3655,6 @@ const FDM_LAYER_PRESET_KEYS = new Set(['pla', 'abs', 'petg', 'nylon', 'peek', 'c
 const ADDITIVE_LAYER_PRESET_KEYS = new Set([
     ...FDM_LAYER_PRESET_KEYS,
     'resin',
-    'nylon-powder',
 ]);
 const INTRINSIC_COLOR_PRESET_KEYS = new Set(['black-pom', 'white-pom', 'blue-pom', 'peek', 'petg-clear', 'acrylic-clear', 'resin-clear']);
 const TRANSPARENT_REALISTIC_PRESET_KEYS = new Set(['petg-clear', 'acrylic-clear', 'resin-clear']);
@@ -4462,12 +4461,7 @@ function getAdditiveLayerProfile(processCode) {
     }
 
     if (isPowderBedProcess(process)) {
-        return {
-            layerHeightMm: POWDER_BED_LAYER_HEIGHT_MM,
-            layerLineStrength: 0.018,
-            layerBump: 0.12,
-            layerWaveform: 'powder-bed-step',
-        };
+        return null;
     }
 
     if (process === 'SLA' || process === 'SLA_DLP' || process === 'DLP') {
