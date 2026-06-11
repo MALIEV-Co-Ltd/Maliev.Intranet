@@ -729,9 +729,9 @@ function syncSceneShadowParticipation(canvasId) {
 }
 
 /**
- * Extends the shadow frustum to cover the full 8x shadow catcher area.
+ * Extends the shadow frustum to cover the shadow catcher and projected model shadow.
  * Creates invisible corner meshes and adds them as shadow casters so the
- * auto-frustum encompasses the entire catcher, not just the model.
+ * auto-frustum encompasses the contact area, not just the model.
  */
 function extendShadowFrustum(canvasId) {
     const scene = scenes[canvasId];
@@ -752,7 +752,7 @@ function extendShadowFrustum(canvasId) {
     const catcherMin = catcherInfo?.boundingBox?.minimumWorld ?? bb.min;
     const catcherMax = catcherInfo?.boundingBox?.maximumWorld ?? bb.max;
     const light = shadowGen.getLight?.();
-    const lightDir = light?.direction ?? { x: 0, y: 0, z: -1 };
+    const lightDir = light?.direction ?? CONFIG.STUDIO_LIGHT?.key?.direction ?? { x: -0.50, y: -1.10, z: -0.80 };
     const lightDirZ = Math.max(Math.abs(lightDir.z || 0), 0.05);
     const projectedX = Math.abs(sizeZ * lightDir.x / lightDirZ);
     const projectedY = Math.abs(sizeZ * lightDir.y / lightDirZ);
@@ -7579,7 +7579,7 @@ export function showGrid(canvasId) {
     // Size the floor to the actual part footprint on each axis. A single square
     // floor based on the largest dimension makes long, narrow parts sit on a
     // huge empty grid that dominates camera framing and clips in the canvas.
-    const axisPadding = Math.max(gridRatio * 2, Math.min(footprint * 0.10, gridRatio * 4));
+    const axisPadding = Math.max(gridRatio * 0.5, Math.min(footprint * 0.05, gridRatio * 2));
     const minAxisSize = gridRatio * 4;
     const snapGridAxis = axisSize => Math.max(
         Math.ceil(Math.max(axisSize + axisPadding * 2, 1) / gridRatio) * gridRatio,

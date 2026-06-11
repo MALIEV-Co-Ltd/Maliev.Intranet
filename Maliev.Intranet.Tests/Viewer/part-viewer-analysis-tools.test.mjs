@@ -1395,7 +1395,7 @@ test('showGrid uses a low-contrast grid floor in light mode', () => {
     assert.ok(result.mainColor.r >= 0.99);
 });
 
-test('showGrid sizes the floor to a padded part footprint instead of oversized major blocks', () => {
+test('showGrid sizes the floor to a padded per-axis footprint instead of oversized major blocks', () => {
     const context = loadViewerContext();
     context.scene = {
         meshes: [],
@@ -1422,7 +1422,7 @@ test('showGrid sizes the floor to a padded part footprint instead of oversized m
 
     assert.equal(result.gridRatio, 50);
     assert.equal(result.width, 550);
-    assert.equal(result.height, 550);
+    assert.equal(result.height, 200);
 });
 
 test('grid floor fades in and fades out before disposal', () => {
@@ -1526,7 +1526,7 @@ test('grid floor fades in and fades out before disposal', () => {
     assert.equal(removedTicks.length, 2);
 });
 
-test('shadow frustum extension accounts for narrow tall parts', () => {
+test('shadow frustum extension accounts for narrow tall parts without an exposed light object', () => {
     const context = loadViewerContext();
     const addedCasters = [];
     context.BABYLON.MeshBuilder.CreateBox = (name, options, scene) => {
@@ -1575,10 +1575,10 @@ test('shadow frustum extension accounts for narrow tall parts', () => {
     assert.deepEqual(
         result.map(mesh => [mesh.x, mesh.y, mesh.z]),
         [
-            [-800, -800, 0],
-            [800, -800, 0],
-            [-800, 800, 0],
-            [800, 800, 0],
+            [-154, -304, 0],
+            [154, -304, 0],
+            [-154, 304, 0],
+            [154, 304, 0],
         ]);
     assert.ok(result.every(mesh => mesh.visible === false));
     assert.ok(result.every(mesh => mesh.pickable === false));
