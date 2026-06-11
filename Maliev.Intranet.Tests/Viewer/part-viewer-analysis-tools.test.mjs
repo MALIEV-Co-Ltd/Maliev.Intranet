@@ -33,6 +33,13 @@ class Vector3 {
         return new Vector3(this.x * value, this.y * value, this.z * value);
     }
 
+    set(x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        return this;
+    }
+
     length() {
         return Math.hypot(this.x, this.y, this.z);
     }
@@ -1517,6 +1524,105 @@ test('grid floor fades in and fades out before disposal', () => {
 
     assert.equal(hidden, false);
     assert.equal(removedTicks.length, 2);
+});
+
+test('shadow frustum extension accounts for narrow tall parts', () => {
+    const context = loadViewerContext();
+    const addedCasters = [];
+    context.BABYLON.MeshBuilder.CreateBox = (name, options, scene) => {
+        const mesh = makeMesh(name, { totalVertices: 8 });
+        mesh.position = new Vector3(0, 0, 0);
+        mesh.isVisible = true;
+        mesh.isPickable = true;
+        mesh.size = options.size;
+        scene.meshes.push(mesh);
+        return mesh;
+    };
+    context.scene = {
+        meshes: [],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+    };
+    context.shadowGenerator = {
+        _malievShadowCasterKeys: new Set(),
+        getShadowMap: () => ({ renderList: [] }),
+        addShadowCaster(mesh) {
+            addedCasters.push(mesh);
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        shadowGenerators.viewer = shadowGenerator;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -5, y: -5, z: 0 },
+            max: { x: 5, y: 5, z: 200 }
+        };
+        extendShadowFrustum('viewer');
+        scene.meshes
+            .filter(mesh => mesh.name.startsWith('__shadow_ext_'))
+            .map(mesh => ({
+                name: mesh.name,
+                x: mesh.position.x,
+                y: mesh.position.y,
+                z: mesh.position.z,
+                visible: mesh.isVisible,
+                pickable: mesh.isPickable
+            }));
+    `, context);
+
+    assert.deepEqual(
+        result.map(mesh => [mesh.x, mesh.y, mesh.z]),
+        [
+            [-800, -800, 0],
+            [800, -800, 0],
+            [-800, 800, 0],
+            [800, 800, 0],
+        ]);
+    assert.ok(result.every(mesh => mesh.visible === false));
+    assert.ok(result.every(mesh => mesh.pickable === false));
+    assert.deepEqual(addedCasters.map(mesh => mesh.name), [
+        '__shadow_ext_0',
+        '__shadow_ext_1',
+        '__shadow_ext_2',
+        '__shadow_ext_3',
+    ]);
+});
+
+test('shadow catcher remains coplanar with model base and uses depth bias for floor layering', () => {
+    const context = loadViewerContext();
+    const shadowCatcher = makeMesh('__shadow_catcher__', { totalVertices: 4 });
+    shadowCatcher.position = new Vector3(0, 0, 12);
+    shadowCatcher.material = { zOffset: 0 };
+    context.scene = {
+        meshes: [shadowCatcher],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name && !mesh.disposed) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -5, y: -5, z: 0 },
+            max: { x: 5, y: 5, z: 200 }
+        };
+        gridActiveFlags.viewer = true;
+        cuttingMatActiveFlags.viewer = true;
+        _syncShadowCatcherVisibility('viewer');
+        ({
+            visible: scene.getMeshByName('__shadow_catcher__').isVisible,
+            receiveShadows: scene.getMeshByName('__shadow_catcher__').receiveShadows,
+            z: scene.getMeshByName('__shadow_catcher__').position.z,
+            zOffset: scene.getMeshByName('__shadow_catcher__').material.zOffset
+        });
+    `, context);
+
+    assert.equal(result.visible, true);
+    assert.equal(result.receiveShadows, true);
+    assert.equal(result.z, 0);
+    assert.equal(result.zOffset, 4);
 });
 
 test('cutting mat creates an RGBA-textured rounded floor at the model base', () => {
