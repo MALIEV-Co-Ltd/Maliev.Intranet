@@ -2156,6 +2156,7 @@ test('DFM overlay transform keeps imported overlay geometry in its authored root
     assert.deepEqual(overlayRoot.rotationQuaternion, { rotated: true });
     assert.equal(overlayMesh.rotationQuaternion, null);
     assert.equal(overlayMesh.isPickable, false);
+    assert.equal(overlayMesh.alwaysSelectAsActiveMesh, true);
     assert.equal(overlayMesh.material.name, 'dfm_FDM__thin_wall_mat');
     assert.equal(overlayMesh.material.backFaceCulling, true);
     assert.equal(overlayMesh.material.useVertexColors, false);
@@ -2167,6 +2168,9 @@ test('DFM overlay transform keeps imported overlay geometry in its authored root
         },
         { r: 0.95, g: 0.10, b: 0.05 });
     assert.equal(overlayMesh.material.alpha, 0.55);
+    assert.equal(overlayMesh.material.transparencyMode, context.BABYLON.Material.MATERIAL_ALPHABLEND);
+    assert.equal(overlayMesh.material.needDepthPrePass, false);
+    assert.equal(overlayMesh.material.forceDepthWrite, false);
     assert.deepEqual(
         {
             r: overlayMesh.material.emissiveColor.r,

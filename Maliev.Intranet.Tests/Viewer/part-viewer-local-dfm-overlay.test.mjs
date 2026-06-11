@@ -125,9 +125,20 @@ test('toggleLocalDfmOverlay builds a world-space overlay mesh from face indices'
     assert.deepEqual(Array.from(overlay.vertexData.positions), [0, 0, 5, 1, 0, 5, 0, 1, 5]);
     assert.deepEqual(Array.from(overlay.vertexData.indices), [0, 1, 2]);
     assert.equal(overlay.isPickable, false);
+    assert.equal(overlay.alwaysSelectAsActiveMesh, true);
     assert.equal(overlay.metadata.malievAnalysisHelper, true);
     // Default red DFM style (overhang has no per-category override).
+    assert.deepEqual(
+        {
+            r: overlay.material.albedoColor.r,
+            g: overlay.material.albedoColor.g,
+            b: overlay.material.albedoColor.b,
+        },
+        { r: 0.95, g: 0.10, b: 0.05 });
     assert.equal(overlay.material.alpha, 0.55);
+    assert.equal(overlay.material.transparencyMode, context.BABYLON.Material.MATERIAL_ALPHABLEND);
+    assert.equal(overlay.material.needDepthPrePass, false);
+    assert.equal(overlay.material.forceDepthWrite, false);
     assert.equal(overlay.material.zOffset, -2);
 });
 

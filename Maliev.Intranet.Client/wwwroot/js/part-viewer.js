@@ -8465,6 +8465,7 @@ export async function toggleDfmOverlay(canvasId, partKey, overlayKey, glbUrl, vi
             }
             mesh.material = mat;
             mesh.isPickable = false;
+            mesh.alwaysSelectAsActiveMesh = true;
         });
 
         overlayMeshes[slot].set(overlayKey, meshes);
@@ -8498,16 +8499,15 @@ function applyDfmOverlayCategoryStyle(mat, overlayKey) {
         mat.alpha        = style.alpha;
         mat.emissiveColor = style.emissive();
         mat.zOffset      = style.zOffset;
-        if (categorySuffix === 'overhang_support' || categorySuffix === 'support_required') {
-            mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-            mat.needDepthPrePass = false;
-        }
     } else {
         mat.albedoColor  = new BABYLON.Color3(0.95, 0.10, 0.05); // red
         mat.alpha        = 0.55;
         mat.emissiveColor = new BABYLON.Color3(0.25, 0.00, 0.00); // faint red glow
         mat.zOffset      = -2; // depth bias: overlay wins depth test against coplanar main mesh
     }
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    mat.needDepthPrePass = false;
+    mat.forceDepthWrite = false;
 }
 
 /**
@@ -8602,6 +8602,7 @@ function buildLocalDfmOverlayMesh(canvasId, scene, overlayKey, faceIndices) {
     applyDfmOverlayCategoryStyle(mat, overlayKey);
     mesh.material = mat;
     mesh.isPickable = false;
+    mesh.alwaysSelectAsActiveMesh = true;
     // Never let the overlay itself feed back into a later advisory analysis pass.
     mesh.metadata = { ...(mesh.metadata ?? {}), malievAnalysisHelper: true };
     return mesh;
