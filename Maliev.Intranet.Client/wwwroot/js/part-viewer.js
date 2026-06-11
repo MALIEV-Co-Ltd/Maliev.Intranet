@@ -4924,16 +4924,40 @@ function shouldSkipRealisticDeferredUpgrade(canvasId) {
     return false;
 }
 
+function getRealisticShaderPrewarmVariants(canvasId) {
+    const processCode = perCanvasProcessCodes[canvasId];
+    const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
+    const effectKey = surfaceEffect?.key && surfaceEffect.key !== 'none'
+        ? surfaceEffect.key
+        : null;
+    const variants = [[false, null]];
+
+    if (isFdmProcess(processCode)) {
+        variants.push([true, null]);
+    }
+
+    if (effectKey && effectKey !== FDM_LAYER_EFFECT_KEY) {
+        variants.push([false, effectKey]);
+        if (isFdmProcess(processCode)) {
+            variants.push([true, effectKey]);
+        }
+    }
+
+    return variants;
+}
+
 function prewarmRealisticShaders(canvasId) {
     const scene = scenes[canvasId];
     if (!scene) return;
     const targetMesh = scene.meshes.find(m => !isSystemMesh(m) && typeof m.getTotalVertices === 'function');
     if (!targetMesh) return;
 
-    // Pre-compile all 4 shader variants (FDMLAYER on/off × MALIEV_SURFACE_EFFECT on/off)
-    // so that finish switching no longer triggers a synchronous WebGL compile stall.
-    const presets = [[false, null], [true, null], [false, 'bead-blast'], [true, 'bead-blast']];
-    presets.forEach(([useFdm, effectKey]) => {
+    // Pre-compile only variants reachable from the current process and finish.
+    // Powder-bed processes use powder-grain but never FDM-layer or bead-blast
+    // defaults, so compiling those variants during SLS/MJF selection wastes
+    // GPU time and can stutter seconds after the user picks the process.
+    const variants = getRealisticShaderPrewarmVariants(canvasId);
+    variants.forEach(([useFdm, effectKey]) => {
         try {
             const mat = new BABYLON.PBRMaterial(`__prewarm_${useFdm}_${effectKey}__`, scene);
             configureRealisticPbrQuality(mat);

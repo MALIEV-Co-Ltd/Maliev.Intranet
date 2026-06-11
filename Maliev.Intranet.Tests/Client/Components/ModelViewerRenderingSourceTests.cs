@@ -117,6 +117,23 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void RealisticShaderPrewarm_UsesCurrentProcessVariantsOnly()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var variantsBlock = ExtractBlock(source, "function getRealisticShaderPrewarmVariants");
+        var prewarmBlock = ExtractBlock(source, "function prewarmRealisticShaders");
+
+        Assert.Contains("const processCode = perCanvasProcessCodes[canvasId];", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("if (isFdmProcess(processCode))", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("variants.push([true, null]);", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("const effectKey = surfaceEffect?.key", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("variants.push([false, effectKey]);", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("variants.push([true, effectKey]);", variantsBlock, StringComparison.Ordinal);
+        Assert.Contains("const variants = getRealisticShaderPrewarmVariants(canvasId);", prewarmBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[false, null], [true, null], [false, 'bead-blast'], [true, 'bead-blast']]", prewarmBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StagedRender_NormalizeViewerSettings_IncludesInitialRenderModeAndTransition()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
