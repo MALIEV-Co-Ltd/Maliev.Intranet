@@ -1011,9 +1011,7 @@ else
 {
     <div class="pcs-quote-footer">
         @* Total + action buttons *@
-        @if (SelectedCustomer != null)
-        {
-            <div class="pcs-qf-total-area">
+        <div class="pcs-qf-total-area">
                 <div class="pcs-qf-total-top">
                     <div class="pcs-qf-ships">
                         <div class="pcs-qf-total-label">Quote Total</div>
@@ -1061,7 +1059,7 @@ else
                     </button>
                     <button type="button"
                             class="pcs-qf-btn-pdf"
-                            disabled="@(!CanQuote || AllParts.Count == 0 || _quotePdfGenerating)"
+                            disabled="@(AllParts.Count == 0 || _quotePdfGenerating)"
                             @onclick="HandleQuoteGeneratePdfAsync">
                         @if (_quotePdfGenerating)
                         {
@@ -1075,7 +1073,8 @@ else
                     </button>
                     <button type="button"
                             class="pcs-qf-btn-quote"
-                            disabled="@(!CanQuote || AllParts.Count == 0 || Saving)"
+                            title="@(SelectedCustomer == null ? "Select a customer to create the quote" : null)"
+                            disabled="@(!CanQuote || AllParts.Count == 0 || Saving || SelectedCustomer == null)"
                             @onclick="@OnQuote">
                         @if (Saving)
                         {
@@ -1183,8 +1182,7 @@ else
                         </div>
                     </div>
                 }
-            </div>
-        }
+        </div>
     </div>
 }
 

@@ -994,6 +994,42 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         });
     }
 
+    [Fact]
+    public void QuoteFooter_WhenNoCustomerSelected_StillShowsTotalsDetailsAndPreliminaryPdf()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.step",
+            Quantity = 2,
+            EstimatedUnitPrice = 100m,
+            EstimatedBaseUnitPrice = 100m,
+            EstimatedDiscountedUnitPriceBeforeFinish = 100m,
+            FinishPricingBaseUnitPrice = 100m,
+        };
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, [])
+            .Add(p => p.ShowQuoteFooter, true)
+            .Add(p => p.AllParts, [part])
+            .Add(p => p.CanQuote, true)
+            .Add(p => p.ShippingCost, 50m));
+
+        var footer = cut.Find(".pcs-quote-footer");
+        Assert.Contains("Quote Total", footer.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Details", footer.TextContent, StringComparison.Ordinal);
+        Assert.Contains("PDF", footer.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Quote", footer.TextContent, StringComparison.Ordinal);
+
+        var pdfButton = cut.Find(".pcs-qf-btn-pdf");
+        Assert.False(pdfButton.HasAttribute("disabled"));
+
+        var quoteButton = cut.Find(".pcs-qf-btn-quote");
+        Assert.True(quoteButton.HasAttribute("disabled"));
+        Assert.Equal("Select a customer to create the quote", quoteButton.GetAttribute("title"));
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         return File.ReadAllText(FindRepoFile(relativeParts));
