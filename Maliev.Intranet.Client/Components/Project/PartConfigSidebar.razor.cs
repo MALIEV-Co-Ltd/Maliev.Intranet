@@ -1668,7 +1668,6 @@ public partial class PartConfigSidebar : ComponentBase
         var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description} {material.Category}");
         return normalized.Contains("clear", StringComparison.Ordinal)
             || normalized.Contains("transparent", StringComparison.Ordinal)
-            || normalized.Contains("translucent", StringComparison.Ordinal)
             || normalized.Contains("acrylic", StringComparison.Ordinal)
             || normalized.Contains("pmma", StringComparison.Ordinal);
     }

@@ -1082,6 +1082,24 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Contains(">Black<", colorSection.InnerHtml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void MaterialColorOptions_WhenTranslucentNonClearResinHasClearCatalogChoice_HidesClear()
+    {
+        var materialId = Guid.NewGuid();
+        var part = CreatePartWithMaterialColorOption(
+            new CatalogMaterialDto(materialId, "Translucent Red Resin", "RESIN_TRANSLUCENT_RED", "Polymer", null, "Translucent red SLA resin.", 10),
+            materialId);
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var colorSection = cut.Find("[data-config-section='process-options']");
+        Assert.DoesNotContain(">Clear<", colorSection.InnerHtml, StringComparison.Ordinal);
+        Assert.Contains(">White<", colorSection.InnerHtml, StringComparison.Ordinal);
+        Assert.Contains(">Black<", colorSection.InnerHtml, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("Clear Resin", "RESIN_CLEAR", "Transparent photopolymer resin.")]
     [InlineData("Acrylic PMMA", "PMMA_CLEAR", "Clear acrylic sheet material.")]
