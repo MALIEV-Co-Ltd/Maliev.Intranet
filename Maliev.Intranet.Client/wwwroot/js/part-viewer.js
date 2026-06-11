@@ -7540,20 +7540,23 @@ export function showGrid(canvasId) {
     const cellOptions = [1, 2, 5, 10, 20, 50, 100];
     const gridRatio = cellOptions.find(cell => cell >= footprint / 15) ?? 100;
 
-    // Size the floor to the part with a modest margin. Rounding to the active
-    // cell size keeps the edge clean without snapping a 460 mm part up to a
-    // 1000 mm major-block floor that dominates and clips in the canvas.
-    const paddedFootprint = footprint * 1.10;
-    const gridSize = Math.max(
-        Math.ceil(paddedFootprint / gridRatio) * gridRatio,
-        gridRatio * 8);
+    // Size the floor to the actual part footprint on each axis. A single square
+    // floor based on the largest dimension makes long, narrow parts sit on a
+    // huge empty grid that dominates camera framing and clips in the canvas.
+    const axisPadding = Math.max(gridRatio * 2, Math.min(footprint * 0.10, gridRatio * 4));
+    const minAxisSize = gridRatio * 4;
+    const snapGridAxis = axisSize => Math.max(
+        Math.ceil(Math.max(axisSize + axisPadding * 2, 1) / gridRatio) * gridRatio,
+        minAxisSize);
+    const gridWidth = snapGridAxis(sizeX);
+    const gridHeight = snapGridAxis(sizeY);
 
     // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
     // BabylonJS ground lies in the XZ plane by default, so we rotate +90° around X to flip it.
     // +PI/2 (not -PI/2) gives the correct upward-facing normal (+Z), which is required for
     // shadow reception — a downward normal means shadow map depth tests fail on the surface.
     const ground = BABYLON.MeshBuilder.CreateGround('__grid__', {
-        width: gridSize, height: gridSize, subdivisions: 1
+        width: gridWidth, height: gridHeight, subdivisions: 1
     }, scene);
     ground.rotation.x = Math.PI / 2;
     // Coplanar with the model base — z-fighting with the bottom face is

@@ -526,6 +526,19 @@ public sealed class ModelViewerRenderingSourceTests
             "usePercentageCloserFiltering must appear before useContactHardeningShadow in configureSoftShadowGenerator");
     }
 
+    [Fact]
+    public void GridFloor_SizesRectangularlyToModelFootprint()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var block = ExtractBlock(source, "export function showGrid");
+
+        Assert.Contains("const snapGridAxis = axisSize =>", block, StringComparison.Ordinal);
+        Assert.Contains("const gridWidth = snapGridAxis(sizeX);", block, StringComparison.Ordinal);
+        Assert.Contains("const gridHeight = snapGridAxis(sizeY);", block, StringComparison.Ordinal);
+        Assert.Contains("width: gridWidth, height: gridHeight", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("width: gridSize, height: gridSize", block, StringComparison.Ordinal);
+    }
+
     private static string ExtractBlock(string source, string start)
     {
         var startIndex = source.IndexOf(start, StringComparison.Ordinal);
