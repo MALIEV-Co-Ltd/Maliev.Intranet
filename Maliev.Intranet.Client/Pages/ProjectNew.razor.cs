@@ -616,10 +616,16 @@ public partial class ProjectNew : IAsyncDisposable
                         if (!string.IsNullOrEmpty(signedUrl))
                         {
                             part.SignedDownloadUrl = signedUrl;
-                            await ThumbnailService.GenerateAsync(
+                            var result = await ThumbnailService.GenerateAsync(
                                 completedUpload.StoragePath,
                                 part.ThumbnailVersion,
                                 signedUrl);
+                            await InvokeAsync(() =>
+                            {
+                                ApplyLocalThumbnailSetToPart(part, result);
+                                if (result.HasAny)
+                                    TriggerAutoSave();
+                            });
                         }
                     }
                     catch (Exception ex)
@@ -1065,8 +1071,14 @@ public partial class ProjectNew : IAsyncDisposable
                     var signedUrl = await GetSignedDownloadUrlAsync(storagePath);
                     if (string.IsNullOrEmpty(signedUrl)) return;
                     part.SignedDownloadUrl = signedUrl;
-                    await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
-                    await InvokeAsync(StateHasChanged);
+                    var result = await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
+                    await InvokeAsync(() =>
+                    {
+                        ApplyLocalThumbnailSetToPart(part, result);
+                        if (result.HasAny)
+                            TriggerAutoSave();
+                        StateHasChanged();
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -1253,6 +1265,25 @@ public partial class ProjectNew : IAsyncDisposable
         && ThumbnailService.TryGetCached(part.StoragePath, part.ThumbnailVersion, out var localSet)
         && localSet is { HasAny: true };
 
+    private static void ApplyLocalThumbnailSetToPart(PartViewModel part, ThumbnailSetDto? thumbnails)
+    {
+        if (thumbnails is not { HasAny: true })
+            return;
+
+        var small = !string.IsNullOrWhiteSpace(thumbnails.ThumbnailSmall)
+            ? thumbnails.ThumbnailSmall
+            : thumbnails.FrontSmall;
+        var large = !string.IsNullOrWhiteSpace(thumbnails.ThumbnailLarge)
+            ? thumbnails.ThumbnailLarge
+            : small;
+
+        part.ThumbnailSmallUrl = small;
+        part.ThumbnailLargeUrl = large;
+        part.AwaitingPreview = false;
+        part.StatusText = "Ready";
+        part.PreviewLoadFailed = false;
+    }
+
     /// <summary>
     /// Generates the part's thumbnail set locally from a browser-renderable viewer
     /// source (the server-exported GLB). Marks the part Ready on success so the
@@ -1271,10 +1302,9 @@ public partial class ProjectNew : IAsyncDisposable
                 var result = await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, viewerUrl);
                 await InvokeAsync(() =>
                 {
-                    part.AwaitingPreview = false;
+                    ApplyLocalThumbnailSetToPart(part, result);
                     if (result is { HasAny: true })
                     {
-                        part.StatusText = "Ready";
                         StopStatusWatchdog(storagePath);
                         TriggerAutoSave();
                     }
@@ -1765,7 +1795,13 @@ public partial class ProjectNew : IAsyncDisposable
                         var signedUrl = await GetSignedDownloadUrlAsync(storagePath);
                         if (string.IsNullOrEmpty(signedUrl)) return;
                         part.SignedDownloadUrl = signedUrl;
-                        await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
+                        var result = await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
+                        await InvokeAsync(() =>
+                        {
+                            ApplyLocalThumbnailSetToPart(part, result);
+                            if (result.HasAny)
+                                TriggerAutoSave();
+                        });
                     }
                     catch (Exception ex)
                     {

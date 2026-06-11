@@ -429,6 +429,34 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ApplyLocalThumbnailSetToPart_WhenGeneratedLocally_PromotesGeneratedUrlsToPart()
+    {
+        var part = new PartViewModel
+        {
+            Name = "bracket.stl",
+            StoragePath = "projects/temp/bracket.stl",
+            AwaitingPreview = true,
+            StatusText = "Processing geometry...",
+        };
+        var thumbnails = new ThumbnailSetDto
+        {
+            ThumbnailSmall = "data:image/webp;base64,small",
+            ThumbnailLarge = "data:image/webp;base64,large",
+        };
+
+        var method = typeof(global::Maliev.Intranet.Client.Pages.ProjectNew)
+            .GetMethod("ApplyLocalThumbnailSetToPart", BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+        method.Invoke(null, [part, thumbnails]);
+
+        Assert.Equal("data:image/webp;base64,small", part.ThumbnailSmallUrl);
+        Assert.Equal("data:image/webp;base64,large", part.ThumbnailLargeUrl);
+        Assert.False(part.AwaitingPreview);
+        Assert.Equal("Ready", part.StatusText);
+    }
+
+    [Fact]
     public async Task HandleFileSelectedAsync_WhenTwoValidFilesSelected_StartsBothUploads()
     {
         var releaseUploads = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
