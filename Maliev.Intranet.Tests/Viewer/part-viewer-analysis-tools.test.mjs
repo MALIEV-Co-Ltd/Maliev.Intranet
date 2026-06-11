@@ -1421,8 +1421,8 @@ test('showGrid sizes the floor to a padded part footprint instead of oversized m
     `, context);
 
     assert.equal(result.gridRatio, 50);
-    assert.equal(result.width, 600);
-    assert.equal(result.height, 600);
+    assert.equal(result.width, 550);
+    assert.equal(result.height, 550);
 });
 
 test('grid floor fades in and fades out before disposal', () => {

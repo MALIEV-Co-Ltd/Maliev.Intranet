@@ -7535,7 +7535,7 @@ export function showGrid(canvasId) {
     // Size the floor to the part with a modest margin. Rounding to the active
     // cell size keeps the edge clean without snapping a 460 mm part up to a
     // 1000 mm major-block floor that dominates and clips in the canvas.
-    const paddedFootprint = footprint * 1.25;
+    const paddedFootprint = footprint * 1.10;
     const gridSize = Math.max(
         Math.ceil(paddedFootprint / gridRatio) * gridRatio,
         gridRatio * 8);
