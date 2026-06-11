@@ -54,6 +54,18 @@ public sealed class GeometryInteropSourceTests
     }
 
     [Fact]
+    public void GeometryInteropCapturesThumbnailsWithTransparentAlphaBackground()
+    {
+        var source = ReadRepoFile(InteropPath);
+
+        Assert.Contains("preserveDrawingBuffer: true", source, StringComparison.Ordinal);
+        Assert.Contains("premultipliedAlpha: false", source, StringComparison.Ordinal);
+        Assert.Contains("alpha: true", source, StringComparison.Ordinal);
+        Assert.Contains("scene.clearColor = new BABYLON.Color4(0, 0, 0, 0)", source, StringComparison.Ordinal);
+        Assert.Contains("toDataURL('image/png')", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GeometryInteropUsesZUpViewConvention()
     {
         var source = ReadRepoFile(InteropPath);
