@@ -389,6 +389,22 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "window.projectNewUploads.initDropZones",
+                ProjectUploadContainerId,
+                ".project-new-upload-dropzone");
+        }
+        catch (JSException ex)
+        {
+            Logger.LogDebug(ex, "ProjectNew upload dropzone wiring is not available yet.");
+        }
+    }
+
     private void HandleProjectNewLocationChanged(object? sender, LocationChangedEventArgs args)
     {
         if (!IsBareProjectNewRoute(args.Location))

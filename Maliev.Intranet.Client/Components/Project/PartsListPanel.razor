@@ -24,8 +24,8 @@
         <FileUploadDropzone Variant="FileUploadDropzone.DropzoneVariant.Compact"
                             Icon="@Icons.Material.Outlined.CloudUpload" Label="Drop CAD files to quote"
                             SubLabel="@FileTypes.ThreeDSubLabel"
-                            MaxFileSizeLabel="@($"max {UploadSettings.ThreeDModelLimit / 1048576} MB")" Class="plp-dropzone"
-                            OnClick="@OnAddPart" OnFilesDropped="@OnAddPart" />
+                            MaxFileSizeLabel="@($"max {UploadSettings.ThreeDModelLimit / 1048576} MB")" Class="plp-dropzone project-new-upload-dropzone"
+                            OnClick="@OnAddPart" />
     </div>
 
     @* ── Parts Count Header ─────────────────────────────────────────────── *@

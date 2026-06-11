@@ -274,6 +274,34 @@ window.projectNewUploads = (function () {
         return true;
     }
 
+    function initDropZones(containerId, selector) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const dropZones = Array.from(document.querySelectorAll(selector || '.project-new-upload-dropzone'));
+        for (const dropZone of dropZones) {
+            if (dropZone.dataset?.projectNewDropzoneBound === 'true') continue;
+            if (dropZone.dataset) dropZone.dataset.projectNewDropzoneBound = 'true';
+
+            dropZone.addEventListener('drop', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const files = event.dataTransfer?.files;
+                if (!files || files.length === 0) return;
+
+                const inputs = Array.from(container.querySelectorAll('input[type=file]'));
+                const input = inputs[inputs.length - 1];
+                if (!input) return;
+
+                const transfer = new DataTransfer();
+                for (const file of files) transfer.items.add(file);
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }, false);
+        }
+    }
+
     return {
         captureFiles,
         uploadFile,
@@ -281,6 +309,7 @@ window.projectNewUploads = (function () {
         scheduleClearFile,
         getFileBytes,
         getObjectUrl,
-        registerGeneratedFile
+        registerGeneratedFile,
+        initDropZones
     };
 })();

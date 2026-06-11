@@ -51,6 +51,80 @@ function loadUploadContext(input) {
     return context;
 }
 
+function loadDropZoneContext(input, dropZone) {
+    const container = {
+        querySelectorAll(selector) {
+            return selector === 'input[type=file]' ? [input] : [];
+        }
+    };
+    const context = {
+        Blob,
+        console,
+        document: {
+            getElementById(id) {
+                return id === 'project-new-file-upload' ? container : null;
+            },
+            querySelectorAll(selector) {
+                return selector === '.project-new-upload-dropzone' ? [dropZone] : [];
+            }
+        },
+        Event: class {
+            constructor(type, options = {}) {
+                this.type = type;
+                this.bubbles = Boolean(options.bubbles);
+            }
+        },
+        DataTransfer: class {
+            constructor() {
+                const files = [];
+                this.items = {
+                    add(file) {
+                        files.push(file);
+                    }
+                };
+                this.files = files;
+            }
+        },
+        setTimeout: () => 1,
+        clearTimeout: () => {},
+        window: {}
+    };
+
+    const source = fs.readFileSync('Maliev.Intranet.Client/wwwroot/js/uploadWithProgress.js', 'utf8');
+    vm.runInNewContext(source, context);
+    return context;
+}
+
+test('initDropZones relays dropped files into the hidden MudFileUpload input', () => {
+    const droppedFile = new File(['solid'], 'drop-zone-part.stl', { type: 'model/stl' });
+    let inputChangeCount = 0;
+    const input = {
+        files: [],
+        dispatchEvent(event) {
+            if (event.type === 'change') inputChangeCount++;
+        }
+    };
+    let dropHandler;
+    const dropZone = {
+        addEventListener(type, handler) {
+            if (type === 'drop') dropHandler = handler;
+        }
+    };
+    const context = loadDropZoneContext(input, dropZone);
+    const uploads = context.window.projectNewUploads;
+
+    uploads.initDropZones('project-new-file-upload', '.project-new-upload-dropzone');
+    dropHandler({
+        dataTransfer: { files: [droppedFile] },
+        preventDefault() {},
+        stopPropagation() {}
+    });
+
+    assert.equal(input.files.length, 1);
+    assert.equal(input.files[0], droppedFile);
+    assert.equal(inputChangeCount, 1);
+});
+
 test('captureFiles clears the hidden input while retaining browser files for upload', async () => {
     const selectedFile = new File(['solid'], 'bracket.stl', { type: 'model/stl' });
     const input = {

@@ -2157,6 +2157,26 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNew_DropzonesRelayDroppedFilesWithoutOpeningPicker()
+    {
+        var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor")
+            .ReplaceLineEndings("\n");
+        var projectNewCode = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs")
+            .ReplaceLineEndings("\n");
+        var partsList = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartsListPanel.razor")
+            .ReplaceLineEndings("\n");
+        var uploadHelper = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "uploadWithProgress.js")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("Class=\"pn-empty-dropzone project-new-upload-dropzone\"", projectNew, StringComparison.Ordinal);
+        Assert.Contains("Class=\"plp-dropzone project-new-upload-dropzone\"", partsList, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnFilesDropped=\"OpenFilePicker\"", projectNew, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnFilesDropped=\"@OnAddPart\"", partsList, StringComparison.Ordinal);
+        Assert.Contains("window.projectNewUploads.initDropZones", projectNewCode, StringComparison.Ordinal);
+        Assert.Contains("function initDropZones", uploadHelper, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_MobileConfiguratorUsesFingerFriendlyControls()
     {
         var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");
