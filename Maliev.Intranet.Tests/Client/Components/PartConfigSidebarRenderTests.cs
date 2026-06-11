@@ -1030,10 +1030,73 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
         Assert.Equal("Select a customer to create the quote", quoteButton.GetAttribute("title"));
     }
 
+    [Fact]
+    public void MaterialColorOptions_WhenStandardResinHasClearCatalogChoice_HidesClear()
+    {
+        var materialId = Guid.NewGuid();
+        var part = CreatePartWithMaterialColorOption(
+            new CatalogMaterialDto(materialId, "Standard Resin", "RESIN_STD", "Polymer", null, "Opaque SLA resin.", 10),
+            materialId);
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var colorSection = cut.Find("[data-config-section='process-options']");
+        Assert.DoesNotContain(">Clear<", colorSection.InnerHtml, StringComparison.Ordinal);
+        Assert.Contains(">White<", colorSection.InnerHtml, StringComparison.Ordinal);
+        Assert.Contains(">Black<", colorSection.InnerHtml, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Clear Resin", "RESIN_CLEAR", "Transparent photopolymer resin.")]
+    [InlineData("Acrylic PMMA", "PMMA_CLEAR", "Clear acrylic sheet material.")]
+    public void MaterialColorOptions_WhenClearCapableMaterialHasClearCatalogChoice_ShowsClear(
+        string materialName,
+        string materialCode,
+        string description)
+    {
+        var materialId = Guid.NewGuid();
+        var part = CreatePartWithMaterialColorOption(
+            new CatalogMaterialDto(materialId, materialName, materialCode, "Polymer", null, description, 10),
+            materialId);
+
+        var cut = Render<PartConfigSidebar>(parameters => parameters
+            .Add(p => p.Part, part)
+            .Add(p => p.Processes, []));
+
+        var colorSection = cut.Find("[data-config-section='process-options']");
+        Assert.Contains(">Clear<", colorSection.InnerHtml, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] relativeParts)
     {
         return File.ReadAllText(FindRepoFile(relativeParts));
     }
+
+    private static PartViewModel CreatePartWithMaterialColorOption(CatalogMaterialDto material, Guid materialId) =>
+        new()
+        {
+            FileId = Guid.Empty,
+            Name = "fixture.stl",
+            ProcessCode = "SLA",
+            MaterialId = materialId,
+            AvailableMaterials = [material],
+            AvailableProcessOptions =
+            [
+                new ProcessConfigOptionDto(
+                    Guid.NewGuid(),
+                    "material_color",
+                    "Material Color",
+                    "select",
+                    "White",
+                    """["Clear","White","Black"]""",
+                    null,
+                    "Select the resin color.",
+                    false,
+                    10),
+            ],
+        };
 
     private static string FindRepoFile(params string[] relativeParts)
     {

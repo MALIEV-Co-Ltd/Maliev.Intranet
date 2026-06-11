@@ -1634,7 +1634,7 @@ public partial class PartConfigSidebar : ComponentBase
         {
             var parsed = ParseOptionChoices(option.OptionsJson);
             if (parsed.Count > 0)
-                return parsed;
+                return FilterMaterialColorChoices(option, parsed);
         }
 
         if (IsAnodizeColorOption(option))
@@ -1642,9 +1642,35 @@ public partial class PartConfigSidebar : ComponentBase
 
         if (option.ConfigKey.Contains("color", StringComparison.OrdinalIgnoreCase)
             || option.Label.Contains("color", StringComparison.OrdinalIgnoreCase))
-            return DefaultPlasticColors;
+            return FilterMaterialColorChoices(option, DefaultPlasticColors);
 
         return [];
+    }
+
+    private IReadOnlyList<string> FilterMaterialColorChoices(ProcessConfigOptionDto option, IReadOnlyList<string> choices)
+    {
+        if (!IsMaterialColorOption(option) || SelectedMaterial is null || MaterialAllowsClearColor(SelectedMaterial))
+            return choices;
+
+        return choices
+            .Where(choice => !IsClearColorChoice(choice))
+            .ToList();
+    }
+
+    private static bool IsClearColorChoice(string value)
+    {
+        var normalized = NormalizeOptionText(value);
+        return normalized is "clear" or "transparent" or "translucent";
+    }
+
+    private static bool MaterialAllowsClearColor(CatalogMaterialDto material)
+    {
+        var normalized = NormalizeOptionText($"{material.Code} {material.Name} {material.Description} {material.Category}");
+        return normalized.Contains("clear", StringComparison.Ordinal)
+            || normalized.Contains("transparent", StringComparison.Ordinal)
+            || normalized.Contains("translucent", StringComparison.Ordinal)
+            || normalized.Contains("acrylic", StringComparison.Ordinal)
+            || normalized.Contains("pmma", StringComparison.Ordinal);
     }
 
     private string? GetCurrentOptionChoiceValue(ProcessConfigOptionDto option, IReadOnlyList<string> options)
