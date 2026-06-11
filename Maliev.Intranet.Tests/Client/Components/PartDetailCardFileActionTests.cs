@@ -205,6 +205,7 @@ public sealed class PartDetailCardFileActionTests : BunitContext, IAsyncLifetime
         Assert.Contains("pdc-chip-meta-label", cut.Markup);
         Assert.Contains("pdc-chip-meta-value", cut.Markup);
         Assert.Contains("pdc-chip-action-label", cut.Markup);
+        Assert.Contains("aria-label=\"Adjust part units and scale\"", cut.Markup);
         Assert.Contains(">Scale<", cut.Markup, StringComparison.Ordinal);
     }
 

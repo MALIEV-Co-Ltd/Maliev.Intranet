@@ -2036,7 +2036,9 @@ public class ModuleRegressionSourceTests
         Assert.Contains("rgba(56, 189, 248", footerGeo, StringComparison.Ordinal);
         Assert.Contains("linear-gradient", footerGeo, StringComparison.Ordinal);
         Assert.Contains("box-shadow", scaleButton, StringComparison.Ordinal);
+        Assert.Contains("min-width: 98px;", scaleButton, StringComparison.Ordinal);
         Assert.Contains("border-left", detail, StringComparison.Ordinal);
+        Assert.Contains(".pdc-weight-tooltip ::deep *", detail, StringComparison.Ordinal);
         Assert.Contains("cursor: pointer;", weightTooltip, StringComparison.Ordinal);
     }
 
