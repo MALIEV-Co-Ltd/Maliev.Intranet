@@ -194,36 +194,6 @@ else
             }
         </section>
 
-        @if (RequiresDedicatedMaterialColorSelection)
-        {
-            @* ── Material Color ───────────────────────────────────────────── *@
-            <section class="pcs-section">
-                <div class="pcs-section-header">
-                    <span class="pcs-section-title">Material Color</span>
-                    <span class="pcs-section-count">@MaterialColorOptions.Count options</span>
-                </div>
-                <div class="pcs-color-choice-grid">
-                    @foreach (var color in MaterialColorOptions)
-                    {
-                        var fallback = MaterialColorOptions[0];
-                        var currentColor = GetProcessOptionValue(MaterialColorKey, fallback);
-                        var active = string.Equals(currentColor, color, StringComparison.OrdinalIgnoreCase);
-                        <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
-                                @onclick="@(() => OnMaterialColorChanged(color))">
-                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
-                                              ImageUrl="@GetMaterialColorImageUrl(color)"
-                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
-                            <span>@color</span>
-                            @if (active)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
-                            }
-                        </button>
-                    }
-                </div>
-            </section>
-        }
-
         @* ── Surface Finish ───────────────────────────────────────────── *@
         <section class="pcs-section" data-config-section="surface-finish">
             @{
@@ -296,6 +266,38 @@ else
                 </div>
             }
         </section>
+
+        @if (RequiresDedicatedMaterialColorSelection)
+        {
+            @* ── Material Color ───────────────────────────────────────────────
+               Always AFTER Surface Finish: the user picks a finish (e.g.
+               anodizing) first, then its color. *@
+            <section class="pcs-section">
+                <div class="pcs-section-header">
+                    <span class="pcs-section-title">Material Color</span>
+                    <span class="pcs-section-count">@MaterialColorOptions.Count options</span>
+                </div>
+                <div class="pcs-color-choice-grid">
+                    @foreach (var color in MaterialColorOptions)
+                    {
+                        var fallback = MaterialColorOptions[0];
+                        var currentColor = GetProcessOptionValue(MaterialColorKey, fallback);
+                        var active = string.Equals(currentColor, color, StringComparison.OrdinalIgnoreCase);
+                        <button class="pcs-color-choice @(active ? "pcs-color-choice--active" : "")"
+                                @onclick="@(() => OnMaterialColorChanged(color))">
+                            <OptionImageFrame Class="pcs-color-chip pcs-option-image-frame--small"
+                                              ImageUrl="@GetMaterialColorImageUrl(color)"
+                                              FallbackIcon="@Icons.Material.Outlined.Palette" />
+                            <span>@color</span>
+                            @if (active)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            }
+                        </button>
+                    }
+                </div>
+            </section>
+        }
 
         @* ── Color (Finish Options / Material Color) ───────────────────── *@
         @if (ShowColorSection)
@@ -1707,12 +1709,22 @@ else
             }
 
             .pcs-tol-selected-info {
+                /* Name on the first line, grade + range details wrap onto their
+                   own line — never truncate the tolerance values. */
                 display: flex;
-                align-items: center;
-                gap: 6px;
+                flex-wrap: wrap;
+                align-items: baseline;
+                column-gap: 6px;
+                row-gap: 2px;
                 flex: 1;
                 min-width: 0;
-                overflow: hidden;
+            }
+
+            .pcs-tol-selected-info .pcs-tol-range--selected {
+                flex-basis: 100%;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
             }
 
             .pcs-tol-grade--selected {

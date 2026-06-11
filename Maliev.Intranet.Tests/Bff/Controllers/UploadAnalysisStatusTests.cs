@@ -39,7 +39,6 @@ public class UploadAnalysisStatusTests
                 ".obj",
                 ".igs",
                 ".iges",
-                ".blend",
                 ".fbx",
                 ".gltf",
                 ".glb"

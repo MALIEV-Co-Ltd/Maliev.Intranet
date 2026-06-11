@@ -5,8 +5,11 @@ namespace Maliev.Intranet.Client.Components;
 /// </summary>
 public sealed class LocalGeometryRuntimeResult
 {
-    /// <summary>Manufacturing process code used by the browser runtime.</summary>
+    /// <summary>Manufacturing process code used by the browser runtime. Null for metrics-only runs.</summary>
     public string? ProcessCode { get; set; }
+
+    /// <summary>Runtime operation that produced this result: analyze or compute_metrics.</summary>
+    public string? Operation { get; set; }
 
     /// <summary>Runtime package version served by GeometryService.</summary>
     public string? RuntimeVersion { get; set; }
@@ -80,11 +83,17 @@ public sealed class LocalGeometryRuntimeMetrics
     /// <summary>Bounding box dimensions computed locally in millimeters.</summary>
     public LocalGeometryRuntimeBoundingBox? BoundingBox { get; set; }
 
-    /// <summary>Whether the local mesh appears manifold.</summary>
+    /// <summary>Whether the local mesh appears manifold (watertight, no shared-edge defects).</summary>
     public bool? IsManifold { get; set; }
 
-    /// <summary>Number of non-manifold edges found locally.</summary>
+    /// <summary>Number of edges shared by more than two faces (true non-manifold defects).</summary>
     public double? NonManifoldEdgeCount { get; set; }
+
+    /// <summary>Number of boundary edges belonging to exactly one face (open mesh / holes).</summary>
+    public double? OpenEdgeCount { get; set; }
+
+    /// <summary>Number of disconnected bodies in the mesh.</summary>
+    public double? BodyCount { get; set; }
 
     /// <summary>Runtime complexity bucket for the mesh.</summary>
     public string? Complexity { get; set; }

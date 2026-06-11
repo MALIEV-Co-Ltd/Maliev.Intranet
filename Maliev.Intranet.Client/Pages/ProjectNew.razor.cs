@@ -1546,6 +1546,273 @@ public partial class ProjectNew : IAsyncDisposable
         await InvokeAsync(StateHasChanged);
     }
 
+    /// <summary>
+    /// Replaces a part's 3D file with a newly uploaded revision. The part keeps
+    /// its configuration (process, material, finish, tolerance, quantity); all
+    /// geometry-derived state (metrics, DFM, viewer, thumbnails) is reset and
+    /// recomputed for the new file.
+    /// </summary>
+    private async Task HandleReplacePartFileAsync(PartReplaceFileRequest request)
+    {
+        var part = request.Part;
+        var file = request.File;
+        if (!_parts.Contains(part) || file.Size <= 0)
+            return;
+
+        var extension = Path.GetExtension(file.Name);
+        if (!FileTypes.Is3DFile(extension))
+        {
+            Snackbar.Add($"{file.Name}: not a supported 3D file format.", Severity.Warning);
+            return;
+        }
+
+        var clientUploadId = $"revision-{Guid.NewGuid():N}";
+
+        // Hand the browser File object to the shared upload pipeline.
+        await JS.InvokeVoidAsync(
+            "window.projectNewUploads.captureFiles",
+            request.ContainerId,
+            new[] { new { clientUploadId, fileName = file.Name, fileSize = file.Size, index = 0 } });
+
+        await ReplacePartFileCoreAsync(part, file.Name, file.Size, file.ContentType, clientUploadId);
+    }
+
+    /// <summary>
+    /// Handles a rescale request: scales every vertex of the part's mesh file by
+    /// the requested factor in the browser, then replaces the uploaded file with
+    /// the scaled result (configuration preserved).
+    /// </summary>
+    private async Task HandleRescalePartAsync(PartRescaleRequest request)
+    {
+        var part = request.Part;
+        if (!_parts.Contains(part) || string.IsNullOrEmpty(part.StoragePath))
+            return;
+
+        var clientUploadId = $"rescale-{Guid.NewGuid():N}";
+        try
+        {
+            var signedUrl = await GetSignedDownloadUrlAsync(part.StoragePath);
+            if (string.IsNullOrEmpty(signedUrl))
+            {
+                Snackbar.Add($"{part.Name}: could not download the file for rescaling.", Severity.Error);
+                return;
+            }
+
+            var scaled = await JS.InvokeAsync<ScaledFileResult?>(
+                "malievPartScaling.scaleAndRegister",
+                signedUrl,
+                part.Name,
+                request.ScaleFactor,
+                clientUploadId);
+            if (scaled is null || scaled.Size <= 0)
+            {
+                Snackbar.Add($"{part.Name}: rescaling produced no file.", Severity.Error);
+                return;
+            }
+
+            await ReplacePartFileCoreAsync(part, scaled.FileName ?? part.Name, scaled.Size, null, clientUploadId);
+        }
+        catch (JSException ex)
+        {
+            Snackbar.Add($"{part.Name}: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private sealed record ScaledFileResult(string? FileName, long Size);
+
+    /// <summary>
+    /// Shared revision/rescale upload core: uploads the file already registered
+    /// under <paramref name="clientUploadId"/> in the browser, then swaps it into
+    /// the part, resetting geometry-derived state while keeping configuration.
+    /// </summary>
+    private async Task ReplacePartFileCoreAsync(
+        PartViewModel part,
+        string fileName,
+        long fileSize,
+        string? contentType,
+        string clientUploadId)
+    {
+        var callbackId = Guid.NewGuid();
+        DotNetObjectReference<UploadProgressCallback>? callbackRef = null;
+
+        part.Uploading = true;
+        part.ProgressPercent = 0;
+        part.Error = null;
+        part.StatusText = "Uploading revision…";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var browserContentType = string.IsNullOrWhiteSpace(contentType) ? null : contentType;
+            var initiateRequest = new BffInitiateResumableUploadRequest
+            {
+                FileName = fileName,
+                ContentType = browserContentType,
+                FileSize = fileSize,
+                ProjectId = _tempProjectId,
+                CustomerId = _selectedCustomerId
+            };
+
+            var initiateResponse = await Http.PostAsJsonAsync("api/v1/uploads/resumable", initiateRequest);
+            if (!initiateResponse.IsSuccessStatusCode)
+            {
+                await MarkUploadFailedAsync(part, $"Revision upload initiation failed ({(int)initiateResponse.StatusCode}).");
+                return;
+            }
+
+            var session = await initiateResponse.Content.ReadFromJsonAsync<BffResumableUploadSessionResponse>();
+            if (session == null || string.IsNullOrWhiteSpace(session.UploadId) || string.IsNullOrWhiteSpace(session.SessionUri))
+            {
+                await MarkUploadFailedAsync(part, "Revision upload initiation response was invalid.");
+                return;
+            }
+
+            callbackRef = DotNetObjectReference.Create(new UploadProgressCallback(part, () => InvokeAsync(StateHasChanged)));
+            _uploadCallbacks[callbackId] = callbackRef;
+
+            var uploadResult = await JS.InvokeAsync<UploadResult>(
+                "window.projectNewUploads.uploadFile",
+                clientUploadId,
+                session.SessionUri,
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}",
+                browserContentType ?? "application/octet-stream",
+                fileSize,
+                callbackRef);
+
+            if (uploadResult == null || uploadResult.Status < 200 || uploadResult.Status >= 300)
+            {
+                await MarkUploadFailedAsync(part, $"Revision upload failed ({uploadResult?.Status ?? 0}).");
+                return;
+            }
+
+            var completeResponse = await Http.PostAsJsonAsync(
+                $"api/v1/uploads/resumable/{Uri.EscapeDataString(session.UploadId)}/complete",
+                new { });
+            if (!completeResponse.IsSuccessStatusCode)
+            {
+                await MarkUploadFailedAsync(part, $"Revision upload completion failed ({(int)completeResponse.StatusCode}).");
+                return;
+            }
+
+            var completedUpload = await completeResponse.Content.ReadFromJsonAsync<BffUploadResponse>();
+            if (completedUpload == null || string.IsNullOrWhiteSpace(completedUpload.StoragePath))
+            {
+                await MarkUploadFailedAsync(part, "Revision upload completion response was invalid.");
+                return;
+            }
+
+            // Detach from the old file before swapping in the revision.
+            await LeavePartFileGroupsAsync(part);
+            StopStatusWatchdogs(part);
+            _thumbnailSourceRequests.Remove(part.StoragePath ?? string.Empty);
+
+            ApplyReplacementFileToPart(part, fileName, completedUpload, clientUploadId);
+
+            part.Uploading = false;
+            part.ProgressPercent = 100;
+            part.AwaitingPreview = true;
+            part.StatusText = "Processing geometry...";
+
+            var completedLocally = await TryCompleteBrowserPrimaryViewerLocallyAsync(part);
+
+            if (CanGenerateThumbnailsLocally(part.StoragePath))
+            {
+                var storagePath = part.StoragePath!;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var signedUrl = await GetSignedDownloadUrlAsync(storagePath);
+                        if (string.IsNullOrEmpty(signedUrl)) return;
+                        part.SignedDownloadUrl = signedUrl;
+                        await ThumbnailService.GenerateAsync(storagePath, part.ThumbnailVersion, signedUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Revision thumbnail generation failed for {StoragePath}", storagePath);
+                    }
+                    finally
+                    {
+                        await InvokeAsync(() =>
+                        {
+                            part.AwaitingPreview = false;
+                            StateHasChanged();
+                        });
+                    }
+                });
+            }
+
+            await JoinPartFileGroupsAsync(part);
+            if (!completedLocally)
+                StartStatusWatchdog(part, part.StoragePath);
+
+            TriggerAutoSave();
+            TriggerPricingAsync(part);
+            Snackbar.Add($"{fileName}: revision uploaded — configuration kept.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            await MarkUploadFailedAsync(part, $"Revision upload error: {ex.Message}");
+        }
+        finally
+        {
+            if (callbackRef != null)
+            {
+                _uploadCallbacks.TryRemove(callbackId, out _);
+                callbackRef.Dispose();
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static void ApplyReplacementFileToPart(
+        PartViewModel part,
+        string fileName,
+        BffUploadResponse completedUpload,
+        string clientUploadId)
+    {
+        part.StoragePath = completedUpload.StoragePath;
+        part.StoragePathAliases.Clear();
+        part.FileId = Guid.TryParse(completedUpload.UploadId, out var fileId) ? fileId : Guid.NewGuid();
+        part.Name = fileName;
+        part.ClientUploadId = clientUploadId;
+        part.ThumbnailVersion = part.FileId.ToString("N");
+
+        // Geometry-derived state belongs to the OLD file — reset everything the
+        // pipelines recompute. Configuration (process/material/finish/tolerance/
+        // quantity/lead time) is intentionally preserved.
+        part.SignedDownloadUrl = null;
+        part.ViewerUrl = null;
+        part.ViewerStoragePath = null;
+        part.ViewerFileExtension = null;
+        part.GlbStoragePath = null;
+        part.GlbSignedUrl = null;
+        part.Dimensions = null;
+        part.VolumeMm3 = null;
+        part.SurfaceAreaMm2 = null;
+        part.IsManifold = null;
+        part.NonManifoldReason = null;
+        part.NonManifoldFaceCount = null;
+        part.BodyCount = null;
+        part.Bodies = [];
+        part.ThumbnailSmallUrl = null;
+        part.ThumbnailLargeUrl = null;
+        part.ThumbnailSmallGcsPath = null;
+        part.ThumbnailLargeGcsPath = null;
+        part.OverlayPaths = null;
+        part.OverlayUrls = null;
+        part.DfmReport = null;
+        part.FdmDfmReport = null;
+        part.SlaDfmReport = null;
+        part.CncDfmReport = null;
+        part.DfmAnalysisTimedOut = false;
+        part.AnalysisErrorCode = null;
+        part.LocalDfmRuntimeCompletedForProcessCode = null;
+        part.LocalDfmRuntimeTerminalProcessCode = null;
+        part.LocalDfmRuntimeTerminalReason = null;
+        part.Error = null;
+    }
+
     private static bool TryApplyLocalGeometryRuntimeResult(
         PartViewModel part,
         LocalGeometryRuntimeResult result)
@@ -1560,8 +1827,19 @@ public partial class ProjectNew : IAsyncDisposable
             return false;
         }
 
+        // Metrics-only probe (no manufacturing process selected yet): apply the
+        // mesh metrics so dimensions/volume/integrity show right after upload,
+        // but do not record a DFM report — that needs a process-specific run.
+        if (string.Equals(result.Operation, "compute_metrics", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(result.ProcessCode))
+        {
+            if (result.Metrics is null)
+                return false;
+            ApplyLocalGeometryRuntimeMetrics(part, result.Metrics);
+            return true;
+        }
+
         if (string.IsNullOrWhiteSpace(part.ProcessCode)
-            || string.IsNullOrWhiteSpace(result.ProcessCode)
             || !ProcessCodeNormalizer.Equals(part.ProcessCode, result.ProcessCode))
         {
             return false;
@@ -1610,6 +1888,13 @@ public partial class ProjectNew : IAsyncDisposable
         if (metrics.IsManifold.HasValue)
             part.IsManifold = metrics.IsManifold.Value;
 
+        if (TryGetFiniteNonNegative(metrics.BodyCount, out var bodyCountValue)
+            && bodyCountValue >= 1
+            && bodyCountValue <= int.MaxValue)
+        {
+            part.BodyCount = (int)Math.Round(bodyCountValue, MidpointRounding.AwayFromZero);
+        }
+
         if (TryGetFiniteNonNegative(metrics.NonManifoldEdgeCount, out var edgeCountValue)
             && edgeCountValue > 0
             && edgeCountValue <= int.MaxValue)
@@ -1619,7 +1904,18 @@ public partial class ProjectNew : IAsyncDisposable
             part.NonManifoldFaceCount = edgeCount;
             part.NonManifoldReason = string.Create(
                 CultureInfo.InvariantCulture,
-                $"Found {edgeCount:N0} non-manifold edge(s).");
+                $"Found {edgeCount:N0} non-manifold edge(s) shared by more than two faces.");
+        }
+        else if (TryGetFiniteNonNegative(metrics.OpenEdgeCount, out var openEdgeValue)
+            && openEdgeValue > 0
+            && openEdgeValue <= int.MaxValue)
+        {
+            var openEdgeCount = (int)Math.Round(openEdgeValue, MidpointRounding.AwayFromZero);
+            part.IsManifold = false;
+            part.NonManifoldFaceCount = openEdgeCount;
+            part.NonManifoldReason = string.Create(
+                CultureInfo.InvariantCulture,
+                $"Found {openEdgeCount:N0} open edge(s) — the mesh is not watertight.");
         }
         else if (metrics.IsManifold == true)
         {

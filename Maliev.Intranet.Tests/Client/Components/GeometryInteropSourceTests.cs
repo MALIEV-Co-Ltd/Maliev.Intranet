@@ -62,21 +62,28 @@ public sealed class GeometryInteropSourceTests
         Assert.Contains("up: [0, 0, 1]", source, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void IndexHtmlLoadsBabylonBeforeGeometryInterop()
+    [Theory]
+    [InlineData("index.html host page")]
+    [InlineData("BFF App.razor host page")]
+    public void HostPagesLoadBabylonBeforeGeometryInterop(string hostPage)
     {
-        var html = ReadRepoFile(IndexHtmlPath);
+        // InteractiveAuto serves the BFF's App.razor, NOT the WASM index.html.
+        // GeometryInterop.js missing from the served page leaves window.MalievGeometry
+        // undefined and silently disables ALL local thumbnail generation.
+        var html = hostPage.StartsWith("index", StringComparison.Ordinal)
+            ? ReadRepoFile(IndexHtmlPath)
+            : ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
         var babylonIndex = html.IndexOf("lib/babylonjs/babylon.js", StringComparison.Ordinal);
         var loadersIndex = html.IndexOf("lib/babylonjs/babylonjs.loaders.min.js", StringComparison.Ordinal);
         var interopIndex = html.IndexOf("js/geometry/JsInterop/GeometryInterop.js", StringComparison.Ordinal);
 
-        Assert.True(babylonIndex >= 0, "index.html must load the BabylonJS runtime.");
-        Assert.True(loadersIndex >= 0, "index.html must load the BabylonJS mesh loaders.");
-        Assert.True(interopIndex >= 0, "index.html must load GeometryInterop.js.");
+        Assert.True(babylonIndex >= 0, $"{hostPage} must load the BabylonJS runtime.");
+        Assert.True(loadersIndex >= 0, $"{hostPage} must load the BabylonJS mesh loaders.");
+        Assert.True(interopIndex >= 0, $"{hostPage} must load GeometryInterop.js.");
         Assert.True(
             babylonIndex < interopIndex && loadersIndex < interopIndex,
-            "GeometryInterop.js depends on the global BABYLON runtime and must load after babylon.js and the loaders.");
+            $"GeometryInterop.js depends on the global BABYLON runtime and must load after babylon.js and the loaders in {hostPage}.");
     }
 
     private static string ReadRepoFile(params string[] relativeParts)

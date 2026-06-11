@@ -8,11 +8,14 @@
 @inject ISnackbar Snackbar
 @implements IDisposable
 
-<div class="qsb-root @(SelectedCustomer != null ? "qsb-root--has-customer" : "qsb-root--no-customer")">
-    @if (SelectedCustomer != null)
-    {
+@* The quote total stays visible even without a selected customer — only the
+   final Quote action requires one. The PDF action produces a preliminary
+   quote that works without a customer. *@
+<div class="qsb-root qsb-root--has-customer">
+    @{
         @* ── Zone 2: Total + Actions ──────────────────────────────────────────── *@
-        <div class="qsb-zone-total">
+    }
+    <div class="qsb-zone-total">
         <div class="qsb-total-top">
             <div class="qsb-total-ships">
                 <div class="qsb-zone-label">Quote Total</div>
@@ -60,11 +63,12 @@
                        Class="@($"qsb-btn-details {(_detailsOpen ? "qsb-btn-details--active" : "")}")">
                 Details
             </MudButton>
+            @* Preliminary quote PDF works without a customer. *@
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Default"
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Outlined.PictureAsPdf"
-                       Disabled="@(!CanQuote || Parts.Count == 0 || _generatingPdf)"
+                       Disabled="@(Parts.Count == 0 || _generatingPdf)"
                        OnClick="@HandleGeneratePdfAsync"
                        Class="qsb-btn-pdf">
                 @if (_generatingPdf)
@@ -73,19 +77,22 @@
                 }
                 PDF
             </MudButton>
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       Disabled="@(!CanQuote || Parts.Count == 0 || Saving)"
-                       OnClick="@OnQuote"
-                       Class="qsb-btn-checkout">
-                @if (Saving)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                }
-                Quote
-                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
-            </MudButton>
+            <MudTooltip Text="@(SelectedCustomer == null ? "Select a customer to create the quote" : null)"
+                        Disabled="@(SelectedCustomer != null)">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           Disabled="@(!CanQuote || Parts.Count == 0 || Saving || SelectedCustomer == null)"
+                           OnClick="@OnQuote"
+                           Class="qsb-btn-checkout">
+                    @if (Saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                    }
+                    Quote
+                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                </MudButton>
+            </MudTooltip>
         </div>
         @if (_detailsOpen)
         {
@@ -200,7 +207,6 @@
             </div>
         }
     </div>
-}
 </div>
 
 <style>
@@ -213,19 +219,7 @@
         overflow: visible;
     }
 
-    /* ── No customer: empty/hidden state ─────────────────────────────────── */
-    .qsb-root--no-customer {
-        min-height: 0;
-        padding: 0;
-        border-top: none;
-        background: transparent;
-    }
-
-    .qsb-root--no-customer .qsb-zone-total {
-        display: none;
-    }
-
-    /* ── Has customer: show quote total ───────────────────────────────────── */
+    /* ── Quote total: always visible ──────────────────────────────────────── */
     .qsb-root--has-customer {
         display: flex;
         flex-direction: column;

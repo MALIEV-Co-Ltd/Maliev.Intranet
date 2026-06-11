@@ -337,6 +337,7 @@
     <script src="js/note-editor.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/uploadWithProgress.js"></script>
+    <script src="js/file-download.js"></script>
     <script src="js/google-address-picker.js"></script>
     <script src="js/address-map.js"></script>
     <script>
@@ -362,6 +363,10 @@
     <script src="lib/babylonjs/babylon.js"></script>
     <script src="lib/babylonjs/babylonjs.materials.min.js"></script>
     <script src="lib/babylonjs/babylonjs.loaders.min.js"></script>
+    @* Browser-local thumbnail generation — classic script, requires the global
+       BABYLON runtime + loaders above. Without it window.MalievGeometry is
+       undefined and every thumbnail silently falls back to the server. *@
+    <script src="js/geometry/JsInterop/GeometryInterop.js"></script>
     <script src="js/material-labels.js"></script>
     <script src="js/production-schedule-board.js"></script>
 </body>

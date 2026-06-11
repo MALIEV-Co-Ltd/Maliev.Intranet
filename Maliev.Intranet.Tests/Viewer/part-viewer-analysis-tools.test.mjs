@@ -1106,9 +1106,52 @@ test('runLocalAdvisoryGeometry refuses to fabricate a default process code', asy
 
         throw new Error(`Unexpected manifest fetch for ${url}`);
     };
+    const workerMessages = [];
+    context.fetch = async (url, init = {}) => {
+        if (init?.method === 'POST') {
+            telemetryPosts.push({ url, payload: JSON.parse(init.body) });
+            return { ok: true };
+        }
+        return {
+            ok: true,
+            json: async () => ({
+                manifestVersion: 1,
+                runtimeVersion: '1.2.0',
+                algorithmVersion: 'browser-first-dfm-v1',
+                executionMode: 'primary_interactive',
+                authority: 'local_primary',
+                isAuthoritative: false,
+                minFrontendApiVersion: 1,
+                assets: {
+                    worker: '/geometry/client-runtime/assets/client-geometry-runtime.abc123.worker.js',
+                },
+            }),
+        };
+    };
     context.Worker = class Worker {
         constructor() {
             workerStarted = true;
+            this.onmessage = null;
+        }
+
+        postMessage(message) {
+            workerMessages.push(message);
+            // Metrics-only envelope from the runtime worker.
+            queueMicrotask(() => this.onmessage?.({
+                data: {
+                    id: message.id,
+                    ok: true,
+                    result: {
+                        isAuthoritative: false,
+                        authority: 'local_primary',
+                        executionMode: 'primary_interactive',
+                        operation: 'compute_metrics',
+                        processCode: null,
+                        metrics: { faceCount: 1 },
+                        issues: [],
+                    },
+                },
+            }));
         }
 
         terminate() {}
@@ -1137,19 +1180,23 @@ test('runLocalAdvisoryGeometry refuses to fabricate a default process code', asy
         });
     `, context);
 
-    assert.equal(result, null);
-    assert.equal(workerStarted, false);
-    assert.equal(panelRendered, false);
-    assert.equal(dotNetCalls.length, 1);
-    assert.equal(dotNetCalls[0].method, 'NotifyLocalGeometryRuntimeUnavailable');
-    assert.deepEqual(JSON.parse(JSON.stringify(dotNetCalls[0].payload)), {
-        processCode: null,
-        reason: 'process_code_missing',
-    });
-    assert.equal(telemetryPosts.length, 1);
-    assert.equal(telemetryPosts[0].payload.processCode, null);
-    assert.equal(telemetryPosts[0].payload.status, 'unavailable');
-    assert.equal(telemetryPosts[0].payload.reason, 'process_code_missing');
+    // Without a process code the runtime degrades to a metrics-only probe —
+    // it must never fabricate a default process code for DFM screening.
+    assert.equal(workerStarted, true);
+    assert.equal(workerMessages.length, 1);
+    assert.equal(workerMessages[0].operation, 'compute_metrics');
+    assert.equal(workerMessages[0].processCode, null);
+
+    assert.ok(result, 'metrics-only run must produce a result');
+    assert.equal(result.operation, 'compute_metrics');
+
+    const completed = dotNetCalls.find(call => call.method === 'NotifyLocalGeometryRuntimeComplete');
+    assert.ok(completed, 'metrics must be reported to .NET');
+    assert.equal(completed.payload.processCode, null);
+    assert.equal(
+        dotNetCalls.some(call => call.method === 'NotifyLocalGeometryRuntimeUnavailable'),
+        false,
+        'a missing process code is not an unavailability condition');
 });
 
 test('runLocalAdvisoryGeometry can analyze direct file bytes before viewer mesh buffers exist', async () => {
@@ -1700,8 +1747,9 @@ test('cutting mat fades in from below and fades out before disposal', () => {
         })();
     `, context);
 
-    // The mat rests 0.5 mm below the model base (z=0 here) to prevent z-fighting.
-    assert.equal(shown.topZ, -0.5);
+    // The mat top settles exactly at the model base (z=0 here) — z-fighting is
+    // handled by material depth bias, not a physical gap.
+    assert.equal(shown.topZ, 0);
     assert.equal(shown.topAlpha, 1);
     assert.equal(shown.topTransparencyMode, 0);
     assert.equal(shown.cameraMinZ, 0.001);
@@ -1720,7 +1768,7 @@ test('cutting mat fades in from below and fades out before disposal', () => {
     `, context);
 
     assert.equal(hideStart.topExists, true);
-    assert.equal(hideStart.topZ, -0.5);
+    assert.equal(hideStart.topZ, 0);
     assert.equal(hideStart.topAlpha, 1);
     assert.equal(renderTicks.length, 3);
 

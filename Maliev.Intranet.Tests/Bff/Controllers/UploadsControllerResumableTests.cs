@@ -82,6 +82,62 @@ public class UploadsControllerResumableTests
         Assert.Equal("skip_for_browser_viewable", metadataTags.GetProperty("geometry.serverGlbExport").GetString());
     }
 
+    [Theory]
+    [InlineData("part.stl")]
+    [InlineData("part.step")]
+    [InlineData("part.stp")]
+    [InlineData("part.3mf")]
+    [InlineData("part.obj")]
+    [InlineData("part.igs")]
+    [InlineData("part.iges")]
+    [InlineData("part.fbx")]
+    [InlineData("part.glb")]
+    [InlineData("part.gltf")]
+    public async Task InitiateResumableUploadAsync_AcceptsConfiguredQuoteEngineModelExtensions(string fileName)
+    {
+        var uploadClient = MakeUploadClient((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    uploadId = "upload-123",
+                    sessionUri = "https://storage.googleapis.com/upload/session",
+                    expiresAt = DateTime.UtcNow.AddHours(1),
+                    totalSize = 1024L
+                })
+            }));
+
+        var controller = CreateController(uploadClient);
+        var result = await controller.InitiateResumableUploadAsync(new BffInitiateResumableUploadRequest
+        {
+            FileName = fileName,
+            ContentType = "application/octet-stream",
+            FileSize = 1024,
+            ProjectId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task InitiateResumableUploadAsync_RejectsBlendBecauseItIsNotAQuoteEngineModelFormat()
+    {
+        var uploadClient = MakeUploadClient((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)));
+
+        var controller = CreateController(uploadClient);
+        var result = await controller.InitiateResumableUploadAsync(new BffInitiateResumableUploadRequest
+        {
+            FileName = "scene.blend",
+            ContentType = "application/x-blender",
+            FileSize = 1024,
+            ProjectId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        }, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains(".blend", Assert.IsType<string>(badRequest.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task CompleteResumableUploadAsync_CompletesUploadSession()
     {
@@ -383,7 +439,19 @@ public class UploadsControllerResumableTests
     {
         return new FileTypesSettings
         {
-            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".stl", ".step", ".stp", ".3mf" },
+            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".stl",
+                ".step",
+                ".stp",
+                ".3mf",
+                ".obj",
+                ".igs",
+                ".iges",
+                ".fbx",
+                ".glb",
+                ".gltf"
+            },
             DocumentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             DrawingExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase),

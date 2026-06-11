@@ -105,6 +105,17 @@
                 }
             </button>
         }
+        @if (OnReplaceFile.HasDelegate && !string.IsNullOrEmpty(Part.StoragePath))
+        {
+            <div id="@RevisionUploadContainerId" class="pdc-revision-upload">
+                <label class="pdc-icon-btn" title="Upload new revision (keeps configuration)">
+                    <InputFile OnChange="HandleRevisionFileSelectedAsync"
+                               accept="@FileTypes.ThreeDAcceptString"
+                               style="display:none" />
+                    <MudIcon Icon="@Icons.Material.Outlined.UploadFile" Size="Size.Small" />
+                </label>
+            </div>
+        }
         @if (OnRemovePart.HasDelegate)
         {
             <button class="pdc-icon-btn pdc-icon-btn--danger" title="Remove part"
@@ -322,18 +333,30 @@
             var weightKg = GetEstimatedWeightKg();
         }
         <div class="pdc-footer-geo">
-            <span class="pdc-chip pdc-chip--meta">Units: mm</span>
+            <button class="pdc-chip pdc-chip--meta pdc-chip--action"
+                    title="Adjust part size, scale, or original units"
+                    @onclick="OpenScaleDialog"
+                    disabled="@(!CanRescalePart)">
+                Units: mm
+                <MudIcon Icon="@Icons.Material.Outlined.Straighten" Style="font-size:12px;width:12px;height:12px;margin-left:3px;" />
+            </button>
 
             @if (weightKg.HasValue)
             {
                 <span class="pdc-footer-sep">·</span>
-                <span class="pdc-chip pdc-chip--meta">Weight: @(weightKg.Value.ToString("F3")) kg</span>
+                <MudTooltip Text="@GetWeightFormulaTooltip()" Placement="Placement.Top">
+                    <span class="pdc-chip pdc-chip--meta">Weight: @FormatWeight(weightKg.Value)</span>
+                </MudTooltip>
             }
 
             @if (Part.SurfaceAreaMm2.HasValue)
             {
                 <span class="pdc-footer-sep">·</span>
-                <span class="pdc-chip pdc-chip--meta">Surface Area: @(Part.SurfaceAreaMm2.Value.ToString("N1")) mm²</span>
+                <button class="pdc-chip pdc-chip--meta pdc-chip--action"
+                        title="Click to switch between mm², cm², and m²"
+                        @onclick="CycleAreaUnit">
+                    Surface Area: @FormatSurfaceArea(Part.SurfaceAreaMm2.Value)
+                </button>
             }
         </div>
 
@@ -366,6 +389,52 @@
 
 </div>@* end pdc-root *@
 
+@* ── Scale / units dialog ─────────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_scaleDialogVisible" Options="@(new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Adjust size &amp; units</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!CanRescalePart)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Rescaling is currently supported for STL and OBJ files only.
+            </MudAlert>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                The rescaled file replaces the uploaded 3D file. The part keeps its
+                configuration; geometry, DFM, and pricing are recomputed.
+            </MudText>
+            <MudSelect T="string" @bind-Value="_scaleSourceUnit" Label="File was authored in" Dense="true" Class="mb-2">
+                <MudSelectItem Value="@("mm")">Millimeters (no change)</MudSelectItem>
+                <MudSelectItem Value="@("cm")">Centimeters (×10)</MudSelectItem>
+                <MudSelectItem Value="@("m")">Meters (×1000)</MudSelectItem>
+                <MudSelectItem Value="@("in")">Inches (×25.4)</MudSelectItem>
+            </MudSelect>
+            <MudNumericField T="double" @bind-Value="_scaleCustomFactor"
+                             Label="Additional scale factor" Min="0.001" Max="1000" Step="0.1"
+                             Format="0.###" Immediate="true" Class="mb-2" />
+            @if (Part.Dimensions != null)
+            {
+                var factor = ResolveScaleFactor();
+                <MudText Typo="Typo.caption" Class="maliev-mono">
+                    @($"{Part.Dimensions.X:0.#} × {Part.Dimensions.Y:0.#} × {Part.Dimensions.Z:0.#} mm → " +
+                      $"{Part.Dimensions.X * factor:0.#} × {Part.Dimensions.Y * factor:0.#} × {Part.Dimensions.Z * factor:0.#} mm")
+                </MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _scaleDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Disabled="@(!CanRescalePart || Math.Abs(ResolveScaleFactor() - 1.0) < 0.0000001)"
+                   OnClick="ApplyRescaleAsync">
+            Apply &amp; re-upload
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     /// <summary>Injected snackbar service for user notifications.</summary>
@@ -397,6 +466,21 @@
 
     /// <summary>Callback invoked when the user clicks the remove button.</summary>
     [Parameter] public EventCallback<PartViewModel> OnRemovePart { get; set; }
+
+    /// <summary>
+    /// Callback invoked when the user uploads a replacement file (new revision).
+    /// The part keeps its configuration; only the 3D file is replaced.
+    /// </summary>
+    [Parameter] public EventCallback<PartReplaceFileRequest> OnReplaceFile { get; set; }
+
+    private string RevisionUploadContainerId => $"pdc-revision-{Part.FileId:N}";
+
+    private async Task HandleRevisionFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null || !OnReplaceFile.HasDelegate) return;
+        await OnReplaceFile.InvokeAsync(new PartReplaceFileRequest(Part, file, RevisionUploadContainerId));
+    }
 
     private int _activeTab = 0;
     private bool _bodyTreeExpanded = false;
@@ -460,6 +544,79 @@
         if (!Part.VolumeMm3.HasValue || Part.VolumeMm3.Value <= 0) return null;
         var density = GetMaterialDensityGcm3(Part.MaterialCode);
         return Part.VolumeMm3.Value * density / 1_000_000.0;
+    }
+
+    /// <summary>Adapts the unit to the magnitude: 5 g instead of 0.005 kg, 32 kg instead of 32,000 g.</summary>
+    private static string FormatWeight(double weightKg) => weightKg switch
+    {
+        < 1.0 => $"{weightKg * 1000.0:0.#} g",
+        >= 1000.0 => $"{weightKg / 1000.0:0.##} t",
+        _ => $"{weightKg:0.##} kg",
+    };
+
+    private string GetWeightFormulaTooltip()
+    {
+        var density = GetMaterialDensityGcm3(Part.MaterialCode);
+        var volumeCm3 = (Part.VolumeMm3 ?? 0) / 1000.0;
+        var material = string.IsNullOrEmpty(Part.MaterialCode) ? "default density" : Part.MaterialCode;
+        return $"Weight = volume × density = {volumeCm3:N2} cm³ × {density:0.##} g/cm³ ({material})";
+    }
+
+    // ── Surface-area unit toggle (mm² → cm² → m²) ──────────────────────
+    private int _areaUnitIndex;
+
+    private void CycleAreaUnit() => _areaUnitIndex = (_areaUnitIndex + 1) % 3;
+
+    private string FormatSurfaceArea(double areaMm2) => _areaUnitIndex switch
+    {
+        1 => $"{areaMm2 / 100.0:N2} cm²",
+        2 => $"{areaMm2 / 1_000_000.0:N4} m²",
+        _ => $"{areaMm2:N1} mm²",
+    };
+
+    // ── Scale / units dialog ────────────────────────────────────────────
+    private bool _scaleDialogVisible;
+    private string _scaleSourceUnit = "mm";
+    private double _scaleCustomFactor = 1.0;
+
+    private static readonly string[] RescalableExtensions = [".stl", ".obj"];
+
+    private bool CanRescalePart =>
+        OnRescalePart.HasDelegate
+        && !string.IsNullOrEmpty(Part.StoragePath)
+        && RescalableExtensions.Contains(
+            Path.GetExtension(Part.Name ?? Part.StoragePath ?? string.Empty),
+            StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Callback invoked when the user applies a rescale; the page re-uploads the scaled file.</summary>
+    [Parameter] public EventCallback<PartRescaleRequest> OnRescalePart { get; set; }
+
+    private void OpenScaleDialog()
+    {
+        _scaleSourceUnit = "mm";
+        _scaleCustomFactor = 1.0;
+        _scaleDialogVisible = true;
+    }
+
+    private double ResolveScaleFactor()
+    {
+        var unitFactor = _scaleSourceUnit switch
+        {
+            "cm" => 10.0,
+            "m" => 1000.0,
+            "in" => 25.4,
+            _ => 1.0,
+        };
+        var custom = double.IsFinite(_scaleCustomFactor) && _scaleCustomFactor > 0 ? _scaleCustomFactor : 1.0;
+        return unitFactor * custom;
+    }
+
+    private async Task ApplyRescaleAsync()
+    {
+        var factor = ResolveScaleFactor();
+        _scaleDialogVisible = false;
+        if (Math.Abs(factor - 1.0) < 0.0000001 || !OnRescalePart.HasDelegate) return;
+        await OnRescalePart.InvokeAsync(new PartRescaleRequest(Part, factor));
     }
 
     private static double GetMaterialDensityGcm3(string? materialCode)
@@ -654,7 +811,13 @@
                 if (result.TryGetProperty("url", out var urlProp))
                 {
                     var url = urlProp.GetString();
-                    if (url != null) await JS.InvokeVoidAsync("window.open", url, "_blank");
+                    if (url != null)
+                    {
+                        // Signed storage URLs serve hashed object names — download
+                        // through the helper so the file keeps its original name.
+                        var fileName = ResolveDownloadFileName();
+                        await JS.InvokeVoidAsync("malievFiles.downloadFromUrl", url, fileName);
+                    }
                 }
             }
         }
@@ -666,6 +829,25 @@
         {
             _downloading = false;
         }
+    }
+
+    private string ResolveDownloadFileName()
+    {
+        var name = Part.Name;
+        if (string.IsNullOrWhiteSpace(name))
+            name = Path.GetFileName(Part.StoragePath ?? string.Empty);
+
+        // Storage paths prefix the original name with an upload hash
+        // ("ab12cd34_stud bolt.step") — strip it when it leaks into the name.
+        if (string.IsNullOrWhiteSpace(Path.GetExtension(name)))
+        {
+            var storageName = Path.GetFileName(Part.StoragePath ?? string.Empty);
+            var underscore = storageName.IndexOf('_');
+            if (underscore > 0 && underscore < storageName.Length - 1)
+                name = storageName[(underscore + 1)..];
+        }
+
+        return string.IsNullOrWhiteSpace(name) ? "part" : name;
     }
     private string? _viewerErrorMessage;
     private CancellationTokenSource? _dfmTimeoutCts;
@@ -949,7 +1131,13 @@
             return new ModelViewer.TurningAxisViewModel(cachedDto.PrimaryAxis, cachedDto.AxisVector.Take(3).ToArray(), cachedDto.AxisPoint.Take(3).ToArray());
         }
 
-        return null;
+        if (Part.DfmReport is DfmReport report && IsNotTurnableReport(report))
+            return null;
+
+        // Local-first DFM reports carry no axis data — send an "auto" request so
+        // the viewer derives the turning axis from the model bounds and ring fit.
+        // Restores the axis-of-turning marker lost in the local-DFM migration.
+        return new ModelViewer.TurningAxisViewModel("auto", [0d, 0d, 0d], [0d, 0d, 0d]);
     }
 
     private string ResolveViewerFileExtension()

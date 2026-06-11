@@ -786,7 +786,6 @@ public class UploadsController(
             ".igs" => "application/iges",
             ".iges" => "application/iges",
             // 3D design
-            ".blend" => "application/x-blender",
             ".fbx" => "application/x-fbx",
             ".gltf" => "model/gltf+json",
             ".glb" => "model/gltf-binary",

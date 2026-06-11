@@ -2572,10 +2572,20 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                 // ── Permanent shadow-catcher ground plane ──
                 // Creates an always-on ground mesh to catch shadows from the model.
                 // The grid toggle is independent and creates/disposes its own ground.
-                const bbSizeXY = Math.max(finalBb.max.x - finalBb.min.x, finalBb.max.y - finalBb.min.y) * 8;
+                // Size includes the model HEIGHT: a tall narrow part throws a shadow
+                // roughly its height across the floor, so footprint-only sizing
+                // visibly clips the shadow for tall parts.
+                const bbSizeXY = Math.max(
+                    finalBb.max.x - finalBb.min.x,
+                    finalBb.max.y - finalBb.min.y,
+                    (finalBb.max.z - finalBb.min.z) * 1.5) * 8;
                 const catcher = BABYLON.MeshBuilder.CreateGround('__shadow_catcher__', { width: bbSizeXY, height: bbSizeXY }, _scene);
                 catcher.rotation.x = Math.PI / 2;   // world XY plane (Z-up)
-                catcher.position.z = finalBb.min.z - 0.5;  // sit just below model base to prevent z-fighting
+                // Coplanar with the model base — the shadow must CONTACT the part.
+                // Z-fighting with the model's bottom face is prevented by the
+                // material depth bias (zOffset) below, not by a physical gap that
+                // visually disconnects the part from its shadow.
+                catcher.position.z = finalBb.min.z;
                 catcher.receiveShadows = true;
                 catcher.isPickable = false;
                 catcher.isVisible = false; // hidden until showGrid/showCuttingMat activates a floor
@@ -2588,6 +2598,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     mat.activeLight  = key;
                     mat.shadowColor  = new BABYLON.Color3(0, 0, 0);
                     mat.alpha        = 0.35;
+                    mat.zOffset      = 2; // depth bias instead of a physical 0.5 mm gap
                     catcher.material = mat;
                 } else {
                     // Fallback: transparent StandardMaterial
@@ -2595,6 +2606,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
                     mat.alpha = 0.0001;
                     mat.diffuseColor = new BABYLON.Color3(1, 1, 1);
                     mat.specularColor = new BABYLON.Color3(0, 0, 0);
+                    mat.zOffset = 2;
                     catcher.material = mat;
                 }
 
@@ -5822,13 +5834,43 @@ export function collectAdvisoryMeshBuffers(canvasId) {
             : Array.from({ length: positions.length / 3 }, (_, index) => index);
         if (safeIndices.length < 3) continue;
 
+        // A mirroring world matrix (negative determinant — BabylonJS adds one
+        // to GLB roots for left/right-handed conversion) inverts triangle
+        // winding once positions are baked to world space. Swap each
+        // triangle's last two indices so cross-product face normals in the
+        // DFM worker point OUTWARD again — otherwise upward faces get
+        // flagged as overhangs. Face index order is preserved.
+        const orientedIndices = meshWorldMatrixFlipsWinding(mesh)
+            ? swapTriangleWinding(safeIndices)
+            : safeIndices;
+
         buffers.push({
             positions: getMeshWorldPositions(mesh, positions),
-            indices: safeIndices,
+            indices: orientedIndices,
         });
     }
 
     return buffers;
+}
+
+function meshWorldMatrixFlipsWinding(mesh) {
+    try {
+        mesh.computeWorldMatrix?.(true);
+        const determinant = mesh.getWorldMatrix?.()?.determinant?.();
+        return Number.isFinite(determinant) && determinant < 0;
+    } catch (_) {
+        return false;
+    }
+}
+
+function swapTriangleWinding(indices) {
+    const swapped = indices.slice();
+    for (let index = 0; index + 2 < swapped.length; index += 3) {
+        const tmp = swapped[index + 1];
+        swapped[index + 1] = swapped[index + 2];
+        swapped[index + 2] = tmp;
+    }
+    return swapped;
 }
 
 function resolveRuntimeAssetUrl(assetPath, assetBaseUrl = LOCAL_ADVISORY_ASSET_BASE_URL) {
@@ -6069,7 +6111,7 @@ function terminateLocalAdvisoryWorker(canvasId) {
     delete localAdvisoryWorkers[canvasId];
 }
 
-function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, wasmUrl, input, processCode, timeoutMs) {
+function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, wasmUrl, input, processCode, timeoutMs, operation = 'analyze') {
     terminateLocalAdvisoryWorker(canvasId);
 
     return new Promise((resolve, reject) => {
@@ -6093,7 +6135,7 @@ function analyzeWithLocalAdvisoryWorker(canvasId, workerUrl, wasmUrl, input, pro
             terminateLocalAdvisoryWorker(canvasId);
             reject(new Error(event?.message || 'Local advisory geometry worker failed.'));
         };
-        worker.postMessage({ id: messageId, input, processCode, wasmUrl });
+        worker.postMessage({ id: messageId, operation, input, processCode, wasmUrl });
     });
 }
 
@@ -6392,12 +6434,11 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
         return null;
     }
 
-    if (!processCode) {
-        await notifyLocalAdvisoryUnavailableDotNet(
-            options.dotNetRef,
-            unavailablePayload('process_code_missing'));
-        return null;
-    }
+    // Without a manufacturing process the runtime still computes mesh metrics
+    // (dimensions, volume, manifold/open edges, body count) so the part shows
+    // real data immediately after upload. Process-specific DFM screening runs
+    // later once the user picks a process.
+    const metricsOnly = !processCode;
 
     const runId = (localAdvisoryRuns[canvasId] ?? 0) + 1;
     localAdvisoryRuns[canvasId] = runId;
@@ -6480,7 +6521,8 @@ export async function runLocalAdvisoryGeometry(canvasId, options = {}) {
                 wasmUrl,
                 runtimeInput,
                 processCode,
-                resolveLocalAdvisoryTimeoutMs(manifest, options));
+                resolveLocalAdvisoryTimeoutMs(manifest, options),
+                metricsOnly ? 'compute_metrics' : 'analyze');
         });
         if (!result) {
             clearLocalAdvisoryPanel(canvasId);
@@ -7382,10 +7424,15 @@ function _syncShadowCatcherVisibility(canvasId) {
     if (catcher.position) {
         const bb = sceneBoundingBoxes[canvasId];
         const baseZ = bb ? bb.min.z : 0;
-        // Both the grid and cutting mat top sit 0.5 mm below the model base (z=baseZ)
-        // to prevent z-fighting with the model's bottom face. The shadow catcher must
-        // stay below whichever floor surface is active so depth tests resolve correctly.
-        catcher.position.z = matOn ? baseZ - 0.6 : baseZ - 0.5;
+        // All floor surfaces are coplanar with the model base; z-fighting is
+        // resolved with material depth bias (zOffset), not physical gaps. The
+        // shadow must visibly CONTACT the part, so the catcher sits at the
+        // base plane too (its zOffset is larger than the grid/mat's so depth
+        // tests still resolve deterministically between the floor layers).
+        catcher.position.z = baseZ;
+        if (catcher.material && typeof catcher.material.zOffset === 'number') {
+            catcher.material.zOffset = matOn ? 4 : 2;
+        }
     }
 }
 
@@ -7414,7 +7461,19 @@ export function showGrid(canvasId) {
 
     const sizeX = bb.max.x - bb.min.x;
     const sizeY = bb.max.y - bb.min.y;
-    const gridSize = Math.max(sizeX, sizeY) * 3;
+    const footprint = Math.max(sizeX, sizeY, 1);
+
+    // Cell size adapts to the part so small parts are not lost on a coarse
+    // 10 mm grid and large parts do not drown in hairlines (~10-20 cells
+    // across the footprint).
+    const cellOptions = [1, 2, 5, 10, 20, 50, 100];
+    const gridRatio = cellOptions.find(cell => cell >= footprint / 15) ?? 100;
+
+    // Size the floor to the part (≈2× footprint), aligned to major-line
+    // blocks so the visible edge always lands on a major line instead of a
+    // ragged minor-cell cut.
+    const majorBlock = gridRatio * CONFIG.GRID.majorUnitFrequency;
+    const gridSize = Math.max(Math.ceil((footprint * 2) / majorBlock) * majorBlock, majorBlock * 2);
 
     // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
     // BabylonJS ground lies in the XZ plane by default, so we rotate +90° around X to flip it.
@@ -7424,7 +7483,10 @@ export function showGrid(canvasId) {
         width: gridSize, height: gridSize, subdivisions: 1
     }, scene);
     ground.rotation.x = Math.PI / 2;
-    ground.position.z = -0.5;  // 0.5 mm below model base to prevent z-fighting with bottom face
+    // Coplanar with the model base — z-fighting with the bottom face is
+    // handled by the material depth bias (zOffset), not a physical gap that
+    // would visually float the part above its own floor.
+    ground.position.z = 0;
     ground.isPickable = false;
     ground.receiveShadows = true;
 
@@ -7433,11 +7495,12 @@ export function showGrid(canvasId) {
         const gridTheme = getGridThemeConfig(canvasId);
         mat.majorUnitFrequency = CONFIG.GRID.majorUnitFrequency;
         mat.minorUnitVisibility = gridTheme.minorUnitVisibility;
-        mat.gridRatio = CONFIG.GRID.gridRatio;
+        mat.gridRatio = gridRatio;
         mat.backFaceCulling = false;
         mat.mainColor   = toColor3(gridTheme.mainColor);
         mat.lineColor   = toColor3(gridTheme.lineColor);
         mat.opacity     = gridTheme.opacity;
+        mat.zOffset     = 2; // depth bias — grid is coplanar with the model base
         ground.material = mat;
         ground.metadata = { ...(ground.metadata ?? {}), malievGridTargetOpacity: gridTheme.opacity };
         disableSectionClippingForMesh(ground);
@@ -7447,6 +7510,7 @@ export function showGrid(canvasId) {
         mat.alpha = 0.15;
         mat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
         mat.backFaceCulling = false;
+        mat.zOffset = 2;
         ground.material = mat;
         ground.metadata = { ...(ground.metadata ?? {}), malievGridTargetOpacity: 0.15 };
         disableSectionClippingForMesh(ground);
@@ -7639,6 +7703,9 @@ export function showCuttingMat(canvasId) {
     const topMesh = _createRoundedMatTopMesh(scene, topOutline, matW, matH);
 
     const topMat = _createCuttingMatTopMaterial(scene, canvasId, tex, 0);
+    // Coplanar mat top: depth bias keeps it from z-fighting the model's
+    // bottom face without physically floating the part above the mat.
+    topMat.zOffset = 3;
     topMesh.material = topMat;
     topMesh.metadata = { ...(topMesh.metadata ?? {}), malievCuttingMatSlideOffset: slideOffset };
     disableSectionClippingForMesh(topMesh);
@@ -7660,7 +7727,10 @@ export function showCuttingMat(canvasId) {
 
     _animateCuttingMat(canvasId, scene, [topMesh, slabMesh], [topMat, slabMat], {
         fromZ: -slideOffset,
-        toZ: -0.5,  // 0.5 mm below model base to prevent z-fighting with bottom face
+        // Settle the mat top exactly at the model base — the part must sit ON
+        // the mat. Z-fighting with the bottom face is handled by the material
+        // depth bias (zOffset) above instead of a visible 0.5 mm gap.
+        toZ: 0,
         fromAlpha: 0,
         toAlpha: 1,
         onComplete: () => _setCuttingMatMaterialsOpaque([topMat, slabMat]),

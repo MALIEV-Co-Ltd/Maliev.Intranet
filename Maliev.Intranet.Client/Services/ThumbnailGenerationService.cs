@@ -19,8 +19,6 @@ public sealed class ThumbnailGenerationService
     private readonly ConcurrentDictionary<string, Task<ThumbnailSetDto>> _inflight = new();
     private readonly object _subscribersLock = new();
     private readonly List<EventCallback<ThumbnailProgress>> _subscribers = new();
-    // Set to false on first "module not found" error so we never attempt again.
-    private bool _wasmModuleAvailable = true;
 
     /// <summary>
     /// Initializes a new instance of <see cref="ThumbnailGenerationService"/>.
@@ -125,19 +123,12 @@ public sealed class ThumbnailGenerationService
         {
             try
             {
-                if (!_wasmModuleAvailable)
-                {
-                    // Module was previously not found — skip JS call entirely.
-                    await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
-                    return new ThumbnailSetDto { Version = version ?? string.Empty };
-                }
-
                 await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Downloading, 10, "Downloading mesh"));
 
                 var result = await _jsRuntime.InvokeAsync<ThumbnailSetDto>(
                     "MalievGeometry.generateThumbnails",
                     signedDownloadUrl,
-                    new { timeoutMs = 20000, jpegQuality = 0.85 });
+                    new { timeoutMs = 20000 });
 
                 result.Version = version ?? string.Empty;
 
@@ -154,9 +145,13 @@ public sealed class ThumbnailGenerationService
             }
             catch (JSException ex) when (IsModuleNotFoundError(ex))
             {
-                // WASM geometry module is not loaded (expected when client-side generation is not yet enabled).
-                _wasmModuleAvailable = false;
-                _logger.LogDebug("WASM thumbnail module not available for {StoragePath}, using server fallback", storagePath);
+                // The interop script has not loaded (yet). Do NOT latch this state —
+                // a transient early call would otherwise disable local thumbnails for
+                // the whole session. The next caller simply retries.
+                _logger.LogWarning(
+                    "MalievGeometry interop is not loaded for {StoragePath} — check that " +
+                    "js/geometry/JsInterop/GeometryInterop.js is referenced by the host page",
+                    storagePath);
                 await NotifyAsync(new ThumbnailProgress(storagePath, ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
                 return new ThumbnailSetDto { Version = version ?? string.Empty };
             }

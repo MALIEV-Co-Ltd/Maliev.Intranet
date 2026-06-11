@@ -265,12 +265,22 @@ window.projectNewUploads = (function () {
         return objectUrl;
     }
 
+    function registerGeneratedFile(clientUploadId, file) {
+        if (!clientUploadId || !file) return false;
+        const existingTimer = clearTimersByClientId.get(clientUploadId);
+        if (existingTimer) clearTimeout(existingTimer);
+        clearTimersByClientId.delete(clientUploadId);
+        filesByClientId.set(clientUploadId, file);
+        return true;
+    }
+
     return {
         captureFiles,
         uploadFile,
         clearFile,
         scheduleClearFile,
         getFileBytes,
-        getObjectUrl
+        getObjectUrl,
+        registerGeneratedFile
     };
 })();

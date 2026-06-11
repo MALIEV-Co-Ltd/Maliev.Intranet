@@ -15,15 +15,33 @@
         <div class="ccc-avatar">@GetInitials(Customer.Name)</div>
     }
     <div class="ccc-info">
-        <div class="ccc-name">@Customer.Name</div>
+        <div class="ccc-name-row">
+            <div class="ccc-name">@Customer.Name</div>
+            @if (!string.IsNullOrEmpty(Customer.Tier))
+            {
+                <span class="ccc-tier ccc-tier--@Customer.Tier.ToLowerInvariant()">@Customer.Tier</span>
+            }
+        </div>
         @if (!string.IsNullOrEmpty(Customer.CompanyName))
         {
             <div class="ccc-sub">@Customer.CompanyName</div>
         }
-        else if (!string.IsNullOrEmpty(Customer.Email))
-        {
-            <div class="ccc-sub">@Customer.Email</div>
-        }
+        <div class="ccc-contact">
+            @if (!string.IsNullOrEmpty(Customer.Email))
+            {
+                <span class="ccc-contact-item" title="@Customer.Email">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6c0-1.1.9-2 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" stroke="currentColor" stroke-width="2"/><path d="m3 7 9 6 9-6" stroke="currentColor" stroke-width="2"/></svg>
+                    @Customer.Email
+                </span>
+            }
+            @if (!string.IsNullOrEmpty(PrimaryPhone))
+            {
+                <span class="ccc-contact-item" title="@PrimaryPhone">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2"/></svg>
+                    @PrimaryPhone
+                </span>
+            }
+        </div>
     </div>
     @if (ShowClear)
     {
@@ -41,6 +59,12 @@
     [Parameter, EditorRequired] public CustomerSummaryDto Customer { get; set; } = null!;
     [Parameter] public EventCallback OnClear { get; set; }
     [Parameter] public bool ShowClear { get; set; } = true;
+
+    private string? PrimaryPhone =>
+        FirstNonEmpty(Customer.Mobile, Customer.Landline, Customer.CompanyPhone);
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static string GetInitials(string name)
     {

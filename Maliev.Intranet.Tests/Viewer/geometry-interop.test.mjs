@@ -44,7 +44,7 @@ function makeFakeCanvas(state) {
         getContext: kind => (kind === 'webgl2' && state.webgl2Available ? {} : null),
         toDataURL: (type, quality) => {
             state.encodedFrames.push({ type, quality, size: state.engineSize });
-            return `data:image/jpeg;base64,frame${state.encodedFrames.length}`;
+            return `data:${type || 'image/png'};base64,frame${state.encodedFrames.length}`;
         },
     };
 }
@@ -270,7 +270,7 @@ test('generateThumbnails renders all 8 ThumbnailSetDto views', async () => {
 
     const result = await context.window.MalievGeometry.generateThumbnails(
         'https://storage.local/parts/bracket.stl?sig=abc',
-        { timeoutMs: 5000, jpegQuality: 0.85 });
+        { timeoutMs: 5000 });
 
     const keys = [
         'frontSmall', 'backSmall', 'leftSmall', 'rightSmall',
@@ -278,8 +278,8 @@ test('generateThumbnails renders all 8 ThumbnailSetDto views', async () => {
     ];
     for (const key of keys) {
         assert.ok(
-            typeof result[key] === 'string' && result[key].startsWith('data:image/jpeg;base64,'),
-            `${key} must be a JPEG DataURL, got: ${result[key]}`);
+            typeof result[key] === 'string' && result[key].startsWith('data:image/png;base64,'),
+            `${key} must be a PNG DataURL (alpha-capable), got: ${result[key]}`);
     }
 
     // 6 orthographic face views + 2 perspective isometric views.
@@ -329,7 +329,7 @@ test('generateThumbnails renders 3MF files via the GeometryService runtime worke
     assert.equal(worker.terminated, true, 'worker must be terminated after extraction');
 
     assert.equal(state.renderedViews.length, 8);
-    assert.ok(result.thumbnailLarge.startsWith('data:image/jpeg;base64,'));
+    assert.ok(result.thumbnailLarge.startsWith('data:image/png;base64,'));
 });
 
 test('generateThumbnails rejects unsupported formats so Blazor falls back to the server', async () => {

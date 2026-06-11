@@ -190,3 +190,30 @@ test('clearDfmOverlays disposes locally generated overlay meshes', () => {
     vm.runInContext("clearDfmOverlays('c5', 'file5')", context);
     assert.equal(overlay.disposed, true);
 });
+
+test('collectAdvisoryMeshBuffers swaps triangle winding under mirroring world matrices', () => {
+    const context = loadViewerContext();
+
+    // GLB roots get a negative-determinant (mirroring) world matrix from
+    // BabylonJS handedness conversion. Once positions are baked to world
+    // space, the stored winding is inverted — cross-product normals in the
+    // DFM worker would point inward and upward faces would be flagged as
+    // overhangs. The collector must re-orient triangles.
+    const mirrored = makeModelMesh('part', MESH_A_POSITIONS, MESH_A_INDICES, 21);
+    mirrored.computeWorldMatrix = () => {};
+    mirrored.getWorldMatrix = () => ({ determinant: () => -1 });
+    setupScene(context, 'cw', [mirrored]);
+
+    const buffers = vm.runInContext("collectAdvisoryMeshBuffers('cw')", context);
+    assert.equal(buffers.length, 1);
+    assert.deepEqual(Array.from(buffers[0].indices), [0, 2, 1, 3, 5, 4]);
+
+    // A regular (positive determinant) matrix keeps the original winding.
+    const regular = makeModelMesh('part2', MESH_A_POSITIONS, MESH_A_INDICES, 22);
+    regular.computeWorldMatrix = () => {};
+    regular.getWorldMatrix = () => ({ determinant: () => 1 });
+    setupScene(context, 'cw2', [regular]);
+
+    const regularBuffers = vm.runInContext("collectAdvisoryMeshBuffers('cw2')", context);
+    assert.deepEqual(Array.from(regularBuffers[0].indices), [0, 1, 2, 3, 4, 5]);
+});

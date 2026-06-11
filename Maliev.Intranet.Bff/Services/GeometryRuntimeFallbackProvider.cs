@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Bff.Services;
 public sealed class GeometryRuntimeFallbackProvider
 {
     private const int ManifestVersion = 1;
-    private const string RuntimeVersion = "1.1.1";
+    private const string RuntimeVersion = "1.2.0";
     private const string AlgorithmVersion = "browser-first-dfm-v1";
     private const string RuntimePrefix = "/geometry/client-runtime/assets/";
     private const string WorkerResourceSuffix = ".GeometryRuntimeFallback.client-geometry-runtime.worker.js";

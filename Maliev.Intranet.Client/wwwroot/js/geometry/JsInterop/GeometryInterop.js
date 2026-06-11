@@ -10,7 +10,7 @@
 //   isWebGL2Available()                  → boolean
 //
 // ThumbnailSet matches Maliev.Intranet.Shared.Dtos.ThumbnailSetDto
-// (camelCase keys, base64 JPEG DataURLs):
+// (camelCase keys, base64 PNG DataURLs with a transparent background):
 //   frontSmall, backSmall, leftSmall, rightSmall, topSmall, bottomSmall,
 //   thumbnailSmall (256px isometric), thumbnailLarge (1200px isometric).
 //
@@ -22,7 +22,6 @@
     const SMALL_SIZE = 256;
     const LARGE_SIZE = 1200;
     const DEFAULT_TIMEOUT_MS = 20000;
-    const DEFAULT_JPEG_QUALITY = 0.85;
 
     // Extensions the bundled BabylonJS loaders (+ built-in glTF) can parse.
     const LOADER_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf'];
@@ -205,7 +204,6 @@
     async function generateThumbnails(fileUrl, options) {
         options = options || {};
         const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : DEFAULT_TIMEOUT_MS;
-        const jpegQuality = Number(options.jpegQuality) > 0 ? Number(options.jpegQuality) : DEFAULT_JPEG_QUALITY;
 
         if (typeof BABYLON === 'undefined' || !BABYLON.Engine) {
             throw new Error('BabylonJS runtime is not loaded');
@@ -239,9 +237,11 @@
             const canvas = document.createElement('canvas');
             canvas.width = SMALL_SIZE;
             canvas.height = SMALL_SIZE;
-            engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, premultipliedAlpha: false });
+            engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, premultipliedAlpha: false, alpha: true });
             scene = new BABYLON.Scene(engine);
-            scene.clearColor = new BABYLON.Color4(0.95, 0.95, 0.95, 1.0);
+            // Fully transparent background — thumbnails contain only the part so
+            // they composite cleanly over light and dark UI themes.
+            scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
             let meshes;
             if (RUNTIME_EXTRACTION_EXTENSIONS.includes(extension)) {
@@ -313,7 +313,9 @@
                 engine.setSize(view.size, view.size);
                 configureCamera(camera, view, center, radius, view.size);
                 scene.render();
-                result[view.key] = canvas.toDataURL('image/jpeg', jpegQuality);
+                // PNG keeps the alpha channel — JPEG would flatten the
+                // transparent background to black.
+                result[view.key] = canvas.toDataURL('image/png');
             }
 
             return result;

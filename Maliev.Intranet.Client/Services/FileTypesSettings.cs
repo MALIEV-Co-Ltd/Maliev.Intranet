@@ -17,7 +17,6 @@ public sealed class FileTypesSettings
         [".obj"] = Icons.Material.Outlined.ViewInAr,
         [".igs"] = Icons.Material.Outlined.ViewInAr,
         [".iges"] = Icons.Material.Outlined.ViewInAr,
-        [".blend"] = Icons.Material.Outlined.ViewInAr,
         [".fbx"] = Icons.Material.Outlined.ViewInAr,
         [".gltf"] = Icons.Material.Outlined.ViewInAr,
         [".glb"] = Icons.Material.Outlined.ViewInAr,
