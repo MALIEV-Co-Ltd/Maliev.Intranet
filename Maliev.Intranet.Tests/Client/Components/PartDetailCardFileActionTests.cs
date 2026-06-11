@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Maliev.Intranet.Tests.Client.Components;
 
-public sealed class PartDetailCardFileActionTests : BunitContext
+public sealed class PartDetailCardFileActionTests : BunitContext, IAsyncLifetime
 {
     private readonly MockHttpMessageHandler _httpHandler = new();
 
@@ -46,6 +46,10 @@ public sealed class PartDetailCardFileActionTests : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public new async Task DisposeAsync() => await base.DisposeAsync();
+
     [Fact]
     public void DownloadOriginal_WhenPartNameContainsStorageHash_UsesOriginalFileName()
     {
@@ -76,5 +80,44 @@ public sealed class PartDetailCardFileActionTests : BunitContext
             Assert.Equal("https://storage.example/signed-object", invocation.Arguments[0]?.ToString());
             Assert.Equal("stud bolt.step", invocation.Arguments[1]?.ToString());
         });
+    }
+
+    [Theory]
+    [InlineData(5_000, "Weight: 5 g")]
+    [InlineData(32_000_000, "Weight: 32 kg")]
+    public void EstimatedWeight_UsesReadableUnits(double volumeMm3, string expectedLabel)
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "bracket.stl",
+            StoragePath = "projects/project-1/bracket.stl",
+            ProcessCode = "FDM",
+            VolumeMm3 = volumeMm3,
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        Assert.Contains(expectedLabel, cut.Markup);
+    }
+
+    [Fact]
+    public void EstimatedWeight_ShowsFormulaTooltip()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "aluminum-bracket.stl",
+            StoragePath = "projects/project-1/aluminum-bracket.stl",
+            ProcessCode = "CNC_MILLING",
+            VolumeMm3 = 10_000,
+            MaterialCode = "AL6061",
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        Assert.Contains("Weight = volume", cut.Markup);
+        Assert.Contains("10.00 cm", cut.Markup);
+        Assert.Contains("2.7 g/cm", cut.Markup);
     }
 }
