@@ -337,16 +337,20 @@
                     title="Adjust part size, scale, or original units"
                     @onclick="OpenScaleDialog"
                     disabled="@(!CanRescalePart)">
-                <span>Units: mm</span>
+                <span class="pdc-chip-meta-label">Units</span>
+                <span class="pdc-chip-meta-value">mm</span>
+                <span class="pdc-chip-action-label">Scale</span>
                 <MudIcon Icon="@Icons.Material.Outlined.Straighten" Class="pdc-chip-action-icon" />
             </button>
 
             @if (weightKg.HasValue)
             {
                 <span class="pdc-footer-sep">·</span>
-                <MudTooltip Text="@GetWeightFormulaTooltip()" Placement="Placement.Top">
-                    <span class="pdc-chip pdc-chip--meta pdc-chip--hover-help" title="@GetWeightFormulaTooltip()">Weight: @FormatWeight(weightKg.Value)</span>
-                </MudTooltip>
+                <span class="pdc-weight-tooltip">
+                    <MudTooltip Text="@GetWeightFormulaTooltip()" Placement="Placement.Top">
+                        <span class="pdc-chip pdc-chip--meta pdc-chip--hover-help" title="@GetWeightFormulaTooltip()">Weight: @FormatWeight(weightKg.Value)</span>
+                    </MudTooltip>
+                </span>
             }
 
             @if (Part.SurfaceAreaMm2.HasValue)

@@ -476,11 +476,15 @@
     flex: 0 1 auto;
     justify-content: center;
     min-width: 0;
-    padding: 3px 6px;
-    border: 1px solid rgba(96, 165, 250, 0.24);
+    padding: 4px 7px;
+    border: 1px solid rgba(56, 189, 248, 0.34);
     border-radius: 6px;
-    background: rgba(37, 99, 235, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    background:
+        linear-gradient(180deg, rgba(14, 116, 144, 0.18), rgba(15, 23, 42, 0.2)),
+        rgba(2, 132, 199, 0.08);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px rgba(8, 47, 73, 0.12);
 }
 .pdc-footer-price-placeholder { flex-shrink: 0; }
 .pdc-footer-chips { display: flex; align-items: center; gap: 4px; }
@@ -525,6 +529,11 @@
 .pdc-chip--hover-help {
     cursor: pointer;
 }
+.pdc-weight-tooltip,
+::deep .pdc-weight-tooltip,
+::deep .pdc-weight-tooltip * {
+    cursor: pointer;
+}
 button.pdc-chip--action {
     font: inherit;
     appearance: none;
@@ -551,9 +560,33 @@ button.pdc-chip--action {
     opacity: 0.45;
 }
 .pdc-chip--scale {
-    padding: 0 7px 0 8px;
-    border-color: rgba(96, 165, 250, 0.46);
-    background: rgba(37, 99, 235, 0.14);
+    padding: 0 8px;
+    gap: 5px;
+    border-color: rgba(125, 211, 252, 0.5);
+    background:
+        linear-gradient(180deg, rgba(30, 64, 175, 0.28), rgba(15, 23, 42, 0.22)),
+        rgba(14, 165, 233, 0.12);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 0 0 1px rgba(14, 116, 144, 0.16);
+}
+.pdc-chip--scale:hover:not(:disabled) {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 0 0 1px rgba(56, 189, 248, 0.28);
+}
+.pdc-chip-meta-label {
+    color: var(--maliev-muted);
+}
+.pdc-chip-meta-value {
+    color: var(--maliev-ink);
+    font-weight: 600;
+}
+.pdc-chip-action-label {
+    padding-left: 5px;
+    border-left: 1px solid rgba(125, 211, 252, 0.24);
+    color: rgb(125, 211, 252);
+    font-weight: 600;
 }
 .pdc-chip--surface {
     color: var(--maliev-ink-2);

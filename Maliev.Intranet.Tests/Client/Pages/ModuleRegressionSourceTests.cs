@@ -2025,6 +2025,22 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNewFooterMetrics_UseInteractiveInformationStyling()
+    {
+        var detail = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor.css");
+
+        var footerGeo = ExtractCssBlock(detail, ".pdc-footer-geo");
+        var scaleButton = ExtractCssBlock(detail, ".pdc-chip--scale");
+        var weightTooltip = ExtractCssBlock(detail, "::deep .pdc-weight-tooltip *");
+
+        Assert.Contains("rgba(56, 189, 248", footerGeo, StringComparison.Ordinal);
+        Assert.Contains("linear-gradient", footerGeo, StringComparison.Ordinal);
+        Assert.Contains("box-shadow", scaleButton, StringComparison.Ordinal);
+        Assert.Contains("border-left", detail, StringComparison.Ordinal);
+        Assert.Contains("cursor: pointer;", weightTooltip, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ClientThemeInteractiveSurfaces_DoNotUseLightOnlyBackgrounds()
     {
         var designTokens = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "css", "design-tokens.css");

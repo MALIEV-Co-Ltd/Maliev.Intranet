@@ -187,6 +187,28 @@ public sealed class PartDetailCardFileActionTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void FooterMetrics_ExposeWeightTooltipAndScaleActionAffordances()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "aluminum-bracket.stl",
+            StoragePath = "projects/project-1/aluminum-bracket.stl",
+            ProcessCode = "CNC_MILLING",
+            VolumeMm3 = 10_000,
+            MaterialCode = "AL6061",
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        Assert.Contains("pdc-weight-tooltip", cut.Markup);
+        Assert.Contains("pdc-chip-meta-label", cut.Markup);
+        Assert.Contains("pdc-chip-meta-value", cut.Markup);
+        Assert.Contains("pdc-chip-action-label", cut.Markup);
+        Assert.Contains(">Scale<", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EstimatedWeight_UsesSelectedCatalogDensity()
     {
         var materialId = Guid.NewGuid();
