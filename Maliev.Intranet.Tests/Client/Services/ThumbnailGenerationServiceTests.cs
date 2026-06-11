@@ -2,6 +2,7 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using Xunit;
 
 namespace Maliev.Intranet.Tests.Client.Services;
@@ -95,5 +96,41 @@ public class ThumbnailGenerationServiceTests
         await service.NotifyAsync(new ThumbnailProgress("path", ThumbnailGenerationStage.Queued, 0, null));
 
         Assert.Empty(received);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_PassesStoragePathExtensionToThumbnailInterop()
+    {
+        var jsRuntime = new CapturingJsRuntime();
+        var service = new ThumbnailGenerationService(
+            jsRuntime,
+            httpClient: new HttpClient(),
+            logger: NullLogger<ThumbnailGenerationService>.Instance);
+
+        await service.GenerateAsync(
+            "projects/project-1/bracket.stl",
+            "v1",
+            "https://storage.local/download/signed-object?X-Goog-Signature=abc");
+
+        Assert.Equal("MalievGeometry.generateThumbnails", jsRuntime.Identifier);
+        Assert.NotNull(jsRuntime.Arguments);
+        Assert.Equal("https://storage.local/download/signed-object?X-Goog-Signature=abc", jsRuntime.Arguments[0]);
+        Assert.Equal(".stl", jsRuntime.Arguments[1]?.GetType().GetProperty("fileExtension")?.GetValue(jsRuntime.Arguments[1]));
+    }
+
+    private sealed class CapturingJsRuntime : IJSRuntime
+    {
+        public string? Identifier { get; private set; }
+        public object?[]? Arguments { get; private set; }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
+        {
+            Identifier = identifier;
+            Arguments = args;
+            return ValueTask.FromResult((TValue)(object)new ThumbnailSetDto { ThumbnailSmall = "data:image/png;base64,abc" });
+        }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) =>
+            InvokeAsync<TValue>(identifier, args);
     }
 }

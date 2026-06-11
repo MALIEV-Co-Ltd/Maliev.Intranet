@@ -128,7 +128,11 @@ public sealed class ThumbnailGenerationService
                 var result = await _jsRuntime.InvokeAsync<ThumbnailSetDto>(
                     "MalievGeometry.generateThumbnails",
                     signedDownloadUrl,
-                    new { timeoutMs = 20000 });
+                    new
+                    {
+                        timeoutMs = 20000,
+                        fileExtension = Path.GetExtension(storagePath)
+                    });
 
                 result.Version = version ?? string.Empty;
 
