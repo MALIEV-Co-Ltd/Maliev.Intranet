@@ -782,6 +782,24 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ToleranceCards_WrapNameGradeAndRangeText()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-tol-name {\n                grid-column: 1;\n                grid-row: 1;\n                font-size: var(--mud-typography-caption-size);", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-tol-grade {\n                grid-column: 1;\n                grid-row: 2;\n                font-size: var(--mud-typography-caption-size);", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-tol-range {\n                grid-column: 1;\n                grid-row: 3;\n                font-size: var(--mud-typography-caption-size);", source, StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: anywhere;\n                text-overflow: clip;\n                white-space: normal;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-tol-name {\n                grid-column: 1;\n                grid-row: 1;\n                font-size: 11.5px;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-tol-range {\n                grid-column: 1;\n                grid-row: 3;\n                font-size: 10px;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ThreadInsertFeatureImage_IsDistinctFromGenericSteelInsertImage()
     {
         var threadInsertPath = FindRepoFile(
