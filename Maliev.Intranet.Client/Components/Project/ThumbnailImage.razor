@@ -12,7 +12,7 @@
     else if (_progress?.Stage == ThumbnailGenerationStage.Fallback)
     {
         <div class="thumbnail-fallback">
-            <MudIcon Icon="@Icons.Material.Outlined.CloudSync" Size="Size.Small" />
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Default" />
         </div>
     }
     else if (_progress?.Stage == ThumbnailGenerationStage.Failed)

@@ -5,6 +5,7 @@ using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using MudBlazor;
 using Xunit;
 
 namespace Maliev.Intranet.Tests.Client.Components;
@@ -103,7 +104,7 @@ public class ThumbnailImageTests : BunitContext
     }
 
     [Fact]
-    public void ThumbnailImage_ShowsFallback_WhenFallbackStage()
+    public async Task ThumbnailImage_ShowsSpinner_WhenFallbackStage()
     {
         var service = new ThumbnailGenerationService(
             jsRuntime: null!,
@@ -116,8 +117,11 @@ public class ThumbnailImageTests : BunitContext
             .Add(p => p.StoragePath, "path/file.stl")
             .Add(p => p.SignedDownloadUrl, "https://test.com/file.stl"));
 
-        // We can't easily test the fallback stage without triggering generation
-        // but we can verify the component renders
-        Assert.Contains("thumbnail-image", component.Markup);
+        await service.NotifyAsync(new ThumbnailProgress(
+            "path/file.stl", ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
+
+        Assert.Contains("thumbnail-fallback", component.Markup);
+        Assert.Contains("mud-progress-circular", component.Markup);
+        Assert.DoesNotContain(Icons.Material.Outlined.CloudSync, component.Markup);
     }
 }
