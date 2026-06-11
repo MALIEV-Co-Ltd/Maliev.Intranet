@@ -147,11 +147,31 @@
                 {
                     <img src="@SelectedCustomer.ProfileImageUrl" class="plp-customer-avatar" alt="@SelectedCustomer.Name" />
                 }
+                else
+                {
+                    <div class="plp-customer-avatar plp-customer-avatar--fallback" aria-hidden="true">
+                        @GetCustomerInitials(SelectedCustomer)
+                    </div>
+                }
                 <div class="plp-customer-info">
-                    <div class="plp-customer-name">@SelectedCustomer.Name</div>
+                    <div class="plp-customer-headline">
+                        <div class="plp-customer-name">@SelectedCustomer.Name</div>
+                        @if (!string.IsNullOrWhiteSpace(SelectedCustomer.Tier))
+                        {
+                            <span class="plp-customer-tier">@SelectedCustomer.Tier</span>
+                        }
+                    </div>
                     @if (!string.IsNullOrEmpty(SelectedCustomer.CompanyName))
                     {
                         <div class="plp-customer-company">@SelectedCustomer.CompanyName</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(SelectedCustomer.Email))
+                    {
+                        <div class="plp-customer-contact">@SelectedCustomer.Email</div>
+                    }
+                    @if (GetCustomerPhone(SelectedCustomer) is { Length: > 0 } phone)
+                    {
+                        <div class="plp-customer-contact">@phone</div>
                     }
                 </div>
                 <button class="plp-customer-edit" title="Change customer"
@@ -500,20 +520,40 @@
 
     .plp-customer-card {
         display: flex;
-        align-items: center;
-        gap: 6px;
+        align-items: flex-start;
+        gap: 8px;
     }
 
     .plp-customer-avatar {
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         object-fit: cover;
         flex-shrink: 0;
     }
 
+    .plp-customer-avatar--fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--maliev-accent-soft);
+        color: var(--mud-palette-primary);
+        font-size: var(--maliev-font-tiny);
+        font-weight: 700;
+    }
+
     .plp-customer-info {
         flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .plp-customer-headline {
+        display: flex;
+        align-items: center;
+        gap: 6px;
         min-width: 0;
     }
 
@@ -521,6 +561,21 @@
         font-size: 12px;
         font-weight: 600;
         color: var(--maliev-ink);
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .plp-customer-tier {
+        max-width: 60px;
+        padding: 1px 5px;
+        border-radius: var(--maliev-radius-pill);
+        background: var(--maliev-accent-softer);
+        color: var(--mud-palette-primary);
+        font-size: var(--maliev-font-nano);
+        font-weight: 700;
+        flex-shrink: 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -528,6 +583,14 @@
 
     .plp-customer-company {
         font-size: 10.5px;
+        color: var(--maliev-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .plp-customer-contact {
+        font-size: var(--maliev-font-nano);
         color: var(--maliev-muted);
         white-space: nowrap;
         overflow: hidden;
@@ -629,6 +692,29 @@
 
     /// <summary>Fired when a customer is selected via the picker.</summary>
     [Parameter] public EventCallback<CustomerSummaryDto?> OnCustomerSelected { get; set; }
+
+    private static string GetCustomerPhone(CustomerSummaryDto customer) =>
+        FirstNonEmpty(customer.Mobile, customer.Landline, customer.CompanyPhone);
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private static string GetCustomerInitials(CustomerSummaryDto customer)
+    {
+        var words = customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (words.Length == 0)
+        {
+            return "?";
+        }
+
+        if (words.Length == 1)
+        {
+            return words[0][..Math.Min(words[0].Length, 2)].ToUpperInvariant();
+        }
+
+        return string.Concat(words[0][0], words[^1][0]).ToUpperInvariant();
+    }
 
     protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
     public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;

@@ -1,6 +1,7 @@
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using MudBlazor;
@@ -177,6 +178,35 @@ public sealed class PartsListPanelTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("44", progress.GetAttribute("aria-valuenow"));
         Assert.DoesNotContain("mud-progress-circular-indeterminate", progress.ClassList);
+    }
+
+    [Fact]
+    public void PartsListPanel_SelectedCustomer_RendersFullProfileSummary()
+    {
+        var customer = new CustomerSummaryDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "Mayuree Nguyen",
+            CompanyName = "Axion Robotics",
+            Tier = "Gold",
+            Email = "mayuree@example.com",
+            Mobile = "+66 81 234 5678",
+            ProfileImageUrl = "https://images.example/mayuree.png",
+        };
+
+        var cut = Render<PartsListPanel>(parameters => parameters
+            .Add(p => p.Title, "Project 2026-06-10")
+            .Add(p => p.Parts, [])
+            .Add(p => p.SelectedCustomer, customer));
+
+        var card = cut.Find(".plp-customer-card");
+
+        Assert.Equal("https://images.example/mayuree.png", card.QuerySelector(".plp-customer-avatar")?.GetAttribute("src"));
+        Assert.Contains("Mayuree Nguyen", card.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Axion Robotics", card.TextContent, StringComparison.Ordinal);
+        Assert.Contains("Gold", card.TextContent, StringComparison.Ordinal);
+        Assert.Contains("mayuree@example.com", card.TextContent, StringComparison.Ordinal);
+        Assert.Contains("+66 81 234 5678", card.TextContent, StringComparison.Ordinal);
     }
 
     private static FileTypesSettings CreateFileTypesSettings() => new()
