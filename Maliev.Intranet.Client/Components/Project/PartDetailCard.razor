@@ -838,16 +838,40 @@
             name = Path.GetFileName(Part.StoragePath ?? string.Empty);
 
         // Storage paths prefix the original name with an upload hash
-        // ("ab12cd34_stud bolt.step") — strip it when it leaks into the name.
-        if (string.IsNullOrWhiteSpace(Path.GetExtension(name)))
+        // ("ab12cd34_stud bolt.step"). Strip it if that storage object name
+        // leaks into the part name or when the visible name has no extension.
+        var storageName = Path.GetFileName(Part.StoragePath ?? string.Empty);
+        if (TryStripGeneratedUploadPrefix(name, out var cleanedName)
+            || (string.IsNullOrWhiteSpace(Path.GetExtension(name))
+                && TryStripGeneratedUploadPrefix(storageName, out cleanedName)))
         {
-            var storageName = Path.GetFileName(Part.StoragePath ?? string.Empty);
-            var underscore = storageName.IndexOf('_');
-            if (underscore > 0 && underscore < storageName.Length - 1)
-                name = storageName[(underscore + 1)..];
+            name = cleanedName;
         }
 
         return string.IsNullOrWhiteSpace(name) ? "part" : name;
+    }
+
+    private static bool TryStripGeneratedUploadPrefix(string? fileName, out string cleanedName)
+    {
+        cleanedName = string.Empty;
+        if (string.IsNullOrWhiteSpace(fileName))
+            return false;
+
+        var leafName = Path.GetFileName(fileName);
+        var underscore = leafName.IndexOf('_', StringComparison.Ordinal);
+        if (underscore < 6 || underscore >= leafName.Length - 1)
+            return false;
+
+        var prefix = leafName[..underscore];
+        if (!prefix.Any(char.IsDigit) || !prefix.All(char.IsAsciiLetterOrDigit))
+            return false;
+
+        var candidate = leafName[(underscore + 1)..];
+        if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(Path.GetExtension(candidate)))
+            return false;
+
+        cleanedName = candidate;
+        return true;
     }
     private string? _viewerErrorMessage;
     private CancellationTokenSource? _dfmTimeoutCts;
