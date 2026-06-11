@@ -800,6 +800,22 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void SelectedToleranceRange_UsesThemeTypographyAndOwnWrappingLine()
+    {
+        var source = ReadRepoFile(
+                "Maliev.Intranet.Client",
+                "Components",
+                "Project",
+                "PartConfigSidebar.razor")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains(".pcs-tol-selected-info .pcs-tol-range--selected {\n                flex-basis: 100%;", source, StringComparison.Ordinal);
+        Assert.Contains("white-space: normal;\n                overflow: visible;\n                text-overflow: clip;", source, StringComparison.Ordinal);
+        Assert.Contains(".pcs-tol-range--selected {\n                font-size: var(--mud-typography-caption-size);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".pcs-tol-range--selected {\n                font-size: 10px;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ThreadInsertFeatureImage_IsDistinctFromGenericSteelInsertImage()
     {
         var threadInsertPath = FindRepoFile(
