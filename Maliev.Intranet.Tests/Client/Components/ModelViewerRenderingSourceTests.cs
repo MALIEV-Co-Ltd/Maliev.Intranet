@@ -544,6 +544,38 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void ShadowFrustum_ExtensionAccountsForCatcherAndProjectedTallPartShadow()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var block = ExtractBlock(source, "function extendShadowFrustum(canvasId)");
+
+        Assert.Contains("const catcher = scene.getMeshByName('__shadow_catcher__');", block, StringComparison.Ordinal);
+        Assert.Contains("catcher.getBoundingInfo()", block, StringComparison.Ordinal);
+        Assert.Contains("const light = shadowGen.getLight?.();", block, StringComparison.Ordinal);
+        Assert.Contains("const projectedX = Math.abs(sizeZ * lightDir.x / lightDirZ);", block, StringComparison.Ordinal);
+        Assert.Contains("const projectedY = Math.abs(sizeZ * lightDir.y / lightDirZ);", block, StringComparison.Ordinal);
+        Assert.Contains("const minX = Math.min(bb.min.x - projectedX - margin, catcherMin.x - margin);", block, StringComparison.Ordinal);
+        Assert.Contains("const maxY = Math.max(bb.max.y + projectedY + margin, catcherMax.y + margin);", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("const extHalf = Math.max(sizeX, sizeY, sizeZ) * 4;", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TurningAxisOverlay_RendersPersistentCenterMarker()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var createBlock = ExtractBlock(source, "function createTurningAxisSvg()");
+        var updateBlock = ExtractBlock(source, "function updateTurningAxisSvg(canvasId, state)");
+        var buildBlock = ExtractBlock(source, "function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint)");
+
+        Assert.Contains("document.createElementNS(ns, 'circle')", createBlock, StringComparison.Ordinal);
+        Assert.Contains("centerMarker.setAttribute('class', 'turning-axis-center-marker');", createBlock, StringComparison.Ordinal);
+        Assert.Contains("svg.appendChild(centerMarker);", createBlock, StringComparison.Ordinal);
+        Assert.Contains("state.centerMarker.setAttribute('cx', centerPoint.x.toString());", updateBlock, StringComparison.Ordinal);
+        Assert.Contains("state.centerMarker.setAttribute('cy', centerPoint.y.toString());", updateBlock, StringComparison.Ordinal);
+        Assert.Contains("centerMarker: overlay.centerMarker", buildBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GridFloor_SizesRectangularlyToModelFootprint()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");

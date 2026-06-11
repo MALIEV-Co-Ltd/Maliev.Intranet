@@ -745,19 +745,31 @@ function extendShadowFrustum(canvasId) {
     const sizeX = bb.max.x - bb.min.x;
     const sizeY = bb.max.y - bb.min.y;
     const sizeZ = bb.max.z - bb.min.z;
-    // Include sizeZ: tall parts cast shadows that extend sizeZ * (lightXY/lightZ) ≈ 1.4× sizeZ
-    // beyond the model footprint, so the frustum extension must account for height, not just XY.
-    const extHalf = Math.max(sizeX, sizeY, sizeZ) * 4;
+    const maxModelSize = Math.max(sizeX, sizeY, sizeZ, 1);
+    const margin = Math.max(maxModelSize * 0.12, 4);
+    const catcher = scene.getMeshByName('__shadow_catcher__');
+    const catcherInfo = catcher ? catcher.getBoundingInfo() : null;
+    const catcherMin = catcherInfo?.boundingBox?.minimumWorld ?? bb.min;
+    const catcherMax = catcherInfo?.boundingBox?.maximumWorld ?? bb.max;
+    const light = shadowGen.getLight?.();
+    const lightDir = light?.direction ?? { x: 0, y: 0, z: -1 };
+    const lightDirZ = Math.max(Math.abs(lightDir.z || 0), 0.05);
+    const projectedX = Math.abs(sizeZ * lightDir.x / lightDirZ);
+    const projectedY = Math.abs(sizeZ * lightDir.y / lightDirZ);
+    const minX = Math.min(bb.min.x - projectedX - margin, catcherMin.x - margin);
+    const maxX = Math.max(bb.max.x + projectedX + margin, catcherMax.x + margin);
+    const minY = Math.min(bb.min.y - projectedY - margin, catcherMin.y - margin);
+    const maxY = Math.max(bb.max.y + projectedY + margin, catcherMax.y + margin);
     const baseZ = bb.min.z;
 
     // Create 4 invisible boxes at catcher corners to extend shadow frustum.
     // They must have proper bounding info so autoUpdateExtends includes them.
     const extNames = ['__shadow_ext_0', '__shadow_ext_1', '__shadow_ext_2', '__shadow_ext_3'];
     const corners = [
-        [-extHalf, -extHalf, baseZ],
-        [ extHalf, -extHalf, baseZ],
-        [-extHalf,  extHalf, baseZ],
-        [ extHalf,  extHalf, baseZ],
+        [minX, minY, baseZ],
+        [maxX, minY, baseZ],
+        [minX, maxY, baseZ],
+        [maxX, maxY, baseZ],
     ];
 
     corners.forEach((pos, i) => {
