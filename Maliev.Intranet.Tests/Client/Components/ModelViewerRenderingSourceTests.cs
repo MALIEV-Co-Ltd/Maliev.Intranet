@@ -283,6 +283,22 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void RealisticFdmLayerLines_AreDrivenByProcessNotMaterialWhitelist()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var strengthFunction = ExtractBlock(source, "function getAdditiveLayerLineStrength");
+
+        var fdmProcessIndex = strengthFunction.IndexOf("if (isFdmProcess(processCode))", StringComparison.Ordinal);
+        var presetGateIndex = strengthFunction.IndexOf("ADDITIVE_LAYER_PRESET_KEYS.has(materialType)", StringComparison.Ordinal);
+
+        Assert.True(fdmProcessIndex >= 0, "FDM layer-line activation must explicitly check the manufacturing process.");
+        Assert.True(presetGateIndex >= 0, "Non-FDM additive processes should still be guarded by material preset suitability.");
+        Assert.True(
+            fdmProcessIndex < presetGateIndex,
+            "FDM/FFF process selection must enable layer lines before any material whitelist gate so clear/custom FDM presets still show extrusion layers.");
+    }
+
+    [Fact]
     public void RealisticConfigurator_PartDetailCardRepushesWhenProcessChanges()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartDetailCard.razor")

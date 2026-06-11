@@ -4532,7 +4532,15 @@ function getAdditiveLayerProfile(processCode) {
 
 function getAdditiveLayerLineStrength(canvasId, materialType) {
     const processCode = perCanvasProcessCodes[canvasId];
-    if (!ADDITIVE_LAYER_PRESET_KEYS.has(materialType) || !isLayeredAdditiveProcess(processCode)) {
+    if (!isLayeredAdditiveProcess(processCode)) {
+        return 0;
+    }
+
+    if (isFdmProcess(processCode)) {
+        return getAdditiveLayerProfile(processCode)?.layerLineStrength ?? 0;
+    }
+
+    if (!ADDITIVE_LAYER_PRESET_KEYS.has(materialType)) {
         return 0;
     }
 
