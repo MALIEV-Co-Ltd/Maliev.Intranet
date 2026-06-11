@@ -25,6 +25,9 @@ packages/
 *.lock.json
 artifacts/
 
+# Node dependencies
+node_modules/
+
 # Environment & Secrets
 appsettings.Local.json
 !appsettings.json

@@ -1,0 +1,12 @@
+{
+  "name": "maliev-intranet-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e:install-browsers": "playwright install chromium",
+    "test:e2e:project-new-upload": "node --test Maliev.Intranet.Tests/E2E/project-new-upload.e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.52.0"
+  }
+}
