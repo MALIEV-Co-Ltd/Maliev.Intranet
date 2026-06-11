@@ -1635,10 +1635,20 @@ function createTurningAxisSvg() {
     line.setAttribute('stroke-linecap', 'round');
     line.setAttribute('stroke-dasharray', '9 7');
 
+    const centerMarker = document.createElementNS(ns, 'circle');
+    centerMarker.setAttribute('class', 'turning-axis-center-marker');
+    centerMarker.setAttribute('r', '5');
+    centerMarker.setAttribute('fill', '#ffffff');
+    centerMarker.setAttribute('stroke', '#2563eb');
+    centerMarker.setAttribute('stroke-width', '2');
+    centerMarker.setAttribute('opacity', '0.9');
+    centerMarker.setAttribute('vector-effect', 'non-scaling-stroke');
+
     svg.appendChild(line);
+    svg.appendChild(centerMarker);
     document.body.appendChild(svg);
 
-    return { svg, line };
+    return { svg, line, centerMarker };
 }
 
 function projectWorldPointToScreen(worldPos, canvasId) {
@@ -1712,8 +1722,9 @@ function isPointerNearTurningAxis(canvasId, state, pointerEvent) {
 function updateTurningAxisSvg(canvasId, state) {
     const start = projectWorldPointToScreen(state.start, canvasId);
     const end = projectWorldPointToScreen(state.end, canvasId);
+    const centerPoint = projectWorldPointToScreen(state.center, canvasId);
 
-    if (!start || !end) {
+    if (!start || !end || !centerPoint) {
         state.svg.style.display = 'none';
         state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, false));
         return;
@@ -1724,6 +1735,8 @@ function updateTurningAxisSvg(canvasId, state) {
     state.line.setAttribute('y1', start.y.toString());
     state.line.setAttribute('x2', end.x.toString());
     state.line.setAttribute('y2', end.y.toString());
+    state.centerMarker.setAttribute('cx', centerPoint.x.toString());
+    state.centerMarker.setAttribute('cy', centerPoint.y.toString());
     state.labels.forEach(label => projectTurningAxisLabel(label.div, label.worldPos, canvasId, state.hovered));
 }
 
@@ -1776,6 +1789,8 @@ function buildTurningAxisGeometry(canvasId, primaryAxis, axisVector, axisPoint) 
         renderObserver: null,
         canvasLeaveHandler: null,
         hovered: false,
+        center: center,
+        centerMarker: overlay.centerMarker,
         start,
         end,
     };

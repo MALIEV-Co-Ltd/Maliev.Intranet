@@ -290,6 +290,17 @@ test('turning axis overlay is subtle and has no arrowheads', () => {
     assert.equal(source.includes("line.setAttribute('opacity', '0.45')"), true);
 });
 
+test('turning axis overlay renders a center marker at the resolved axis center', () => {
+    const source = viewerSource();
+
+    assert.match(source, /const centerMarker = document\.createElementNS\(ns,\s*'circle'\)/);
+    assert.match(source, /centerMarker\.setAttribute\('class',\s*'turning-axis-center-marker'\)/);
+    assert.match(source, /centerMarker\.setAttribute\('cx',\s*centerPoint\.x\.toString\(\)\)/);
+    assert.match(source, /centerMarker\.setAttribute\('cy',\s*centerPoint\.y\.toString\(\)\)/);
+    assert.match(source, /center:\s*center,/);
+    assert.match(source, /centerMarker:\s*overlay\.centerMarker,/);
+});
+
 test('viewer disposal invalidates stale render work before releasing Babylon resources', () => {
     const source = viewerSource();
 
