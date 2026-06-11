@@ -53,7 +53,19 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         Services.AddScoped<BreadcrumbService>();
         Services.AddSingleton(new FileTypesSettings
         {
-            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".stl", ".step", ".3mf", ".obj" },
+            ThreeDExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".stl",
+                ".step",
+                ".stp",
+                ".3mf",
+                ".obj",
+                ".igs",
+                ".iges",
+                ".fbx",
+                ".glb",
+                ".gltf",
+            },
             DocumentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".dxf", ".dwg" },
             ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp" },
             OfficeExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".doc", ".docx", ".xls", ".xlsx" },
@@ -80,6 +92,18 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
 
     public Task InitializeAsync() => Task.CompletedTask;
     public new async Task DisposeAsync() => await base.DisposeAsync();
+
+    [Fact]
+    public void TestFileTypeSettings_CoverEveryProjectNewSupported3dExtension()
+    {
+        var fileTypes = Services.GetRequiredService<FileTypesSettings>();
+
+        foreach (var extension in new[] { ".stl", ".step", ".stp", ".3mf", ".obj", ".igs", ".iges", ".fbx", ".glb", ".gltf" })
+        {
+            Assert.Contains(extension, fileTypes.ThreeDExtensions);
+        }
+    }
+
     private Task<HttpResponseMessage> DefaultHandler(HttpRequestMessage request, CancellationToken ct)
     {
         lock (_sentRequests) { _sentRequests.Add(request); }
