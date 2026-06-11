@@ -2221,6 +2221,81 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ApplyReplacementFileToPart_PreservesConfigurationAndResetsGeometryState()
+    {
+        var processId = Guid.NewGuid();
+        var materialId = Guid.NewGuid();
+        var finishId = Guid.NewGuid();
+        var toleranceId = Guid.NewGuid();
+        var newUploadId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "old-bracket.step",
+            StoragePath = "projects/project-1/old-bracket.step",
+            ProcessCode = "CNC_MILL",
+            ProcessId = processId,
+            MaterialCode = "AL6061",
+            MaterialId = materialId,
+            FinishCode = "ANODIZED",
+            FinishId = finishId,
+            ToleranceCode = "ISO2768_M",
+            ToleranceId = toleranceId,
+            Quantity = 12,
+            PartNotes = "Keep cosmetic face A.",
+            Dimensions = new FileAnalysisDimensionsDto { X = 10, Y = 20, Z = 30 },
+            VolumeMm3 = 456,
+            SurfaceAreaMm2 = 789,
+            DfmReport = new DfmReport { ReportType = "CNC_MILL" },
+            GlbStoragePath = "projects/project-1/old-bracket.step_viewer.glb",
+            ViewerUrl = "https://signed.example/old.glb",
+            OverlayUrls = new Dictionary<string, string> { ["CNC_MILL__sharp_corner"] = "https://signed.example/overlay.glb" },
+        };
+        var completed = new BffUploadResponse
+        {
+            UploadId = newUploadId.ToString(),
+            FileName = "new-bracket.step",
+            FileSize = 987_000,
+            StoragePath = "projects/project-1/new-bracket.step",
+        };
+
+        InvokePrivateStaticVoid(
+            typeof(global::Maliev.Intranet.Client.Pages.ProjectNew),
+            "ApplyReplacementFileToPart",
+            part,
+            "new-bracket.step",
+            completed,
+            "revision-client-id");
+
+        Assert.Equal(newUploadId, part.FileId);
+        Assert.Equal("new-bracket.step", part.Name);
+        Assert.Equal("projects/project-1/new-bracket.step", part.StoragePath);
+        Assert.Equal("revision-client-id", part.ClientUploadId);
+        Assert.Equal(newUploadId.ToString("N"), part.ThumbnailVersion);
+
+        Assert.Equal("CNC_MILL", part.ProcessCode);
+        Assert.Equal(processId, part.ProcessId);
+        Assert.Equal("AL6061", part.MaterialCode);
+        Assert.Equal(materialId, part.MaterialId);
+        Assert.Equal("ANODIZED", part.FinishCode);
+        Assert.Equal(finishId, part.FinishId);
+        Assert.Equal("ISO2768_M", part.ToleranceCode);
+        Assert.Equal(toleranceId, part.ToleranceId);
+        Assert.Equal(12, part.Quantity);
+        Assert.Equal("Keep cosmetic face A.", part.PartNotes);
+
+        Assert.Null(part.Dimensions);
+        Assert.Null(part.VolumeMm3);
+        Assert.Null(part.SurfaceAreaMm2);
+        Assert.Null(part.DfmReport);
+        Assert.Null(part.GlbStoragePath);
+        Assert.Null(part.ViewerUrl);
+        Assert.Null(part.OverlayUrls);
+        Assert.False(part.DfmAnalysisTimedOut);
+        Assert.Null(part.AnalysisErrorCode);
+    }
+
+    [Fact]
     public void RefreshLeadTimeOptionsFromPricing_WhenNoLeadTimeSelected_SelectsStandardWithBufferedRanges()
     {
         var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
@@ -2328,6 +2403,16 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method.Invoke(instance, []);
+    }
+
+    private static void InvokePrivateStaticVoid(
+        Type type,
+        string methodName,
+        params object[] args)
+    {
+        var method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(null, args);
     }
 
     private static PartViewModel CreatePartViewModelFromProjectPart(

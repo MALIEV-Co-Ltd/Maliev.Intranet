@@ -83,6 +83,70 @@ public sealed class PartDetailCardFileActionTests : BunitContext, IAsyncLifetime
         });
     }
 
+    [Fact]
+    public void DownloadOriginal_WhenPartNameHasNoExtension_AppendsStoragePathExtension()
+    {
+        _httpHandler.HandlerFunc = (request, _) =>
+        {
+            Assert.Equal("/api/v1/uploads/preview-url", request.RequestUri?.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"url":"https://storage.example/signed-object"}""", Encoding.UTF8, "application/json")
+            });
+        };
+
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "stud bolt",
+            StoragePath = "projects/project-1/a18f772c_stud bolt.step",
+            FileSizeBytes = 689_000,
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        cut.Find("button[title='Download original file']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var invocation = Assert.Single(JSInterop.Invocations, call => call.Identifier == "malievFiles.downloadFromUrl");
+            Assert.Equal("https://storage.example/signed-object", invocation.Arguments[0]?.ToString());
+            Assert.Equal("stud bolt.step", invocation.Arguments[1]?.ToString());
+        });
+    }
+
+    [Fact]
+    public void DownloadOriginal_WhenStoragePathHasPlainFileName_AppendsMissingExtension()
+    {
+        _httpHandler.HandlerFunc = (request, _) =>
+        {
+            Assert.Equal("/api/v1/uploads/preview-url", request.RequestUri?.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"url":"https://storage.example/signed-object"}""", Encoding.UTF8, "application/json")
+            });
+        };
+
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "gear housing",
+            StoragePath = "customers/customer-1/projects/project-1/gear housing.3mf",
+            FileSizeBytes = 689_000,
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        cut.Find("button[title='Download original file']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var invocation = Assert.Single(JSInterop.Invocations, call => call.Identifier == "malievFiles.downloadFromUrl");
+            Assert.Equal("https://storage.example/signed-object", invocation.Arguments[0]?.ToString());
+            Assert.Equal("gear housing.3mf", invocation.Arguments[1]?.ToString());
+        });
+    }
+
     [Theory]
     [InlineData(5_000, "Weight: 5 g")]
     [InlineData(32_000_000, "Weight: 32 kg")]

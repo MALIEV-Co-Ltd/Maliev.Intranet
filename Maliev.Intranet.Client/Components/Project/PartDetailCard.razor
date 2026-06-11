@@ -859,6 +859,12 @@
         {
             name = cleanedName;
         }
+        else if (string.IsNullOrWhiteSpace(Path.GetExtension(name)))
+        {
+            var storageExtension = Path.GetExtension(storageName);
+            if (!string.IsNullOrWhiteSpace(storageExtension))
+                name += storageExtension;
+        }
 
         return string.IsNullOrWhiteSpace(name) ? "part" : name;
     }
