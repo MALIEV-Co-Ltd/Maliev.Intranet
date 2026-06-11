@@ -27,6 +27,33 @@ public sealed class QuoteSummaryBarTests : BunitContext, IAsyncLifetime
     public new async Task DisposeAsync() => await base.DisposeAsync();
 
     [Fact]
+    public void QuoteSummaryBar_WhenNoCustomerSelected_StillShowsTotalAndPreliminaryPdf()
+    {
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "bracket.step",
+            Quantity = 2,
+            EstimatedUnitPrice = 100m
+        };
+
+        var cut = Render<QuoteSummaryBar>(parameters => parameters
+            .Add(p => p.Parts, [part])
+            .Add(p => p.LeadTimeOptions, [])
+            .Add(p => p.ShippingCost, 50m)
+            .Add(p => p.CanQuote, true));
+
+        Assert.Contains("Quote Total", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("267.50", cut.Markup, StringComparison.Ordinal);
+
+        var pdfButton = cut.Find(".qsb-btn-pdf");
+        Assert.False(pdfButton.HasAttribute("disabled"));
+
+        var quoteButton = cut.Find(".qsb-btn-checkout");
+        Assert.True(quoteButton.HasAttribute("disabled"));
+    }
+
+    [Fact]
     public async Task DetailsPopover_WhenOpened_RendersCommercialAdjustmentCards()
     {
         var customer = new CustomerSummaryDto { Id = Guid.NewGuid(), Name = "Test Customer", Email = "test@example.com" };
