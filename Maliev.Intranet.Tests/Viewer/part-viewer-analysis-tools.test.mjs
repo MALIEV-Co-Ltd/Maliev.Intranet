@@ -2155,6 +2155,36 @@ test('DFM overlay transform keeps imported overlay geometry in its authored root
         { x: 0, y: 0, z: 0 });
     assert.deepEqual(overlayRoot.rotationQuaternion, { rotated: true });
     assert.equal(overlayMesh.rotationQuaternion, null);
+    assert.equal(overlayMesh.isPickable, false);
+    assert.equal(overlayMesh.material.name, 'dfm_FDM__thin_wall_mat');
+    assert.equal(overlayMesh.material.backFaceCulling, true);
+    assert.equal(overlayMesh.material.useVertexColors, false);
+    assert.deepEqual(
+        {
+            r: overlayMesh.material.albedoColor.r,
+            g: overlayMesh.material.albedoColor.g,
+            b: overlayMesh.material.albedoColor.b,
+        },
+        { r: 0.95, g: 0.10, b: 0.05 });
+    assert.equal(overlayMesh.material.alpha, 0.55);
+    assert.deepEqual(
+        {
+            r: overlayMesh.material.emissiveColor.r,
+            g: overlayMesh.material.emissiveColor.g,
+            b: overlayMesh.material.emissiveColor.b,
+        },
+        { r: 0.25, g: 0.00, b: 0.00 });
+    assert.equal(overlayMesh.material.zOffset, -2);
+
+    await vm.runInContext(`
+        toggleDfmOverlay('viewer', 'part-a', 'FDM__thin_wall', 'thin-wall.glb', false);
+    `, context);
+    assert.equal(overlayMesh.isVisible, false);
+
+    await vm.runInContext(`
+        toggleDfmOverlay('viewer', 'part-a', 'FDM__thin_wall', 'thin-wall.glb', true);
+    `, context);
+    assert.equal(overlayMesh.isVisible, true);
 });
 
 test('section cut edge and hatch lines are dark and depth-aware', () => {
