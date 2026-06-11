@@ -87,6 +87,20 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void BrowserDfmFallbackRuntime_WeldsOnlyWithinSourceMeshBuffers()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "GeometryRuntimeFallback", "client-geometry-runtime.worker.js")
+            .ReplaceLineEndings("\n");
+
+        Assert.Contains("const sourceGroups = [];", source, StringComparison.Ordinal);
+        Assert.Contains("sourceGroups.push({", source, StringComparison.Ordinal);
+        Assert.Contains("function buildWeldedIndexMap(positions, sourceGroups = null)", source, StringComparison.Ordinal);
+        Assert.Contains("function buildSourceGroupLookup(vertexCount, sourceGroups)", source, StringComparison.Ordinal);
+        Assert.Contains("const key = `${groupByVertex[vertex]}:` +", source, StringComparison.Ordinal);
+        Assert.Contains("const weldedIndex = buildWeldedIndexMap(positions, mesh.sourceGroups);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RealisticPbrMaterials_EnableSpecularAntiAliasingWithoutExpensiveRealtimeFiltering()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
