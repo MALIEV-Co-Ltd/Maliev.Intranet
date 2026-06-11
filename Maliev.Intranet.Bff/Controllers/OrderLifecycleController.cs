@@ -48,6 +48,10 @@ public class OrderLifecycleController(
         DateTime? GetTimestamp(string status) =>
             order.Timeline.LastOrDefault(t => t.Status.Equals(status, StringComparison.OrdinalIgnoreCase))?.Timestamp;
 
+        static bool IsPaidInvoiceStatus(string? invoiceStatus) =>
+            string.Equals(invoiceStatus, "Paid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(invoiceStatus, "FullyPaid", StringComparison.OrdinalIgnoreCase);
+
         // 4. Build the 7-stage list
         var status = order.Status;
         var stages = new List<OrderLifecycleStageDto>
@@ -115,7 +119,7 @@ public class OrderLifecycleController(
                 Stage           = "Invoiced",
                 Label           = "Invoiced",
                 Icon            = Icons.Material.Outlined.Receipt,
-                Status          = invoice?.Status is "Sent" or "Paid" or "Finalized" ? "Completed"
+                Status          = invoice?.Status is "Sent" or "Finalized" || IsPaidInvoiceStatus(invoice?.Status) ? "Completed"
                                 : invoice?.Status is "Draft" ? "Current"
                                 : status is "Delivered" or "Invoiced" or "Paid" ? "Current"
                                 : "Pending",
@@ -129,7 +133,7 @@ public class OrderLifecycleController(
                 Stage       = "Paid",
                 Label       = "Paid",
                 Icon        = Icons.Material.Outlined.Payments,
-                Status      = status is "Paid" || invoice?.Status is "Paid" ? "Completed" : "Pending",
+                Status      = status is "Paid" || IsPaidInvoiceStatus(invoice?.Status) ? "Completed" : "Pending",
                 NavigateTo  = "/finance/payments",
                 CompletedAt = GetTimestamp("Paid")
             }

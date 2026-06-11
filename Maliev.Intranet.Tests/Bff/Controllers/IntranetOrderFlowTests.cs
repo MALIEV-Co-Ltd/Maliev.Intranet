@@ -363,7 +363,9 @@ public sealed class IntranetOrderFlowTests
 
         var orderClient = MakeOrderClient(
             _ => new HttpResponseMessage(HttpStatusCode.OK)
-                { Content = JsonContent.Create(orderJson) });
+            {
+                Content = JsonContent.Create(orderJson)
+            });
 
         // No CustomerPoNumber in the order response → invoice client is never called.
         var invoiceClient = MakeInvoiceClient(
@@ -382,11 +384,94 @@ public sealed class IntranetOrderFlowTests
 
         Assert.Equal("Completed", lifecycle.Stages.Single(s => s.Stage == "Quoted").Status);
         Assert.Equal("Completed", lifecycle.Stages.Single(s => s.Stage == "Confirmed").Status);
-        Assert.Equal("Current",   lifecycle.Stages.Single(s => s.Stage == "InProduction").Status);
-        Assert.Equal("Pending",   lifecycle.Stages.Single(s => s.Stage == "QC").Status);
-        Assert.Equal("Pending",   lifecycle.Stages.Single(s => s.Stage == "Delivered").Status);
-        Assert.Equal("Pending",   lifecycle.Stages.Single(s => s.Stage == "Invoiced").Status);
-        Assert.Equal("Pending",   lifecycle.Stages.Single(s => s.Stage == "Paid").Status);
+        Assert.Equal("Current", lifecycle.Stages.Single(s => s.Stage == "InProduction").Status);
+        Assert.Equal("Pending", lifecycle.Stages.Single(s => s.Stage == "QC").Status);
+        Assert.Equal("Pending", lifecycle.Stages.Single(s => s.Stage == "Delivered").Status);
+        Assert.Equal("Pending", lifecycle.Stages.Single(s => s.Stage == "Invoiced").Status);
+        Assert.Equal("Pending", lifecycle.Stages.Single(s => s.Stage == "Paid").Status);
+    }
+
+    /// <summary>
+    /// InvoiceService marks automatically allocated payments as FullyPaid. The lifecycle BFF must
+    /// treat that status as paid when resolving an order through its customer PO number.
+    /// </summary>
+    [Fact]
+    public async Task GetOrderLifecycle_MarksPaidCompleted_WhenInvoiceStatusIsFullyPaid()
+    {
+        var orderId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        HttpRequestMessage? invoiceRequest = null;
+
+        var orderJson = new
+        {
+            orderId = "ORD-2026-PAID",
+            currentStatus = "Invoiced",
+            customerPoNumber = "PO-2026-PAID",
+            orderedQuantity = 1,
+            quotedAmount = 15_000m,
+            quoteCurrency = "THB",
+            serviceCategoryName = "3D Printing",
+            processTypeName = "FDM",
+            isOutsourced = false,
+            createdAt = DateTime.UtcNow.AddHours(-5),
+            updatedAt = DateTime.UtcNow.AddMinutes(-10)
+        };
+
+        var invoiceJson = new
+        {
+            items = new[]
+            {
+                new
+                {
+                    id = invoiceId,
+                    invoiceNumber = "INV-20260612-000001",
+                    customerName = "Paid Customer Co.",
+                    customerId = Guid.NewGuid(),
+                    customerTaxId = "1234567890123",
+                    billingAddress = "123 Test St",
+                    poNumber = "PO-2026-PAID",
+                    currency = "THB",
+                    grandTotal = 15000m,
+                    paidAmount = 15000m,
+                    status = "FullyPaid",
+                    issueDate = DateTime.UtcNow.Date,
+                    dueDate = DateTime.UtcNow.Date.AddDays(30),
+                    createdAt = DateTime.UtcNow.AddDays(-1),
+                    updatedAt = DateTime.UtcNow
+                }
+            },
+            page = 1,
+            pageSize = 1,
+            totalCount = 1
+        };
+
+        var orderClient = MakeOrderClient(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(orderJson)
+            });
+
+        var invoiceClient = MakeInvoiceClient(
+            request =>
+            {
+                invoiceRequest = request;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(invoiceJson)
+                };
+            });
+
+        var controller = new OrderLifecycleController(orderClient, invoiceClient);
+
+        var result = await controller.Get(orderId, CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var lifecycle = Assert.IsType<OrderLifecycleDto>(okResult.Value);
+        Assert.Equal("Completed", lifecycle.Stages.Single(s => s.Stage == "Invoiced").Status);
+        Assert.Equal("Completed", lifecycle.Stages.Single(s => s.Stage == "Paid").Status);
+        Assert.Equal(invoiceId, lifecycle.Stages.Single(s => s.Stage == "Invoiced").EntityId);
+        Assert.NotNull(invoiceRequest);
+        Assert.Contains("poNumber=PO-2026-PAID", invoiceRequest!.RequestUri!.PathAndQuery);
     }
 
     /// <summary>
