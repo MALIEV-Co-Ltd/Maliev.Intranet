@@ -1175,6 +1175,19 @@ function detectTurningAxisDirectionFromBounds(bb) {
     return new BABYLON.Vector3(0, 0, 1);
 }
 
+function getTurningAxisLength(bb, direction) {
+    const corners = getBoundingBoxCorners(bb);
+    let minT = Infinity;
+    let maxT = -Infinity;
+    corners.forEach(corner => {
+        const t = BABYLON.Vector3.Dot(corner, direction);
+        minT = Math.min(minT, t);
+        maxT = Math.max(maxT, t);
+    });
+
+    return Math.max(maxT - minT, 0);
+}
+
 function getBoundingBoxCorners(bb) {
     const min = toWorldPoint(bb.min);
     const max = toWorldPoint(bb.max);
@@ -1571,13 +1584,54 @@ function evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter) {
     };
 }
 
+function selectAutoTurningAxis(points, bb, fallbackCenter) {
+    const candidates = [
+        new BABYLON.Vector3(1, 0, 0),
+        new BABYLON.Vector3(0, 1, 0),
+        new BABYLON.Vector3(0, 0, 1),
+    ].map(direction => {
+        const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+        return {
+            direction,
+            evaluated,
+            axisLength: getTurningAxisLength(bb, direction),
+        };
+    });
+
+    candidates.sort((a, b) => {
+        const scoreDelta = b.evaluated.score - a.evaluated.score;
+        if (Math.abs(scoreDelta) > 1e-6) return scoreDelta;
+
+        const ringDelta = b.evaluated.ringCount - a.evaluated.ringCount;
+        if (ringDelta !== 0) return ringDelta;
+
+        return b.axisLength - a.axisLength;
+    });
+
+    const selected = candidates[0];
+    if (selected?.evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && selected.evaluated.ringCount > 0) {
+        return selected;
+    }
+
+    const fallbackDirection = detectTurningAxisDirectionFromBounds(bb);
+    return {
+        direction: fallbackDirection,
+        evaluated: evaluateTurningAxisCandidate(points, fallbackDirection, bb, fallbackCenter),
+        axisLength: getTurningAxisLength(bb, fallbackDirection),
+    };
+}
+
 function resolveTurningAxis(scene, canvasId, primaryAxis, axisVector, axisPoint, bb, fallbackCenter) {
     const points = collectTurningAxisSamplePoints(scene, canvasId);
-    const direction = normalizeAxisVector(axisVector)
-        || directionFromPrimaryAxis(primaryAxis)
-        || detectTurningAxisDirectionFromBounds(bb);
     const backendCenter = transformBackendAxisPoint(canvasId, axisPoint);
-    const evaluated = evaluateTurningAxisCandidate(points, direction, bb, fallbackCenter);
+    const explicitDirection = normalizeAxisVector(axisVector) || directionFromPrimaryAxis(primaryAxis);
+    const candidate = explicitDirection
+        ? {
+            direction: explicitDirection,
+            evaluated: evaluateTurningAxisCandidate(points, explicitDirection, bb, fallbackCenter),
+        }
+        : selectAutoTurningAxis(points, bb, fallbackCenter);
+    const { direction, evaluated } = candidate;
     if (evaluated.score >= TURNING_AXIS_MIN_CENTER_SCORE && evaluated.ringCount > 0) {
         return {
             direction,

@@ -244,6 +244,30 @@ test('explicit turning axis uses low-resolution bore center instead of bounding-
     assert.ok(Math.abs(result.center.z) < 0.2, `expected bore center z=0, got ${result.center.z}`);
 });
 
+test('auto turning axis scores visible ring geometry instead of bounding-box dimensions', () => {
+    const context = loadViewerContext();
+    const positions = [];
+
+    addRing(positions, -8, 0, 0, 4.5, 72);
+    addRing(positions, 0, 0, 0, 4.5, 72);
+    addRing(positions, 8, 0, 0, 4.5, 72);
+
+    context.scene = buildScene(positions);
+    context.bb = {
+        min: { x: -8, y: -8, z: -10 },
+        max: { x: 8, y: 8, z: 10 },
+    };
+    context.fallbackCenter = new Vector3(0, 0, 0);
+
+    const result = vm.runInContext(
+        "resolveTurningAxis(scene, 'viewer', 'auto', [0, 0, 0], [0, 0, 0], bb, fallbackCenter)",
+        context);
+
+    assert.ok(Math.abs(result.direction.x) > 0.98, `expected auto axis X, got ${JSON.stringify(result.direction)}`);
+    assert.ok(Math.abs(result.center.y) < 0.15, `expected center y=0, got ${result.center.y}`);
+    assert.ok(Math.abs(result.center.z) < 0.15, `expected center z=0, got ${result.center.z}`);
+});
+
 test('turning axis is only requested from GeometryService report data', () => {
     const cardSource = partDetailCardSource();
     const source = viewerSource();
