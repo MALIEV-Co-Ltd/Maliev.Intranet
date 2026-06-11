@@ -31,6 +31,9 @@ public class UploadsController(
     private static readonly HashSet<string> BrowserViewerSourceExtensions = new(
         [".3mf", ".glb", ".gltf", ".obj", ".stl"],
         StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> BrowserPrimaryUploadExtensions = new(
+        [".3mf", ".glb", ".gltf", ".obj"],
+        StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Uploads a single project file to GCS via UploadService.
@@ -815,7 +818,7 @@ public class UploadsController(
 
     private static IReadOnlyDictionary<string, string>? BuildBrowserPrimaryUploadMetadata(string extension)
     {
-        if (!BrowserViewerSourceExtensions.Contains(extension))
+        if (!BrowserPrimaryUploadExtensions.Contains(extension))
             return null;
 
         return new Dictionary<string, string>(StringComparer.Ordinal)

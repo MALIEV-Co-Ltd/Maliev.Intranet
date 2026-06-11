@@ -76,6 +76,41 @@ public class UploadsControllerResumableTests
         Assert.Equal(1024, payload.GetProperty("totalSize").GetInt64());
         Assert.True(payload.GetProperty("overwrite").GetBoolean());
 
+        Assert.True(payload.TryGetProperty("metadataTags", out var stlMetadataTags));
+        Assert.Equal(JsonValueKind.Null, stlMetadataTags.ValueKind);
+    }
+
+    [Fact]
+    public async Task InitiateResumableUploadAsync_ForBrowserPrimaryFormats_AddsUploadPolicyMetadata()
+    {
+        HttpRequestMessage? downstreamRequest = null;
+        var uploadClient = MakeUploadClient((request, _) =>
+        {
+            downstreamRequest = request;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    uploadId = "upload-123",
+                    sessionUri = "https://storage.googleapis.com/upload/session",
+                    expiresAt = DateTime.UtcNow.AddHours(1),
+                    totalSize = 1024L
+                })
+            });
+        });
+
+        var controller = CreateController(uploadClient);
+        var result = await controller.InitiateResumableUploadAsync(new BffInitiateResumableUploadRequest
+        {
+            FileName = "mesh.obj",
+            ContentType = "model/obj",
+            FileSize = 1024,
+            ProjectId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.NotNull(downstreamRequest);
+        var payload = JsonDocument.Parse(await downstreamRequest.Content!.ReadAsStringAsync()).RootElement;
         var metadataTags = payload.GetProperty("metadataTags");
         Assert.Equal("browser_primary", metadataTags.GetProperty("geometry.executionPolicy").GetString());
         Assert.Equal("required", metadataTags.GetProperty("geometry.browserRuntime").GetString());
