@@ -167,24 +167,6 @@
                                                        Class="pn-empty-dropzone" />
                                 </div>
                             </div>
-                            <QuoteSummaryBar Parts="@_parts"
-                                             LeadTimeOptions="@_leadTimeOptions"
-                                             SelectedLeadTime="@_selectedLeadTime"
-                                             OnLeadTimeChanged="@(lt => { _selectedLeadTime = lt; TriggerAutoSave(); })"
-                                             ShippingCost="@_shippingCost"
-                                             ShippingCostChanged="@(value => { _shippingCost = Math.Max(0m, value); TriggerAutoSave(); })"
-                                             ManualDiscountAmount="@_manualDiscountAmount"
-                                             ManualDiscountAmountChanged="@(value => { _manualDiscountAmount = Math.Max(0m, value); TriggerAutoSave(); })"
-                                             QuotationTerms="@_quotationTerms"
-                                             QuotationTermsChanged="@(value => { _quotationTerms = value; TriggerAutoSave(); })"
-                                             CanQuote="@CanSubmit"
-                                             Saving="@_saving"
-                                             OnQuote="CreateProjectAndQuoteAsync"
-                                             OnGeneratePdf="GenerateDraftPdfAsync"
-                                             SelectedCustomer="@_selectedCustomer"
-                                             ShippingDestinationCountry="@ShippingDestinationCountry"
-                                             ShippingDestinationPostalCode="@ShippingDestinationPostalCode"
-                                             TotalWeightKg="@TotalWeightKg" />
                         </div>
                     }
                 </div>

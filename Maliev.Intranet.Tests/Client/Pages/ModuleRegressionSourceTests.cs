@@ -2139,16 +2139,19 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
-    public void ProjectNew_EmptyWorkspaceKeepsQuoteSummaryVisible()
+    public void ProjectNew_EmptyWorkspaceHidesQuoteSummaryUntilPartsExist()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor");
         var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");
         var normalized = source.ReplaceLineEndings("\n");
+        var emptyWorkspaceStart = normalized.IndexOf("<div class=\"pn-empty-workspace\">", StringComparison.Ordinal);
+        var emptyWorkspaceEnd = normalized.IndexOf("</div>\n                    }\n                </div>", emptyWorkspaceStart, StringComparison.Ordinal);
+        Assert.True(emptyWorkspaceStart >= 0, "ProjectNew should keep an empty upload workspace.");
+        Assert.True(emptyWorkspaceEnd > emptyWorkspaceStart, "ProjectNew empty workspace block should remain parseable.");
+        var emptyWorkspace = normalized[emptyWorkspaceStart..emptyWorkspaceEnd];
 
         Assert.Contains("class=\"pn-empty-workspace\"", normalized, StringComparison.Ordinal);
-        Assert.Contains("<QuoteSummaryBar Parts=\"@_parts\"", normalized, StringComparison.Ordinal);
-        Assert.Contains("SelectedCustomer=\"@_selectedCustomer\"", normalized, StringComparison.Ordinal);
-        Assert.Contains("OnGeneratePdf=\"GenerateDraftPdfAsync\"", normalized, StringComparison.Ordinal);
+        Assert.DoesNotContain("<QuoteSummaryBar", emptyWorkspace, StringComparison.Ordinal);
         Assert.Contains(".pn-empty-workspace", styles, StringComparison.Ordinal);
         Assert.Contains("flex-direction: column;", ExtractCssBlock(styles, ".pn-empty-workspace"), StringComparison.Ordinal);
     }
