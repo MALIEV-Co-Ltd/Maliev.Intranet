@@ -4770,7 +4770,8 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
 
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
     const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
-    new SurfaceEffectPlugin(pbr, surfaceEffect);
+    const surfacePlugin = new SurfaceEffectPlugin(pbr, surfaceEffect);
+    surfacePlugin.setEffect(surfaceEffect);
 
     pbr._malievMaterialPipeline = 'pbr-plugin-fallback';
     pbr._malievNodeMaterialProfile = profile;
@@ -4978,7 +4979,8 @@ function prewarmRealisticShaders(canvasId) {
             if (useFdm) {
                 new (getFdmLayerPluginClass())(mat, FDM_LAYER_HEIGHT_MM);
             }
-            new (getSurfaceEffectPluginClass())(mat, effectKey ? getSurfaceEffect(effectKey) : null);
+            const surfacePlugin = new (getSurfaceEffectPluginClass())(mat, effectKey ? getSurfaceEffect(effectKey) : null);
+            surfacePlugin.setEffect(effectKey ? getSurfaceEffect(effectKey) : null);
             mat.forceCompilation?.(targetMesh, () => { try { mat.dispose?.(); } catch (_) {} });
         } catch (_) {}
     });
@@ -7425,11 +7427,39 @@ function _updateGridMaterial(canvasId) {
     const cfg = getGridThemeConfig(canvasId);
     const mat = grid.material;
     if (mat.mainColor !== undefined) {
-        mat.mainColor           = toColor3(cfg.mainColor);
+        mat.mainColor           = new BABYLON.Color3(0, 0, 0);
         mat.lineColor           = toColor3(cfg.lineColor);
         mat.minorUnitVisibility = cfg.minorUnitVisibility;
         mat.opacity             = cfg.opacity;
+        mat.opacityTexture      = mat.opacityTexture || createGridLineOpacityTexture(scene);
+        if (mat.opacityTexture) {
+            mat.useAlphaFromDiffuseTexture = true;
+            mat.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+        }
     }
+}
+
+function createGridLineOpacityTexture(scene) {
+    if (typeof BABYLON.DynamicTexture !== 'function') return null;
+
+    const texture = new BABYLON.DynamicTexture('__grid_line_alpha__', { width: 64, height: 64 }, scene, false);
+    const context = texture.getContext?.();
+    if (!context) return null;
+
+    context.clearRect(0, 0, 64, 64);
+    context.strokeStyle = 'rgba(255,255,255,1)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(64, 0);
+    context.moveTo(0, 0);
+    context.lineTo(0, 64);
+    context.stroke();
+    texture.hasAlpha = true;
+    texture.wrapU = BABYLON.Texture?.WRAP_ADDRESSMODE ?? 1;
+    texture.wrapV = BABYLON.Texture?.WRAP_ADDRESSMODE ?? 1;
+    texture.update(false);
+    return texture;
 }
 
 function _gridNow() {
@@ -7587,7 +7617,9 @@ export function showGrid(canvasId) {
     const gridWidth = snapGridAxis(sizeX);
     const gridHeight = snapGridAxis(sizeY);
 
-    // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
+    const baseZ = Number.isFinite(bb.min.z) ? bb.min.z : 0;
+
+    // In Z-up space the floor is the XY plane at the model base after centering.
     // BabylonJS ground lies in the XZ plane by default, so we rotate +90° around X to flip it.
     // +PI/2 (not -PI/2) gives the correct upward-facing normal (+Z), which is required for
     // shadow reception — a downward normal means shadow map depth tests fail on the surface.
@@ -7598,7 +7630,7 @@ export function showGrid(canvasId) {
     // Coplanar with the model base — z-fighting with the bottom face is
     // handled by the material depth bias (zOffset), not a physical gap that
     // would visually float the part above its own floor.
-    ground.position.z = 0;
+    ground.position.z = baseZ;
     ground.isPickable = false;
     ground.receiveShadows = true;
 
@@ -7609,9 +7641,14 @@ export function showGrid(canvasId) {
         mat.minorUnitVisibility = gridTheme.minorUnitVisibility;
         mat.gridRatio = gridRatio;
         mat.backFaceCulling = false;
-        mat.mainColor   = toColor3(gridTheme.mainColor);
+        mat.mainColor = new BABYLON.Color3(0, 0, 0);
         mat.lineColor   = toColor3(gridTheme.lineColor);
         mat.opacity     = gridTheme.opacity;
+        mat.opacityTexture = createGridLineOpacityTexture(scene);
+        if (mat.opacityTexture) {
+            mat.useAlphaFromDiffuseTexture = true;
+            mat.transparencyMode = BABYLON.Material?.MATERIAL_ALPHABLEND ?? 2;
+        }
         mat.zOffset     = 2; // depth bias — grid is coplanar with the model base
         ground.material = mat;
         ground.metadata = { ...(ground.metadata ?? {}), malievGridTargetOpacity: gridTheme.opacity };

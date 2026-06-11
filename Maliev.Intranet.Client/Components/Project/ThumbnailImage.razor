@@ -12,7 +12,7 @@
     else if (_progress?.Stage == ThumbnailGenerationStage.Fallback)
     {
         <div class="thumbnail-fallback">
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Default" />
+            <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Small" />
         </div>
     }
     else if (_progress?.Stage == ThumbnailGenerationStage.Failed)
@@ -87,10 +87,15 @@
             {
                 if (string.IsNullOrEmpty(SignedDownloadUrl))
                 {
-                    // TODO Phase 2: Trigger fallback if no signed URL
+                    _progress = new ThumbnailProgress(StoragePath, ThumbnailGenerationStage.Failed, 0, "Thumbnail unavailable");
+                    await InvokeAsync(StateHasChanged);
                     return;
                 }
                 _thumbnails = await ThumbnailService.GenerateAsync(StoragePath, Version, SignedDownloadUrl);
+                if (_thumbnails is not { HasAny: true })
+                {
+                    _progress = new ThumbnailProgress(StoragePath, ThumbnailGenerationStage.Fallback, 0, "Thumbnail unavailable");
+                }
                 await InvokeAsync(StateHasChanged);
             }
             catch

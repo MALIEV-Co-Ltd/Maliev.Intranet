@@ -87,8 +87,10 @@
 
     function applyNeutralMaterial(scene, meshes) {
         const material = new BABYLON.StandardMaterial('thumb_mat', scene);
-        material.diffuseColor = new BABYLON.Color3(0.62, 0.66, 0.70);
-        material.specularColor = new BABYLON.Color3(0.18, 0.18, 0.18);
+        material.diffuseColor = new BABYLON.Color3(0.78, 0.82, 0.86);
+        material.ambientColor = new BABYLON.Color3(0.46, 0.48, 0.52);
+        material.emissiveColor = new BABYLON.Color3(0.12, 0.13, 0.14);
+        material.specularColor = new BABYLON.Color3(0.22, 0.22, 0.22);
         material.backFaceCulling = false;
         for (const mesh of meshes) {
             if (!mesh.material) mesh.material = material;
@@ -294,9 +296,9 @@
             // Hemispheric key light along +Z (model up) plus a fill from the
             // isometric direction so face views are never fully unlit.
             const keyLight = new BABYLON.HemisphericLight('thumb_key', new BABYLON.Vector3(0, 0, 1), scene);
-            keyLight.intensity = 0.9;
+            keyLight.intensity = 1.15;
             const fillLight = new BABYLON.DirectionalLight('thumb_fill', new BABYLON.Vector3(-1, 1, -1), scene);
-            fillLight.intensity = 0.5;
+            fillLight.intensity = 0.85;
 
             const camera = new BABYLON.FreeCamera('thumb_cam', BABYLON.Vector3.Zero(), scene);
             scene.activeCamera = camera;

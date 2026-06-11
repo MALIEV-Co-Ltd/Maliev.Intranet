@@ -253,6 +253,31 @@ public sealed class ModelViewerRenderingSourceTests
     }
 
     [Fact]
+    public void RealisticSurfaceEffectPlugin_IsEnabledWhenMaterialIsCreatedAndPrewarmed()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var createBlock = ExtractBlock(source, "function createRealisticPbrMaterial");
+        var prewarmBlock = ExtractBlock(source, "function prewarmRealisticShaders");
+
+        Assert.Contains("const surfacePlugin = new SurfaceEffectPlugin(pbr, surfaceEffect);", createBlock, StringComparison.Ordinal);
+        Assert.Contains("surfacePlugin.setEffect(surfaceEffect);", createBlock, StringComparison.Ordinal);
+        Assert.Contains("const surfacePlugin = new (getSurfaceEffectPluginClass())(mat, effectKey ? getSurfaceEffect(effectKey) : null);", prewarmBlock, StringComparison.Ordinal);
+        Assert.Contains("surfacePlugin.setEffect(effectKey ? getSurfaceEffect(effectKey) : null);", prewarmBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GridFloor_UsesModelBaseAndTransparentFill()
+    {
+        var source = ViewerScript.ReplaceLineEndings("\n");
+        var gridBlock = ExtractBlock(source, "export function showGrid");
+
+        Assert.Contains("const baseZ = Number.isFinite(bb.min.z) ? bb.min.z : 0;", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("ground.position.z = baseZ;", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("mat.mainColor = new BABYLON.Color3(0, 0, 0);", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("mat.opacityTexture = createGridLineOpacityTexture(scene);", gridBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RealisticConfigurator_MapsPowderBedProcessesToNylonPowderPreset()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor")

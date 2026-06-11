@@ -118,6 +118,24 @@ public class ThumbnailGenerationServiceTests
         Assert.Equal(".stl", jsRuntime.Arguments[1]?.GetType().GetProperty("fileExtension")?.GetValue(jsRuntime.Arguments[1]));
     }
 
+    [Fact]
+    public async Task GenerateAsync_WhenStepFormatIsUnsupported_ReturnsFallbackInsteadOfThrowing()
+    {
+        var jsRuntime = new ThrowingJsRuntime("Unsupported format for local thumbnail generation: .step");
+        var service = new ThumbnailGenerationService(
+            jsRuntime,
+            httpClient: new HttpClient(),
+            logger: NullLogger<ThumbnailGenerationService>.Instance);
+
+        var result = await service.GenerateAsync(
+            "projects/project-1/bracket.step",
+            "v1",
+            "https://storage.local/download/bracket.step?sig=abc");
+
+        Assert.False(result.HasAny);
+        Assert.Equal("v1", result.Version);
+    }
+
     private sealed class CapturingJsRuntime : IJSRuntime
     {
         public string? Identifier { get; private set; }
@@ -129,6 +147,15 @@ public class ThumbnailGenerationServiceTests
             Arguments = args;
             return ValueTask.FromResult((TValue)(object)new ThumbnailSetDto { ThumbnailSmall = "data:image/png;base64,abc" });
         }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) =>
+            InvokeAsync<TValue>(identifier, args);
+    }
+
+    private sealed class ThrowingJsRuntime(string message) : IJSRuntime
+    {
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>
+            throw new JSException(message);
 
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) =>
             InvokeAsync<TValue>(identifier, args);

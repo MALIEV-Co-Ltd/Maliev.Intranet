@@ -36,27 +36,6 @@ else if (Analyzing)
         </div>
     </div>
 }
-else if (_allClearShown)
-{
-    <div class="dfm-overlay dfm-overlay--all-clear @( _allClearFading ? "dfm-overlay--fade-out" : "")">
-        <div class="dfm-overlay-header">
-            <div class="dfm-header-left">
-                <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
-                         Size="Size.Small"
-                         Color="Color.Success" />
-                <span>All Clear &mdash; No Issues Found</span>
-                @if (!string.IsNullOrWhiteSpace(dfmSource))
-                {
-                    <MudIcon Icon="@sourceIcon"
-                             Size="Size.Small"
-                             Color="@sourceColor"
-                             Class="dfm-source-icon"
-                             Title="@($"DFM analysis: {sourceLabel}")" />
-                }
-            </div>
-        </div>
-    </div>
-}
 else if (IsVisible && DfmIssues.Count > 0)
 {
     <div class="dfm-overlay @(_acknowledged ? "dfm-overlay--success" : "")">
@@ -144,13 +123,6 @@ else if (IsVisible && DfmIssues.Count > 0)
         border-top-color: var(--mud-palette-lines-default);
         background: color-mix(in srgb, var(--mud-palette-surface) 70%, transparent);
     }
-    .dfm-overlay--all-clear {
-        border-top-color: var(--mud-palette-success);
-        background: color-mix(in srgb, var(--mud-palette-success) 12%, var(--mud-palette-surface));
-    }
-    .dfm-overlay--fade-out {
-        opacity: 0;
-    }
     .dfm-overlay--success {
         border-top-color: var(--mud-palette-success) !important;
     }
@@ -229,17 +201,11 @@ else if (IsVisible && DfmIssues.Count > 0)
     /// <summary>Optional user-friendly message describing why DFM is unavailable. Shown instead of the generic label when set.</summary>
     [Parameter] public string? ErrorMessage { get; set; }
 
-    /// <summary>True when DFM analysis completed and no issues were found.</summary>
-    [Parameter] public bool AllClear { get; set; }
-
     /// <summary>Invoked when the user clicks the Acknowledge button.</summary>
     [Parameter] public EventCallback OnAcknowledged { get; set; }
 
     /// <summary>Invoked when the user clicks the eye icon on a DFM issue to toggle its overlay on the 3D model.</summary>
     [Parameter] public EventCallback<DfmIssue> OnToggleOverlay { get; set; }
-
-    /// <summary>Invoked after the transient all-clear message has been dismissed.</summary>
-    [Parameter] public EventCallback OnAllClearDismissed { get; set; }
 
     /// <summary>Optional action callback shown as a button in the error/timed-out state.</summary>
     [Parameter] public EventCallback OnErrorAction { get; set; }
@@ -254,12 +220,6 @@ else if (IsVisible && DfmIssues.Count > 0)
     // Kept for backward compatibility: parent reads this to determine isActive for ToggleDfmOverlayAsync.
     internal readonly HashSet<string> _activeOverlays = [];
     private bool _previousIsVisible;
-    private bool _allClearFading;
-    private bool _allClearShown;
-    private CancellationTokenSource? _allClearCts;
-    // Tracks the last issue count we transitioned *from* when showing All Clear.
-    // Prevents re-triggering the banner every time parameters change.
-    private int _previousIssueCount = -1;
 
     protected override void OnParametersSet()
     {
@@ -270,50 +230,6 @@ else if (IsVisible && DfmIssues.Count > 0)
             _expanded = true;
         }
         _previousIsVisible = IsVisible;
-
-        if (AllClear && !_allClearShown)
-        {
-            // Only fire the All Clear dismissal when transitioning from issues → clear,
-            // not on every re-render. _previousIssueCount tracks the last count that
-            // triggered a meaningful state change.
-            var isNewAllClear = _previousIssueCount != 0;
-            _previousIssueCount = 0;
-
-            if (isNewAllClear)
-            {
-                _allClearShown = true;
-                _allClearFading = false;
-                _ = TriggerAllClearAutoDismiss();
-            }
-        }
-        else if (!AllClear)
-        {
-            if (DfmIssues.Count > 0)
-                _previousIssueCount = DfmIssues.Count;
-            _allClearShown = false;
-            _allClearFading = false;
-            _allClearCts?.Cancel();
-        }
-    }
-
-    private async Task TriggerAllClearAutoDismiss()
-    {
-        _allClearCts?.Cancel();
-        _allClearCts = new CancellationTokenSource();
-        var token = _allClearCts.Token;
-        try
-        {
-            await Task.Delay(3000, token);
-            _allClearFading = true;
-            await InvokeAsync(StateHasChanged);
-            await Task.Delay(500, token);
-            _allClearShown = false;
-            await OnAllClearDismissed.InvokeAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (OperationCanceledException)
-        {
-        }
     }
 
     private void ToggleExpanded()
@@ -351,9 +267,5 @@ else if (IsVisible && DfmIssues.Count > 0)
     {
         _selectedIssue = null;
         _activeOverlays.Clear();
-        _allClearShown = false;
-        _allClearFading = false;
-        _previousIssueCount = -1;
-        _allClearCts?.Cancel();
     }
 }

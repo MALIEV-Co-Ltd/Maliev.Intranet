@@ -291,10 +291,8 @@
                              AnalyzingMessage="@GetDfmAnalyzingMessage()"
                              TimedOut="@DfmUnavailable"
                              ErrorMessage="@(DfmUnavailable ? DfmStatusMessages.GetFriendlyMessage(Part.AnalysisErrorCode) : null)"
-                             AllClear="@ShouldShowAllClearOverlay()"
                              OnAcknowledged="@HandleDfmAcknowledged"
                              OnToggleOverlay="@HandleToggleOverlay"
-                             OnAllClearDismissed="@HandleAllClearDismissed"
                              OnErrorAction="@(Part.AnalysisErrorCode == "FILE_MISSING" ? EventCallback.Factory.Create(this, () => OnRemovePart.InvokeAsync(Part)) : default)"
                              ErrorActionLabel="@(Part.AnalysisErrorCode == "FILE_MISSING" ? "Remove Part" : null)" />
         </div>
@@ -1125,19 +1123,6 @@
     private Task HandleDfmAcknowledged()
     {
         NotifyChanged(p => p.DfmAcknowledged = true);
-        return Task.CompletedTask;
-    }
-
-    private bool ShouldShowAllClearOverlay() =>
-        _dfmIssues.Count == 0
-        && Part.DfmReport != null
-        && !Part.DfmAcknowledged
-        && !Part.DfmAllClearNotified
-        && !string.IsNullOrEmpty(Part.ProcessCode);
-
-    private Task HandleAllClearDismissed()
-    {
-        Part.DfmAllClearNotified = true;
         return Task.CompletedTask;
     }
 

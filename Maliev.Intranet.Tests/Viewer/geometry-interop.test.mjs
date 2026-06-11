@@ -173,8 +173,12 @@ function createInteropContext(state) {
         StandardMaterial: class {
             constructor() {
                 this.diffuseColor = null;
+                this.ambientColor = null;
+                this.emissiveColor = null;
                 this.specularColor = null;
                 this.backFaceCulling = true;
+                state.materials ??= [];
+                state.materials.push(this);
             }
         },
         Vector3,
@@ -350,6 +354,21 @@ test('generateThumbnails renders STL files via the GeometryService runtime worke
     assert.equal(state.importArgs, undefined, 'STL thumbnailing must not depend on Babylon STL loader registration');
     assert.equal(state.renderedViews.length, 8);
     assert.ok(result.thumbnailSmall.startsWith('data:image/png;base64,'));
+});
+
+test('generateThumbnails uses a bright neutral material for runtime-extracted STL meshes', async () => {
+    const state = makeState();
+    const context = createInteropContext(state);
+    FakeWorker.instances.length = 0;
+
+    await context.window.MalievGeometry.generateThumbnails(
+        'https://storage.local/parts/bracket.stl?sig=abc', { timeoutMs: 5000 });
+
+    const material = state.materials?.[0];
+    assert.ok(material, 'thumbnail generation should assign a neutral material');
+    assert.ok(material.diffuseColor.r >= 0.74, 'diffuse color should be bright enough for light UI thumbnails');
+    assert.ok(material.ambientColor.r >= 0.42, 'ambient color should prevent dark silhouettes');
+    assert.ok(material.emissiveColor.r >= 0.10, 'emissive lift should keep worker STL thumbnails readable');
 });
 
 test('generateThumbnails rejects unsupported formats so Blazor falls back to the server', async () => {
