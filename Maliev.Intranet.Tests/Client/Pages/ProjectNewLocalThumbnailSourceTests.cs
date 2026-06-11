@@ -8,6 +8,29 @@ namespace Maliev.Intranet.Tests.Client.Pages;
 /// </summary>
 public sealed class ProjectNewLocalThumbnailSourceTests
 {
+    private static readonly string[] RequiredProjectNew3dExtensions =
+    [
+        ".stl",
+        ".step",
+        ".stp",
+        ".3mf",
+        ".obj",
+        ".igs",
+        ".iges",
+        ".fbx",
+        ".glb",
+        ".gltf"
+    ];
+
+    private static readonly string[] DirectBrowserThumbnailExtensions =
+    [
+        ".stl",
+        ".obj",
+        ".glb",
+        ".gltf",
+        ".3mf"
+    ];
+
     private static readonly string[] ProjectNewPath =
         ["Maliev.Intranet.Client", "Pages", "ProjectNew.razor.cs"];
 
@@ -48,11 +71,32 @@ public sealed class ProjectNewLocalThumbnailSourceTests
         var interop = ReadRepoFile(
             "Maliev.Intranet.Client", "wwwroot", "js", "geometry", "JsInterop", "GeometryInterop.js");
 
-        foreach (var extension in new[] { ".stl", ".obj", ".glb", ".gltf", ".3mf" })
+        foreach (var extension in DirectBrowserThumbnailExtensions)
         {
             Assert.Contains($"\"{extension}\"", projectNew, StringComparison.Ordinal);
             Assert.Contains($"'{extension}'", interop, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void EverySupportedProjectNew3dExtensionHasAThumbnailPath()
+    {
+        var fileTypes = ReadRepoFile("Maliev.Intranet.Tests", "Client", "Pages", "ProjectNewAutoSaveTests.cs");
+        var projectNew = ReadRepoFile(ProjectNewPath);
+
+        foreach (var extension in RequiredProjectNew3dExtensions)
+        {
+            Assert.Contains($"\"{extension}\"", fileTypes, StringComparison.Ordinal);
+        }
+
+        foreach (var extension in DirectBrowserThumbnailExtensions)
+        {
+            Assert.Contains($"\"{extension}\"", projectNew, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("!CanGenerateThumbnailsLocally(part.StoragePath)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("CanGenerateThumbnailsLocally(viewerStoragePath ?? part.ViewerFileExtension)", projectNew, StringComparison.Ordinal);
+        Assert.Contains("TriggerLocalThumbnailsFromViewer(part, payload.GlbUrl)", projectNew, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] relativeParts)
