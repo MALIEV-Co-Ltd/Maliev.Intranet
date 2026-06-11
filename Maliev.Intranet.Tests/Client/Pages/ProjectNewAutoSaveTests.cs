@@ -158,6 +158,27 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectNew_BareNewQuoteNavigation_ResetsCurrentWorkspace()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        var existingSessionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        navigation.NavigateTo($"/sales/projects/new?session={existingSessionId}");
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var parts = GetParts(cut.Instance);
+        parts.Add(new PartViewModel { Name = "carryover.stl", Quantity = 2 });
+
+        navigation.NavigateTo("/sales/projects/new");
+
+        cut.WaitForAssertion(() =>
+        {
+            var nextSessionId = GetPrivateField<Guid>(cut.Instance, "_sessionId");
+            Assert.NotEqual(existingSessionId, nextSessionId);
+            Assert.Empty(GetParts(cut.Instance));
+            Assert.Contains($"/sales/projects/new?session={nextSessionId}", navigation.Uri, StringComparison.OrdinalIgnoreCase);
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void ProjectNew_ShouldRequestCurrenciesDuringInit()
     {
         ClearRequests();

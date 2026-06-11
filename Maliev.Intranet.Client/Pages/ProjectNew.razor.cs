@@ -12,6 +12,7 @@ using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -157,6 +158,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     // ── Session ────────────────────────────────────────────────────────
     private Guid _sessionId;
+    private bool _startingNewQuoteSession;
 
     /// <summary>
     /// When non-null, the project has been persisted to the ProjectService as a Draft.
@@ -206,6 +208,7 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        Navigation.LocationChanged -= HandleProjectNewLocationChanged;
         foreach (var cts in _pricingTokens.Values) { await cts.CancelAsync(); cts.Dispose(); }
         foreach (var cts in _statusPollCts.Values) { cts.Cancel(); cts.Dispose(); }
         _statusPollCts.Clear();
@@ -226,6 +229,8 @@ public partial class ProjectNew : IAsyncDisposable
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
+        Navigation.LocationChanged += HandleProjectNewLocationChanged;
+
         // ── Session management: parse or assign ?session= GUID ─────────
         var uri = new Uri(Navigation.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -382,6 +387,102 @@ public partial class ProjectNew : IAsyncDisposable
         {
             Logger.LogWarning(ex, "ProjectNew notifications hub is unavailable during initialization.");
         }
+    }
+
+    private void HandleProjectNewLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!IsBareProjectNewRoute(args.Location))
+            return;
+
+        _ = InvokeAsync(StartNewQuoteSessionAsync);
+    }
+
+    private bool IsBareProjectNewRoute(string location)
+    {
+        var relativePath = Navigation.ToBaseRelativePath(location).Split('#')[0];
+        var queryStart = relativePath.IndexOf('?', StringComparison.Ordinal);
+        var routePath = queryStart >= 0 ? relativePath[..queryStart] : relativePath;
+        if (!string.Equals(routePath.Trim('/'), "sales/projects/new", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (queryStart < 0 || queryStart == relativePath.Length - 1)
+            return true;
+
+        var query = System.Web.HttpUtility.ParseQueryString(relativePath[queryStart..]);
+        return string.IsNullOrWhiteSpace(query["session"]) &&
+            string.IsNullOrWhiteSpace(query["resume"]) &&
+            string.IsNullOrWhiteSpace(query["customerId"]);
+    }
+
+    private async Task StartNewQuoteSessionAsync()
+    {
+        if (_startingNewQuoteSession)
+            return;
+
+        _startingNewQuoteSession = true;
+        try
+        {
+            await ResetQuoteWorkspaceAsync();
+            _sessionId = Guid.NewGuid();
+            Navigation.NavigateTo($"/sales/projects/new?session={_sessionId}", replace: true);
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            _startingNewQuoteSession = false;
+        }
+    }
+
+    private async Task ResetQuoteWorkspaceAsync()
+    {
+        _autoSaveDebounceTimer?.Dispose();
+        _autoSaveDebounceTimer = null;
+        _storageMigrationDebounceTimer?.Dispose();
+        _storageMigrationDebounceTimer = null;
+
+        foreach (var cts in _pricingTokens.Values)
+        {
+            await cts.CancelAsync();
+            cts.Dispose();
+        }
+        _pricingTokens.Clear();
+
+        foreach (var cts in _statusPollCts.Values)
+        {
+            await cts.CancelAsync();
+            cts.Dispose();
+        }
+        _statusPollCts.Clear();
+        _missingAnalysisStatusPolls.Clear();
+        _routingProcessByPart.Clear();
+        _recentDfmFailureKeys.Clear();
+
+        foreach (var callbackRef in _uploadCallbacks.Values)
+            callbackRef.Dispose();
+        _uploadCallbacks.Clear();
+
+        foreach (var part in _parts.ToList())
+            await ClearBrowserUploadFileAsync(part, force: true);
+
+        _tempProjectId = Guid.NewGuid();
+        _title = $"Project {DateTime.Today:yyyy-MM-dd}";
+        _selectedCustomer = null;
+        _shippingCost = 0m;
+        _manualDiscountAmount = 0m;
+        _quotationTerms = null;
+        _titleHasError = false;
+        _parts.Clear();
+        _bulkSelectedParts.Clear();
+        _layoutMode = LayoutMode.Configurator;
+        _selectedPartIndex = 0;
+        _partsDrawerOpen = false;
+        _serverProjectId = null;
+        _lastSavedAt = null;
+        _serverSavePending = false;
+        _storageMigrationInProgress = false;
+        _serverSaveInProgress = false;
+        _projectLocked = false;
+        RefreshLeadTimeOptionsFromPricing();
     }
 
     // ── Task 4: Customer search ────────────────────────────────────────
