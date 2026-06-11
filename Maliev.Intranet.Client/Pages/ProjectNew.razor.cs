@@ -1886,7 +1886,7 @@ public partial class ProjectNew : IAsyncDisposable
         }
 
         var processCode = ProcessCodeNormalizer.Normalize(part.ProcessCode) ?? part.ProcessCode;
-        var report = BuildDfmReportFromLocalGeometryRuntimeResult(processCode, result);
+        var report = BuildDfmReportFromLocalGeometryRuntimeResult(part, processCode, result);
         SetDfmReportForProcess(part, processCode, report);
         part.ResolveDfmReport();
         ApplyLocalGeometryRuntimeMetrics(part, result.Metrics);
@@ -1928,14 +1928,23 @@ public partial class ProjectNew : IAsyncDisposable
         if (metrics.IsManifold.HasValue)
             part.IsManifold = metrics.IsManifold.Value;
 
+        var isParametricCad = IsParametricCadPart(part);
         if (TryGetFiniteNonNegative(metrics.BodyCount, out var bodyCountValue)
             && bodyCountValue >= 1
             && bodyCountValue <= int.MaxValue)
         {
-            part.BodyCount = (int)Math.Round(bodyCountValue, MidpointRounding.AwayFromZero);
+            var bodyCount = (int)Math.Round(bodyCountValue, MidpointRounding.AwayFromZero);
+            part.BodyCount = bodyCount;
+            EnsureBodyMetadata(part, bodyCount);
         }
 
-        if (TryGetFiniteNonNegative(metrics.NonManifoldEdgeCount, out var edgeCountValue)
+        if (isParametricCad)
+        {
+            part.IsManifold = true;
+            part.NonManifoldFaceCount = null;
+            part.NonManifoldReason = null;
+        }
+        else if (TryGetFiniteNonNegative(metrics.NonManifoldEdgeCount, out var edgeCountValue)
             && edgeCountValue > 0
             && edgeCountValue <= int.MaxValue)
         {
@@ -1964,6 +1973,38 @@ public partial class ProjectNew : IAsyncDisposable
         }
     }
 
+    private static void EnsureBodyMetadata(PartViewModel part, int bodyCount)
+    {
+        if (bodyCount <= 1 || part.Bodies.Count == bodyCount)
+            return;
+
+        part.Bodies = Enumerable.Range(0, bodyCount)
+            .Select(index => new PartViewModel.BodyInfo(
+                index,
+                $"Body {index + 1}",
+                null,
+                [],
+                [],
+                null))
+            .ToList();
+    }
+
+    private static bool IsParametricCadPart(PartViewModel part)
+    {
+        var extension = Path.GetExtension(part.ViewerFileExtension);
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = Path.GetExtension(part.ViewerStoragePath);
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = Path.GetExtension(part.StoragePath);
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = Path.GetExtension(part.Name);
+
+        return extension.Equals(".step", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".stp", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".igs", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".iges", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool TryGetFiniteNonNegative(double? value, out double number)
     {
         number = value.GetValueOrDefault();
@@ -1971,10 +2012,12 @@ public partial class ProjectNew : IAsyncDisposable
     }
 
     private static DfmReport BuildDfmReportFromLocalGeometryRuntimeResult(
+        PartViewModel part,
         string processCode,
         LocalGeometryRuntimeResult result)
     {
         var issues = result.Issues
+            .Where(issue => !ShouldSuppressLocalGeometryIssue(part, issue))
             .Select(issue => new Maliev.Intranet.Shared.Dtos.DfmIssue
             {
                 Category = issue.Category ?? string.Empty,
@@ -2004,6 +2047,14 @@ public partial class ProjectNew : IAsyncDisposable
             OverhangFaceCount = overhangFaceCount > 0 ? overhangFaceCount : null,
             SupportRequired = overhangFaceCount > 0 ? true : null,
         };
+    }
+
+    private static bool ShouldSuppressLocalGeometryIssue(
+        PartViewModel part,
+        LocalGeometryRuntimeIssue issue)
+    {
+        return IsParametricCadPart(part)
+            && string.Equals(issue.Category, "mesh_integrity", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void SetDfmReportForProcess(

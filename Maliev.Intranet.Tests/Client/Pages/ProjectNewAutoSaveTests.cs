@@ -1854,6 +1854,77 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleLocalGeometryRuntimeCompletedAsync_WhenStepAssemblyReportsBrowserEdgeNoise_KeepsCadManifoldAndBodies()
+    {
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "Housing for Drive wheel.STEP",
+            StoragePath = "projects/housing.step",
+            ViewerStoragePath = "projects/housing.step",
+            ViewerFileExtension = ".step",
+            ProcessCode = "CNC_MILL",
+            IsManifold = true,
+        };
+        GetParts(cut.Instance).Add(part);
+
+        var result = new LocalGeometryRuntimeResult
+        {
+            ProcessCode = "CNC_MILL",
+            Authority = "local_primary",
+            ExecutionMode = "primary_interactive",
+            IsAuthoritative = false,
+            RuntimeVersion = "1.0.0",
+            AlgorithmVersion = "browser-first-dfm-v1",
+            InputHash = "step123",
+            Metrics = new LocalGeometryRuntimeMetrics
+            {
+                FaceCount = 84520,
+                VolumeMm3 = 200000,
+                IsManifold = false,
+                NonManifoldEdgeCount = 561,
+                BodyCount = 3,
+                BoundingBox = new LocalGeometryRuntimeBoundingBox
+                {
+                    X = 60,
+                    Y = 33,
+                    Z = 60,
+                },
+            },
+            Issues =
+            [
+                new LocalGeometryRuntimeIssue
+                {
+                    Category = "mesh_integrity",
+                    Severity = "warning",
+                    Title = "Non-manifold mesh",
+                    Description = "Found 561 non-manifold edges.",
+                    Value = 561,
+                    Threshold = 0,
+                },
+            ],
+        };
+
+        var applied = await InvokePrivateTaskWithResultAsync<bool>(cut, "HandleLocalGeometryRuntimeCompletedAsync", new PartLocalGeometryRuntimeResult
+        {
+            Part = part,
+            Result = result,
+        });
+
+        Assert.True(applied);
+        Assert.True(part.IsManifold);
+        Assert.Null(part.NonManifoldReason);
+        Assert.Null(part.NonManifoldFaceCount);
+        Assert.Equal(3, part.BodyCount);
+        Assert.Equal(3, part.Bodies.Count);
+        Assert.Equal(["Body 1", "Body 2", "Body 3"], part.Bodies.Select(body => body.Name).ToArray());
+
+        var report = Assert.IsType<DfmReport>(part.DfmReport);
+        Assert.Empty(report.Issues);
+    }
+
+    [Fact]
     public async Task HandleLocalGeometryRuntimeCompletedAsync_WhenResultDoesNotMatchProcess_ReturnsFalse()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
