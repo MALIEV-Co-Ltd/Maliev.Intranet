@@ -269,7 +269,7 @@ test('generateThumbnails renders all 8 ThumbnailSetDto views', async () => {
     const context = createInteropContext(state);
 
     const result = await context.window.MalievGeometry.generateThumbnails(
-        'https://storage.local/parts/bracket.stl?sig=abc',
+        'https://storage.local/parts/bracket.obj?sig=abc',
         { timeoutMs: 5000 });
 
     const keys = [
@@ -330,6 +330,26 @@ test('generateThumbnails renders 3MF files via the GeometryService runtime worke
 
     assert.equal(state.renderedViews.length, 8);
     assert.ok(result.thumbnailLarge.startsWith('data:image/png;base64,'));
+});
+
+test('generateThumbnails renders STL files via the GeometryService runtime worker', async () => {
+    const state = makeState();
+    const context = createInteropContext(state);
+    FakeWorker.instances.length = 0;
+
+    const result = await context.window.MalievGeometry.generateThumbnails(
+        'https://storage.local/parts/bracket.stl?sig=abc', { timeoutMs: 5000 });
+
+    assert.equal(state.manifestFetched, true, 'must pull the runtime manifest from GeometryService');
+    assert.equal(FakeWorker.instances.length, 1, 'must spawn the GeometryService runtime worker');
+    const worker = FakeWorker.instances[0];
+    assert.equal(worker.lastMessage.operation, 'extract_mesh');
+    assert.equal(worker.lastMessage.input.fileName, 'thumbnail-source.stl');
+    assert.equal(worker.terminated, true, 'worker must be terminated after extraction');
+
+    assert.equal(state.importArgs, undefined, 'STL thumbnailing must not depend on Babylon STL loader registration');
+    assert.equal(state.renderedViews.length, 8);
+    assert.ok(result.thumbnailSmall.startsWith('data:image/png;base64,'));
 });
 
 test('generateThumbnails rejects unsupported formats so Blazor falls back to the server', async () => {

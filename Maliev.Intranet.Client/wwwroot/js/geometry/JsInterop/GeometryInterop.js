@@ -3,7 +3,7 @@
 //
 // Loaded as a CLASSIC script (no ES modules) from index.html AFTER
 // lib/babylonjs/babylon.js and lib/babylonjs/babylonjs.loaders.min.js,
-// so the global BABYLON runtime and its STL/OBJ/glTF loaders are available.
+// so the global BABYLON runtime and its OBJ/glTF loaders are available.
 //
 // Exposes window.MalievGeometry:
 //   generateThumbnails(fileUrl, options) → Promise<ThumbnailSet>
@@ -24,10 +24,10 @@
     const DEFAULT_TIMEOUT_MS = 20000;
 
     // Extensions the bundled BabylonJS loaders (+ built-in glTF) can parse.
-    const LOADER_EXTENSIONS = ['.stl', '.obj', '.glb', '.gltf'];
+    const LOADER_EXTENSIONS = ['.obj', '.glb', '.gltf'];
     // Extensions parsed by the GeometryService browser runtime worker instead
     // (single source of truth for mesh extraction — same worker the viewer uses).
-    const RUNTIME_EXTRACTION_EXTENSIONS = ['.3mf'];
+    const RUNTIME_EXTRACTION_EXTENSIONS = ['.stl', '.3mf'];
     const SUPPORTED_EXTENSIONS = [...LOADER_EXTENSIONS, ...RUNTIME_EXTRACTION_EXTENSIONS];
 
     const GEOMETRY_RUNTIME_MANIFEST_URL = '/api/v1/geometry/runtime/manifest';
