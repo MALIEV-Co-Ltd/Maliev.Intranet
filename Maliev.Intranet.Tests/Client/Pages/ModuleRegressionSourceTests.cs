@@ -2139,6 +2139,21 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void ProjectNew_EmptyWorkspaceKeepsQuoteSummaryVisible()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor");
+        var styles = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");
+        var normalized = source.ReplaceLineEndings("\n");
+
+        Assert.Contains("class=\"pn-empty-workspace\"", normalized, StringComparison.Ordinal);
+        Assert.Contains("<QuoteSummaryBar Parts=\"@_parts\"", normalized, StringComparison.Ordinal);
+        Assert.Contains("SelectedCustomer=\"@_selectedCustomer\"", normalized, StringComparison.Ordinal);
+        Assert.Contains("OnGeneratePdf=\"GenerateDraftPdfAsync\"", normalized, StringComparison.Ordinal);
+        Assert.Contains(".pn-empty-workspace", styles, StringComparison.Ordinal);
+        Assert.Contains("flex-direction: column;", ExtractCssBlock(styles, ".pn-empty-workspace"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProjectNew_MobileConfiguratorUsesFingerFriendlyControls()
     {
         var projectNew = ReadRepoFile("Maliev.Intranet.Client", "Pages", "ProjectNew.razor.css");

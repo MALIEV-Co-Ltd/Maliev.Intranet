@@ -94,6 +94,13 @@
     align-items: center;
     justify-content: center;
 }
+.pn-empty-workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
 .pn-empty-state {
     flex: 1;
     display: flex;
