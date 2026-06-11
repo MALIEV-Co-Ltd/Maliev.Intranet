@@ -1359,7 +1359,7 @@ test('runLocalAdvisoryGeometry can resolve direct file bytes from the upload sto
     assert.equal(workerMessages[0].input.meshBuffers, undefined);
 });
 
-test('showGrid uses a low-contrast grid floor in light mode', () => {
+test('showGrid renders grid lines without a dark floor patch', () => {
     const context = loadViewerContext();
     context.scene = {
         meshes: [],
@@ -1370,32 +1370,54 @@ test('showGrid uses a low-contrast grid floor in light mode', () => {
 
     const result = vm.runInContext(`
         scenes.viewer = scene;
-        darkModes.viewer = false;
         sceneBoundingBoxes.viewer = {
             min: { x: -25, y: -10, z: 0 },
             max: { x: 25, y: 10, z: 30 }
         };
+        darkModes.viewer = false;
         showGrid('viewer');
-        const grid = scene.getMeshByName('__grid__');
-        ({
-            gridOpacity: grid.material.opacity,
-            minorUnitVisibility: grid.material.minorUnitVisibility,
-            lineColor: grid.material.lineColor,
-            mainColor: grid.material.mainColor,
-            receivesShadows: grid.receiveShadows
-        });
+        const lightGrid = scene.getMeshByName('__grid__');
+        const light = {
+            gridOpacity: lightGrid.material.opacity,
+            minorUnitVisibility: lightGrid.material.minorUnitVisibility,
+            lineColor: lightGrid.material.lineColor,
+            mainColor: lightGrid.material.mainColor,
+            receivesShadows: lightGrid.receiveShadows
+        };
+
+        lightGrid.dispose();
+        scene.meshes = scene.meshes.filter(mesh => !mesh.disposed);
+        darkModes.viewer = true;
+        showGrid('viewer');
+        const darkGrid = scene.getMeshByName('__grid__');
+        const dark = {
+            gridOpacity: darkGrid.material.opacity,
+            minorUnitVisibility: darkGrid.material.minorUnitVisibility,
+            lineColor: darkGrid.material.lineColor,
+            mainColor: darkGrid.material.mainColor,
+            receivesShadows: darkGrid.receiveShadows
+        };
+
+        ({ light, dark });
     `, context);
 
-    assert.equal(result.receivesShadows, true);
+    assert.equal(result.light.receivesShadows, true);
     // Light theme: white fill is invisible on the white canvas background, so only
     // medium-gray lines show. Opacity is raised so those lines stay readable.
-    assert.ok(result.gridOpacity <= 0.75);
-    assert.ok(result.minorUnitVisibility <= 0.5);
-    assert.ok(result.lineColor.r >= 0.5 && result.lineColor.r <= 0.75);
-    assert.ok(result.mainColor.r >= 0.99);
+    assert.ok(result.light.gridOpacity <= 0.75);
+    assert.ok(result.light.minorUnitVisibility <= 0.5);
+    assert.ok(result.light.lineColor.r >= 0.5 && result.light.lineColor.r <= 0.75);
+    assert.ok(result.light.mainColor.r >= 0.99);
+    // Dark theme: fill matches the clear color so the floor does not render as
+    // a black patch, while line color remains bright enough to reveal the grid.
+    assert.equal(result.dark.receivesShadows, true);
+    assert.ok(result.dark.gridOpacity >= 0.8);
+    assert.ok(result.dark.minorUnitVisibility >= 0.5);
+    assert.ok(result.dark.lineColor.r >= 0.6);
+    assert.ok(result.dark.mainColor.r >= 0.035 && result.dark.mainColor.r <= 0.05);
 });
 
-test('showGrid sizes the floor to a padded per-axis footprint instead of oversized major blocks', () => {
+test('showGrid uses fixed 10mm minor and 100mm major spacing with padded per-axis floor', () => {
     const context = loadViewerContext();
     context.scene = {
         meshes: [],
@@ -1416,13 +1438,15 @@ test('showGrid sizes the floor to a padded per-axis footprint instead of oversiz
         ({
             width: grid.width,
             height: grid.height,
-            gridRatio: grid.material.gridRatio
+            gridRatio: grid.material.gridRatio,
+            majorUnitFrequency: grid.material.majorUnitFrequency
         });
     `, context);
 
-    assert.equal(result.gridRatio, 50);
-    assert.equal(result.width, 550);
-    assert.equal(result.height, 200);
+    assert.equal(result.gridRatio, 10);
+    assert.equal(result.majorUnitFrequency, 10);
+    assert.equal(result.width, 500);
+    assert.equal(result.height, 100);
 });
 
 test('grid floor fades in and fades out before disposal', () => {

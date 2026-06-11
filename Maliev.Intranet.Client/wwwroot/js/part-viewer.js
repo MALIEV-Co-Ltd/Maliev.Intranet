@@ -423,10 +423,10 @@ const CONFIG = {
             opacity: 0.65,
         },
         dark: {
-            minorUnitVisibility: 0.50,
+            minorUnitVisibility: 0.55,
             mainColor: { r: 0.039, g: 0.039, b: 0.039 },   // matches #0a0a0a dark clearColor — fill invisible on dark bg
-            lineColor: { r: 0.42, g: 0.42, b: 0.46 },      // lighter gray lines visible on dark bg
-            opacity: 0.75,
+            lineColor: { r: 0.68, g: 0.70, b: 0.74 },      // visible gray lines on dark bg
+            opacity: 0.90,
         },
     },
 
@@ -7427,7 +7427,7 @@ function _updateGridMaterial(canvasId) {
     const cfg = getGridThemeConfig(canvasId);
     const mat = grid.material;
     if (mat.mainColor !== undefined) {
-        mat.mainColor           = new BABYLON.Color3(0, 0, 0);
+        mat.mainColor           = toColor3(cfg.mainColor);
         mat.lineColor           = toColor3(cfg.lineColor);
         mat.minorUnitVisibility = cfg.minorUnitVisibility;
         mat.opacity             = cfg.opacity;
@@ -7600,11 +7600,8 @@ export function showGrid(canvasId) {
     const sizeY = bb.max.y - bb.min.y;
     const footprint = Math.max(sizeX, sizeY, 1);
 
-    // Cell size adapts to the part so small parts are not lost on a coarse
-    // 10 mm grid and large parts do not drown in hairlines (~10-20 cells
-    // across the footprint).
-    const cellOptions = [1, 2, 5, 10, 20, 50, 100];
-    const gridRatio = cellOptions.find(cell => cell >= footprint / 15) ?? 100;
+    // Fixed metrology grid: minor lines every 10mm, major lines every 100mm.
+    const gridRatio = CONFIG.GRID.gridRatio;
 
     // Size the floor to the actual part footprint on each axis. A single square
     // floor based on the largest dimension makes long, narrow parts sit on a
@@ -7641,7 +7638,7 @@ export function showGrid(canvasId) {
         mat.minorUnitVisibility = gridTheme.minorUnitVisibility;
         mat.gridRatio = gridRatio;
         mat.backFaceCulling = false;
-        mat.mainColor = new BABYLON.Color3(0, 0, 0);
+        mat.mainColor = toColor3(gridTheme.mainColor);
         mat.lineColor   = toColor3(gridTheme.lineColor);
         mat.opacity     = gridTheme.opacity;
         mat.opacityTexture = createGridLineOpacityTexture(scene);
