@@ -1388,6 +1388,36 @@ test('showGrid uses a low-contrast grid floor in light mode', () => {
     assert.ok(result.mainColor.r >= 0.99);
 });
 
+test('showGrid sizes the floor to a padded part footprint instead of oversized major blocks', () => {
+    const context = loadViewerContext();
+    context.scene = {
+        meshes: [],
+        getMeshByName(name) {
+            return this.meshes.find(mesh => mesh.name === name) ?? null;
+        },
+    };
+
+    const result = vm.runInContext(`
+        scenes.viewer = scene;
+        darkModes.viewer = false;
+        sceneBoundingBoxes.viewer = {
+            min: { x: -230, y: -30, z: 0 },
+            max: { x: 230, y: 30, z: 200 }
+        };
+        showGrid('viewer');
+        const grid = scene.getMeshByName('__grid__');
+        ({
+            width: grid.width,
+            height: grid.height,
+            gridRatio: grid.material.gridRatio
+        });
+    `, context);
+
+    assert.equal(result.gridRatio, 50);
+    assert.equal(result.width, 600);
+    assert.equal(result.height, 600);
+});
+
 test('grid floor fades in and fades out before disposal', () => {
     const context = loadViewerContext();
     let now = 1000;

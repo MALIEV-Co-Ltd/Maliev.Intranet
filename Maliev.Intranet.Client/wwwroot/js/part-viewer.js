@@ -7469,11 +7469,13 @@ export function showGrid(canvasId) {
     const cellOptions = [1, 2, 5, 10, 20, 50, 100];
     const gridRatio = cellOptions.find(cell => cell >= footprint / 15) ?? 100;
 
-    // Size the floor to the part (≈2× footprint), aligned to major-line
-    // blocks so the visible edge always lands on a major line instead of a
-    // ragged minor-cell cut.
-    const majorBlock = gridRatio * CONFIG.GRID.majorUnitFrequency;
-    const gridSize = Math.max(Math.ceil((footprint * 2) / majorBlock) * majorBlock, majorBlock * 2);
+    // Size the floor to the part with a modest margin. Rounding to the active
+    // cell size keeps the edge clean without snapping a 460 mm part up to a
+    // 1000 mm major-block floor that dominates and clips in the canvas.
+    const paddedFootprint = footprint * 1.25;
+    const gridSize = Math.max(
+        Math.ceil(paddedFootprint / gridRatio) * gridRatio,
+        gridRatio * 8);
 
     // In Z-up space the floor is the XY plane at z=0 (already the model base after centering).
     // BabylonJS ground lies in the XZ plane by default, so we rotate +90° around X to flip it.
