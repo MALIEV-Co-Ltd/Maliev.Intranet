@@ -2094,6 +2094,38 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TotalWeightKg_UsesSelectedCatalogMaterialDensity()
+    {
+        var aluminumId = Guid.NewGuid();
+        var nylonId = Guid.NewGuid();
+        var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
+        GetParts(page).Add(new PartViewModel
+        {
+            Name = "aluminum-bracket.step",
+            VolumeMm3 = 1_000,
+            MaterialId = aluminumId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(aluminumId, "Aluminum 6061", "AL6061", "Metal", 2.70m, null, 10),
+            ],
+        });
+        GetParts(page).Add(new PartViewModel
+        {
+            Name = "nylon-cover.stl",
+            VolumeMm3 = 1_000,
+            MaterialId = nylonId,
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(nylonId, "PA12 Nylon", "PA12", "Plastic", 1.24m, null, 10),
+            ],
+        });
+
+        var totalWeightKg = GetPrivateProperty<decimal>(page, "TotalWeightKg");
+
+        Assert.Equal(0.00394m, totalWeightKg);
+    }
+
+    [Fact]
     public void RefreshLeadTimeOptionsFromPricing_WhenNoLeadTimeSelected_SelectsStandardWithBufferedRanges()
     {
         var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();

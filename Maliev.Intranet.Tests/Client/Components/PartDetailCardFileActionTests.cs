@@ -1,6 +1,7 @@
 using Bunit;
 using Maliev.Intranet.Client.Components.Project;
 using Maliev.Intranet.Client.Services;
+using Maliev.Intranet.Shared.Dtos;
 using Maliev.Intranet.Tests.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
@@ -119,5 +120,31 @@ public sealed class PartDetailCardFileActionTests : BunitContext, IAsyncLifetime
         Assert.Contains("Weight = volume", cut.Markup);
         Assert.Contains("10.00 cm", cut.Markup);
         Assert.Contains("2.7 g/cm", cut.Markup);
+    }
+
+    [Fact]
+    public void EstimatedWeight_UsesSelectedCatalogDensity()
+    {
+        var materialId = Guid.NewGuid();
+        var part = new PartViewModel
+        {
+            FileId = Guid.NewGuid(),
+            Name = "custom-polymer.stl",
+            StoragePath = "projects/project-1/custom-polymer.stl",
+            ProcessCode = "SLA",
+            VolumeMm3 = 1_000,
+            MaterialId = materialId,
+            MaterialCode = "CUSTOM_POLYMER",
+            AvailableMaterials =
+            [
+                new CatalogMaterialDto(materialId, "Custom Polymer 1.42", "CUSTOM_POLYMER", "Polymer", 1.42m, null, 10),
+            ],
+        };
+
+        var cut = Render<PartDetailCard>(parameters => parameters.Add(component => component.Part, part));
+
+        Assert.Contains("Weight: 1.4 g", cut.Markup);
+        Assert.Contains("1.42 g/cm", cut.Markup);
+        Assert.Contains("Custom Polymer 1.42", cut.Markup);
     }
 }

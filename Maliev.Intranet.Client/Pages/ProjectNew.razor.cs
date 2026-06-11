@@ -46,7 +46,7 @@ public partial class ProjectNew : IAsyncDisposable
     // Computed properties for QuoteSummaryBar
     private string ShippingDestinationCountry => "US"; // default, will be overridden when user enters details
     private string ShippingDestinationPostalCode => "90210"; // default
-    private decimal TotalWeightKg => _parts.Sum(p => (decimal)(p.VolumeMm3 ?? 0) * 0.000001m); // rough estimate from mm³ to kg
+    private decimal TotalWeightKg => _parts.Sum(GetEstimatedPartWeightKg);
 
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
     private const string ProjectUploadContainerId = "project-new-file-upload";
@@ -75,6 +75,46 @@ public partial class ProjectNew : IAsyncDisposable
         _layoutMode == LayoutMode.SummaryTable
             ? "Configurator"
             : "Table edit";
+
+    private static decimal GetEstimatedPartWeightKg(PartViewModel part)
+    {
+        if (part.VolumeMm3 is not > 0)
+            return 0m;
+
+        var density = GetSelectedMaterialDensityGcm3(part);
+        return (decimal)part.VolumeMm3.Value * density / 1_000_000m;
+    }
+
+    private static decimal GetSelectedMaterialDensityGcm3(PartViewModel part)
+    {
+        if (part.MaterialId.HasValue)
+        {
+            var selectedMaterial = part.AvailableMaterials.FirstOrDefault(material => material.Id == part.MaterialId.Value);
+            if (selectedMaterial?.DensityGCm3 is > 0m)
+                return selectedMaterial.DensityGCm3.Value;
+        }
+
+        return GetMaterialDensityGcm3(part.MaterialCode);
+    }
+
+    private static decimal GetMaterialDensityGcm3(string? materialCode)
+    {
+        var code = materialCode?.ToUpperInvariant() ?? string.Empty;
+        return code switch
+        {
+            var c when c.Contains("AL") || c.Contains("ALUMINUM") => 2.7m,
+            var c when c.Contains("STEEL") || c.Contains("SS") => 7.85m,
+            var c when c.Contains("TITANIUM") || c.Contains("TI") => 4.5m,
+            var c when c.Contains("BRASS") => 8.5m,
+            var c when c.Contains("COPPER") => 8.96m,
+            var c when c.Contains("NYLON") || c.Contains("PA12") || c.Contains("PA11") => 1.15m,
+            var c when c.Contains("PETG") => 1.27m,
+            var c when c.Contains("ABS") => 1.04m,
+            var c when c.Contains("PLA") => 1.24m,
+            var c when c.Contains("RESIN") => 1.1m,
+            _ => 1.0m,
+        };
+    }
 
     // ── Customer search ────────────────────────────────────────────────
     private CancellationTokenSource? _searchCts;

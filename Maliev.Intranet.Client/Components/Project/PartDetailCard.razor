@@ -542,7 +542,7 @@
     private double? GetEstimatedWeightKg()
     {
         if (!Part.VolumeMm3.HasValue || Part.VolumeMm3.Value <= 0) return null;
-        var density = GetMaterialDensityGcm3(Part.MaterialCode);
+        var density = GetSelectedMaterialDensityGcm3();
         return Part.VolumeMm3.Value * density / 1_000_000.0;
     }
 
@@ -556,9 +556,9 @@
 
     private string GetWeightFormulaTooltip()
     {
-        var density = GetMaterialDensityGcm3(Part.MaterialCode);
+        var density = GetSelectedMaterialDensityGcm3();
         var volumeCm3 = (Part.VolumeMm3 ?? 0) / 1000.0;
-        var material = string.IsNullOrEmpty(Part.MaterialCode) ? "default density" : Part.MaterialCode;
+        var material = string.IsNullOrEmpty(GetMaterialDisplayName()) ? "default density" : GetMaterialDisplayName();
         return $"Weight = volume × density = {volumeCm3:N2} cm³ × {density:0.##} g/cm³ ({material})";
     }
 
@@ -617,6 +617,18 @@
         _scaleDialogVisible = false;
         if (Math.Abs(factor - 1.0) < 0.0000001 || !OnRescalePart.HasDelegate) return;
         await OnRescalePart.InvokeAsync(new PartRescaleRequest(Part, factor));
+    }
+
+    private double GetSelectedMaterialDensityGcm3()
+    {
+        if (Part.MaterialId.HasValue)
+        {
+            var selectedMaterial = Part.AvailableMaterials.FirstOrDefault(material => material.Id == Part.MaterialId.Value);
+            if (selectedMaterial?.DensityGCm3 is > 0m)
+                return (double)selectedMaterial.DensityGCm3.Value;
+        }
+
+        return GetMaterialDensityGcm3(Part.MaterialCode);
     }
 
     private static double GetMaterialDensityGcm3(string? materialCode)
