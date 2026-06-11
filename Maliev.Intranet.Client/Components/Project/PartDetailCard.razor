@@ -333,26 +333,26 @@
             var weightKg = GetEstimatedWeightKg();
         }
         <div class="pdc-footer-geo">
-            <button class="pdc-chip pdc-chip--meta pdc-chip--action"
+            <button class="pdc-chip pdc-chip--meta pdc-chip--action pdc-chip--scale"
                     title="Adjust part size, scale, or original units"
                     @onclick="OpenScaleDialog"
                     disabled="@(!CanRescalePart)">
-                Units: mm
-                <MudIcon Icon="@Icons.Material.Outlined.Straighten" Style="font-size:12px;width:12px;height:12px;margin-left:3px;" />
+                <span>Units: mm</span>
+                <MudIcon Icon="@Icons.Material.Outlined.Straighten" Class="pdc-chip-action-icon" />
             </button>
 
             @if (weightKg.HasValue)
             {
                 <span class="pdc-footer-sep">·</span>
                 <MudTooltip Text="@GetWeightFormulaTooltip()" Placement="Placement.Top">
-                    <span class="pdc-chip pdc-chip--meta" title="@GetWeightFormulaTooltip()">Weight: @FormatWeight(weightKg.Value)</span>
+                    <span class="pdc-chip pdc-chip--meta pdc-chip--hover-help" title="@GetWeightFormulaTooltip()">Weight: @FormatWeight(weightKg.Value)</span>
                 </MudTooltip>
             }
 
             @if (Part.SurfaceAreaMm2.HasValue)
             {
                 <span class="pdc-footer-sep">·</span>
-                <button class="pdc-chip pdc-chip--meta pdc-chip--action"
+                <button class="pdc-chip pdc-chip--meta pdc-chip--action pdc-chip--surface"
                         title="Click to switch between mm², cm², and m²"
                         @onclick="CycleAreaUnit">
                     Surface Area: @FormatSurfaceArea(Part.SurfaceAreaMm2.Value)
