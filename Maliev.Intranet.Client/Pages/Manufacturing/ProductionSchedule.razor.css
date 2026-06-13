@@ -36,6 +36,59 @@
     font-size: var(--maliev-font-small);
 }
 
+.production-job-ticket-scan {
+    display: grid;
+    grid-template-columns: auto minmax(220px, 420px) auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel-2);
+}
+
+.production-job-ticket-scan > div,
+.production-job-ticket-scan label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.production-job-ticket-scan > div {
+    grid-auto-flow: column;
+    align-items: center;
+    justify-content: start;
+    color: var(--maliev-ink);
+    font-weight: 800;
+}
+
+.production-job-ticket-scan label span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-job-ticket-scan input {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--maliev-border);
+    border-radius: var(--maliev-radius-sm);
+    background: var(--maliev-panel);
+    color: var(--maliev-ink);
+}
+
+@media (max-width: 760px) {
+    .production-job-ticket-scan {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+    }
+}
+
 .production-move-panel {
     position: absolute;
     right: 28px;

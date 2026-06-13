@@ -30,6 +30,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private readonly List<string> _requestedRequests = [];
     private JsonDocument? _rescheduleRequest;
     private JsonDocument? _jobDetailsRequest;
+    private JsonDocument? _jobTicketScanRequest;
     private JsonDocument? _materialConsumeRequest;
     private DateTime? _boardRangeStart;
 
@@ -214,6 +215,33 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         Assert.Equal("Natt Operator", root.GetProperty("operatorId").GetString());
         Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
         Assert.Equal(125m, root.GetProperty("quantityConsumed").GetDecimal());
+    }
+
+    [Fact]
+    public void ProductionSchedule_ScanJobTicket_ResolvesJobWithoutAutoAdvancingStatus()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+
+        var scanInput = cut.Find("input[placeholder='Scan job QR or paste job id']");
+        scanInput.Input($"https://intranet.maliev.com/mfg/production-schedule?jobId={_jobId:D}");
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Scan job", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == "POST /api/v1/jobs/ticket-scan");
+            Assert.NotNull(_jobTicketScanRequest);
+            Assert.Contains("Job information", cut.Markup);
+            Assert.Contains("Bangkok Precision Parts", cut.Markup);
+        });
+
+        Assert.Equal(
+            $"https://intranet.maliev.com/mfg/production-schedule?jobId={_jobId:D}",
+            _jobTicketScanRequest!.RootElement.GetProperty("code").GetString());
+        Assert.DoesNotContain(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/status");
     }
 
     [Fact]
@@ -422,6 +450,13 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
             && pathAndQuery.StartsWith("/api/v1/inventory/items/lookup", StringComparison.Ordinal))
         {
             return Json(BuildInventoryItem());
+        }
+
+        if (request.Method == HttpMethod.Post
+            && pathAndQuery.Equals("/api/v1/jobs/ticket-scan", StringComparison.Ordinal))
+        {
+            _jobTicketScanRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Json(BuildJobDetail());
         }
 
         if (request.Method == HttpMethod.Post

@@ -23,6 +23,30 @@
                 <div class="production-schedule-error">@_error</div>
             }
 
+            <div class="production-job-ticket-scan" aria-label="Job ticket scan">
+                <div>
+                    <MudIcon Icon="@Icons.Material.Outlined.QrCodeScanner" Size="Size.Small" />
+                    <span>Job ticket</span>
+                </div>
+                <label>
+                    <span>Scan QR / job id</span>
+                    <input value="@_jobTicketScanCode"
+                           @oninput="OnJobTicketScanChanged"
+                           placeholder="Scan job QR or paste job id"
+                           disabled="@_scanningJobTicket" />
+                </label>
+                <SecondaryButton Icon="@Icons.Material.Outlined.QrCodeScanner"
+                                 Disabled="@(_scanningJobTicket || string.IsNullOrWhiteSpace(_jobTicketScanCode))"
+                                 OnClick="@ScanJobTicketAsync">
+                    @(_scanningJobTicket ? "Scanning..." : "Scan job")
+                </SecondaryButton>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_jobTicketScanError))
+            {
+                <div class="production-schedule-error" role="alert">@_jobTicketScanError</div>
+            }
+
             <ProductionScheduleBoard Board="_board"
                                      Title="Scheduled work centers"
                                      Eyebrow="Machine queue"
@@ -446,6 +470,7 @@
     private MaterialInventoryStatusDto? _jobInventoryStatus;
     private InventoryItemDto? _selectedInventoryItem;
     private string _moveMachineId = string.Empty;
+    private string _jobTicketScanCode = string.Empty;
     private string _materialScanCode = string.Empty;
     private DateTime _moveStartLocal;
     private DateTime _moveEndLocal;
@@ -457,9 +482,11 @@
     private bool _loadingJobReferences;
     private bool _savingMove;
     private bool _savingJobDetails;
+    private bool _scanningJobTicket;
     private bool _scanningMaterialItem;
     private bool _recordingMaterialUse;
     private string? _error;
+    private string? _jobTicketScanError;
     private string? _slotDetailsError;
     private string? _jobDetailsEditError;
     private string? _materialTraceError;
@@ -620,6 +647,7 @@
         _jobInventoryStatus = null;
         _jobInventoryItems = [];
         _selectedInventoryItem = null;
+        _jobTicketScanError = null;
         _materialScanCode = string.Empty;
         _materialConsumeQuantity = null;
         _jobDetailsEditError = null;
@@ -627,6 +655,7 @@
         _slotDetailsError = null;
         _loadingSlotDetails = false;
         _loadingJobReferences = false;
+        _scanningJobTicket = false;
         _scanningMaterialItem = false;
         _recordingMaterialUse = false;
     }
@@ -915,6 +944,67 @@
     {
         _materialScanCode = e.Value?.ToString() ?? string.Empty;
         _materialTraceError = null;
+    }
+
+    private void OnJobTicketScanChanged(ChangeEventArgs e)
+    {
+        _jobTicketScanCode = e.Value?.ToString() ?? string.Empty;
+        _jobTicketScanError = null;
+    }
+
+    private async Task ScanJobTicketAsync(MouseEventArgs _)
+    {
+        if (string.IsNullOrWhiteSpace(_jobTicketScanCode))
+        {
+            _jobTicketScanError = "Scan the job ticket QR code or paste the job id.";
+            return;
+        }
+
+        _scanningJobTicket = true;
+        _jobTicketScanError = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                "api/v1/jobs/ticket-scan",
+                new JobTicketScanRequest { Code = _jobTicketScanCode.Trim() });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _jobTicketScanError = await ReadScheduleErrorAsync(response);
+                return;
+            }
+
+            var job = await response.Content.ReadFromJsonAsync<JobDetailDto>();
+            if (job is null)
+            {
+                _jobTicketScanError = "No job matched that ticket.";
+                return;
+            }
+
+            CloseMovePanel();
+            _selectedSlot = FindScheduleSlotForJob(job.Id) ?? BuildScannedJobSlot(job);
+            _selectedJobDetail = job;
+            _jobEditModel = null;
+            _jobCustomer = null;
+            _jobInventoryStatus = null;
+            _jobInventoryItems = [];
+            _selectedInventoryItem = null;
+            _materialScanCode = string.Empty;
+            _materialConsumeQuantity = null;
+            _slotDetailsError = null;
+            _jobDetailsEditError = null;
+            _materialTraceError = null;
+            InitializeJobEditor(job);
+            await LoadJobReferenceDataAsync(job);
+        }
+        catch (Exception ex)
+        {
+            _jobTicketScanError = $"Job ticket could not be resolved: {ex.Message}";
+        }
+        finally
+        {
+            _scanningJobTicket = false;
+        }
     }
 
     private void OnMaterialConsumeQuantityChanged(ChangeEventArgs e)
@@ -1392,6 +1482,31 @@
 
     private static bool SameScheduleInstant(DateTime left, DateTime right) =>
         Math.Abs((NormalizeUtc(left) - NormalizeUtc(right)).TotalSeconds) < 60;
+
+    private ProductionScheduleSlotDto? FindScheduleSlotForJob(Guid jobId) =>
+        _board?.Machines
+            .SelectMany(machine => machine.Slots)
+            .FirstOrDefault(slot => slot.JobId == jobId);
+
+    private static ProductionScheduleSlotDto BuildScannedJobSlot(JobDetailDto job)
+    {
+        var start = job.ScheduledStartTime ?? job.CreatedAt;
+        var end = job.ScheduledEndTime ?? job.EstimatedCompletionAt ?? start;
+        return new ProductionScheduleSlotDto
+        {
+            SlotId = job.Id,
+            JobId = job.Id,
+            MachineId = FirstNonEmpty(job.MachineName, "Unassigned"),
+            MachineName = FirstNonEmpty(job.MachineName, "Unassigned"),
+            Technology = job.ProcessType,
+            ScheduledStart = NormalizeUtc(start),
+            ScheduledEnd = NormalizeUtc(end),
+            QueuePosition = job.QueuePosition,
+            Status = job.Status,
+            Label = FirstNonEmpty(job.JobNumber, job.Id.ToString("N")[..8].ToUpperInvariant()),
+            CanMove = false
+        };
+    }
 
     private static async Task<string> ReadScheduleErrorAsync(HttpResponseMessage response)
     {
