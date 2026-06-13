@@ -532,9 +532,27 @@ public sealed record AddQuotationNoteRequest
 /// </summary>
 public sealed record UpdateOrderStatusRequest
 {
-    /// <summary>The new status to assign to the order (e.g., "Processing", "Shipped").</summary>
+    /// <summary>The new status to assign to the order.</summary>
     [Required]
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>Employee-only note recorded in the order audit history.</summary>
+    public string? InternalNotes { get; set; }
+
+    /// <summary>Customer-facing note shown in the order status history.</summary>
+    public string? CustomerNotes { get; set; }
+
+    /// <summary>The payment transaction identifier for paid transitions.</summary>
+    public string? PaymentId { get; set; }
+
+    /// <summary>The actual amount received for paid transitions.</summary>
+    public decimal? PaidAmount { get; set; }
+
+    /// <summary>The ISO currency code for the actual payment received.</summary>
+    public string? PaymentCurrency { get; set; }
+
+    /// <summary>The payment provider name for paid transitions.</summary>
+    public string? PaymentProviderName { get; set; }
 }
 
 /// <summary>

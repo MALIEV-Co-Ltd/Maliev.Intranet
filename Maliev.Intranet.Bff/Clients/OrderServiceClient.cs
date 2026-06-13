@@ -65,8 +65,12 @@ public class OrderServiceClient(HttpClient httpClient)
         return await httpClient.PostAsJsonAsync($"/order/v1/orders/{id}/statuses", new
         {
             request.Status,
-            InternalNotes = (string?)null,
-            CustomerNotes = (string?)null
+            request.InternalNotes,
+            request.CustomerNotes,
+            request.PaymentId,
+            request.PaidAmount,
+            request.PaymentCurrency,
+            request.PaymentProviderName
         }, ct);
     }
 

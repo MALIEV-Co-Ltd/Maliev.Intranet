@@ -152,6 +152,39 @@ public sealed class IntranetOrderFlowTests
     }
 
     /// <summary>
+    /// QC release is the handoff that triggers OrderService's OrderCompletedEvent for DeliveryService.
+    /// The BFF must preserve the employee audit note and customer-facing note on the downstream wire.
+    /// </summary>
+    [Fact]
+    public async Task UpdateOrderStatus_ToQualityReleased_ForwardsAuditAndCustomerNotes()
+    {
+        string? downstreamJson = null;
+        var orderClient = MakeOrderClient(
+            request =>
+            {
+                downstreamJson = request.Content?.ReadAsStringAsync(CancellationToken.None).GetAwaiter().GetResult();
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            });
+        var controller = new OrdersController(orderClient);
+
+        var result = await controller.UpdateStatus(
+            "ORD-2026-QC",
+            new UpdateOrderStatusRequest
+            {
+                Status = "QualityReleased",
+                InternalNotes = "QC release by operator after dimensional inspection passed.",
+                CustomerNotes = "Your parts passed quality control and are being prepared for shipping."
+            },
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.NotNull(downstreamJson);
+        Assert.Contains("\"status\":\"QualityReleased\"", downstreamJson, StringComparison.Ordinal);
+        Assert.Contains("\"internalNotes\":\"QC release by operator after dimensional inspection passed.\"", downstreamJson, StringComparison.Ordinal);
+        Assert.Contains("\"customerNotes\":\"Your parts passed quality control and are being prepared for shipping.\"", downstreamJson, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// When OrderService rejects a status transition (e.g. invalid state machine transition),
     /// the BFF proxies the downstream error code.
     /// </summary>

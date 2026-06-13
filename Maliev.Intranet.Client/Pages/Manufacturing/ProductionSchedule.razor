@@ -204,6 +204,20 @@
                                 </PrimaryButton>
                             </div>
                         }
+                        else if (CanReleaseOrderForShipping(job))
+                        {
+                            <div class="production-order-release-actions" aria-label="QC release actions">
+                                <div>
+                                    <span>Order handoff</span>
+                                    <strong>@FirstNonEmpty(job.OrderNumber, "Linked order")</strong>
+                                </div>
+                                <PrimaryButton Icon="@Icons.Material.Outlined.LocalShipping"
+                                               Disabled="@_releasingOrderForShipping"
+                                               OnClick="@ReleaseOrderForShippingAsync">
+                                    @(_releasingOrderForShipping ? "Releasing..." : "Release to shipping")
+                                </PrimaryButton>
+                            </div>
+                        }
 
                         <div class="production-job-editor" aria-label="Editable job production details">
                             <label class="production-job-field production-job-field-wide">
@@ -498,6 +512,7 @@
     private bool _savingMove;
     private bool _savingJobDetails;
     private bool _savingJobStage;
+    private bool _releasingOrderForShipping;
     private bool _scanningJobTicket;
     private bool _scanningMaterialItem;
     private bool _recordingMaterialUse;
@@ -1277,6 +1292,44 @@
         }
     }
 
+    private async Task ReleaseOrderForShippingAsync(MouseEventArgs _)
+    {
+        if (_selectedJobDetail is null || string.IsNullOrWhiteSpace(_selectedJobDetail.OrderNumber))
+        {
+            return;
+        }
+
+        _releasingOrderForShipping = true;
+        _jobDetailsEditError = null;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync(
+                $"api/v1/orders/{Uri.EscapeDataString(_selectedJobDetail.OrderNumber)}/status",
+                new UpdateOrderStatusRequest
+                {
+                    Status = "QualityReleased",
+                    InternalNotes = $"QC released job {FirstNonEmpty(_selectedJobDetail.JobNumber, _selectedJobDetail.Id.ToString("N")[..8].ToUpperInvariant())} for shipping.",
+                    CustomerNotes = "Your parts passed quality control and are being prepared for shipping."
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _jobDetailsEditError = await ReadScheduleErrorAsync(response);
+                return;
+            }
+
+            Snackbar.Add("Order released to shipping.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _jobDetailsEditError = $"Order could not be released to shipping: {ex.Message}";
+        }
+        finally
+        {
+            _releasingOrderForShipping = false;
+        }
+    }
+
     private async Task ReloadSelectedJobAsync(Guid jobId, ProductionScheduleSlotDto selectedSlot)
     {
         var job = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{jobId}");
@@ -1554,6 +1607,10 @@
                 return false;
         }
     }
+
+    private static bool CanReleaseOrderForShipping(JobDetailDto job) =>
+        string.Equals(NormalizeStatus(job.Status), "Completed", StringComparison.OrdinalIgnoreCase)
+        && !string.IsNullOrWhiteSpace(job.OrderNumber);
 
     private bool IsMoveUnchanged(DateTime startUtc, DateTime endUtc)
     {

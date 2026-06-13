@@ -256,7 +256,8 @@
     font-weight: 700;
 }
 
-.production-job-stage-actions {
+.production-job-stage-actions,
+.production-order-release-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
@@ -267,13 +268,19 @@
     background: color-mix(in oklab, var(--maliev-success) 8%, var(--maliev-panel));
 }
 
-.production-job-stage-actions > div {
+.production-order-release-actions {
+    background: color-mix(in oklab, var(--maliev-info) 8%, var(--maliev-panel));
+}
+
+.production-job-stage-actions > div,
+.production-order-release-actions > div {
     display: grid;
     gap: 2px;
     min-width: 0;
 }
 
-.production-job-stage-actions span {
+.production-job-stage-actions span,
+.production-order-release-actions span {
     color: var(--maliev-muted);
     font-size: var(--maliev-font-nano);
     font-weight: 800;
@@ -281,7 +288,8 @@
     text-transform: uppercase;
 }
 
-.production-job-stage-actions strong {
+.production-job-stage-actions strong,
+.production-order-release-actions strong {
     min-width: 0;
     overflow: hidden;
     color: var(--maliev-ink);
@@ -539,6 +547,7 @@
     .production-slot-overview,
     .production-slot-facts,
     .production-job-stage-actions,
+    .production-order-release-actions,
     .production-job-editor,
     .production-material-trace,
     .production-material-scan-row,

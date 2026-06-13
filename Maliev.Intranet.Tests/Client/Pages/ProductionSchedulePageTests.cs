@@ -32,8 +32,10 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private JsonDocument? _jobDetailsRequest;
     private JsonDocument? _jobTicketScanRequest;
     private JsonDocument? _jobStatusRequest;
+    private JsonDocument? _orderStatusRequest;
     private JsonDocument? _materialConsumeRequest;
     private DateTime? _boardRangeStart;
+    private string _jobStatus = "Queued";
 
     public ProductionSchedulePageTests()
     {
@@ -296,6 +298,32 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProductionSchedule_CompletedJobReleaseAction_TransitionsOrderToQualityReleased()
+    {
+        _jobStatus = "Completed";
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Release to shipping", cut.Markup));
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Release to shipping", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == "PATCH /api/v1/orders/SO-5005/status");
+            Assert.NotNull(_orderStatusRequest);
+        });
+
+        var root = _orderStatusRequest!.RootElement;
+        Assert.Equal("QualityReleased", root.GetProperty("status").GetString());
+        Assert.Equal("QC released job JOB-2001 for shipping.", root.GetProperty("internalNotes").GetString());
+        Assert.Equal("Your parts passed quality control and are being prepared for shipping.", root.GetProperty("customerNotes").GetString());
+    }
+
+    [Fact]
     public void ProductionSchedule_ClickPlanningHold_ShowsHoldDetailsWithoutJobFetch()
     {
         var cut = Render<ProductionSchedule>();
@@ -511,6 +539,13 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         }
 
         if (request.Method == HttpMethod.Patch
+            && pathAndQuery.Equals("/api/v1/orders/SO-5005/status", StringComparison.Ordinal))
+        {
+            _orderStatusRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        }
+
+        if (request.Method == HttpMethod.Patch
             && pathAndQuery.Equals($"/api/v1/jobs/planning-holds/{_holdId}", StringComparison.Ordinal))
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
@@ -551,7 +586,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
                             SetupMinutes = 30,
                             ProductionMinutes = 90,
                             QueuePosition = 1,
-                            Status = "Queued",
+                            Status = _jobStatus,
                             Label = "JOB-2001",
                             CanMove = true
                         },
@@ -636,7 +671,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         MaterialId = _materialId,
         MaterialSku = "AL-6061-T6",
         Priority = "High",
-        Status = "Queued",
+        Status = _jobStatus,
         MachineName = "CNC Mill 01",
         MachineId = Guid.Parse("99999999-aaaa-bbbb-cccc-dddddddddddd"),
         Quantity = 12,
