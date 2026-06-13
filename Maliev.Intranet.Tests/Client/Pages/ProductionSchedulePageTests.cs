@@ -31,6 +31,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     private JsonDocument? _rescheduleRequest;
     private JsonDocument? _jobDetailsRequest;
     private JsonDocument? _jobTicketScanRequest;
+    private JsonDocument? _jobStatusRequest;
     private JsonDocument? _materialConsumeRequest;
     private DateTime? _boardRangeStart;
 
@@ -273,6 +274,28 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProductionSchedule_StartJobAction_PatchesStatusAfterExplicitConfirmation()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Start job", cut.Markup));
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Start job", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+            Assert.Contains(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/status"));
+
+        Assert.NotNull(_jobStatusRequest);
+        var root = _jobStatusRequest!.RootElement;
+        Assert.Equal("InProgress", root.GetProperty("status").GetString());
+        Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
+    }
+
+    [Fact]
     public void ProductionSchedule_ClickPlanningHold_ShowsHoldDetailsWithoutJobFetch()
     {
         var cut = Render<ProductionSchedule>();
@@ -483,6 +506,7 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
         if (request.Method == HttpMethod.Patch
             && pathAndQuery.Equals($"/api/v1/jobs/{_jobId}/status", StringComparison.Ordinal))
         {
+            _jobStatusRequest = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         }
 

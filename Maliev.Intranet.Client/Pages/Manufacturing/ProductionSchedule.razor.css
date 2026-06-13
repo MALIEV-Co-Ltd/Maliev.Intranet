@@ -256,6 +256,39 @@
     font-weight: 700;
 }
 
+.production-job-stage-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--maliev-border-subtle);
+    border-radius: var(--maliev-radius-sm);
+    background: color-mix(in oklab, var(--maliev-success) 8%, var(--maliev-panel));
+}
+
+.production-job-stage-actions > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.production-job-stage-actions span {
+    color: var(--maliev-muted);
+    font-size: var(--maliev-font-nano);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.production-job-stage-actions strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--maliev-ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .production-job-editor {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -505,6 +538,7 @@
     .production-move-grid,
     .production-slot-overview,
     .production-slot-facts,
+    .production-job-stage-actions,
     .production-job-editor,
     .production-material-trace,
     .production-material-scan-row,

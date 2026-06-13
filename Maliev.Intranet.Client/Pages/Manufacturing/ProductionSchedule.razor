@@ -190,6 +190,21 @@
                             </div>
                         </dl>
 
+                        @if (TryGetNextStageAction(job.Status, out var nextStatus, out var actionLabel))
+                        {
+                            <div class="production-job-stage-actions" aria-label="Job stage actions">
+                                <div>
+                                    <span>Current stage</span>
+                                    <strong>@FormatStatus(job.Status)</strong>
+                                </div>
+                                <PrimaryButton Icon="@Icons.Material.Outlined.PlayArrow"
+                                               Disabled="@_savingJobStage"
+                                               OnClick="@(args => ApplyJobStageAsync(nextStatus, args))">
+                                    @(_savingJobStage ? "Saving..." : actionLabel)
+                                </PrimaryButton>
+                            </div>
+                        }
+
                         <div class="production-job-editor" aria-label="Editable job production details">
                             <label class="production-job-field production-job-field-wide">
                                 <span>Customer</span>
@@ -482,6 +497,7 @@
     private bool _loadingJobReferences;
     private bool _savingMove;
     private bool _savingJobDetails;
+    private bool _savingJobStage;
     private bool _scanningJobTicket;
     private bool _scanningMaterialItem;
     private bool _recordingMaterialUse;
@@ -1217,6 +1233,50 @@
         }
     }
 
+    private async Task ApplyJobStageAsync(string nextStatus, MouseEventArgs _)
+    {
+        if (_selectedJobDetail is null || _selectedSlot is null)
+        {
+            return;
+        }
+
+        _savingJobStage = true;
+        _jobDetailsEditError = null;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync(
+                $"api/v1/jobs/{_selectedJobDetail.Id}/status",
+                new UpdateJobStatusRequest
+                {
+                    Status = nextStatus,
+                    MachineId = _selectedSlot.MachineId
+                });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _jobDetailsEditError = await ReadScheduleErrorAsync(response);
+                return;
+            }
+
+            _selectedJobDetail.Status = nextStatus;
+            _selectedSlot.Status = nextStatus;
+            if (_jobEditModel is not null)
+            {
+                _jobEditModel.Status = nextStatus;
+            }
+
+            Snackbar.Add("Job stage updated.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _jobDetailsEditError = $"Job stage could not be updated: {ex.Message}";
+        }
+        finally
+        {
+            _savingJobStage = false;
+        }
+    }
+
     private async Task ReloadSelectedJobAsync(Guid jobId, ProductionScheduleSlotDto selectedSlot)
     {
         var job = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{jobId}");
@@ -1467,6 +1527,33 @@
 
     private static string FormatShortId(Guid? id) =>
         id is { } value ? value.ToString("N")[..8].ToUpperInvariant() : "Not linked";
+
+    private static bool TryGetNextStageAction(string? currentStatus, out string nextStatus, out string actionLabel)
+    {
+        nextStatus = string.Empty;
+        actionLabel = string.Empty;
+
+        switch (NormalizeStatus(currentStatus))
+        {
+            case "Queued":
+                nextStatus = "InProgress";
+                actionLabel = "Start job";
+                return true;
+            case "InProgress":
+            case "InProduction":
+                nextStatus = "Finishing";
+                actionLabel = "Finish job";
+                return true;
+            case "Finishing":
+            case "QualityCheck":
+            case "Packaging":
+                nextStatus = "Completed";
+                actionLabel = "Complete job";
+                return true;
+            default:
+                return false;
+        }
+    }
 
     private bool IsMoveUnchanged(DateTime startUtc, DateTime endUtc)
     {
