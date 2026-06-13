@@ -35,6 +35,12 @@ namespace Maliev.Intranet.Bff.Data.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("customer_name");
 
+                    b.Property<string>("EventDeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("event_deduplication_key");
+
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at_utc");
@@ -72,6 +78,9 @@ namespace Maliev.Intranet.Bff.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("EventDeduplicationKey")
+                        .IsUnique();
 
                     b.ToTable("alert_notifications", (string)null);
                 });

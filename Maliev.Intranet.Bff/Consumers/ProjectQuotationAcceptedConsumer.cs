@@ -1,9 +1,11 @@
+using System.Globalization;
 using Maliev.Intranet.Bff.Data;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Shared.Dtos;
 using Maliev.MessagingContracts.Contracts.Projects;
 using MassTransit;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.Intranet.Bff.Consumers;
 
@@ -25,16 +27,29 @@ public class ProjectQuotationAcceptedConsumer(
     /// <inheritdoc />
     public async Task Consume(ConsumeContext<ProjectQuotationAcceptedEvent> context)
     {
-        var payload = context.Message?.Payload;
-        if (payload is null)
+        var message = context.Message;
+        if (message?.Payload is null)
         {
             logger.LogWarning("ProjectQuotationAcceptedConsumer: received null payload — skipping");
             return;
         }
 
+        var payload = message.Payload;
+
         logger.LogInformation(
             "ProjectQuotationAcceptedConsumer: quote accepted for project {ProjectNumber} (id={ProjectId})",
             payload.ProjectNumber, payload.ProjectId);
+
+        var eventDeduplicationKey = BuildEventDeduplicationKey(message, payload);
+        if (await db.AlertNotifications.AnyAsync(
+            notification => notification.EventDeduplicationKey == eventDeduplicationKey,
+            context.CancellationToken))
+        {
+            logger.LogInformation(
+                "ProjectQuotationAcceptedConsumer: duplicate quote accepted event {EventDeduplicationKey} for project {ProjectNumber}; skipping alert",
+                eventDeduplicationKey, payload.ProjectNumber);
+            return;
+        }
 
         var now = DateTime.UtcNow;
         var processTypes = payload.Parts.Count > 0
@@ -44,6 +59,7 @@ public class ProjectQuotationAcceptedConsumer(
         var notification = new AlertNotification
         {
             Id = Guid.NewGuid(),
+            EventDeduplicationKey = eventDeduplicationKey,
             Type = "QuoteAccepted",
             ProjectId = payload.ProjectId,
             ProjectNumber = payload.ProjectNumber,
@@ -96,5 +112,24 @@ public class ProjectQuotationAcceptedConsumer(
                 "ProjectQuotationAcceptedConsumer: SignalR broadcast failed for alert {AlertId} — clients will load from DB on reconnect",
                 notification.Id);
         }
+    }
+
+    private static string BuildEventDeduplicationKey(
+        ProjectQuotationAcceptedEvent message,
+        ProjectQuotationAcceptedEventPayload payload)
+    {
+        if (message.MessageId != Guid.Empty)
+        {
+            return $"message:{message.MessageId:N}";
+        }
+
+        if (payload.QuotationId is { } quotationId && quotationId != Guid.Empty)
+        {
+            return $"quotation:{quotationId:N}:accepted";
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"project:{payload.ProjectId:N}:accepted:{payload.AcceptedAt:O}");
     }
 }

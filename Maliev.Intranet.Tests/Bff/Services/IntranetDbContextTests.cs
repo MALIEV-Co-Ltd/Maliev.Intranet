@@ -49,6 +49,27 @@ public sealed class IntranetDbContextTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AlertNotifications_RejectDuplicateEventDeduplicationKeys()
+    {
+        var options = new DbContextOptionsBuilder<IntranetDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+
+        await using var db = new IntranetDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        db.AlertNotifications.Add(CreateAlert("message:duplicate"));
+        db.AlertNotifications.Add(CreateAlert("message:duplicate"));
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+
+        var indexes = db.Model.FindEntityType(typeof(AlertNotification))?.GetIndexes().ToList();
+        Assert.Contains(indexes!, index =>
+            index.IsUnique
+            && index.Properties.Select(property => property.Name).SequenceEqual(["EventDeduplicationKey"]));
+    }
+
+    [Fact]
     public async Task SystemHealthHistoryService_ReturnsSevenDaysOfFiveMinuteBucketsAndDeletesExpiredSamples()
     {
         var options = new DbContextOptionsBuilder<IntranetDbContext>()
@@ -83,6 +104,21 @@ public sealed class IntranetDbContextTests : IAsyncLifetime
             Status = "Healthy",
             LivenessPath = serviceName == "AuthService" ? "/auth/liveness" : "/inventory/liveness",
             ReadinessPath = serviceName == "AuthService" ? "/auth/readiness" : "/inventory/readiness"
+        };
+
+    private static AlertNotification CreateAlert(string eventDeduplicationKey) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            EventDeduplicationKey = eventDeduplicationKey,
+            Type = "QuoteAccepted",
+            ProjectId = Guid.NewGuid(),
+            ProjectNumber = "PRJ-2026-0001",
+            CustomerName = string.Empty,
+            PartCount = 1,
+            ProcessTypes = "CNC_MILL",
+            OccurredAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7)
         };
 
     private sealed class StaticProbeService(IReadOnlyList<SystemHealthTarget> targets) : ISystemHealthProbeService

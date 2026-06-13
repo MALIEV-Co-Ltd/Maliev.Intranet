@@ -36,6 +36,34 @@ public class AlertSourceTests
     }
 
     [Fact]
+    public void AlertNotification_TracksEventDeduplicationKey()
+    {
+        var property = typeof(AlertNotification).GetProperty("EventDeduplicationKey");
+
+        Assert.NotNull(property);
+        Assert.Equal(typeof(string), property.PropertyType);
+    }
+
+    [Fact]
+    public void AlertNotification_ModelEnforcesUniqueEventDeduplicationKey()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Data", "IntranetDbContext.cs");
+
+        Assert.Contains("alert.Property(x => x.EventDeduplicationKey)", source, StringComparison.Ordinal);
+        Assert.Contains("alert.HasIndex(x => x.EventDeduplicationKey).IsUnique()", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectQuotationAcceptedConsumer_DeduplicatesBeforePersistingAlert()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Consumers", "ProjectQuotationAcceptedConsumer.cs");
+
+        Assert.Contains("BuildEventDeduplicationKey", source, StringComparison.Ordinal);
+        Assert.Contains("db.AlertNotifications.AnyAsync", source, StringComparison.Ordinal);
+        Assert.Contains("EventDeduplicationKey = eventDeduplicationKey", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AlertReadReceipt_ExistsInIntranetDbContext()
     {
         var props = typeof(IntranetDbContext).GetProperties(BindingFlags.Public | BindingFlags.Instance);

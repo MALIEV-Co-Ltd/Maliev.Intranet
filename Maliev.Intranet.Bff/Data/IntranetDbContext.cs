@@ -53,6 +53,7 @@ public class IntranetDbContext(DbContextOptions<IntranetDbContext> options) : Db
         alert.ToTable("alert_notifications");
         alert.HasKey(x => x.Id);
         alert.Property(x => x.Id).HasColumnName("id");
+        alert.Property(x => x.EventDeduplicationKey).HasColumnName("event_deduplication_key").HasMaxLength(128).IsRequired();
         alert.Property(x => x.Type).HasColumnName("type").HasMaxLength(64).IsRequired();
         alert.Property(x => x.ProjectId).HasColumnName("project_id").IsRequired();
         alert.Property(x => x.ProjectNumber).HasColumnName("project_number").HasMaxLength(32).IsRequired();
@@ -62,6 +63,7 @@ public class IntranetDbContext(DbContextOptions<IntranetDbContext> options) : Db
         alert.Property(x => x.OccurredAtUtc).HasColumnName("occurred_at_utc").IsRequired();
         alert.Property(x => x.ExpiresAtUtc).HasColumnName("expires_at_utc").IsRequired();
         alert.HasIndex(x => x.ExpiresAtUtc);
+        alert.HasIndex(x => x.EventDeduplicationKey).IsUnique();
 
         // ── AlertReadReceipt ─────────────────────────────────────────────────
         var receipt = modelBuilder.Entity<AlertReadReceipt>();
