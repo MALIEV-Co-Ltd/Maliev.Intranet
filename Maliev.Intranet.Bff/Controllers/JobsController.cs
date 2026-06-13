@@ -501,8 +501,22 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
             return true;
         }
 
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri) &&
-            !Uri.TryCreate(new Uri("https://intranet.maliev.local"), trimmed, out uri))
+        Uri? uri;
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absoluteUri))
+        {
+            if (!IsTrustedJobTicketHost(absoluteUri))
+            {
+                return false;
+            }
+
+            uri = absoluteUri;
+        }
+        else if (!Uri.TryCreate(new Uri("https://intranet.maliev.local"), trimmed, out uri))
+        {
+            return false;
+        }
+
+        if (!string.Equals(uri.AbsolutePath, "/mfg/production-schedule", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -510,6 +524,14 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         var query = QueryHelpers.ParseQuery(uri.Query);
         return query.TryGetValue("jobId", out var values) &&
             Guid.TryParse(values.FirstOrDefault(), out jobId);
+    }
+
+    private static bool IsTrustedJobTicketHost(Uri uri)
+    {
+        return string.Equals(uri.Host, "intranet.maliev.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Host, "intranet.maliev.local", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string MapEquipmentCategoryToTechnology(string? category) => category switch
