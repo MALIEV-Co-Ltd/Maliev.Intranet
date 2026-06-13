@@ -294,6 +294,24 @@ public class JobsControllerTests
         Assert.IsType<NotFoundResult>(result.Result);
     }
 
+    [Fact]
+    public async Task GetQrAsync_ReturnsProductionScheduleQrPayload()
+    {
+        var client = MakeClientEmpty(HttpStatusCode.InternalServerError);
+
+        var result = await client.GetQrAsync(JobId, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(JobId, result.JobId);
+        Assert.Equal($"/mfg/production-schedule?jobId={JobId:D}", result.Url);
+        Assert.False(string.IsNullOrWhiteSpace(result.QrPngBase64));
+        byte[] qrBytes = Convert.FromBase64String(result.QrPngBase64);
+        byte[] pngSignature = [0x89, 0x50, 0x4E, 0x47];
+        Assert.True(
+            qrBytes.Take(4).SequenceEqual(pngSignature),
+            "QR payload should be a PNG image.");
+    }
+
     // ── PATCH /{id}/status ────────────────────────────────────────────────────
 
     [Fact]

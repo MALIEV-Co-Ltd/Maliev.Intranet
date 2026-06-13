@@ -1,5 +1,6 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using QRCoder;
 
 namespace Maliev.Intranet.Bff.Clients;
 
@@ -211,7 +212,20 @@ public class JobServiceClient(HttpClient httpClient)
     public async Task<JobQrDto?> GetQrAsync(Guid id, CancellationToken ct = default)
     {
         await Task.CompletedTask;
-        return null;
+        ct.ThrowIfCancellationRequested();
+
+        string url = $"/mfg/production-schedule?jobId={id:D}";
+        using var qrGenerator = new QRCodeGenerator();
+        using QRCodeData qrCodeData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
+        using var qrCode = new PngByteQRCode(qrCodeData);
+        byte[] qrBytes = qrCode.GetGraphic(8);
+
+        return new JobQrDto
+        {
+            JobId = id,
+            Url = url,
+            QrPngBase64 = Convert.ToBase64String(qrBytes)
+        };
     }
 
     // ── Scheduling ─────────────────────────────────────────────────────────────
