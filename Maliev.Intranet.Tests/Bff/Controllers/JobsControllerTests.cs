@@ -312,6 +312,107 @@ public class JobsControllerTests
             "QR payload should be a PNG image.");
     }
 
+    [Fact]
+    public async Task ResolveTicketScan_WhenQrUrlContainsJobId_ShouldReturnJobDetail()
+    {
+        string? capturedPath = null;
+        var downstreamJob = new
+        {
+            JobId,
+            OrderId = Guid.Empty,
+            OrderItemId = Guid.Empty,
+            MaterialId = Guid.Empty,
+            CustomerId = (string?)null,
+            CustomerName = "MALIEV Customer",
+            Technology = "FDM",
+            EstimatedPrintTimeMinutes = 90,
+            AssignedMachineId = "MAL-FDM-001",
+            AssignedOperator = "Operator One",
+            Priority = 3,
+            Status = "Queued",
+            Notes = (string?)null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            ScheduledStartTime = (DateTime?)null,
+            ScheduledEndTime = (DateTime?)null,
+            QueuePosition = 0
+        };
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(downstreamJob)
+            });
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.ResolveTicketScan(
+            new JobTicketScanRequest { Code = $"https://intranet.maliev.com/mfg/production-schedule?jobId={JobId:D}" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<JobDetailDto>(ok.Value);
+        Assert.Equal(JobId, dto.Id);
+        Assert.Equal($"/job/v1/jobs/{JobId:D}", capturedPath);
+    }
+
+    [Fact]
+    public async Task ResolveTicketScan_WhenScanCodeIsInvalid_ShouldReturnBadRequestWithoutDownstreamLookup()
+    {
+        var downstreamCalled = false;
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            downstreamCalled = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.ResolveTicketScan(
+            new JobTicketScanRequest { Code = "not-a-job-ticket" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.False(downstreamCalled);
+    }
+
+    [Fact]
+    public async Task ResolveTicketScan_WhenScanCodeIsRawJobId_ShouldReturnJobDetail()
+    {
+        string? capturedPath = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    JobId,
+                    OrderId = Guid.Empty,
+                    OrderItemId = Guid.Empty,
+                    MaterialId = Guid.Empty,
+                    Technology = "SLS",
+                    EstimatedPrintTimeMinutes = 120,
+                    Priority = 2,
+                    Status = "InProgress",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    QueuePosition = 0
+                })
+            });
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.ResolveTicketScan(
+            new JobTicketScanRequest { Code = JobId.ToString("D") },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<JobDetailDto>(ok.Value);
+        Assert.Equal(JobId, dto.Id);
+        Assert.Equal($"/job/v1/jobs/{JobId:D}", capturedPath);
+    }
+
     // ── PATCH /{id}/status ────────────────────────────────────────────────────
 
     [Fact]

@@ -9,6 +9,7 @@ using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -127,6 +128,26 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     {
         var result = await client.GetQrAsync(id, ct);
         return result != null ? Ok(result) : NotFound();
+    }
+
+    /// <summary>
+    /// Resolves a scanned job-ticket QR payload to the matching job without changing production status.
+    /// </summary>
+    /// <param name="request">The scanned QR payload, URL, or raw job identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching job detail, or an error if the scan cannot be resolved.</returns>
+    [HttpPost("ticket-scan")]
+    public async Task<ActionResult<JobDetailDto>> ResolveTicketScan(
+        [FromBody] JobTicketScanRequest request,
+        CancellationToken ct)
+    {
+        if (!TryExtractScannedJobId(request.Code, out Guid jobId))
+        {
+            return BadRequest(new { error = "Scan a MALIEV job ticket QR code or paste a valid job id." });
+        }
+
+        var result = await client.GetJobByIdAsync(jobId, ct);
+        return result is null ? NotFound() : Ok(result);
     }
 
     // ── Mutations ─────────────────────────────────────────────────────────────
@@ -470,6 +491,26 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
 
     private static string FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+    private static bool TryExtractScannedJobId(string? code, out Guid jobId)
+    {
+        jobId = Guid.Empty;
+        string trimmed = code?.Trim() ?? string.Empty;
+        if (Guid.TryParse(trimmed, out jobId))
+        {
+            return true;
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri) &&
+            !Uri.TryCreate(new Uri("https://intranet.maliev.local"), trimmed, out uri))
+        {
+            return false;
+        }
+
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        return query.TryGetValue("jobId", out var values) &&
+            Guid.TryParse(values.FirstOrDefault(), out jobId);
+    }
 
     private static string MapEquipmentCategoryToTechnology(string? category) => category switch
     {

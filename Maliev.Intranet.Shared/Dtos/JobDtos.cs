@@ -183,6 +183,13 @@ public class JobQrDto
 
 // ── Request models ────────────────────────────────────────────────────────────
 
+/// <summary>Request model for resolving a scanned job-ticket QR payload or pasted job identifier.</summary>
+public sealed record JobTicketScanRequest
+{
+    /// <summary>Gets or sets the scanned QR payload, URL, or raw job identifier.</summary>
+    public string Code { get; set; } = string.Empty;
+}
+
 /// <summary>Request model for updating a job's status.</summary>
 public sealed record UpdateJobStatusRequest
 {
