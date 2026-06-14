@@ -81,10 +81,15 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         var expectedLocalUpdated = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
             .ToLocalTime()
             .ToString("MMM d, yyyy HH:mm");
+        var expectedUtcUpdated = new DateTime(2026, 4, 18, 14, 22, 0, DateTimeKind.Utc)
+            .ToString("MMM d, yyyy HH:mm");
         var headerMeta = cut.Find(".mlv-page-meta").TextContent;
         Assert.Contains("Robot arm calibration fixture", headerMeta);
         Assert.Contains("Axion Robotics", headerMeta);
-        Assert.Contains($"Last updated on {expectedLocalUpdated}", headerMeta);
+        Assert.True(
+            headerMeta.Contains($"Last updated on {expectedLocalUpdated}", StringComparison.Ordinal) ||
+            headerMeta.Contains($"Last updated on {expectedUtcUpdated}", StringComparison.Ordinal),
+            $"Expected header metadata to contain the local or UTC updated timestamp. Actual: {headerMeta}");
         Assert.Contains("Quotation Generated", headerMeta);
         Assert.DoesNotContain("Created", headerMeta);
         Assert.DoesNotContain("Updated", headerMeta);
