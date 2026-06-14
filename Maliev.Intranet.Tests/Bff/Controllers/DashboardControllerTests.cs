@@ -214,4 +214,30 @@ public class DashboardControllerTests
         Assert.Equal("Error", productionItem.Severity);
         Assert.Contains("/job/v1/jobs/kanban", requestedPaths);
     }
+
+    [Fact]
+    public async Task GetActionItems_WhenRequestIsCanceled_ShouldPropagateCancellation()
+    {
+        var handler = new MockHttpMessageHandler((req, ct) =>
+            ct.IsCancellationRequested
+                ? Task.FromCanceled<HttpResponseMessage>(ct)
+                : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { count = 0, TodayTotal = 0m })
+                }));
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://test") };
+        var controller = new DashboardController(
+            new OrderServiceClient(httpClient),
+            new QuotationServiceClient(httpClient),
+            new PaymentServiceClient(httpClient),
+            new EmployeeServiceClient(httpClient),
+            new InvoiceServiceClient(httpClient),
+            new LeaveServiceClient(httpClient),
+            new ProjectServiceClient(httpClient),
+            new JobServiceClient(httpClient));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.GetActionItems(cts.Token));
+    }
 }

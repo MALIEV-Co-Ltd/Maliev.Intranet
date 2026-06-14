@@ -167,6 +167,10 @@ public class DashboardController(
                 cts.CancelAfter(TimeSpan.FromSeconds(3));
                 return await fn(cts.Token);
             }
+            catch (OperationCanceledException) when (parentCt.IsCancellationRequested)
+            {
+                throw;
+            }
             catch
             {
                 return 0;
