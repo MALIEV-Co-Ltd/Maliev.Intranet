@@ -99,6 +99,58 @@ public class DashboardControllerTests
     }
 
     [Fact]
+    public async Task Get_WhenOneStatSourceReturnsMalformedJson_ShouldStillReturnOtherWidgets()
+    {
+        var requestedPaths = new List<string>();
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            requestedPaths.Add(req.RequestUri?.PathAndQuery ?? string.Empty);
+            var path = req.RequestUri?.AbsolutePath ?? string.Empty;
+
+            if (path.Equals("/payment/v1/metrics/stats", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{not-json")
+                });
+            }
+
+            if (path.Equals("/order/v1/metrics/active-count", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { count = 3 })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { count = 0, TodayTotal = 0m })
+            });
+        });
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://test") };
+        var controller = new DashboardController(
+            new OrderServiceClient(httpClient),
+            new QuotationServiceClient(httpClient),
+            new PaymentServiceClient(httpClient),
+            new EmployeeServiceClient(httpClient),
+            new InvoiceServiceClient(httpClient),
+            new LeaveServiceClient(httpClient),
+            new ProjectServiceClient(httpClient),
+            new JobServiceClient(httpClient));
+
+        var result = await controller.Get("Revenue,ActiveOrders", CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var model = Assert.IsType<DashboardViewModel>(okResult.Value);
+        Assert.Equal(2, model.Widgets.Count);
+        Assert.Equal("THB 0", model.Widgets.Single(widget => widget.Title == "Total Revenue (Today)").Data.GetString());
+        Assert.Equal("3", model.Widgets.Single(widget => widget.Title == "Active Orders").Data.GetString());
+        Assert.Contains("/payment/v1/metrics/stats", requestedPaths);
+        Assert.Contains("/order/v1/metrics/active-count", requestedPaths);
+    }
+
+    [Fact]
     public async Task GetActionItems_WithOverdueProductionJobs_ShouldReturnProductionActionItem()
     {
         var requestedPaths = new List<string>();

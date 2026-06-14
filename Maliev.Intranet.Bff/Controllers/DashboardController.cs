@@ -40,21 +40,29 @@ public class DashboardController(
             requestedWidgets = ["Revenue", "ActiveOrders", "PendingQuotes", "Headcount"];
         }
 
+        var requestedWidgetSet = requestedWidgets.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var model = new DashboardViewModel
         {
             Widgets = new List<WidgetData>(),
             Alerts = new List<SystemAlert>()
         };
 
-        // Parallel execution for better performance
-        var revenueTask = requestedWidgets.Contains("Revenue") ? paymentClient.GetPaymentStatsAsync(ct) : Task.FromResult<PaymentStatsDto?>(null);
-        var ordersTask = requestedWidgets.Contains("ActiveOrders") ? orderClient.GetActiveOrderCountAsync(ct) : Task.FromResult(0);
-        var quotesTask = requestedWidgets.Contains("PendingQuotes") ? quotationClient.GetPendingQuotationCountAsync(ct) : Task.FromResult(0);
-        var employeesTask = requestedWidgets.Contains("Headcount") ? employeeClient.GetTotalHeadcountAsync(ct) : Task.FromResult(0);
+        var revenueTask = requestedWidgetSet.Contains("Revenue")
+            ? SafeDashboardValueAsync(token => paymentClient.GetPaymentStatsAsync(token), (PaymentStatsDto?)null, ct)
+            : Task.FromResult<PaymentStatsDto?>(null);
+        var ordersTask = requestedWidgetSet.Contains("ActiveOrders")
+            ? SafeDashboardValueAsync(token => orderClient.GetActiveOrderCountAsync(token), 0, ct)
+            : Task.FromResult(0);
+        var quotesTask = requestedWidgetSet.Contains("PendingQuotes")
+            ? SafeDashboardValueAsync(token => quotationClient.GetPendingQuotationCountAsync(token), 0, ct)
+            : Task.FromResult(0);
+        var employeesTask = requestedWidgetSet.Contains("Headcount")
+            ? SafeDashboardValueAsync(token => employeeClient.GetTotalHeadcountAsync(token), 0, ct)
+            : Task.FromResult(0);
 
         await Task.WhenAll(revenueTask, ordersTask, quotesTask, employeesTask);
 
-        if (requestedWidgets.Contains("Revenue"))
+        if (requestedWidgetSet.Contains("Revenue"))
         {
             var stats = await revenueTask;
             model.Widgets.Add(new WidgetData
@@ -67,7 +75,7 @@ public class DashboardController(
             });
         }
 
-        if (requestedWidgets.Contains("ActiveOrders"))
+        if (requestedWidgetSet.Contains("ActiveOrders"))
         {
             var count = await ordersTask;
             model.Widgets.Add(new WidgetData
@@ -80,7 +88,7 @@ public class DashboardController(
             });
         }
 
-        if (requestedWidgets.Contains("PendingQuotes"))
+        if (requestedWidgetSet.Contains("PendingQuotes"))
         {
             var count = await quotesTask;
             model.Widgets.Add(new WidgetData
@@ -93,7 +101,7 @@ public class DashboardController(
             });
         }
 
-        if (requestedWidgets.Contains("Headcount"))
+        if (requestedWidgetSet.Contains("Headcount"))
         {
             var count = await employeesTask;
             model.Widgets.Add(new WidgetData
@@ -106,7 +114,7 @@ public class DashboardController(
             });
         }
 
-        if (requestedWidgets.Contains("OrderTrend"))
+        if (requestedWidgetSet.Contains("OrderTrend"))
         {
             model.Widgets.Add(new WidgetData
             {
@@ -119,6 +127,25 @@ public class DashboardController(
         }
 
         return Ok(model);
+    }
+
+    private static async Task<T> SafeDashboardValueAsync<T>(
+        Func<CancellationToken, Task<T>> fn,
+        T fallback,
+        CancellationToken parentCt)
+    {
+        try
+        {
+            return await fn(parentCt);
+        }
+        catch (OperationCanceledException) when (!parentCt.IsCancellationRequested)
+        {
+            return fallback;
+        }
+        catch
+        {
+            return fallback;
+        }
     }
 
     /// <summary>
