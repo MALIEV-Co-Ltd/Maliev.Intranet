@@ -266,6 +266,7 @@ public sealed class AlertsControllerBoundaryTests : IAsyncLifetime
         _db.AlertNotifications.Add(new AlertNotification
         {
             Id = id,
+            EventDeduplicationKey = $"test-alert:{id:D}",
             Type = "QuoteAccepted",
             ProjectId = Guid.NewGuid(),
             ProjectNumber = projectNumber,
