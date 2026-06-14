@@ -169,7 +169,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         CancellationToken ct)
     {
         var response = await client.UpdateStatusAsync(id, request.Status, request.MachineId, ct);
-        if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+        if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
 
         // Broadcast to all connected production queue clients
         await hub.Clients.All.SendAsync("JobStatusChanged", new { JobId = id, Status = request.Status });

@@ -474,6 +474,33 @@ public class JobsControllerTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task UpdateStatus_WhenDownstreamReturnsErrorBody_ShouldForwardErrorBody()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict)
+            {
+                Content = JsonContent.Create(new { error = "MachineId is required to queue a job." })
+            }));
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+        var (hub, allProxy) = MockHub();
+
+        var result = await controller.UpdateStatus(
+            JobId,
+            new UpdateJobStatusRequest { Status = "Complete" },
+            hub,
+            CancellationToken.None);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(409, content.StatusCode);
+        Assert.Contains("MachineId is required", content.Content, StringComparison.OrdinalIgnoreCase);
+
+        allProxy.Verify(c => c.SendCoreAsync(
+            "JobStatusChanged",
+            It.IsAny<object?[]>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     // ── POST /{id}/assign-machine ─────────────────────────────────────────────
 
     [Fact]
