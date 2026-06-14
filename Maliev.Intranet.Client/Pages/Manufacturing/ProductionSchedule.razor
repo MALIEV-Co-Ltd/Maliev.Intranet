@@ -252,6 +252,18 @@
                                 </select>
                             </label>
 
+                            @if (IsCancelledStatus(_jobEditModel?.Status))
+                            {
+                                <label class="production-job-field production-job-field-wide">
+                                    <span>Cancellation reason</span>
+                                    <textarea value="@(_jobEditModel?.CancellationReason ?? string.Empty)"
+                                              @oninput="OnJobCancellationReasonChanged"
+                                              placeholder="Why is this job being cancelled?"
+                                              disabled="@(_savingJobDetails || _jobEditModel is null)"
+                                              rows="3"></textarea>
+                                </label>
+                            }
+
                             <label class="production-job-field">
                                 <span>Material</span>
                                 <select value="@FormatGuidValue(_jobEditModel?.MaterialId)"
@@ -558,7 +570,9 @@
     private bool CanSaveJobDetails => _selectedJobDetail is not null
         && _jobEditModel is not null
         && !_savingJobDetails
-        && !_loadingJobReferences;
+        && !_loadingJobReferences
+        && (!IsCancelledStatus(_jobEditModel.Status)
+            || !string.IsNullOrWhiteSpace(_jobEditModel.CancellationReason));
 
     private bool CanRecordMaterialUse => _selectedJobDetail is not null
         && _selectedInventoryItem is not null
@@ -941,6 +955,18 @@
         if (_jobEditModel is not null)
         {
             _jobEditModel.Status = e.Value?.ToString() ?? _jobEditModel.Status;
+            if (!IsCancelledStatus(_jobEditModel.Status))
+            {
+                _jobEditModel.CancellationReason = null;
+            }
+        }
+    }
+
+    private void OnJobCancellationReasonChanged(ChangeEventArgs e)
+    {
+        if (_jobEditModel is not null)
+        {
+            _jobEditModel.CancellationReason = e.Value?.ToString();
         }
     }
 
@@ -1224,7 +1250,8 @@
                     new UpdateJobStatusRequest
                     {
                         Status = _jobEditModel.Status,
-                        MachineId = _selectedSlot.MachineId
+                        MachineId = _selectedSlot.MachineId,
+                        CancellationReason = _jobEditModel.CancellationReason
                     });
 
                 if (!statusResponse.IsSuccessStatusCode)
@@ -1541,6 +1568,9 @@
             var value => value
         };
 
+    private static bool IsCancelledStatus(string? status) =>
+        NormalizeStatus(status).Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
+
     private static string FormatStatus(string status) => status switch
     {
         "InProgress" or "InProduction" => "In progress",
@@ -1731,5 +1761,7 @@
         public int PriorityValue { get; set; } = 3;
 
         public string Status { get; set; } = "Queued";
+
+        public string? CancellationReason { get; set; }
     }
 }

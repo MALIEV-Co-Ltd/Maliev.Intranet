@@ -298,6 +298,39 @@ public sealed class ProductionSchedulePageTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProductionSchedule_CancellingJobDetails_SendsCancellationReason()
+    {
+        var cut = Render<ProductionSchedule>();
+
+        cut.WaitForAssertion(() => Assert.Contains("JOB-2001", cut.Markup));
+        cut.Find($"button[data-job-id='{_jobId}']").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("Save job details", cut.Markup));
+        var statusSelect = cut.FindAll("label.production-job-field")
+            .Single(label => label.TextContent.Contains("Queue status", StringComparison.Ordinal))
+            .QuerySelector("select")!;
+        statusSelect.Change("Cancelled");
+
+        cut.WaitForAssertion(() => Assert.Contains("Cancellation reason", cut.Markup));
+        cut.Find("textarea[placeholder='Why is this job being cancelled?']")
+            .Input("Customer cancelled after fixture issue.");
+        cut.FindAll("button")
+            .Single(button => button.TextContent.Contains("Save job details", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains(_requestedRequests, request => request == $"PATCH /api/v1/jobs/{_jobId}/status");
+            Assert.NotNull(_jobStatusRequest);
+        });
+
+        var root = _jobStatusRequest!.RootElement;
+        Assert.Equal("Cancelled", root.GetProperty("status").GetString());
+        Assert.Equal("CNC-01", root.GetProperty("machineId").GetString());
+        Assert.Equal("Customer cancelled after fixture issue.", root.GetProperty("cancellationReason").GetString());
+    }
+
+    [Fact]
     public void ProductionSchedule_CompletedJobReleaseAction_TransitionsOrderToQualityReleased()
     {
         _jobStatus = "Completed";
