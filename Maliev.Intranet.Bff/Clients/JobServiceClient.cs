@@ -98,9 +98,15 @@ public class JobServiceClient(HttpClient httpClient)
     /// <param name="id">The job GUID.</param>
     /// <param name="newStatus">The new status string.</param>
     /// <param name="machineId">The machine identifier required when queueing a pending job.</param>
+    /// <param name="cancellationReason">The operator-provided cancellation reason when cancelling a job.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The HTTP response.</returns>
-    public async Task<HttpResponseMessage> UpdateStatusAsync(Guid id, string newStatus, string? machineId = null, CancellationToken ct = default)
+    public async Task<HttpResponseMessage> UpdateStatusAsync(
+        Guid id,
+        string newStatus,
+        string? machineId = null,
+        string? cancellationReason = null,
+        CancellationToken ct = default)
     {
         return newStatus.Trim().ToLowerInvariant() switch
         {
@@ -112,7 +118,10 @@ public class JobServiceClient(HttpClient httpClient)
             "inprogress" or "in progress" or "started" or "start" => await httpClient.PostAsync($"/job/v1/jobs/{id}/start", null, ct),
             "finishing" or "qualitycheck" or "quality check" or "packaging" => await httpClient.PostAsync($"/job/v1/jobs/{id}/finish", null, ct),
             "completed" or "complete" => await httpClient.PostAsync($"/job/v1/jobs/{id}/complete", null, ct),
-            "cancelled" or "canceled" or "cancel" => await httpClient.PostAsJsonAsync($"/job/v1/jobs/{id}/cancel", new { Reason = "Cancelled from Intranet." }, ct),
+            "cancelled" or "canceled" or "cancel" => await httpClient.PostAsJsonAsync(
+                $"/job/v1/jobs/{id}/cancel",
+                new { Reason = NormalizeCancellationReason(cancellationReason) },
+                ct),
             _ => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
             {
                 ReasonPhrase = "Unsupported JobService status transition."
@@ -200,6 +209,14 @@ public class JobServiceClient(HttpClient httpClient)
     /// <returns>The HTTP response from JobService.</returns>
     public async Task<HttpResponseMessage> CancelPlanningHoldAsync(Guid holdId, CancellationToken ct = default) =>
         await httpClient.DeleteAsync($"/job/v1/jobs/planning-holds/{holdId}", ct);
+
+    private static string NormalizeCancellationReason(string? reason)
+    {
+        reason = reason?.Trim();
+        return string.IsNullOrWhiteSpace(reason)
+            ? "Cancelled from Intranet status update."
+            : reason;
+    }
 
     // ── Stats & QR ────────────────────────────────────────────────────────────
 

@@ -168,7 +168,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
         CancellationToken ct)
     {
-        var response = await client.UpdateStatusAsync(id, request.Status, request.MachineId, ct);
+        var response = await client.UpdateStatusAsync(id, request.Status, request.MachineId, request.CancellationReason, ct);
         if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
 
         // Broadcast to all connected production queue clients

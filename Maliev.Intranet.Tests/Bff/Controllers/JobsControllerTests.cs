@@ -501,6 +501,43 @@ public class JobsControllerTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task UpdateStatus_WhenCancelledWithReason_ShouldForwardCancellationReasonToJobService()
+    {
+        string? capturedPath = null;
+        JsonDocument? capturedBody = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            capturedBody = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+        var (hub, _) = MockHub();
+
+        var request = JsonSerializer.Deserialize<UpdateJobStatusRequest>(
+            """
+            {
+              "status": "Cancelled",
+              "cancellationReason": "Fixture cracked during setup; remake required."
+            }
+            """,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var result = await controller.UpdateStatus(
+            JobId,
+            request!,
+            hub,
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal($"/job/v1/jobs/{JobId:D}/cancel", capturedPath);
+        Assert.NotNull(capturedBody);
+        Assert.Equal(
+            "Fixture cracked during setup; remake required.",
+            capturedBody!.RootElement.GetProperty("reason").GetString());
+    }
+
     // ── POST /{id}/assign-machine ─────────────────────────────────────────────
 
     [Fact]

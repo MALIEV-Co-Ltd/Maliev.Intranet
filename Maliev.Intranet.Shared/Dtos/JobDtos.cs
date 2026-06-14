@@ -198,6 +198,9 @@ public sealed record UpdateJobStatusRequest
 
     /// <summary>Gets or sets the machine identifier required when moving a pending job into the queue.</summary>
     public string? MachineId { get; set; }
+
+    /// <summary>Gets or sets the operator-provided reason when cancelling a job.</summary>
+    public string? CancellationReason { get; set; }
 }
 
 /// <summary>Request model for updating editable production job details.</summary>
