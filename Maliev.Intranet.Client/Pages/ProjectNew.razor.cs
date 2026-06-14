@@ -3850,11 +3850,11 @@ public partial class ProjectNew : IAsyncDisposable
             // Server save failure is non-fatal; sessionStorage draft is the fallback
             saved = false;
         }
-finally
-            {
-                _serverSaveInProgress = false;
+        finally
+        {
+            _serverSaveInProgress = false;
 
-                if (_serverSavePending && _selectedCustomerId.HasValue && !_storageMigrationInProgress)
+            if (_serverSavePending && _selectedCustomerId.HasValue && !_storageMigrationInProgress)
             {
                 _serverSavePending = false;
                 _ = InvokeAsync(SaveDraftAsync);
@@ -4454,20 +4454,20 @@ finally
         Guid projectId,
         bool isUpdatingExistingProject,
         QuotationPdfData pdfData) => new()
-    {
-        ValidityDays = ResolveValidityDays(pdfData),
-        DeliveryExpectations = pdfData.DeliveryExpectations,
-        BulkDiscountAmount = ResolveDiscountAmount(pdfData, "Automatic bulk-order savings"),
-        ManualDiscountAmount = ResolveDiscountAmount(pdfData, "Manual discount"),
-        ShippingCost = Math.Max(0m, pdfData.ShippingCost),
-        TaxAmount = Math.Max(0m, pdfData.TaxAmount),
-        QuotationTerms = pdfData.SpecialTerms,
-        PdfData = pdfData,
-        ChangeSummary = isUpdatingExistingProject
+        {
+            ValidityDays = ResolveValidityDays(pdfData),
+            DeliveryExpectations = pdfData.DeliveryExpectations,
+            BulkDiscountAmount = ResolveDiscountAmount(pdfData, "Automatic bulk-order savings"),
+            ManualDiscountAmount = ResolveDiscountAmount(pdfData, "Manual discount"),
+            ShippingCost = Math.Max(0m, pdfData.ShippingCost),
+            TaxAmount = Math.Max(0m, pdfData.TaxAmount),
+            QuotationTerms = pdfData.SpecialTerms,
+            PdfData = pdfData,
+            ChangeSummary = isUpdatingExistingProject
             ? "Regenerated from employee project quote workspace."
             : "Initial quotation generated from employee project quote workspace.",
-        IdempotencyKey = $"{projectId:N}:{DateTime.UtcNow:yyyyMMddHHmmssfff}"
-    };
+            IdempotencyKey = $"{projectId:N}:{DateTime.UtcNow:yyyyMMddHHmmssfff}"
+        };
 
     private static int ResolveValidityDays(QuotationPdfData pdfData)
     {

@@ -80,8 +80,8 @@ try
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.CookieProvider>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ChatService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.ISignalRCustomerService, Maliev.Intranet.Client.Services.SignalRCustomerService>();
-        builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
-        builder.Services.AddScoped<Maliev.Intranet.Client.Services.AlertService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.ProductionHubService>();
+    builder.Services.AddScoped<Maliev.Intranet.Client.Services.AlertService>();
     builder.Services.AddScoped<Maliev.Intranet.Client.Services.IProjectDraftService, Maliev.Intranet.Client.Services.ProjectDraftService>();
     builder.Services.AddScoped<Maliev.Intranet.Shared.Services.IReferenceDataService, Maliev.Intranet.Bff.Services.ReferenceDataService>();
     builder.Services.AddScoped<Maliev.Intranet.Bff.Services.IChatContextResolver, Maliev.Intranet.Bff.Services.ChatContextResolver>();

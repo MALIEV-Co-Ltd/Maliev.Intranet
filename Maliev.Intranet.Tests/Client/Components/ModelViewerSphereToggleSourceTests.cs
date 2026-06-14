@@ -10,7 +10,7 @@ namespace Maliev.Intranet.Tests.Client.Components;
 public sealed class ModelViewerSphereToggleSourceTests
 {
     private static string Razor => ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor");
-    private static string Css   => ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor.css");
+    private static string Css => ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor.css");
 
     // ── PNG assets ──────────────────────────────────────────────────────────────
 

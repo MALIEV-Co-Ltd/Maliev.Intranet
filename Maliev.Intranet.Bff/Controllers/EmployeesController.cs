@@ -185,7 +185,7 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
             ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     }
 
-private async Task EnrichCurrentUserProfileAsync(EmployeeDetailDto? profile, Guid principalId, CancellationToken ct)
+    private async Task EnrichCurrentUserProfileAsync(EmployeeDetailDto? profile, Guid principalId, CancellationToken ct)
     {
         if (profile is null)
         {

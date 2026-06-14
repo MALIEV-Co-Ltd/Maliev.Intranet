@@ -552,7 +552,7 @@ public class UploadsController(
         }
     }
 
-/// <summary>
+    /// <summary>
     /// Returns a short-lived signed GCS download URL for an uploaded file by its ID.
     /// Used by the BabylonJS viewer to stream the original 3D file directly from GCS.
     /// </summary>

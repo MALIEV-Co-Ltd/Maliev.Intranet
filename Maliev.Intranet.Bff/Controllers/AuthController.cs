@@ -216,17 +216,17 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             // user_id is our platform GUID, NameIdentifier might be the source ID (string)
             var userId = User.FindFirst("user_id")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
 
-        return Ok(new UserContextDto
-        {
-            UserId = userId,
-            DisplayName = User.Identity.Name ?? User.FindFirst("name")?.Value ?? "Unknown",
-            Email = User.FindFirst("email")?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "No email",
-            ProfileImageUrl = User.GetProfileImageUrl(),
-            Roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).Concat(User.FindAll("roles").Select(c => c.Value)).Distinct().ToList(),
+            return Ok(new UserContextDto
+            {
+                UserId = userId,
+                DisplayName = User.Identity.Name ?? User.FindFirst("name")?.Value ?? "Unknown",
+                Email = User.FindFirst("email")?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "No email",
+                ProfileImageUrl = User.GetProfileImageUrl(),
+                Roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).Concat(User.FindAll("roles").Select(c => c.Value)).Distinct().ToList(),
                 Permissions = User.FindAll("permission").Select(c => c.Value)
-                    .Concat(User.FindAll("permissions").Select(c => c.Value))
-                    .Distinct()
-                    .ToList()
+                        .Concat(User.FindAll("permissions").Select(c => c.Value))
+                        .Distinct()
+                        .ToList()
             });
         }
 

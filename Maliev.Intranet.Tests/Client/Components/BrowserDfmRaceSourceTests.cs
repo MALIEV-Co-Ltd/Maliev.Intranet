@@ -247,7 +247,7 @@ public sealed class BrowserDfmRaceSourceTests
         Assert.Contains("ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)", analyzeBlock, StringComparison.Ordinal);
         Assert.Contains("MarkBrowserPrimaryLocalDfmUnavailable(part, processCode", analyzeBlock, StringComparison.Ordinal);
         Assert.True(
-            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)", StringComparison.Ordinal) 
+            analyzeBlock.IndexOf("ShouldRunInteractiveServerDfmFallbackAsync(part, processCode)", StringComparison.Ordinal)
             < analyzeBlock.IndexOf("Http.PostAsJsonAsync", StringComparison.Ordinal),
             "ProjectNew must honor browser-primary runtime policy before posting to the GeometryService server DFM fallback endpoint.");
     }
