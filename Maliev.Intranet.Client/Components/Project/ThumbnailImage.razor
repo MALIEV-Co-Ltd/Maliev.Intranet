@@ -12,7 +12,7 @@
     else if (_progress?.Stage == ThumbnailGenerationStage.Fallback)
     {
         <div class="thumbnail-fallback">
-            <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Size="Size.Small" />
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Default" />
         </div>
     }
     else if (_progress?.Stage == ThumbnailGenerationStage.Failed)
@@ -105,7 +105,7 @@
         });
     }
 
-    private void OnProgress(ThumbnailProgress progress)
+    private async Task OnProgress(ThumbnailProgress progress)
     {
         if (progress.StoragePath != StoragePath) return;
 
@@ -120,7 +120,7 @@
             _thumbnails = cached;
         }
 
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()

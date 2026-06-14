@@ -273,7 +273,8 @@ public sealed class ModelViewerRenderingSourceTests
 
         Assert.Contains("const baseZ = Number.isFinite(bb.min.z) ? bb.min.z : 0;", gridBlock, StringComparison.Ordinal);
         Assert.Contains("ground.position.z = baseZ;", gridBlock, StringComparison.Ordinal);
-        Assert.Contains("mat.mainColor = new BABYLON.Color3(0, 0, 0);", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("const gridTheme = getGridThemeConfig(canvasId);", gridBlock, StringComparison.Ordinal);
+        Assert.Contains("mat.mainColor = toColor3(gridTheme.mainColor);", gridBlock, StringComparison.Ordinal);
         Assert.Contains("mat.opacityTexture = createGridLineOpacityTexture(scene);", gridBlock, StringComparison.Ordinal);
     }
 
@@ -544,7 +545,7 @@ public sealed class ModelViewerRenderingSourceTests
     public void ShadowGenerator_UsesPcfNotPcss()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
-        var block  = ExtractBlock(source, "function configureSoftShadowGenerator(");
+        var block = ExtractBlock(source, "function configureSoftShadowGenerator(");
 
         // PCF (Percentage Closer Filtering) must be enabled and PCSS
         // (Contact Hardening Shadow) must be explicitly disabled.
@@ -562,7 +563,7 @@ public sealed class ModelViewerRenderingSourceTests
         // PCF assignment must appear BEFORE the PCSS-disable assignment so the ordering
         // is self-documenting and no future edit can swap them accidentally.
         // Search for "shadowGenerator.useX" to skip any comment lines that mention the property names.
-        var pcfIndex  = block.IndexOf("shadowGenerator.usePercentageCloserFiltering", StringComparison.Ordinal);
+        var pcfIndex = block.IndexOf("shadowGenerator.usePercentageCloserFiltering", StringComparison.Ordinal);
         var pcssIndex = block.IndexOf("shadowGenerator.useContactHardeningShadow", StringComparison.Ordinal);
         Assert.True(pcfIndex < pcssIndex,
             "usePercentageCloserFiltering must appear before useContactHardeningShadow in configureSoftShadowGenerator");
