@@ -22,7 +22,8 @@ public class DashboardController(
     EmployeeServiceClient employeeClient,
     InvoiceServiceClient invoiceClient,
     ILeaveServiceClient leaveClient,
-    ProjectServiceClient projectClient) : ControllerBase
+    ProjectServiceClient projectClient,
+    JobServiceClient jobClient) : ControllerBase
 {
     /// <summary>
     /// Gets the aggregated dashboard view model.
@@ -145,20 +146,20 @@ public class DashboardController(
             }
         }
 
-        // Fire all available sources in parallel (4 of 6 spec items).
-        // Remaining 2 — "Projects needing pricing" and "Production jobs delayed" —
-        // depend on ProjectServiceClient and JobServiceClient which are added in Phase 4.
+        // Fire all available sources in parallel. Each source is isolated so one degraded service
+        // does not hide the rest of the employee's daily operations queue.
         var onHoldOrdersTask = SafeCount(t => orderClient.GetOnHoldOrderCountAsync(t), ct);
         var agingQuotesTask = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
         var overdueInvoicesTask = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
         var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
+        var overdueJobsTask = SafeCount(t => jobClient.GetOverdueJobCountAsync(t), ct);
 
         var employeeId = await GetEmployeeIdAsync(ct);
         var pendingLeaveTask = employeeId == Guid.Empty
             ? Task.FromResult(0)
             : SafeCount(t => leaveClient.GetPendingApprovalCountAsync(employeeId, t), ct);
 
-        await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask);
+        await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask, overdueJobsTask);
 
         var result = new DashboardActionItemsDto();
 
@@ -167,6 +168,7 @@ public class DashboardController(
         var overdueInvoices = await overdueInvoicesTask;
         var pendingLeave = await pendingLeaveTask;
         var configuringProjects = await configuringProjectsTask;
+        var overdueJobs = await overdueJobsTask;
 
         if (onHoldOrders > 0)
         {
@@ -229,18 +231,36 @@ public class DashboardController(
             });
         }
 
+        if (overdueJobs > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label = $"{overdueJobs} production job{(overdueJobs == 1 ? "" : "s")} overdue",
+                Icon = "Icons.Material.Outlined.PrecisionManufacturing",
+                Count = overdueJobs,
+                NavigateTo = "/mfg/production-schedule",
+                Severity = "Error"
+            });
+        }
+
         return Ok(result);
     }
 
     private async Task<Guid> GetEmployeeIdAsync(CancellationToken ct)
     {
-        var employeeIdClaim = User.FindFirst("employee_id")?.Value;
+        var user = HttpContext?.User;
+        if (user is null)
+        {
+            return Guid.Empty;
+        }
+
+        var employeeIdClaim = user.FindFirst("employee_id")?.Value;
         if (Guid.TryParse(employeeIdClaim, out var employeeId))
         {
             return employeeId;
         }
 
-        var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        var userIdString = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
         if (Guid.TryParse(userIdString, out var principalId))
         {
             var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct);

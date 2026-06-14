@@ -348,7 +348,8 @@ public class QuickControllerTests
             new EmployeeServiceClient(client),
             new InvoiceServiceClient(client),
             new LeaveServiceClient(client),
-            new ProjectServiceClient(client));
+            new ProjectServiceClient(client),
+            new JobServiceClient(client));
         var result = await controller.Get();
         Assert.IsType<OkObjectResult>(result.Result);
     }

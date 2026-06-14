@@ -25,6 +25,17 @@ public class JobServiceClient(HttpClient httpClient)
         return kanban?.ToProductionQueue();
     }
 
+    /// <summary>
+    /// Retrieves the number of production jobs whose estimated completion has passed.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The count of overdue production jobs.</returns>
+    public async Task<int> GetOverdueJobCountAsync(CancellationToken ct = default)
+    {
+        var queue = await GetQueueAsync(ct);
+        return queue?.Stats.OverdueCount ?? 0;
+    }
+
     // ── Job list & detail ─────────────────────────────────────────────────────
 
     /// <summary>

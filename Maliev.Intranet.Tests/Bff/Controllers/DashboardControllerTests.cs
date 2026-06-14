@@ -27,7 +27,9 @@ public class DashboardControllerTests
         var leaveClient = new LeaveServiceClient(httpClient);
         var projectClient = new ProjectServiceClient(httpClient);
 
-        return new DashboardController(orderClient, quotationClient, paymentClient, employeeClient, invoiceClient, leaveClient, projectClient);
+        var jobClient = new JobServiceClient(httpClient);
+
+        return new DashboardController(orderClient, quotationClient, paymentClient, employeeClient, invoiceClient, leaveClient, projectClient, jobClient);
     }
 
     [Fact]
@@ -94,5 +96,70 @@ public class DashboardControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var model = Assert.IsType<DashboardViewModel>(okResult.Value);
         Assert.NotNull(model);
+    }
+
+    [Fact]
+    public async Task GetActionItems_WithOverdueProductionJobs_ShouldReturnProductionActionItem()
+    {
+        var requestedPaths = new List<string>();
+        var overdueStartedAt = DateTime.UtcNow.AddHours(-4);
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            requestedPaths.Add(req.RequestUri?.PathAndQuery ?? string.Empty);
+            var path = req.RequestUri?.AbsolutePath ?? string.Empty;
+
+            if (path.Equals("/job/v1/jobs/kanban", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        pending = Array.Empty<object>(),
+                        queued = Array.Empty<object>(),
+                        inProgress = new[]
+                        {
+                            new
+                            {
+                                jobId = Guid.NewGuid(),
+                                orderId = Guid.NewGuid(),
+                                technology = "CNC",
+                                materialId = Guid.NewGuid(),
+                                assignedMachineId = Guid.NewGuid().ToString(),
+                                priority = 3,
+                                estimatedPrintTimeMinutes = 60,
+                                startedAt = overdueStartedAt
+                            }
+                        },
+                        finishing = Array.Empty<object>(),
+                        completed = Array.Empty<object>(),
+                        cancelled = Array.Empty<object>()
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { count = 0, TodayTotal = 0m })
+            });
+        });
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://test") };
+        var controller = new DashboardController(
+            new OrderServiceClient(httpClient),
+            new QuotationServiceClient(httpClient),
+            new PaymentServiceClient(httpClient),
+            new EmployeeServiceClient(httpClient),
+            new InvoiceServiceClient(httpClient),
+            new LeaveServiceClient(httpClient),
+            new ProjectServiceClient(httpClient),
+            new JobServiceClient(httpClient));
+
+        var result = await controller.GetActionItems(CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var model = Assert.IsType<DashboardActionItemsDto>(okResult.Value);
+        var productionItem = Assert.Single(model.Categories, item => item.NavigateTo == "/mfg/production-schedule");
+        Assert.Equal("1 production job overdue", productionItem.Label);
+        Assert.Equal("Error", productionItem.Severity);
+        Assert.Contains("/job/v1/jobs/kanban", requestedPaths);
     }
 }
