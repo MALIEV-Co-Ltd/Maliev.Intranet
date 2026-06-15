@@ -1,7 +1,8 @@
-using Maliev.Intranet.Shared;
-using Maliev.Intranet.Shared.Dtos;
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Maliev.Intranet.Shared;
+using Maliev.Intranet.Shared.Dtos;
 
 namespace Maliev.Intranet.Client.Services;
 
@@ -33,18 +34,31 @@ public class ShippingService
         var query = $"api/v1/shipping/rates" +
                     $"?originCountry={Uri.EscapeDataString(request.OriginCountryCode)}" +
                     $"&destCountry={Uri.EscapeDataString(request.DestinationCountryCode)}" +
-                    $"&weightKg={request.WeightKg}";
+                    $"&weightKg={FormatDecimal(request.WeightKg)}";
 
         if (!string.IsNullOrWhiteSpace(request.DestinationPostalCode))
+        {
             query += $"&destPostalCode={Uri.EscapeDataString(request.DestinationPostalCode)}";
+        }
+
         if (request.LengthCm.HasValue)
-            query += $"&lengthCm={request.LengthCm.Value}";
+        {
+            query += $"&lengthCm={FormatDecimal(request.LengthCm.Value)}";
+        }
+
         if (request.WidthCm.HasValue)
-            query += $"&widthCm={request.WidthCm.Value}";
+        {
+            query += $"&widthCm={FormatDecimal(request.WidthCm.Value)}";
+        }
+
         if (request.HeightCm.HasValue)
-            query += $"&heightCm={request.HeightCm.Value}";
+        {
+            query += $"&heightCm={FormatDecimal(request.HeightCm.Value)}";
+        }
 
         var response = await _http.GetFromJsonAsync<MalievResponse<ShippingRateResponseDto>>(query, JsonOptions, ct);
         return response?.Data;
     }
+
+    private static string FormatDecimal(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 }
