@@ -111,10 +111,7 @@ public class JobServiceClient(HttpClient httpClient)
         return newStatus.Trim().ToLowerInvariant() switch
         {
             "queued" or "queue" when !string.IsNullOrWhiteSpace(machineId) => await httpClient.PostAsJsonAsync($"/job/v1/jobs/{id}/queue", new { MachineId = machineId }, ct),
-            "queued" or "queue" => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
-            {
-                ReasonPhrase = "MachineId is required to queue a job."
-            },
+            "queued" or "queue" => CreateValidationErrorResponse("MachineId is required to queue a job."),
             "inprogress" or "in progress" or "started" or "start" => await httpClient.PostAsync($"/job/v1/jobs/{id}/start", null, ct),
             "finishing" or "qualitycheck" or "quality check" or "packaging" => await httpClient.PostAsync($"/job/v1/jobs/{id}/finish", null, ct),
             "completed" or "complete" => await httpClient.PostAsync($"/job/v1/jobs/{id}/complete", null, ct),
@@ -122,10 +119,7 @@ public class JobServiceClient(HttpClient httpClient)
                 $"/job/v1/jobs/{id}/cancel",
                 new { Reason = NormalizeCancellationReason(cancellationReason) },
                 ct),
-            _ => new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest)
-            {
-                ReasonPhrase = "Unsupported JobService status transition."
-            }
+            _ => CreateValidationErrorResponse("Unsupported JobService status transition.")
         };
     }
 
@@ -217,6 +211,12 @@ public class JobServiceClient(HttpClient httpClient)
             ? "Cancelled from Intranet status update."
             : reason;
     }
+
+    private static HttpResponseMessage CreateValidationErrorResponse(string message) =>
+        new(System.Net.HttpStatusCode.BadRequest)
+        {
+            Content = JsonContent.Create(new { error = message })
+        };
 
     // ── Stats & QR ────────────────────────────────────────────────────────────
 

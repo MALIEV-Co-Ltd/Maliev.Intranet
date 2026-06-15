@@ -502,6 +502,28 @@ public class JobsControllerTests
     }
 
     [Fact]
+    public async Task UpdateStatus_WhenQueueMissingMachine_ShouldReturnValidationErrorBody()
+    {
+        var controller = Make(MakeClientEmpty(HttpStatusCode.NoContent));
+        var (hub, allProxy) = MockHub();
+
+        var result = await controller.UpdateStatus(
+            JobId,
+            new UpdateJobStatusRequest { Status = "Queued" },
+            hub,
+            CancellationToken.None);
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal(400, content.StatusCode);
+        Assert.Contains("MachineId is required", content.Content, StringComparison.OrdinalIgnoreCase);
+
+        allProxy.Verify(c => c.SendCoreAsync(
+            "JobStatusChanged",
+            It.IsAny<object?[]>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateStatus_WhenCancelledWithReason_ShouldForwardCancellationReasonToJobService()
     {
         string? capturedPath = null;
