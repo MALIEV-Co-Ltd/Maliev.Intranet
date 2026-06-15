@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -85,6 +86,48 @@ public class AuthControllerTests
         Assert.Equal("https://lh3.googleusercontent.com/a/test-user", userContext.ProfileImageUrl);
         Assert.Contains("Admin", userContext.Roles);
         Assert.Contains("read:all", userContext.Permissions);
+    }
+
+    [Fact]
+    public async Task GetAvatar_HttpUrlOnAllowedHost_ReturnsBadRequestWithoutFetching()
+    {
+        var result = await _controller.GetAvatar("http://lh3.googleusercontent.com/a/test-user");
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Unsupported image URL", badRequest.Value);
+        _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAvatar_NonImageResponseFromAllowedHost_ReturnsBadRequest()
+    {
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("<html></html>")
+            });
+
+        _httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
+            .Returns(new HttpClient(handlerMock.Object));
+
+        var services = new ServiceCollection()
+            .AddSingleton(_httpClientFactoryMock.Object)
+            .BuildServiceProvider();
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { RequestServices = services }
+        };
+
+        var result = await _controller.GetAvatar("https://lh3.googleusercontent.com/a/test-user");
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Unsupported image content type", badRequest.Value);
     }
 
     [Fact]

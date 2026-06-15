@@ -321,23 +321,41 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
     public async Task<IActionResult> GetAvatar([FromQuery] string url)
     {
         if (string.IsNullOrWhiteSpace(url) || !Uri.IsWellFormedUriString(url, UriKind.Absolute))
+        {
             return NotFound();
+        }
 
         // Only allow known safe domains
         var allowedHosts = new[] { "lh3.googleusercontent.com", "lh4.googleusercontent.com", "lh5.googleusercontent.com", "lh6.googleusercontent.com", "avatars.githubusercontent.com", "platform-lookaside.fbsbx.com" };
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !allowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Unsupported image URL");
+        }
+
+        if (!allowedHosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase))
+        {
             return BadRequest("Unsupported image host");
+        }
 
         try
         {
-            var httpClient = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+            var httpClient = httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Maliev-Intranet/1.0");
 
             var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, HttpContext.RequestAborted);
             if (!response.IsSuccessStatusCode)
+            {
                 return StatusCode((int)response.StatusCode);
+            }
 
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            if (string.IsNullOrWhiteSpace(contentType)
+                || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("Unsupported image content type");
+            }
+
             var stream = await response.Content.ReadAsStreamAsync(HttpContext.RequestAborted);
 
             // Cache for 1 hour
