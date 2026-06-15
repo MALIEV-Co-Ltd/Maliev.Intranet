@@ -1,10 +1,11 @@
+using System.Net.Http.Json;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
-using Maliev.Intranet.Shared;
 using Maliev.Intranet.Bff.Hubs;
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using System.Net.Http.Json;
+using Microsoft.Extensions.Hosting;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -18,7 +19,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 public class SeedController(
     IHttpClientFactory httpClientFactory,
     IHubContext<NotificationHub> hubContext,
-    ILogger<SeedController> logger) : ControllerBase
+    ILogger<SeedController> logger,
+    IWebHostEnvironment environment) : ControllerBase
 {
     private Guid _thailandCountryId;
 
@@ -31,6 +33,12 @@ public class SeedController(
     [HttpPost("/api/seed/customers")]
     public async Task<IActionResult> SeedCustomers(CancellationToken ct)
     {
+        if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        {
+            logger.LogWarning("Customer seed endpoint rejected in {EnvironmentName} environment.", environment.EnvironmentName);
+            return NotFound();
+        }
+
         logger.LogInformation("Starting customer data seeding...");
 
         // Use separate clients per service — service account auth, no UserContextHandler
