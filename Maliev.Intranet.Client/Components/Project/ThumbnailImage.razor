@@ -58,6 +58,7 @@
     [Parameter] public string Alt { get; set; } = "Thumbnail";
     [Parameter] public string CssClass { get; set; } = string.Empty;
     [Parameter] public string Style { get; set; } = string.Empty;
+    [Parameter] public bool AutoGenerate { get; set; } = true;
 
     private ThumbnailSetDto? _thumbnails;
     private ThumbnailProgress? _progress;
@@ -79,6 +80,9 @@
         _progressHandler = EventCallback.Factory.Create<ThumbnailProgress>(this, OnProgress);
         ThumbnailService.Subscribe(_progressHandler);
         _subscribed = true;
+
+        if (!AutoGenerate)
+            return;
 
         // Trigger generation in background
         _ = Task.Run(async () =>

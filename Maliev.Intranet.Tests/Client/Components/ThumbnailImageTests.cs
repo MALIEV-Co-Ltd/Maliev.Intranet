@@ -115,7 +115,8 @@ public class ThumbnailImageTests : BunitContext
 
         var component = Render<ThumbnailImage>(parameters => parameters
             .Add(p => p.StoragePath, "path/file.stl")
-            .Add(p => p.SignedDownloadUrl, "https://test.com/file.stl"));
+            .Add(p => p.SignedDownloadUrl, "https://test.com/file.stl")
+            .Add(p => p.AutoGenerate, false));
 
         await service.NotifyAsync(new ThumbnailProgress(
             "path/file.stl", ThumbnailGenerationStage.Fallback, 0, "Falling back to server"));
