@@ -240,6 +240,93 @@ public class ChatDrawerTests : BunitContext, IAsyncLifetime
         Assert.Contains("Reminder sent successfully for quotation Q-2026-000001", cut.Markup);
     }
 
+    [Fact]
+    public async Task AssistantUiPings_RenderArtifactsAndSummaryHighlights()
+    {
+        var sessionId = Guid.NewGuid();
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            if (req.RequestUri?.PathAndQuery.Contains("/aiprocessing/health", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { canInitiateSession = true })
+                });
+            }
+
+            if (req.RequestUri?.PathAndQuery.Contains("/chat/session", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new BffChatSessionResponse
+                    {
+                        SessionId = sessionId,
+                        Language = "en",
+                        ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
+                    })
+                });
+            }
+
+            if (req.RequestUri?.PathAndQuery.Contains("/chat/message", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new BffChatMessageResponse
+                    {
+                        MessageId = Guid.NewGuid(),
+                        Content = "Added artifacts and updated the project summary.",
+                        Role = "assistant",
+                        UiPings =
+                        [
+                            new BffChatUiPing
+                            {
+                                Target = "Artifacts",
+                                Title = "2 artifacts added",
+                                Detail = "Agent has added 2 artifacts.",
+                                Count = 2
+                            },
+                            new BffChatUiPing
+                            {
+                                Target = "Summary",
+                                Title = "Project summary updated",
+                                Detail = "The project summary was refreshed."
+                            }
+                        ]
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://test/") };
+        var chatService = new ChatService(client, null!, new CookieProvider());
+
+        await using var testContext = new BunitContext();
+        testContext.Services.AddMudServices();
+        testContext.JSInterop.Mode = JSRuntimeMode.Loose;
+        testContext.Services.AddSingleton(_authMock.Object);
+        testContext.Services.AddSingleton<IMarkdownService, MarkdownService>();
+        testContext.Services.AddSingleton(chatService);
+        testContext.Services.AddSingleton(client);
+        testContext.Render<MudPopoverProvider>();
+
+        var cut = testContext.Render<ChatDrawer>();
+        cut.WaitForAssertion(() => Assert.Contains("How can I help?", cut.Markup), TimeSpan.FromSeconds(5));
+
+        var textarea = cut.Find("textarea.sidekick-composer-input");
+        textarea.Input("Add project artifacts");
+        await cut.InvokeAsync(() => cut.Find("button.sidekick-send-button").Click());
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("sidekick-workspace-chip-active", cut.Markup);
+            Assert.Contains("2 artifacts added", cut.Markup);
+            Assert.Contains("Project summary updated", cut.Markup);
+            Assert.Contains("sidekick-workspace-badge", cut.Markup);
+            Assert.Contains(">2<", cut.Markup);
+        }, TimeSpan.FromSeconds(5));
+    }
+
     private static string ExtractCssBlock(string source, string selector)
     {
         var selectorIndex = source.IndexOf(selector, StringComparison.Ordinal);

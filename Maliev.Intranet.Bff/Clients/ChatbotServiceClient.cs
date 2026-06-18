@@ -578,6 +578,27 @@ public class ChatbotMessageResponse
     public DateTimeOffset CreatedAt { get; set; }
     /// <summary>Thinking steps from AI agent processing.</summary>
     public List<ChatbotThinkingStep> ThinkingSteps { get; set; } = new();
+    /// <summary>UI notification pings for assistant workspace elements.</summary>
+    public List<ChatbotUiPing> UiPings { get; set; } = [];
+}
+
+/// <summary>
+/// UI ping emitted by ChatbotService for a client workspace target.
+/// </summary>
+public class ChatbotUiPing
+{
+    /// <summary>UI target to highlight.</summary>
+    public string Target { get; set; } = string.Empty;
+    /// <summary>Short tooltip title.</summary>
+    public string Title { get; set; } = string.Empty;
+    /// <summary>Optional tooltip detail.</summary>
+    public string? Detail { get; set; }
+    /// <summary>Optional related item count.</summary>
+    public int? Count { get; set; }
+    /// <summary>Optional Material icon.</summary>
+    public string? Icon { get; set; }
+    /// <summary>Timestamp for the ping.</summary>
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>
@@ -658,6 +679,8 @@ public class ChatbotConversationMessage
     public string ContentType { get; set; } = string.Empty;
     /// <summary>Creation timestamp.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>UI notification pings associated with this message.</summary>
+    public List<ChatbotUiPing> UiPings { get; set; } = [];
 }
 
 /// <summary>

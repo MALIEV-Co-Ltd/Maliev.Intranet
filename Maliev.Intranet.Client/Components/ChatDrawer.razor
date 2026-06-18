@@ -54,6 +54,10 @@
                 </ChildContent>
             </MudMenu>
             <span class="sidekick-context-chip">@GetPageName()</span>
+            <div class="sidekick-workspace-pings" aria-label="Assistant workspace updates">
+                @RenderWorkspacePing("Artifacts", Icons.Material.Outlined.Inventory2, "No new artifacts")
+                @RenderWorkspacePing("Summary", Icons.Material.Outlined.Subject, "Project summary is current")
+            </div>
         </div>
 
         <div class="sidekick-header-actions">
@@ -478,6 +482,142 @@
         return local.ToString("MMM d", System.Globalization.CultureInfo.CurrentCulture);
     }
 
+    private RenderFragment RenderWorkspacePing(string target, string icon, string fallbackTitle) => builder =>
+    {
+        var ping = GetLatestUiPing(target);
+        var sequence = 0;
+
+        builder.OpenComponent<MudTooltip>(sequence++);
+        builder.AddAttribute(sequence++, "Placement", Placement.Bottom);
+        builder.AddAttribute(sequence++, "Arrow", true);
+        builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(child =>
+        {
+            child.OpenElement(0, "button");
+            child.AddAttribute(1, "type", "button");
+            child.AddAttribute(2, "class", GetWorkspacePingClass(ping));
+            child.AddAttribute(3, "aria-label", GetWorkspacePingTitle(target, ping, fallbackTitle));
+            child.OpenComponent<MudIcon>(4);
+            child.AddAttribute(5, "Icon", icon);
+            child.AddAttribute(6, "Size", Size.Small);
+            child.CloseComponent();
+            child.OpenElement(7, "span");
+            child.AddContent(8, target);
+            child.CloseElement();
+            if (ping?.Count > 0)
+            {
+                child.OpenElement(9, "span");
+                child.AddAttribute(10, "class", "sidekick-workspace-badge");
+                child.AddContent(11, ping.Count.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                child.CloseElement();
+            }
+            child.CloseElement();
+        }));
+        builder.AddAttribute(sequence++, "TooltipContent", (RenderFragment)(content =>
+        {
+            content.OpenElement(0, "div");
+            content.AddAttribute(1, "class", "sidekick-ping-tooltip");
+            content.OpenComponent<MudIcon>(2);
+            content.AddAttribute(3, "Icon", GetWorkspacePingIcon(target, ping, icon));
+            content.AddAttribute(4, "Size", Size.Small);
+            content.CloseComponent();
+            content.OpenElement(5, "div");
+            content.OpenComponent<MudText>(6);
+            content.AddAttribute(7, "Typo", Typo.subtitle2);
+            content.AddAttribute(8, "Class", "sidekick-ping-tooltip-title");
+            content.AddAttribute(9, "ChildContent", (RenderFragment)(title =>
+            {
+                title.AddContent(0, GetWorkspacePingTitle(target, ping, fallbackTitle));
+            }));
+            content.CloseComponent();
+            content.OpenComponent<MudText>(10);
+            content.AddAttribute(11, "Typo", Typo.body2);
+            content.AddAttribute(12, "Class", "sidekick-ping-tooltip-detail");
+            content.AddAttribute(13, "ChildContent", (RenderFragment)(detail =>
+            {
+                detail.AddContent(0, GetWorkspacePingDetail(target, ping));
+            }));
+            content.CloseComponent();
+            content.CloseElement();
+            content.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    private BffChatUiPing? GetLatestUiPing(string target)
+    {
+        return ChatService.Messages
+            .SelectMany(message => message.UiPings)
+            .Where(ping => ping.Target.Equals(target, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(ping => ping.Timestamp)
+            .LastOrDefault();
+    }
+
+    private static string GetWorkspacePingClass(BffChatUiPing? ping)
+    {
+        return ping is null
+            ? "sidekick-workspace-chip"
+            : "sidekick-workspace-chip sidekick-workspace-chip-active";
+    }
+
+    private static string GetWorkspacePingIcon(string target, BffChatUiPing? ping, string fallbackIcon)
+    {
+        if (!string.IsNullOrWhiteSpace(ping?.Icon))
+        {
+            return ping.Icon;
+        }
+
+        return target.Equals("Summary", StringComparison.OrdinalIgnoreCase)
+            ? Icons.Material.Outlined.AutoStories
+            : fallbackIcon;
+    }
+
+    private static string GetWorkspacePingTitle(string target, BffChatUiPing? ping, string fallbackTitle)
+    {
+        if (!string.IsNullOrWhiteSpace(ping?.Title))
+        {
+            return ping.Title;
+        }
+
+        if (ping?.Count > 0 && target.Equals("Artifacts", StringComparison.OrdinalIgnoreCase))
+        {
+            var noun = ping.Count.Value == 1 ? "artifact" : "artifacts";
+            return $"{ping.Count.Value} {noun} added";
+        }
+
+        if (ping is not null && target.Equals("Summary", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Project summary updated";
+        }
+
+        return fallbackTitle;
+    }
+
+    private static string GetWorkspacePingDetail(string target, BffChatUiPing? ping)
+    {
+        if (!string.IsNullOrWhiteSpace(ping?.Detail))
+        {
+            return ping.Detail;
+        }
+
+        if (ping?.Count > 0 && target.Equals("Artifacts", StringComparison.OrdinalIgnoreCase))
+        {
+            var noun = ping.Count.Value == 1 ? "artifact" : "artifacts";
+            return $"Agent has added {ping.Count.Value} {noun}.";
+        }
+
+        if (ping is not null && target.Equals("Artifacts", StringComparison.OrdinalIgnoreCase))
+        {
+            return "New artifacts are ready to review.";
+        }
+
+        if (ping is not null && target.Equals("Summary", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The project summary has changed since you last reviewed it.";
+        }
+
+        return "No recent assistant updates for this section.";
+    }
+
     private string GetConversationMenuItemClass(BffChatConversationSummary conversation)
     {
         return ChatService.SessionId == conversation.SessionId
@@ -554,7 +694,7 @@
                 var existingPlaceholder = ChatService.Messages.LastOrDefault(m => !m.IsUser && !m.IsProcessing && m.Text == response.Content);
                 if (existingPlaceholder == null && !ChatService.Messages.Any(m => !m.IsUser && m.Text == response.Content))
                 {
-                    ChatService.AddMessage(response.Content, false, response.SuggestedActions);
+                    ChatService.AddMessage(response.Content, false, response.SuggestedActions, response.UiPings);
                 }
             }
             else

@@ -45,6 +45,11 @@ public class ChatMessage
     /// Gets or sets a value indicating whether the message is currently being processed by the AI.
     /// </summary>
     public bool IsProcessing { get; set; }
+
+    /// <summary>
+    /// Gets or sets UI notification pings associated with the assistant response.
+    /// </summary>
+    public List<BffChatUiPing> UiPings { get; set; } = [];
 }
 
 /// <summary>
@@ -130,14 +135,20 @@ public class ChatService : IAsyncDisposable
     /// <param name="text">The text content of the message.</param>
     /// <param name="isUser">True if the message is from the user; false if from the AI.</param>
     /// <param name="suggestedActions">Optional list of suggested actions to display with the message.</param>
-    public void AddMessage(string text, bool isUser, List<BffSuggestedAction>? suggestedActions = null)
+    /// <param name="uiPings">Optional UI notification pings associated with the message.</param>
+    public void AddMessage(
+        string text,
+        bool isUser,
+        List<BffSuggestedAction>? suggestedActions = null,
+        List<BffChatUiPing>? uiPings = null)
     {
         Messages.Add(new ChatMessage
         {
             Text = text,
             IsUser = isUser,
             Context = _currentContext,
-            SuggestedActions = suggestedActions
+            SuggestedActions = suggestedActions,
+            UiPings = uiPings ?? []
         });
         NotifyStateChanged();
     }
@@ -214,7 +225,8 @@ public class ChatService : IAsyncDisposable
                 Text = message.Content,
                 IsUser = message.Role.Equals("user", StringComparison.OrdinalIgnoreCase),
                 Context = _currentContext,
-                Timestamp = message.CreatedAt.LocalDateTime
+                Timestamp = message.CreatedAt.LocalDateTime,
+                UiPings = message.UiPings
             }));
 
             await JoinSessionGroupAsync();
@@ -385,6 +397,7 @@ public class ChatService : IAsyncDisposable
                     placeholder.IsProcessing = false;
                     placeholder.Text = result?.Content ?? "";
                     placeholder.SuggestedActions = result?.SuggestedActions;
+                    placeholder.UiPings = result?.UiPings ?? [];
 
                     // Merge any thinking steps from the HTTP response
                     if (result?.ThinkingSteps?.Count > 0 && placeholder.ThinkingSteps.Count == 0)

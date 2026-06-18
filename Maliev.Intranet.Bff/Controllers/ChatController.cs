@@ -215,7 +215,8 @@ public class ChatController(
                     Text = sa.Text,
                     Action = sa.Action,
                     Data = sa.Data
-                }).ToList()
+                }).ToList(),
+            UiPings = MapUiPings(result.UiPings)
         });
     }
 
@@ -284,7 +285,8 @@ public class ChatController(
                 Detail = ts.Detail,
                 Timestamp = ts.Timestamp,
                 DurationMs = ts.DurationMs
-            }).ToList() ?? new()
+            }).ToList() ?? new(),
+            UiPings = MapUiPings(result.UiPings)
         };
 
         // Also push the complete response via SignalR
@@ -309,6 +311,21 @@ public class ChatController(
         };
     }
 
+    private static List<BffChatUiPing> MapUiPings(IEnumerable<ChatbotUiPing>? pings)
+    {
+        return pings?
+            .Where(ping => !string.IsNullOrWhiteSpace(ping.Target))
+            .Select(ping => new BffChatUiPing
+            {
+                Target = ping.Target,
+                Title = ping.Title,
+                Detail = ping.Detail,
+                Count = ping.Count,
+                Icon = ping.Icon,
+                Timestamp = ping.Timestamp
+            }).ToList() ?? [];
+    }
+
     private static BffChatConversationMessage MapConversationMessage(ChatbotConversationMessage message)
     {
         return new BffChatConversationMessage
@@ -317,7 +334,8 @@ public class ChatController(
             Role = message.Role,
             Content = message.Content,
             ContentType = message.ContentType,
-            CreatedAt = message.CreatedAt
+            CreatedAt = message.CreatedAt,
+            UiPings = MapUiPings(message.UiPings)
         };
     }
 

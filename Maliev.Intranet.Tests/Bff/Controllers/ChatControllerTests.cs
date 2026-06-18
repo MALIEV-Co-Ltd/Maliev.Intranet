@@ -257,7 +257,20 @@ public class ChatControllerTests
     public async Task SendMessage_ShouldReturnOk()
     {
         var request = new BffChatMessageRequest { SessionId = Guid.NewGuid(), Content = "hi" };
-        var aiResponse = new ChatbotMessageResponse { Content = "Hello from AI" };
+        var aiResponse = new ChatbotMessageResponse
+        {
+            Content = "Hello from AI",
+            UiPings =
+            [
+                new ChatbotUiPing
+                {
+                    Target = "Artifacts",
+                    Title = "3 artifacts added",
+                    Detail = "Agent has added 3 artifacts.",
+                    Count = 3
+                }
+            ]
+        };
 
         _contextResolverMock.Setup(x => x.ResolveContextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
@@ -270,6 +283,9 @@ public class ChatControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var bffResponse = Assert.IsType<BffChatMessageResponse>(okResult.Value);
         Assert.Equal("Hello from AI", bffResponse.Content);
+        Assert.Single(bffResponse.UiPings);
+        Assert.Equal("Artifacts", bffResponse.UiPings[0].Target);
+        Assert.Equal(3, bffResponse.UiPings[0].Count);
     }
 
     [Fact]

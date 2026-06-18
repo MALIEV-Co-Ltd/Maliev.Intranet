@@ -331,6 +331,47 @@ public class BffChatMessageResponse
     /// A collection of internal steps describing the AI's reasoning process.
     /// </summary>
     public List<ThinkingStepDto> ThinkingSteps { get; set; } = new();
+
+    /// <summary>
+    /// UI notification pings that should highlight assistant workspace elements.
+    /// </summary>
+    public List<BffChatUiPing> UiPings { get; set; } = [];
+}
+
+/// <summary>
+/// Describes a lightweight UI ping for an assistant workspace element.
+/// </summary>
+public class BffChatUiPing
+{
+    /// <summary>
+    /// Gets or sets the UI target to highlight, such as "Artifacts" or "Summary".
+    /// </summary>
+    public string Target { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the short tooltip title.
+    /// </summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets optional supporting tooltip detail.
+    /// </summary>
+    public string? Detail { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of items associated with the ping, when applicable.
+    /// </summary>
+    public int? Count { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Material icon shown in the tooltip.
+    /// </summary>
+    public string? Icon { get; set; }
+
+    /// <summary>
+    /// Gets or sets the UTC timestamp for the ping.
+    /// </summary>
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>
@@ -465,6 +506,11 @@ public class BffChatConversationMessage
     /// Gets or sets the message creation timestamp.
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>
+    /// Gets or sets UI notification pings associated with this message.
+    /// </summary>
+    public List<BffChatUiPing> UiPings { get; set; } = [];
 }
 
 /// <summary>
