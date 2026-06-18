@@ -706,6 +706,44 @@ public class JobsControllerTests
     }
 
     [Fact]
+    public async Task Reorder_WhenMachineKnown_ShouldBroadcastScheduleChangeWithMachineId()
+    {
+        string? capturedPath = null;
+        JsonDocument? capturedBody = null;
+        object?[]? broadcastArgs = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            capturedBody = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+        var (hub, allProxy) = MockHub();
+        allProxy.Setup(p => p.SendCoreAsync(
+                "ScheduleChanged",
+                It.IsAny<object?[]>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, object?[], CancellationToken>((_, args, _) => broadcastArgs = args)
+            .Returns(Task.CompletedTask);
+
+        var result = await controller.Reorder(
+            JobId,
+            new ReorderJobRequest(3, "MAL-FDM-001"),
+            hub,
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal($"/job/v1/jobs/{JobId:D}/reorder", capturedPath);
+        Assert.NotNull(capturedBody);
+        Assert.Equal(3, capturedBody!.RootElement.GetProperty("newPosition").GetInt32());
+        Assert.NotNull(broadcastArgs);
+        var payload = Assert.Single(broadcastArgs!);
+        Assert.NotNull(payload);
+        var machineId = payload!.GetType().GetProperty("MachineId")?.GetValue(payload) as string;
+        Assert.Equal("MAL-FDM-001", machineId);
+    }
+
+    [Fact]
     public async Task Reschedule_WhenDownstreamConflict_ShouldForwardErrorBodyAndNotBroadcast()
     {
         var controller = Make(MakeClient(new { error = "Scheduled start must be in the future." }, HttpStatusCode.Conflict));

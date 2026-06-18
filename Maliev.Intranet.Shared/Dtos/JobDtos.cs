@@ -230,7 +230,9 @@ public sealed record AssignMachineRequest
 }
 
 /// <summary>Request model for reordering a job in the machine queue.</summary>
-public sealed record ReorderJobRequest(int NewPosition);
+/// <param name="NewPosition">The target 1-based queue position.</param>
+/// <param name="MachineId">The machine queue whose schedule changed, when known by the caller.</param>
+public sealed record ReorderJobRequest(int NewPosition, string? MachineId = null);
 
 /// <summary>All-machine schedule summary for Gantt planning view.</summary>
 public record MachineScheduleSummaryDto(

@@ -267,7 +267,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         var response = await client.ReorderJobAsync(id, request.NewPosition, ct);
         if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
 
-        await hub.Clients.All.SendAsync("ScheduleChanged", new { JobId = id });
+        await hub.Clients.All.SendAsync("ScheduleChanged", new { request.MachineId });
 
         return NoContent();
     }
