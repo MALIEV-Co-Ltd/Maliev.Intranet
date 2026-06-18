@@ -99,6 +99,47 @@
                     </tbody>
                 </table>
             </PanelCard>
+
+            <PanelCard Title="Documents">
+                @if (_files.Count == 0)
+                {
+                    <div class="mlv-empty">No delivery documents are attached yet.</div>
+                }
+                else
+                {
+                    <table class="mlv-table">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Uploaded</th>
+                                <th>By</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var file in _files)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="mlv-row-main">@Display(file.OriginalFileName)</div>
+                                        <div class="mlv-row-sub mlv-mono">@file.FileId</div>
+                                    </td>
+                                    <td>@Display(file.FileType)</td>
+                                    <td>@file.UploadedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td>@Display(file.UploadedBy)</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(file.StorageUrl))
+                                        {
+                                            <a class="button secondary" href="@file.StorageUrl" target="_blank" rel="noopener noreferrer">Preview</a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </PanelCard>
         }
     </PageBody>
 </div>
@@ -107,6 +148,7 @@
     [Parameter] public string DeliveryNoteId { get; set; } = string.Empty;
 
     private DeliveryNoteDetailDto? _note;
+    private List<DeliveryNoteFileDto> _files = [];
     private DeliveryPdfRequestResponse? _pdfRequest;
     private bool _loading = true;
     private bool _statusUpdating;
@@ -145,6 +187,8 @@
                 _error = "Delivery note was not found.";
                 return;
             }
+
+            _files = await Http.GetFromJsonAsync<List<DeliveryNoteFileDto>>($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/files") ?? [];
 
             _receivedBy = string.IsNullOrWhiteSpace(_note.ReceivedByName) ? _receivedBy : _note.ReceivedByName!;
             if (_note.ActualDeliveryTime.HasValue)
@@ -212,6 +256,7 @@
             }
 
             _pdfRequest = await response.Content.ReadFromJsonAsync<DeliveryPdfRequestResponse>();
+            _files = await Http.GetFromJsonAsync<List<DeliveryNoteFileDto>>($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/files") ?? [];
             Snackbar.Add("Delivery note PDF requested.", Severity.Success);
         }
         finally

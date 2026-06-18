@@ -207,6 +207,42 @@ public sealed record DeliveryNoteItemDto
 }
 
 /// <summary>
+/// Represents a file attached to a delivery note.
+/// </summary>
+public sealed record DeliveryNoteFileDto
+{
+    /// <summary>Gets or sets the unique identifier for the file.</summary>
+    public Guid FileId { get; set; }
+
+    /// <summary>Gets or sets the associated delivery note identifier.</summary>
+    public string DeliveryNoteId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the delivery note file type.</summary>
+    public string FileType { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the original file name.</summary>
+    public string OriginalFileName { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the storage URL returned by DeliveryService.</summary>
+    public string StorageUrl { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the file size in bytes.</summary>
+    public long FileSizeBytes { get; set; }
+
+    /// <summary>Gets or sets an optional file description.</summary>
+    public string? Description { get; set; }
+
+    /// <summary>Gets or sets the UTC timestamp when the file was uploaded.</summary>
+    public DateTime UploadedAt { get; set; }
+
+    /// <summary>Gets or sets the user or system that uploaded the file.</summary>
+    public string UploadedBy { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the concurrency version returned by the service.</summary>
+    public uint Version { get; set; }
+}
+
+/// <summary>
 /// Request payload for creating a new delivery note from an existing order.
 /// </summary>
 public sealed record CreateDeliveryNoteRequest

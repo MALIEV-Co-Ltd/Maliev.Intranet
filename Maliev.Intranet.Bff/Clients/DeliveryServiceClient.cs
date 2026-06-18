@@ -37,6 +37,11 @@ public interface IDeliveryServiceClient
     Task<DeliveryPdfRequestResponse?> GeneratePdfAsync(string id, CancellationToken ct = default);
 
     /// <summary>
+    /// Retrieves files attached to a delivery note.
+    /// </summary>
+    Task<List<DeliveryNoteFileDto>> GetFilesAsync(string id, CancellationToken ct = default);
+
+    /// <summary>
     /// Deletes a delivery note.
     /// </summary>
     Task<bool> DeleteDeliveryNoteAsync(string id, CancellationToken ct = default);
@@ -133,6 +138,18 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         }
 
         return await response.Content.ReadFromJsonAsync<DeliveryPdfRequestResponse>(JsonOptions, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<DeliveryNoteFileDto>> GetFilesAsync(string id, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/delivery/v1/delivery-notes/{Uri.EscapeDataString(id)}/files", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        return await response.Content.ReadFromJsonAsync<List<DeliveryNoteFileDto>>(JsonOptions, ct) ?? [];
     }
 
     /// <inheritdoc />

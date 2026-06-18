@@ -73,6 +73,17 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     }
 
     /// <summary>
+    /// Retrieves files attached to a delivery note.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Delivery.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id}/files")]
+    public async Task<ActionResult<List<DeliveryNoteFileDto>>> GetFiles(string id, CancellationToken ct)
+    {
+        var result = await client.GetFilesAsync(id, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Deletes a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.Delete, AuthenticationSchemes = "Bearer,Cookies")]

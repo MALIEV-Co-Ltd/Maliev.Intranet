@@ -216,6 +216,46 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("Requested", result.Status);
     }
 
+    [Fact]
+    public async Task GetFilesAsync_MapsDeliveryServiceFiles()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var fileId = Guid.Parse("c3cfb238-4d49-4b46-88d2-c804841c3ebe");
+        var client = MakeClient(request =>
+        {
+            capturedRequest = request;
+            return JsonContent.Create(new[]
+            {
+                new
+                {
+                    fileId,
+                    deliveryNoteId = "DN-2026-000004",
+                    fileType = "DeliveryNotePdf",
+                    originalFileName = "delivery-note-DN-2026-000004.pdf",
+                    storageUrl = "https://storage.example/delivery-note-DN-2026-000004.pdf",
+                    fileSizeBytes = 12450,
+                    description = "Generated delivery note PDF",
+                    uploadedAt = new DateTime(2026, 6, 18, 8, 15, 0, DateTimeKind.Utc),
+                    uploadedBy = "PdfService",
+                    version = 3U
+                }
+            });
+        });
+
+        var result = await client.GetFilesAsync("DN-2026-000004");
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Get, capturedRequest.Method);
+        Assert.Equal("/delivery/v1/delivery-notes/DN-2026-000004/files", capturedRequest.RequestUri!.PathAndQuery);
+        var file = Assert.Single(result);
+        Assert.Equal(fileId, file.FileId);
+        Assert.Equal("DN-2026-000004", file.DeliveryNoteId);
+        Assert.Equal("DeliveryNotePdf", file.FileType);
+        Assert.Equal("delivery-note-DN-2026-000004.pdf", file.OriginalFileName);
+        Assert.Equal("https://storage.example/delivery-note-DN-2026-000004.pdf", file.StorageUrl);
+        Assert.Equal("PdfService", file.UploadedBy);
+    }
+
     private static DeliveryServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
     {
         var handler = new MockHttpMessageHandler((request, _) =>
