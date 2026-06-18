@@ -65,6 +65,7 @@
                     <div><dt>Address</dt><dd>@Display(_note.CustomerAddress)</dd></div>
                     <div><dt>Instructions</dt><dd>@Display(_note.DeliveryInstructions)</dd></div>
                     <div><dt>Received by</dt><dd>@Display(_note.ReceivedByName)</dd></div>
+                    <div><dt>Signature proof</dt><dd class="mlv-mono">@Display(_note.SignatureFileId?.ToString("D"))</dd></div>
                 </dl>
             </PanelCard>
 

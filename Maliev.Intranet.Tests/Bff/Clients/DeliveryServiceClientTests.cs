@@ -150,6 +150,7 @@ public sealed class DeliveryServiceClientTests
     {
         JsonDocument? payload = null;
         HttpRequestMessage? capturedRequest = null;
+        var signatureFileId = Guid.Parse("d34091ed-62c2-49f0-bc39-7f8ef680c2d8");
         var client = MakeClient(async (request, ct) =>
         {
             capturedRequest = request;
@@ -162,6 +163,7 @@ public sealed class DeliveryServiceClientTests
                 deliveryDate = DateTime.UtcNow.Date,
                 status = "Delivered",
                 receivedByName = "Somchai Receiver",
+                signatureFileId,
                 items = Array.Empty<object>(),
                 createdAt = DateTime.UtcNow,
                 createdBy = "tester"
@@ -172,7 +174,8 @@ public sealed class DeliveryServiceClientTests
         {
             NewStatus = "Delivered",
             ReceivedByName = "Somchai Receiver",
-            ActualDeliveryTime = new DateTime(2026, 5, 22, 10, 30, 0, DateTimeKind.Utc)
+            ActualDeliveryTime = new DateTime(2026, 5, 22, 10, 30, 0, DateTimeKind.Utc),
+            SignatureFileId = signatureFileId
         });
 
         Assert.NotNull(capturedRequest);
@@ -181,9 +184,11 @@ public sealed class DeliveryServiceClientTests
         Assert.NotNull(payload);
         Assert.Equal("Delivered", payload.RootElement.GetProperty("newStatus").GetString());
         Assert.Equal("Somchai Receiver", payload.RootElement.GetProperty("receivedByName").GetString());
+        Assert.Equal(signatureFileId, payload.RootElement.GetProperty("signatureFileId").GetGuid());
         Assert.NotNull(result);
         Assert.Equal("Delivered", result.Status);
         Assert.Equal("Somchai Receiver", result.ReceivedByName);
+        Assert.Equal(signatureFileId, result.SignatureFileId);
     }
 
     [Fact]

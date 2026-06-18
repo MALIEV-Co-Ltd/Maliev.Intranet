@@ -142,6 +142,9 @@ public sealed record DeliveryNoteDetailDto
     /// <summary>Gets or sets the name of the person who received the delivery.</summary>
     public string? ReceivedByName { get; set; }
 
+    /// <summary>Gets or sets the signature file identifier linked to proof of delivery.</summary>
+    public Guid? SignatureFileId { get; set; }
+
     /// <summary>Gets or sets the collection of items included in this delivery.</summary>
     public List<DeliveryNoteItemDto> Items { get; set; } = [];
 
