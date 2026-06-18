@@ -516,6 +516,11 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
             return false;
         }
 
+        if (!IsTrustedJobTicketHost(uri))
+        {
+            return false;
+        }
+
         if (!string.Equals(uri.AbsolutePath, "/mfg/production-schedule", StringComparison.OrdinalIgnoreCase))
         {
             return false;

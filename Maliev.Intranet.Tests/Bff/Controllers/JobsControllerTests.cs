@@ -396,6 +396,25 @@ public class JobsControllerTests
     }
 
     [Fact]
+    public async Task ResolveTicketScan_WhenSchemeRelativeExternalUrlContainsJobId_ShouldReturnBadRequestWithoutDownstreamLookup()
+    {
+        var downstreamCalled = false;
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            downstreamCalled = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var controller = Make(new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") }));
+
+        var result = await controller.ResolveTicketScan(
+            new JobTicketScanRequest { Code = $"//evil.example/mfg/production-schedule?jobId={JobId:D}" },
+            CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.False(downstreamCalled);
+    }
+
+    [Fact]
     public async Task ResolveTicketScan_WhenScanCodeIsRawJobId_ShouldReturnJobDetail()
     {
         string? capturedPath = null;
