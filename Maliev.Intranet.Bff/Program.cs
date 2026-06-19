@@ -652,6 +652,7 @@ try
             mt.AddConsumer<PriceCalculatedConsumer>();
             mt.AddConsumer<FileAnalysisFailedConsumer>();
             mt.AddConsumer<ProjectQuotationAcceptedConsumer>();
+            mt.AddConsumer<ProjectStatusChangedAlertConsumer>();
         },
         configureRabbitMq: (ctx, cfg) =>
         {
@@ -718,6 +719,11 @@ try
             cfg.ReceiveEndpoint("intranet-bff-project-quotation-accepted", ep =>
             {
                 ep.ConfigureConsumer<ProjectQuotationAcceptedConsumer>(ctx);
+            });
+
+            cfg.ReceiveEndpoint("intranet-bff-project-status-changed", ep =>
+            {
+                ep.ConfigureConsumer<ProjectStatusChangedAlertConsumer>(ctx);
             });
         });
 

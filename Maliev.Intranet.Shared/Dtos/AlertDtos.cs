@@ -9,6 +9,9 @@ public class AlertSummaryDto
     /// <summary>Unique alert identifier.</summary>
     public Guid Id { get; set; }
 
+    /// <summary>Alert category, such as QuoteAccepted or ProjectPaid.</summary>
+    public string Type { get; set; } = string.Empty;
+
     /// <summary>Project identifier — used to build the navigation URL.</summary>
     public Guid ProjectId { get; set; }
 

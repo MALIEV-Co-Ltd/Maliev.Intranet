@@ -59,14 +59,18 @@
                              @onclick="() => OpenAlertAsync(alert)"
                              @onkeydown="e => OnItemKeyDown(e, alert)">
                             <div class="notif-icon-wrap">
-                                <MudIcon Icon="@Icons.Material.Outlined.AssignmentTurnedIn" Size="Size.Small" Color="Color.Primary" />
+                                <MudIcon Icon="@AlertIcon(alert)" Size="Size.Small" Color="Color.Primary" />
                             </div>
                             <div class="notif-body">
                                 <div class="notif-headline">
-                                    Quote accepted — <strong>@alert.ProjectNumber</strong>
+                                    @AlertHeadline(alert) — <strong>@alert.ProjectNumber</strong>
                                 </div>
                                 <div class="notif-detail">
-                                    @alert.PartCount part@(alert.PartCount == 1 ? "" : "s")
+                                    @if (alert.PartCount > 0)
+                                    {
+                                        @alert.PartCount
+                                        <text> part@(alert.PartCount == 1 ? "" : "s")</text>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(alert.ProcessTypes))
                                     {
                                         <> · @alert.ProcessTypes</>
@@ -77,7 +81,7 @@
                                     }
                                 </div>
                                 <div class="notif-time">
-                                    @FormatAge(alert.OccurredAtUtc) · Production planning required
+                                    @FormatAge(alert.OccurredAtUtc) · @AlertAction(alert)
                                 </div>
                             </div>
                         </div>
@@ -144,6 +148,21 @@
         _panelOpen = false;
         await AlertService.MarkAllReadAsync();
     }
+
+    private static string AlertHeadline(AlertSummaryDto alert) =>
+        string.Equals(alert.Type, "ProjectPaid", StringComparison.OrdinalIgnoreCase)
+            ? "Payment confirmed"
+            : "Quote accepted";
+
+    private static string AlertAction(AlertSummaryDto alert) =>
+        string.Equals(alert.Type, "ProjectPaid", StringComparison.OrdinalIgnoreCase)
+            ? "Production release ready"
+            : "Production planning required";
+
+    private static string AlertIcon(AlertSummaryDto alert) =>
+        string.Equals(alert.Type, "ProjectPaid", StringComparison.OrdinalIgnoreCase)
+            ? Icons.Material.Outlined.Paid
+            : Icons.Material.Outlined.AssignmentTurnedIn;
 
     private static string FormatAge(DateTime occurredAtUtc)
     {

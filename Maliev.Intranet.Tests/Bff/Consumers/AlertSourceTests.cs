@@ -27,6 +27,15 @@ public class AlertSourceTests
     }
 
     [Fact]
+    public void ProjectStatusChangedAlertConsumer_ImplementsIConsumerInterface()
+    {
+        var consumerType = typeof(ProjectStatusChangedAlertConsumer);
+        Assert.True(
+            typeof(IConsumer<ProjectStatusChangedEvent>).IsAssignableFrom(consumerType),
+            $"{consumerType.Name} must implement IConsumer<ProjectStatusChangedEvent>");
+    }
+
+    [Fact]
     public void AlertNotification_ExistsInIntranetDbContext()
     {
         var props = typeof(IntranetDbContext).GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -105,6 +114,24 @@ public class AlertSourceTests
         Assert.Contains("AddConsumer<ProjectQuotationAcceptedConsumer>", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProgramCs_RegistersProjectStatusChangedAlertConsumer()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Program.cs");
+        Assert.Contains("AddConsumer<ProjectStatusChangedAlertConsumer>", source, StringComparison.Ordinal);
+        Assert.Contains("intranet-bff-project-status-changed", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectStatusChangedAlertConsumer_OnlyAlertsWhenProjectIsPaid()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Bff", "Consumers", "ProjectStatusChangedAlertConsumer.cs");
+        Assert.Contains("NewStatus", source, StringComparison.Ordinal);
+        Assert.Contains("\"Paid\"", source, StringComparison.Ordinal);
+        Assert.Contains("Type = \"ProjectPaid\"", source, StringComparison.Ordinal);
+        Assert.Contains("ReceiveAlert", source, StringComparison.Ordinal);
+    }
+
     // ── Client wiring ────────────────────────────────────────────────────────
 
     [Fact]
@@ -143,6 +170,16 @@ public class AlertSourceTests
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "MainLayout.razor");
         Assert.Contains("ReceiveAlert", source, StringComparison.Ordinal);
         Assert.Contains("AlertService.AddAlert", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NotificationBell_RendersProjectPaidAlertsDistinctly()
+    {
+        var source = ReadRepoFile("Maliev.Intranet.Client", "Components", "NotificationBell.razor");
+        Assert.Contains("AlertHeadline", source, StringComparison.Ordinal);
+        Assert.Contains("ProjectPaid", source, StringComparison.Ordinal);
+        Assert.Contains("Payment confirmed", source, StringComparison.Ordinal);
+        Assert.Contains("Production release ready", source, StringComparison.Ordinal);
     }
 
     [Fact]

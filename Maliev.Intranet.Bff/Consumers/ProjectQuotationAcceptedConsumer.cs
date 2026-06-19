@@ -90,6 +90,7 @@ public class ProjectQuotationAcceptedConsumer(
         var summary = new AlertSummaryDto
         {
             Id = notification.Id,
+            Type = notification.Type,
             ProjectId = notification.ProjectId,
             ProjectNumber = notification.ProjectNumber,
             CustomerName = notification.CustomerName,

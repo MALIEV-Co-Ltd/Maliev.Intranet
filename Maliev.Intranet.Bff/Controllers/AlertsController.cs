@@ -42,6 +42,7 @@ public class AlertsController(IntranetDbContext db) : ControllerBase
             .Select(n => new AlertSummaryDto
             {
                 Id = n.Id,
+                Type = n.Type,
                 ProjectId = n.ProjectId,
                 ProjectNumber = n.ProjectNumber,
                 CustomerName = n.CustomerName,
