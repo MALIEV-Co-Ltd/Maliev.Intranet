@@ -66,6 +66,27 @@ public class JobServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Retrieves production job links for a source project order.
+    /// </summary>
+    /// <param name="orderId">The order identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Matching project job links.</returns>
+    public async Task<List<ProjectJobLinkDto>> GetProjectJobLinksByOrderAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var page = await httpClient.GetFromJsonAsync<JobServiceJobPageResponse>("/job/v1/jobs?page=1&pageSize=100", ct);
+        return page?.Items?
+            .Where(job => job.OrderId == orderId && job.SourceProjectPartId.HasValue)
+            .Select(job => new ProjectJobLinkDto(
+                job.JobId,
+                job.OrderId,
+                job.OrderItemId,
+                job.SourceProjectPartId!.Value,
+                job.Status,
+                FormatProgressPercent(job.Status)))
+            .ToList() ?? [];
+    }
+
+    /// <summary>
     /// Retrieves detailed information for a single job.
     /// </summary>
     /// <param name="id">The job GUID.</param>
@@ -423,6 +444,11 @@ public class JobServiceClient(HttpClient httpClient)
         }
     }
 
+    private sealed class JobServiceJobPageResponse
+    {
+        public List<JobServiceJobResponse> Items { get; set; } = [];
+    }
+
     private sealed record KanbanBoardResponse(
         List<KanbanJobResponse>? Pending,
         List<KanbanJobResponse>? Queued,
@@ -540,3 +566,20 @@ public class JobServiceClient(HttpClient httpClient)
         _ => 0
     };
 }
+
+/// <summary>
+/// Minimal JobService projection used to link project parts to production jobs.
+/// </summary>
+/// <param name="JobId">The production job identifier.</param>
+/// <param name="OrderId">The order identifier.</param>
+/// <param name="OrderItemId">The order item identifier.</param>
+/// <param name="SourceProjectPartId">The source project part identifier.</param>
+/// <param name="Status">The current job status.</param>
+/// <param name="ProgressPercent">The current job progress percentage.</param>
+public sealed record ProjectJobLinkDto(
+    Guid JobId,
+    Guid OrderId,
+    Guid OrderItemId,
+    Guid SourceProjectPartId,
+    string? Status,
+    int ProgressPercent);

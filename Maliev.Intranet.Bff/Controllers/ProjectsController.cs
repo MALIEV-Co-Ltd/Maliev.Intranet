@@ -78,6 +78,9 @@ public class ProjectsController(
         if (result is not null && uploadClient is not null)
             await EnrichProjectDetailArtifactsAsync(result, uploadClient, analysisStatusService, ct);
 
+        if (result is not null)
+            await EnrichProjectProductionJobsAsync(result, jobClient, ct);
+
         if (result is not null && customerClient is not null)
             await EnrichProjectCustomerAsync(result, customerClient, ct);
 
@@ -1472,6 +1475,38 @@ public class ProjectsController(
         foreach (var part in project.Parts)
         {
             await EnrichPartArtifactsAsync(part, upload, analysisStatusService, ct);
+        }
+    }
+
+    private static async Task EnrichProjectProductionJobsAsync(
+        ProjectDetailDto project,
+        JobServiceClient jobServiceClient,
+        CancellationToken ct)
+    {
+        var orderIds = project.Parts
+            .Where(part => part.JobId is null && part.OrderId is { } orderId && orderId != Guid.Empty)
+            .Select(part => part.OrderId!.Value)
+            .Distinct()
+            .ToList();
+
+        foreach (var orderId in orderIds)
+        {
+            var jobLinks = await jobServiceClient.GetProjectJobLinksByOrderAsync(orderId, ct);
+            foreach (var part in project.Parts.Where(part => part.JobId is null))
+            {
+                var link = jobLinks.FirstOrDefault(job =>
+                    job.SourceProjectPartId == part.Id ||
+                    (part.OrderItemId.HasValue && job.OrderItemId == part.OrderItemId.Value));
+
+                if (link is null)
+                {
+                    continue;
+                }
+
+                part.JobId = link.JobId;
+                part.JobStatus = link.Status;
+                part.JobProgressPercent = link.ProgressPercent;
+            }
         }
     }
 
