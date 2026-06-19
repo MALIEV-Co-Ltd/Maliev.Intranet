@@ -403,6 +403,12 @@ public class ProjectPartDto
     /// <summary>Gets or sets the production job ID once the order is placed.</summary>
     public Guid? JobId { get; set; }
 
+    /// <summary>Gets or sets the manufacturing order ID once this part is ordered.</summary>
+    public Guid? OrderId { get; set; }
+
+    /// <summary>Gets or sets the manufacturing order item ID once this part is ordered.</summary>
+    public Guid? OrderItemId { get; set; }
+
     /// <summary>Gets or sets the production job status for progress tracking.</summary>
     public string? JobStatus { get; set; }
 

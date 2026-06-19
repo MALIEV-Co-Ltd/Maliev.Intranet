@@ -636,6 +636,10 @@ public class ProjectServiceClient(HttpClient httpClient)
 
         public Guid? JobId { get; set; }
 
+        public Guid? OrderId { get; set; }
+
+        public Guid? OrderItemId { get; set; }
+
         public string? JobStatus { get; set; }
 
         public int? JobProgressPercent { get; set; }
@@ -705,6 +709,8 @@ public class ProjectServiceClient(HttpClient httpClient)
                 BodiesJson = BodiesJson,
                 SelectedBodyIndex = SelectedBodyIndex,
                 JobId = JobId,
+                OrderId = OrderId,
+                OrderItemId = OrderItemId,
                 JobStatus = JobStatus,
                 JobProgressPercent = JobProgressPercent,
                 MachineName = MachineName
