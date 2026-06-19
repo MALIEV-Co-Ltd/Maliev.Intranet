@@ -1,4 +1,5 @@
 using System.Globalization;
+using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Data;
 using Maliev.Intranet.Bff.Hubs;
 using Maliev.Intranet.Shared.Dtos;
@@ -15,6 +16,7 @@ namespace Maliev.Intranet.Bff.Consumers;
 public class ProjectStatusChangedAlertConsumer(
     IntranetDbContext db,
     IHubContext<NotificationHub> hub,
+    ProjectServiceClient projectClient,
     ILogger<ProjectStatusChangedAlertConsumer> logger) : IConsumer<ProjectStatusChangedEvent>
 {
     /// <inheritdoc />
@@ -53,6 +55,7 @@ public class ProjectStatusChangedAlertConsumer(
             ? DateTime.UtcNow
             : payload.ChangedAt.UtcDateTime;
 
+        var alertContext = await ResolveProjectAlertContextAsync(payload.ProjectId, context.CancellationToken);
         var notification = new AlertNotification
         {
             Id = Guid.NewGuid(),
@@ -60,9 +63,9 @@ public class ProjectStatusChangedAlertConsumer(
             Type = "ProjectPaid",
             ProjectId = payload.ProjectId,
             ProjectNumber = payload.ProjectNumber,
-            CustomerName = string.Empty,
-            PartCount = 0,
-            ProcessTypes = "Payment confirmed",
+            CustomerName = alertContext.CustomerName,
+            PartCount = alertContext.PartCount,
+            ProcessTypes = alertContext.ProcessTypes,
             OccurredAtUtc = occurredAtUtc,
             ExpiresAtUtc = occurredAtUtc.AddDays(7)
         };
@@ -127,5 +130,48 @@ public class ProjectStatusChangedAlertConsumer(
         return string.Create(
             CultureInfo.InvariantCulture,
             $"project:{payload.ProjectId:N}:status:{payload.OldStatus}:{payload.NewStatus}:{payload.ChangedAt:O}");
+    }
+
+    private async Task<PaidProjectAlertContext> ResolveProjectAlertContextAsync(
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var project = await projectClient.GetProjectByIdAsync(projectId, cancellationToken);
+            if (project is null)
+            {
+                return PaidProjectAlertContext.Fallback;
+            }
+
+            var processTypes = project.Parts
+                .Select(part => part.ProcessType)
+                .Where(processType => !string.IsNullOrWhiteSpace(processType))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return new PaidProjectAlertContext(
+                project.CustomerName,
+                project.Parts.Count,
+                processTypes.Length > 0
+                    ? string.Join(", ", processTypes)
+                    : PaidProjectAlertContext.Fallback.ProcessTypes);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "ProjectStatusChangedAlertConsumer: could not enrich paid-project alert for project {ProjectId}",
+                projectId);
+            return PaidProjectAlertContext.Fallback;
+        }
+    }
+
+    private sealed record PaidProjectAlertContext(
+        string CustomerName,
+        int PartCount,
+        string ProcessTypes)
+    {
+        public static PaidProjectAlertContext Fallback { get; } = new(string.Empty, 0, "Payment confirmed");
     }
 }
