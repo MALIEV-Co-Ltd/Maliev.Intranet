@@ -126,6 +126,17 @@ public partial class PartConfigSidebar : ComponentBase
     private bool _quotePdfGenerating;
     private bool _quoteFetchingRates;
     private List<ShippingRateOptionDto> _quoteRateOptions = [];
+    private string _quoteShippingToName = "Customer";
+    private string _quoteShippingToPhone = "";
+    private string _quoteShippingToAddress = "";
+    private string _quoteShippingToDistrict = "";
+    private string _quoteShippingToState = "";
+    private string _quoteShippingToProvince = "";
+    private string _quoteShippingToPostcode = "";
+    private decimal _quoteShippingWeightGrams = 1000m;
+    private decimal _quoteShippingLengthCm = 20m;
+    private decimal _quoteShippingWidthCm = 15m;
+    private decimal _quoteShippingHeightCm = 10m;
 
     private decimal ComputeQuoteTotal()
     {
@@ -166,20 +177,24 @@ public partial class PartConfigSidebar : ComponentBase
         finally { _quotePdfGenerating = false; StateHasChanged(); }
     }
 
-    private async Task FetchQuoteDhlRatesAsync()
+    private async Task FetchQuoteCourierRatesAsync()
     {
+        _quoteShippingToPostcode = FirstNonEmpty(_quoteShippingToPostcode, ShippingDestinationPostalCode);
+        _quoteShippingWeightGrams = Math.Max(1m, Math.Ceiling(Math.Max(TotalWeightKg, 0.001m) * 1000m));
+
+        var validationError = ValidateQuoteShippingRateInputs();
+        if (validationError is not null)
+        {
+            Snackbar.Add(validationError, Severity.Warning);
+            return;
+        }
+
         _quoteFetchingRates = true;
         _quoteRateOptions = [];
         StateHasChanged();
         try
         {
-            var request = new ShippingRateRequestDto
-            {
-                OriginCountryCode = "TH",
-                DestinationCountryCode = ShippingDestinationCountry ?? "US",
-                DestinationPostalCode = ShippingDestinationPostalCode,
-                WeightKg = TotalWeightKg
-            };
+            var request = BuildQuoteShippingRateRequest();
             var result = await ShippingService.GetRatesAsync(request);
             if (result?.Rates is { Count: > 0 })
                 _quoteRateOptions = result.Rates;
@@ -190,7 +205,65 @@ public partial class PartConfigSidebar : ComponentBase
         finally { _quoteFetchingRates = false; StateHasChanged(); }
     }
 
-    private async Task SelectQuoteDhlRate(ShippingRateOptionDto rate)
+    private ShippingRateRequestDto BuildQuoteShippingRateRequest()
+    {
+        return new ShippingRateRequestDto
+        {
+            From = new ShippingAddressDto
+            {
+                Name = "MALIEV",
+                Address = "MALIEV",
+                District = "Pathum Wan",
+                State = "Pathum Wan",
+                Province = "Bangkok",
+                Postcode = "10400",
+                Tel = "020000000"
+            },
+            To = new ShippingAddressDto
+            {
+                Name = FirstNonEmpty(_quoteShippingToName, SelectedCustomer?.Name, "Customer"),
+                Address = FirstNonEmpty(_quoteShippingToAddress),
+                District = FirstNonEmpty(_quoteShippingToDistrict),
+                State = FirstNonEmpty(_quoteShippingToState),
+                Province = FirstNonEmpty(_quoteShippingToProvince),
+                Postcode = FirstNonEmpty(_quoteShippingToPostcode, ShippingDestinationPostalCode),
+                Tel = FirstNonEmpty(_quoteShippingToPhone)
+            },
+            Parcel = new ShippingParcelDto
+            {
+                Name = "MALIEV quote shipment",
+                Weight = Math.Max(1m, _quoteShippingWeightGrams),
+                Length = Math.Max(0.1m, _quoteShippingLengthCm),
+                Width = Math.Max(0.1m, _quoteShippingWidthCm),
+                Height = Math.Max(0.1m, _quoteShippingHeightCm)
+            }
+        };
+    }
+
+    private string? ValidateQuoteShippingRateInputs()
+    {
+        if (string.IsNullOrWhiteSpace(_quoteShippingToPhone) ||
+            string.IsNullOrWhiteSpace(_quoteShippingToAddress) ||
+            string.IsNullOrWhiteSpace(_quoteShippingToDistrict) ||
+            string.IsNullOrWhiteSpace(_quoteShippingToState) ||
+            string.IsNullOrWhiteSpace(_quoteShippingToProvince) ||
+            string.IsNullOrWhiteSpace(FirstNonEmpty(_quoteShippingToPostcode, ShippingDestinationPostalCode)))
+        {
+            return "Enter destination phone, address, district, state, province, and postal code before checking courier rates.";
+        }
+
+        if (_quoteShippingWeightGrams <= 0 || _quoteShippingLengthCm <= 0 || _quoteShippingWidthCm <= 0 || _quoteShippingHeightCm <= 0)
+        {
+            return "Enter positive parcel weight and dimensions before checking courier rates.";
+        }
+
+        return null;
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private async Task SelectQuoteCourierRate(ShippingRateOptionDto rate)
     {
         await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
         _quoteRateOptions = [];

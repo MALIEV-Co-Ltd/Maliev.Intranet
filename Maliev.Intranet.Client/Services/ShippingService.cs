@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Maliev.Intranet.Shared;
@@ -24,41 +23,26 @@ public class ShippingService
     }
 
     /// <summary>
-    /// Fetches shipping rates from DHL Express via the BFF.
+    /// Fetches available couriers from the BFF.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Available courier options.</returns>
+    public async Task<List<ShippingCourierDto>> GetCouriersAsync(CancellationToken ct = default)
+    {
+        var response = await _http.GetFromJsonAsync<MalievResponse<List<ShippingCourierDto>>>("api/v1/shipping/couriers", JsonOptions, ct);
+        return response?.Data ?? [];
+    }
+
+    /// <summary>
+    /// Fetches shipping rates from DeliveryService via the BFF.
     /// </summary>
     /// <param name="request">Shipping rate request with origin, destination, and package details.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Available shipping rate options, or null if the request failed.</returns>
     public async Task<ShippingRateResponseDto?> GetRatesAsync(ShippingRateRequestDto request, CancellationToken ct = default)
     {
-        var query = $"api/v1/shipping/rates" +
-                    $"?originCountry={Uri.EscapeDataString(request.OriginCountryCode)}" +
-                    $"&destCountry={Uri.EscapeDataString(request.DestinationCountryCode)}" +
-                    $"&weightKg={FormatDecimal(request.WeightKg)}";
-
-        if (!string.IsNullOrWhiteSpace(request.DestinationPostalCode))
-        {
-            query += $"&destPostalCode={Uri.EscapeDataString(request.DestinationPostalCode)}";
-        }
-
-        if (request.LengthCm.HasValue)
-        {
-            query += $"&lengthCm={FormatDecimal(request.LengthCm.Value)}";
-        }
-
-        if (request.WidthCm.HasValue)
-        {
-            query += $"&widthCm={FormatDecimal(request.WidthCm.Value)}";
-        }
-
-        if (request.HeightCm.HasValue)
-        {
-            query += $"&heightCm={FormatDecimal(request.HeightCm.Value)}";
-        }
-
-        var response = await _http.GetFromJsonAsync<MalievResponse<ShippingRateResponseDto>>(query, JsonOptions, ct);
+        using var httpResponse = await _http.PostAsJsonAsync("api/v1/shipping/rates", request, JsonOptions, ct);
+        var response = await httpResponse.Content.ReadFromJsonAsync<MalievResponse<ShippingRateResponseDto>>(JsonOptions, ct);
         return response?.Data;
     }
-
-    private static string FormatDecimal(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 }

@@ -45,6 +45,21 @@ public interface IDeliveryServiceClient
     /// Deletes a delivery note.
     /// </summary>
     Task<bool> DeleteDeliveryNoteAsync(string id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets available shipping couriers from DeliveryService.
+    /// </summary>
+    Task<List<ShippingCourierDto>> GetShippingCouriersAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets live shipping rates from DeliveryService.
+    /// </summary>
+    Task<ShippingRateResponseDto> GetShippingRatesAsync(ShippingRateRequestDto request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets tracking status from DeliveryService.
+    /// </summary>
+    Task<ShippingTrackingDto?> GetShippingTrackingAsync(string trackingCode, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -159,6 +174,54 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         return response.IsSuccessStatusCode;
     }
 
+    /// <inheritdoc />
+    public async Task<List<ShippingCourierDto>> GetShippingCouriersAsync(CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync("/delivery/v1/shipping/couriers", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return [];
+        }
+
+        return await response.Content.ReadFromJsonAsync<List<ShippingCourierDto>>(JsonOptions, ct) ?? [];
+    }
+
+    /// <inheritdoc />
+    public async Task<ShippingRateResponseDto> GetShippingRatesAsync(ShippingRateRequestDto request, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("/delivery/v1/shipping/rates", request, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new ShippingRateResponseDto();
+        }
+
+        var downstreamRates = await response.Content.ReadFromJsonAsync<List<DownstreamShippingRateOption>>(JsonOptions, ct) ?? [];
+        return new ShippingRateResponseDto
+        {
+            Rates = downstreamRates.Select(rate => new ShippingRateOptionDto
+            {
+                CourierCode = rate.CourierCode,
+                ProductName = FirstNonEmpty(rate.CourierName, rate.CourierCode),
+                TotalPrice = rate.Price,
+                CurrencyCode = FirstNonEmpty(rate.Currency, "THB"),
+                EstimatedDeliveryDate = rate.EstimatedDelivery,
+                ServiceLevel = rate.ServiceLevel
+            }).ToList()
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<ShippingTrackingDto?> GetShippingTrackingAsync(string trackingCode, CancellationToken ct = default)
+    {
+        var response = await httpClient.GetAsync($"/delivery/v1/shipping/tracking/{Uri.EscapeDataString(trackingCode)}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ShippingTrackingDto>(JsonOptions, ct);
+    }
+
     private static object ToDownstreamCreateRequest(CreateDeliveryNoteRequest request) => new
     {
         orderId = NullIfWhiteSpace(request.OrderId),
@@ -259,5 +322,20 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         public int PageSize { get; init; }
 
         public int TotalPages { get; init; }
+    }
+
+    private sealed record DownstreamShippingRateOption
+    {
+        public string CourierCode { get; init; } = string.Empty;
+
+        public string CourierName { get; init; } = string.Empty;
+
+        public decimal Price { get; init; }
+
+        public string Currency { get; init; } = "THB";
+
+        public string? ServiceLevel { get; init; }
+
+        public string? EstimatedDelivery { get; init; }
     }
 }

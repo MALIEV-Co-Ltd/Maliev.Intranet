@@ -22,7 +22,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
 
 // Initialize bootstrap logging
@@ -515,16 +514,6 @@ try
     builder.AddBffServiceClient<JobServiceClient>("JobService");
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
     builder.AddBffServiceClient<SearchServiceClient>("SearchService");
-
-    // DHL Express API client (external service - no service discovery, explicit base URL)
-    builder.Services.AddHttpClient<DhlExpressClient>(client =>
-    {
-        var baseUrl = builder.Configuration["DhlExpress:BaseUrl"] ?? "https://express.api.dhl.com/mydhlapi/test";
-        client.BaseAddress = new Uri(baseUrl);
-        client.Timeout = TimeSpan.FromSeconds(30);
-        client.DefaultRequestHeaders.Accept.Clear();
-        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    });
 
     builder.Services.AddScoped<GlobalSearchResultEnricher>();
     // GeometryService runs DFM analysis + overlay generation — long-running, non-retryable.

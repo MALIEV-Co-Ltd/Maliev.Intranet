@@ -1,7 +1,9 @@
 @page "/finance/delivery-notes/new"
+@using Maliev.Intranet.Client.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject ShippingService ShippingService
 
 <PageTitle>New Delivery Note | MALIEV Intranet</PageTitle>
 
@@ -23,7 +25,15 @@
                 <FormField Label="Customer ID"><input class="mlv-form-input" @bind="_customerIdText" @bind:event="oninput" /></FormField>
                 <FormField Label="Customer name"><input class="mlv-form-input" @bind="_request.CustomerName" @bind:event="oninput" /></FormField>
                 <FormField Label="Delivery date"><input type="date" class="mlv-form-input" @bind="_request.DeliveryDate" @bind:format="yyyy-MM-dd" /></FormField>
-                <FormField Label="Carrier"><input class="mlv-form-input" @bind="_request.CarrierName" @bind:event="oninput" /></FormField>
+                <FormField Label="Carrier">
+                    <select class="mlv-form-input" @bind="_selectedCourierCode">
+                        <option value="">Any available courier</option>
+                        @foreach (var courier in _couriers)
+                        {
+                            <option value="@courier.CourierCode">@CourierOptionLabel(courier)</option>
+                        }
+                    </select>
+                </FormField>
                 <FormField Label="Tracking number"><input class="mlv-form-input" @bind="_request.TrackingNumber" @bind:event="oninput" /></FormField>
                 <FormField Label="Shipping cost"><input type="number" step="0.01" class="mlv-form-input" @bind="_request.ShippingCost" @bind:event="oninput" /></FormField>
                 <FormField Label="Shipping currency">
@@ -34,7 +44,28 @@
                         }
                     </select>
                 </FormField>
+                <FormField Label="Parcel weight (g)"><input type="number" step="1" min="1" class="mlv-form-input" @bind="_parcelWeightGrams" @bind:event="oninput" /></FormField>
+                <FormField Label="Parcel length (cm)"><input type="number" step="0.1" min="0.1" class="mlv-form-input" @bind="_parcelLengthCm" @bind:event="oninput" /></FormField>
+                <FormField Label="Parcel width (cm)"><input type="number" step="0.1" min="0.1" class="mlv-form-input" @bind="_parcelWidthCm" @bind:event="oninput" /></FormField>
+                <FormField Label="Parcel height (cm)"><input type="number" step="0.1" min="0.1" class="mlv-form-input" @bind="_parcelHeightCm" @bind:event="oninput" /></FormField>
             </FormGrid>
+            <div class="mlv-toolbar mt-4" style="justify-content:flex-end">
+                <SecondaryButton Icon="@Icons.Material.Outlined.LocalShipping" Disabled="@_fetchingRates" OnClick="@FetchRatesAsync">
+                    @(_fetchingRates ? "Checking rates..." : "Get Courier Rates")
+                </SecondaryButton>
+            </div>
+            @if (_rateOptions.Count > 0)
+            {
+                <div class="mlv-list mt-4">
+                    @foreach (var rate in _rateOptions)
+                    {
+                        <button type="button" class="mlv-list-row" @onclick="@(() => SelectRate(rate))">
+                            <span>@rate.ProductName</span>
+                            <strong>@rate.TotalPrice.ToString("N2") @rate.CurrencyCode</strong>
+                        </button>
+                    }
+                </div>
+            }
         </PanelCard>
 
         <PanelCard Title="Destination">
@@ -87,6 +118,8 @@
     };
     private readonly List<CountryDto> _countries = [];
     private readonly List<CurrencyDto> _currencies = [];
+    private readonly List<ShippingCourierDto> _couriers = [];
+    private readonly List<ShippingRateOptionDto> _rateOptions = [];
     private CreateDeliveryNoteItemRequest _item = new()
     {
         UnitOfMeasure = "pcs",
@@ -98,6 +131,12 @@
     private string _purchaseOrderIdText = string.Empty;
     private string? _error;
     private bool _saving;
+    private bool _fetchingRates;
+    private string _selectedCourierCode = "";
+    private decimal _parcelWeightGrams = 1000m;
+    private decimal _parcelLengthCm = 20m;
+    private decimal _parcelWidthCm = 15m;
+    private decimal _parcelHeightCm = 10m;
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,12 +149,15 @@
         {
             var currenciesTask = Http.GetFromJsonAsync<List<CurrencyDto>>("api/v1/referenceData/currencies");
             var countriesTask = Http.GetFromJsonAsync<List<CountryDto>>("api/v1/referenceData/countries");
-            await Task.WhenAll(currenciesTask, countriesTask);
+            var couriersTask = ShippingService.GetCouriersAsync();
+            await Task.WhenAll(currenciesTask, countriesTask, couriersTask);
 
             _currencies.Clear();
             _currencies.AddRange(currenciesTask.Result ?? []);
             _countries.Clear();
             _countries.AddRange(countriesTask.Result ?? []);
+            _couriers.Clear();
+            _couriers.AddRange(couriersTask.Result ?? []);
 
             _request.ShippingCostCurrency = NormalizeCurrencyCode(_request.ShippingCostCurrency);
             _request.ShippingCountry = NormalizeCountryName(_request.ShippingCountry);
@@ -124,6 +166,104 @@
         {
             Snackbar.Add($"Unable to load reference data: {ex.Message}", Severity.Warning);
         }
+    }
+
+    private async Task FetchRatesAsync(MouseEventArgs _)
+    {
+        _error = ValidateShippingQuoteInputs();
+        if (_error is not null)
+        {
+            Snackbar.Add(_error, Severity.Warning);
+            return;
+        }
+
+        _fetchingRates = true;
+        _rateOptions.Clear();
+        try
+        {
+            var result = await ShippingService.GetRatesAsync(BuildShippingRateRequest());
+            if (result?.Rates is { Count: > 0 })
+            {
+                _rateOptions.AddRange(result.Rates);
+            }
+            else
+            {
+                Snackbar.Add("No courier rates returned for this shipment.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Unable to fetch courier rates: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _fetchingRates = false;
+        }
+    }
+
+    private void SelectRate(ShippingRateOptionDto rate)
+    {
+        _request.CarrierName = rate.ProductName;
+        _request.ShippingCost = rate.TotalPrice;
+        _request.ShippingCostCurrency = NormalizeCurrencyCode(rate.CurrencyCode);
+        _selectedCourierCode = rate.CourierCode;
+        _rateOptions.Clear();
+    }
+
+    private ShippingRateRequestDto BuildShippingRateRequest()
+    {
+        return new ShippingRateRequestDto
+        {
+            From = new ShippingAddressDto
+            {
+                Name = "MALIEV",
+                Address = "MALIEV",
+                District = "Pathum Wan",
+                State = "Pathum Wan",
+                Province = "Bangkok",
+                Postcode = "10400",
+                Tel = "020000000"
+            },
+            To = new ShippingAddressDto
+            {
+                Name = FirstNonEmpty(_request.DeliveryContactName, _request.CustomerName, "Customer"),
+                Address = FirstNonEmpty(_request.ShippingAddressLine1),
+                District = FirstNonEmpty(_request.ShippingCity),
+                State = FirstNonEmpty(_request.ShippingCity),
+                Province = FirstNonEmpty(_request.ShippingProvince),
+                Postcode = FirstNonEmpty(_request.ShippingPostalCode),
+                Tel = FirstNonEmpty(_request.DeliveryContactPhone),
+                Email = string.IsNullOrWhiteSpace(_request.DeliveryContactEmail) ? null : _request.DeliveryContactEmail
+            },
+            Parcel = new ShippingParcelDto
+            {
+                Name = FirstNonEmpty(_item.ProductName, "MALIEV shipment"),
+                Weight = Math.Max(1m, _parcelWeightGrams),
+                Length = Math.Max(0.1m, _parcelLengthCm),
+                Width = Math.Max(0.1m, _parcelWidthCm),
+                Height = Math.Max(0.1m, _parcelHeightCm)
+            },
+            CourierCodes = string.IsNullOrWhiteSpace(_selectedCourierCode) ? [] : [_selectedCourierCode]
+        };
+    }
+
+    private string? ValidateShippingQuoteInputs()
+    {
+        if (string.IsNullOrWhiteSpace(_request.ShippingAddressLine1) ||
+            string.IsNullOrWhiteSpace(_request.ShippingCity) ||
+            string.IsNullOrWhiteSpace(_request.ShippingProvince) ||
+            string.IsNullOrWhiteSpace(_request.ShippingPostalCode) ||
+            string.IsNullOrWhiteSpace(_request.DeliveryContactPhone))
+        {
+            return "Enter destination address, city, province, postal code, and contact phone before checking courier rates.";
+        }
+
+        if (_parcelWeightGrams <= 0 || _parcelLengthCm <= 0 || _parcelWidthCm <= 0 || _parcelHeightCm <= 0)
+        {
+            return "Enter positive parcel weight and dimensions before checking courier rates.";
+        }
+
+        return null;
     }
 
     private async Task CreateAsync(MouseEventArgs _)
@@ -277,4 +417,14 @@
             ? country.Name
             : $"{country.Name} ({country.Code})";
     }
+
+    private static string CourierOptionLabel(ShippingCourierDto courier)
+    {
+        return string.IsNullOrWhiteSpace(courier.Note)
+            ? $"{courier.CourierName} ({courier.CourierCode})"
+            : $"{courier.CourierName} ({courier.CourierCode}) - {courier.Note}";
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
 }

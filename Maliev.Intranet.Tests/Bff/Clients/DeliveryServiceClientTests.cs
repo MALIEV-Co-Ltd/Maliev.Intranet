@@ -256,6 +256,135 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("PdfService", file.UploadedBy);
     }
 
+    [Fact]
+    public async Task GetShippingCouriersAsync_TargetsDeliveryServiceShippingCouriersRoute()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var client = MakeClient(request =>
+        {
+            capturedRequest = request;
+            return JsonContent.Create(new[]
+            {
+                new
+                {
+                    courierCode = "thaipost",
+                    courierName = "Thailand Post",
+                    note = "Domestic parcel",
+                    scope = "domestic"
+                }
+            });
+        });
+
+        var result = await client.GetShippingCouriersAsync();
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Get, capturedRequest.Method);
+        Assert.Equal("/delivery/v1/shipping/couriers", capturedRequest.RequestUri!.PathAndQuery);
+        var courier = Assert.Single(result);
+        Assert.Equal("thaipost", courier.CourierCode);
+        Assert.Equal("Thailand Post", courier.CourierName);
+        Assert.Equal("domestic", courier.Scope);
+    }
+
+    [Fact]
+    public async Task GetShippingRatesAsync_PostsDeliveryServiceShippingRateContract()
+    {
+        JsonDocument? payload = null;
+        HttpRequestMessage? capturedRequest = null;
+        var client = MakeClient(async (request, ct) =>
+        {
+            capturedRequest = request;
+            payload = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+            return JsonContent.Create(new[]
+            {
+                new
+                {
+                    courierCode = "flash",
+                    courierName = "Flash Express",
+                    price = 72.5m,
+                    currency = "THB",
+                    serviceLevel = "standard",
+                    estimatedDelivery = "2026-06-22"
+                }
+            });
+        });
+
+        var result = await client.GetShippingRatesAsync(new ShippingRateRequestDto
+        {
+            From = new ShippingAddressDto
+            {
+                Name = "MALIEV",
+                Address = "MALIEV",
+                District = "Pathum Wan",
+                State = "Pathum Wan",
+                Province = "Bangkok",
+                Postcode = "10400",
+                Tel = "020000000"
+            },
+            To = new ShippingAddressDto
+            {
+                Name = "Nexus Manufacturing",
+                Address = "88 Logistics Road",
+                District = "Mueang",
+                State = "Mueang",
+                Province = "Chonburi",
+                Postcode = "20000",
+                Tel = "0800000000"
+            },
+            Parcel = new ShippingParcelDto
+            {
+                Name = "Machined bracket",
+                Weight = 750,
+                Length = 20,
+                Width = 12,
+                Height = 8
+            },
+            CourierCodes = ["flash"]
+        });
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal("/delivery/v1/shipping/rates", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(payload);
+        Assert.Equal("10400", payload.RootElement.GetProperty("from").GetProperty("postcode").GetString());
+        Assert.Equal("20000", payload.RootElement.GetProperty("to").GetProperty("postcode").GetString());
+        Assert.Equal(750m, payload.RootElement.GetProperty("parcel").GetProperty("weight").GetDecimal());
+        Assert.Equal("flash", payload.RootElement.GetProperty("courierCodes")[0].GetString());
+        var rate = Assert.Single(result.Rates);
+        Assert.Equal("flash", rate.CourierCode);
+        Assert.Equal("Flash Express", rate.ProductName);
+        Assert.Equal(72.5m, rate.TotalPrice);
+        Assert.Equal("THB", rate.CurrencyCode);
+    }
+
+    [Fact]
+    public async Task GetShippingTrackingAsync_TargetsDeliveryServiceTrackingRoute()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var client = MakeClient(request =>
+        {
+            capturedRequest = request;
+            return JsonContent.Create(new
+            {
+                trackingCode = "TH-E2E-001",
+                courierCode = "flash",
+                courierName = "Flash Express",
+                status = "in_transit",
+                description = "Parcel is in transit"
+            });
+        });
+
+        var result = await client.GetShippingTrackingAsync("TH-E2E-001");
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Get, capturedRequest.Method);
+        Assert.Equal("/delivery/v1/shipping/tracking/TH-E2E-001", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.NotNull(result);
+        Assert.Equal("TH-E2E-001", result.TrackingCode);
+        Assert.Equal("flash", result.CourierCode);
+        Assert.Equal("in_transit", result.Status);
+    }
+
     private static DeliveryServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)
     {
         var handler = new MockHttpMessageHandler((request, _) =>

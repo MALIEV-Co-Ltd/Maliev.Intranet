@@ -130,39 +130,49 @@
                                            @bind-ThbValue="ShippingCost"
                                            Min="0m" />
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(ShippingDestinationCountry) && TotalWeightKg > 0)
-                        {
-                            <MudButton Variant="Variant.Outlined"
-                                       Size="Size.Small"
-                                       Color="Color.Info"
-                                       StartIcon="@Icons.Material.Outlined.LocalShipping"
-                                       OnClick="FetchDhlRatesAsync"
-                                       Disabled="_fetchingRates"
-                                       FullWidth="true">
-                                @if (_fetchingRates)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                                }
-                                Get DHL Rate
-                            </MudButton>
-                            @if (_rateOptions.Count > 0 && !_fetchingRates)
+                        <div class="qsb-shipping-entry-grid">
+                            <MudTextField T="string" Label="Recipient" @bind-Value="_shippingToName" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Phone" @bind-Value="_shippingToPhone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Address" @bind-Value="_shippingToAddress" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="District" @bind-Value="_shippingToDistrict" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="State" @bind-Value="_shippingToState" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Province" @bind-Value="_shippingToProvince" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField T="string" Label="Postcode" @bind-Value="_shippingToPostcode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudNumericField T="decimal" Label="Weight (g)" @bind-Value="_shippingWeightGrams" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1m" />
+                            <MudNumericField T="decimal" Label="L (cm)" @bind-Value="_shippingLengthCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                            <MudNumericField T="decimal" Label="W (cm)" @bind-Value="_shippingWidthCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                            <MudNumericField T="decimal" Label="H (cm)" @bind-Value="_shippingHeightCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                        </div>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   Color="Color.Info"
+                                   StartIcon="@Icons.Material.Outlined.LocalShipping"
+                                   OnClick="FetchCourierRatesAsync"
+                                   Disabled="_fetchingRates"
+                                   FullWidth="true">
+                            @if (_fetchingRates)
                             {
-                                <div class="qsb-rate-options">
-                                    @foreach (var rate in _rateOptions)
-                                    {
-                                        <button type="button"
-                                                class="qsb-rate-option"
-                                                @onclick="@(() => SelectDhlRate(rate))">
-                                            <span class="qsb-rate-name">@rate.ProductName</span>
-                                            <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0")</span>
-                                            @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
-                                            {
-                                                <span class="qsb-rate-edd">Est: @DateTime.TryParse(rate.EstimatedDeliveryDate, out var d) ? d.ToString("MMM d") : rate.EstimatedDeliveryDate</span>
-                                            }
-                                        </button>
-                                    }
-                                </div>
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
                             }
+                            Get Courier Rates
+                        </MudButton>
+                        @if (_rateOptions.Count > 0 && !_fetchingRates)
+                        {
+                            <div class="qsb-rate-options">
+                                @foreach (var rate in _rateOptions)
+                                {
+                                    <button type="button"
+                                            class="qsb-rate-option"
+                                            @onclick="@(() => SelectCourierRate(rate))">
+                                        <span class="qsb-rate-name">@rate.ProductName</span>
+                                        <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0") @rate.CurrencyCode</span>
+                                        @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
+                                        {
+                                            <span class="qsb-rate-edd">@rate.EstimatedDeliveryDate</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
                         }
                     </section>
                     <section class="qsb-adjustment-card qsb-adjustment-card--discount" aria-label="Discount adjustment">
@@ -824,6 +834,9 @@
         .qsb-details-popover ::deep textarea {
             min-height: 90px !important;
         }
+        .qsb-shipping-entry-grid {
+            grid-template-columns: 1fr;
+        }
         .qsb-btn-details,
         .qsb-btn-pdf,
         .qsb-btn-checkout {
@@ -840,6 +853,13 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+    }
+
+    .qsb-shipping-entry-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 2px 0 8px;
     }
 
     .qsb-rate-option {
@@ -911,6 +931,17 @@
     private bool _detailsOpen;
     private bool _fetchingRates;
     private List<ShippingRateOptionDto> _rateOptions = [];
+    private string _shippingToName = "Customer";
+    private string _shippingToPhone = "";
+    private string _shippingToAddress = "";
+    private string _shippingToDistrict = "";
+    private string _shippingToState = "";
+    private string _shippingToProvince = "";
+    private string _shippingToPostcode = "";
+    private decimal _shippingWeightGrams = 1000m;
+    private decimal _shippingLengthCm = 20m;
+    private decimal _shippingWidthCm = 15m;
+    private decimal _shippingHeightCm = 10m;
     private bool IsLeadTimeLoading => LeadTimeOptions.Count == 0 && Parts.Any(p => p.PricingLoading);
     private string LeadTimeEmptyText => Parts.Count == 0
         ? "Configure a part to calculate lead time."
@@ -931,7 +962,12 @@
         }
     }
 
-    protected override void OnInitialized() => CurrencyService.Changed += OnCurrencyChanged;
+    protected override void OnInitialized()
+    {
+        CurrencyService.Changed += OnCurrencyChanged;
+        _shippingToPostcode = ShippingDestinationPostalCode ?? "";
+        _shippingWeightGrams = Math.Max(1m, Math.Ceiling(Math.Max(TotalWeightKg, 0.001m) * 1000m));
+    }
 
     public void Dispose() => CurrencyService.Changed -= OnCurrencyChanged;
 
@@ -944,22 +980,25 @@
     private async Task OnQuotationTermsChanged(string? value) =>
         await QuotationTermsChanged.InvokeAsync(value);
 
-    private async Task FetchDhlRatesAsync()
+    private async Task FetchCourierRatesAsync()
     {
+        _shippingToPostcode = FirstNonEmpty(_shippingToPostcode, ShippingDestinationPostalCode);
+        _shippingWeightGrams = Math.Max(1m, Math.Ceiling(Math.Max(TotalWeightKg, 0.001m) * 1000m));
+
+        var validationError = ValidateShippingRateInputs();
+        if (validationError is not null)
+        {
+            Snackbar.Add(validationError, Severity.Warning);
+            return;
+        }
+
         _fetchingRates = true;
         _rateOptions = [];
         StateHasChanged();
 
         try
         {
-            var request = new ShippingRateRequestDto
-            {
-                OriginCountryCode = "TH",
-                DestinationCountryCode = ShippingDestinationCountry ?? "US",
-                DestinationPostalCode = ShippingDestinationPostalCode,
-                WeightKg = TotalWeightKg
-            };
-
+            var request = BuildShippingRateRequest();
             var result = await ShippingService.GetRatesAsync(request);
             if (result?.Rates is { Count: > 0 })
             {
@@ -981,7 +1020,65 @@
         }
     }
 
-    private async Task SelectDhlRate(ShippingRateOptionDto rate)
+    private ShippingRateRequestDto BuildShippingRateRequest()
+    {
+        return new ShippingRateRequestDto
+        {
+            From = new ShippingAddressDto
+            {
+                Name = "MALIEV",
+                Address = "MALIEV",
+                District = "Pathum Wan",
+                State = "Pathum Wan",
+                Province = "Bangkok",
+                Postcode = "10400",
+                Tel = "020000000"
+            },
+            To = new ShippingAddressDto
+            {
+                Name = FirstNonEmpty(_shippingToName, SelectedCustomer?.Name, "Customer"),
+                Address = FirstNonEmpty(_shippingToAddress),
+                District = FirstNonEmpty(_shippingToDistrict),
+                State = FirstNonEmpty(_shippingToState),
+                Province = FirstNonEmpty(_shippingToProvince),
+                Postcode = FirstNonEmpty(_shippingToPostcode, ShippingDestinationPostalCode),
+                Tel = FirstNonEmpty(_shippingToPhone)
+            },
+            Parcel = new ShippingParcelDto
+            {
+                Name = "MALIEV quote shipment",
+                Weight = Math.Max(1m, _shippingWeightGrams),
+                Length = Math.Max(0.1m, _shippingLengthCm),
+                Width = Math.Max(0.1m, _shippingWidthCm),
+                Height = Math.Max(0.1m, _shippingHeightCm)
+            }
+        };
+    }
+
+    private string? ValidateShippingRateInputs()
+    {
+        if (string.IsNullOrWhiteSpace(_shippingToPhone) ||
+            string.IsNullOrWhiteSpace(_shippingToAddress) ||
+            string.IsNullOrWhiteSpace(_shippingToDistrict) ||
+            string.IsNullOrWhiteSpace(_shippingToState) ||
+            string.IsNullOrWhiteSpace(_shippingToProvince) ||
+            string.IsNullOrWhiteSpace(FirstNonEmpty(_shippingToPostcode, ShippingDestinationPostalCode)))
+        {
+            return "Enter destination phone, address, district, state, province, and postal code before checking courier rates.";
+        }
+
+        if (_shippingWeightGrams <= 0 || _shippingLengthCm <= 0 || _shippingWidthCm <= 0 || _shippingHeightCm <= 0)
+        {
+            return "Enter positive parcel weight and dimensions before checking courier rates.";
+        }
+
+        return null;
+    }
+
+    private static string FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private async Task SelectCourierRate(ShippingRateOptionDto rate)
     {
         await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
         _rateOptions = [];

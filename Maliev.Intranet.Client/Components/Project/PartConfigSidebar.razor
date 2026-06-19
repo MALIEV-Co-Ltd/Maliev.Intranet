@@ -1113,39 +1113,49 @@ else
                                                HelperText="Freight, courier, or delivery charge"
                                                @bind-ThbValue="ShippingCost"
                                                Min="0m" />
-                                @if (!string.IsNullOrWhiteSpace(ShippingDestinationCountry) && TotalWeightKg > 0)
-                                {
-                                    <MudButton Variant="Variant.Outlined"
-                                               Size="Size.Small"
-                                               Color="Color.Info"
-                                               StartIcon="@Icons.Material.Outlined.LocalShipping"
-                                               OnClick="FetchQuoteDhlRatesAsync"
-                                               Disabled="_quoteFetchingRates"
-                                               FullWidth="true">
-                                        @if (_quoteFetchingRates)
-                                        {
-                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                                        }
-                                        Get DHL Rate
-                                    </MudButton>
-                                    @if (_quoteRateOptions.Count > 0 && !_quoteFetchingRates)
+                                <div class="pcs-qf-shipping-entry-grid">
+                                    <MudTextField T="string" Label="Recipient" @bind-Value="_quoteShippingToName" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="Phone" @bind-Value="_quoteShippingToPhone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="Address" @bind-Value="_quoteShippingToAddress" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="District" @bind-Value="_quoteShippingToDistrict" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="State" @bind-Value="_quoteShippingToState" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="Province" @bind-Value="_quoteShippingToProvince" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField T="string" Label="Postcode" @bind-Value="_quoteShippingToPostcode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudNumericField T="decimal" Label="Weight (g)" @bind-Value="_quoteShippingWeightGrams" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1m" />
+                                    <MudNumericField T="decimal" Label="L (cm)" @bind-Value="_quoteShippingLengthCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                                    <MudNumericField T="decimal" Label="W (cm)" @bind-Value="_quoteShippingWidthCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                                    <MudNumericField T="decimal" Label="H (cm)" @bind-Value="_quoteShippingHeightCm" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.1m" />
+                                </div>
+                                <MudButton Variant="Variant.Outlined"
+                                           Size="Size.Small"
+                                           Color="Color.Info"
+                                           StartIcon="@Icons.Material.Outlined.LocalShipping"
+                                           OnClick="FetchQuoteCourierRatesAsync"
+                                           Disabled="_quoteFetchingRates"
+                                           FullWidth="true">
+                                    @if (_quoteFetchingRates)
                                     {
-                                        <div class="pcs-qf-rate-options">
-                                            @foreach (var rate in _quoteRateOptions)
-                                            {
-                                                <button type="button"
-                                                        class="pcs-qf-rate-option"
-                                                        @onclick="@(() => SelectQuoteDhlRate(rate))">
-                                                    <span class="pcs-qf-rate-name">@rate.ProductName</span>
-                                                    <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0")</span>
-                                                    @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
-                                                    {
-                                                        <span class="pcs-qf-rate-edd">Est: @(DateTime.TryParse(rate.EstimatedDeliveryDate, out var d) ? d.ToString("MMM d") : rate.EstimatedDeliveryDate)</span>
-                                                    }
-                                                </button>
-                                            }
-                                        </div>
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
                                     }
+                                    Get Courier Rates
+                                </MudButton>
+                                @if (_quoteRateOptions.Count > 0 && !_quoteFetchingRates)
+                                {
+                                    <div class="pcs-qf-rate-options">
+                                        @foreach (var rate in _quoteRateOptions)
+                                        {
+                                            <button type="button"
+                                                    class="pcs-qf-rate-option"
+                                                    @onclick="@(() => SelectQuoteCourierRate(rate))">
+                                                <span class="pcs-qf-rate-name">@rate.ProductName</span>
+                                                <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0") @rate.CurrencyCode</span>
+                                                @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
+                                                {
+                                                    <span class="pcs-qf-rate-edd">@rate.EstimatedDeliveryDate</span>
+                                                }
+                                            </button>
+                                        }
+                                    </div>
                                 }
                             </div>
                             <div class="pcs-qf-adj-card pcs-qf-adj-discount">
@@ -1515,6 +1525,13 @@ else
                 display: flex;
                 flex-direction: column;
                 gap: 3px;
+            }
+
+            .pcs-qf-shipping-entry-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px;
+                margin: 2px 0 8px;
             }
 
             .pcs-qf-rate-option {
