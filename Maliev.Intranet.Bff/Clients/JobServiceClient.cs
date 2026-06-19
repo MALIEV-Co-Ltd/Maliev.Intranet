@@ -73,8 +73,8 @@ public class JobServiceClient(HttpClient httpClient)
     /// <returns>Matching project job links.</returns>
     public async Task<List<ProjectJobLinkDto>> GetProjectJobLinksByOrderAsync(Guid orderId, CancellationToken ct = default)
     {
-        var page = await httpClient.GetFromJsonAsync<JobServiceJobPageResponse>("/job/v1/jobs?page=1&pageSize=100", ct);
-        return page?.Items?
+        var jobs = await httpClient.GetFromJsonAsync<List<JobServiceJobResponse>>($"/job/v1/jobs/by-order/{orderId:D}", ct);
+        return jobs?
             .Where(job => job.OrderId == orderId && job.SourceProjectPartId.HasValue)
             .Select(job => new ProjectJobLinkDto(
                 job.JobId,
@@ -442,11 +442,6 @@ public class JobServiceClient(HttpClient httpClient)
                 UpdatedAt = UpdatedAt
             };
         }
-    }
-
-    private sealed class JobServiceJobPageResponse
-    {
-        public List<JobServiceJobResponse> Items { get; set; } = [];
     }
 
     private sealed record KanbanBoardResponse(

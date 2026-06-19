@@ -119,6 +119,53 @@ public class JobsControllerTests
     }
 
     [Fact]
+    public async Task GetProjectJobLinksByOrderAsync_UsesOrderScopedJobServiceEndpoint()
+    {
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+        var jobId = Guid.NewGuid();
+        var sourceProjectPartId = Guid.NewGuid();
+        string? capturedPath = null;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            capturedPath = request.RequestUri!.AbsolutePath;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[]
+                {
+                    new
+                    {
+                        jobId,
+                        orderId,
+                        orderItemId,
+                        sourceProjectPartId,
+                        status = "Queued"
+                    },
+                    new
+                    {
+                        jobId = Guid.NewGuid(),
+                        orderId = Guid.NewGuid(),
+                        orderItemId = Guid.NewGuid(),
+                        sourceProjectPartId = Guid.NewGuid(),
+                        status = "Queued"
+                    }
+                })
+            });
+        });
+        var client = new JobServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://test") });
+
+        var links = await client.GetProjectJobLinksByOrderAsync(orderId, CancellationToken.None);
+
+        Assert.Equal($"/job/v1/jobs/by-order/{orderId:D}", capturedPath);
+        var link = Assert.Single(links);
+        Assert.Equal(jobId, link.JobId);
+        Assert.Equal(orderId, link.OrderId);
+        Assert.Equal(orderItemId, link.OrderItemId);
+        Assert.Equal(sourceProjectPartId, link.SourceProjectPartId);
+        Assert.Equal(10, link.ProgressPercent);
+    }
+
+    [Fact]
     public async Task GetQueue_WhenServiceFails_ShouldReturnEmptyQueue()
     {
         var controller = Make(MakeClientEmpty(HttpStatusCode.InternalServerError));
