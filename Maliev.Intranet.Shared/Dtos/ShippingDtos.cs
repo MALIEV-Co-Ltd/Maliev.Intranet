@@ -126,6 +126,9 @@ public record ShippingRateOptionDto
 
     /// <summary>Raw service level returned by the gateway.</summary>
     public string? ServiceLevel { get; init; }
+
+    /// <summary>Shipping gateway that served this rate option.</summary>
+    public string Provider { get; init; } = string.Empty;
 }
 
 /// <summary>
@@ -144,6 +147,9 @@ public record ShippingCourierDto
 
     /// <summary>Shipping scope.</summary>
     public string Scope { get; init; } = "domestic";
+
+    /// <summary>Shipping gateway that served this courier option.</summary>
+    public string Provider { get; init; } = string.Empty;
 }
 
 /// <summary>
@@ -165,4 +171,7 @@ public record ShippingTrackingDto
 
     /// <summary>Latest status description.</summary>
     public string? Description { get; init; }
+
+    /// <summary>Shipping gateway that served this tracking status.</summary>
+    public string Provider { get; init; } = string.Empty;
 }

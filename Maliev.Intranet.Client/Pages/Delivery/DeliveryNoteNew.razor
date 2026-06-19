@@ -60,7 +60,7 @@
                     @foreach (var rate in _rateOptions)
                     {
                         <button type="button" class="mlv-list-row" @onclick="@(() => SelectRate(rate))">
-                            <span>@rate.ProductName</span>
+                            <span>@RateOptionLabel(rate)</span>
                             <strong>@rate.TotalPrice.ToString("N2") @rate.CurrencyCode</strong>
                         </button>
                     }
@@ -420,9 +420,22 @@
 
     private static string CourierOptionLabel(ShippingCourierDto courier)
     {
-        return string.IsNullOrWhiteSpace(courier.Note)
+        var label = string.IsNullOrWhiteSpace(courier.Note)
             ? $"{courier.CourierName} ({courier.CourierCode})"
             : $"{courier.CourierName} ({courier.CourierCode}) - {courier.Note}";
+
+        return AppendProviderLabel(label, courier.Provider);
+    }
+
+    private static string RateOptionLabel(ShippingRateOptionDto rate)
+    {
+        var label = string.IsNullOrWhiteSpace(rate.ProductName) ? rate.CourierCode : rate.ProductName;
+        return AppendProviderLabel(label, rate.Provider);
+    }
+
+    private static string AppendProviderLabel(string label, string? provider)
+    {
+        return string.IsNullOrWhiteSpace(provider) ? label : $"{label} via {provider.Trim()}";
     }
 
     private static string FirstNonEmpty(params string?[] values) =>

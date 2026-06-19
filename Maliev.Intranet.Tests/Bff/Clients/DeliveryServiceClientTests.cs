@@ -270,7 +270,8 @@ public sealed class DeliveryServiceClientTests
                     courierCode = "thaipost",
                     courierName = "Thailand Post",
                     note = "Domestic parcel",
-                    scope = "domestic"
+                    scope = "domestic",
+                    provider = "Shippop"
                 }
             });
         });
@@ -284,6 +285,7 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("thaipost", courier.CourierCode);
         Assert.Equal("Thailand Post", courier.CourierName);
         Assert.Equal("domestic", courier.Scope);
+        Assert.Equal("Shippop", courier.Provider);
     }
 
     [Fact]
@@ -304,7 +306,8 @@ public sealed class DeliveryServiceClientTests
                     price = 72.5m,
                     currency = "THB",
                     serviceLevel = "standard",
-                    estimatedDelivery = "2026-06-22"
+                    estimatedDelivery = "2026-06-22",
+                    provider = "GoShip"
                 }
             });
         });
@@ -355,6 +358,7 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("Flash Express", rate.ProductName);
         Assert.Equal(72.5m, rate.TotalPrice);
         Assert.Equal("THB", rate.CurrencyCode);
+        Assert.Equal("GoShip", rate.Provider);
     }
 
     [Fact]
@@ -370,7 +374,8 @@ public sealed class DeliveryServiceClientTests
                 courierCode = "flash",
                 courierName = "Flash Express",
                 status = "in_transit",
-                description = "Parcel is in transit"
+                description = "Parcel is in transit",
+                provider = "Shippop"
             });
         });
 
@@ -383,6 +388,7 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("TH-E2E-001", result.TrackingCode);
         Assert.Equal("flash", result.CourierCode);
         Assert.Equal("in_transit", result.Status);
+        Assert.Equal("Shippop", result.Provider);
     }
 
     private static DeliveryServiceClient MakeClient(Func<HttpRequestMessage, HttpContent> contentFactory)

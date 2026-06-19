@@ -205,7 +205,8 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
                 TotalPrice = rate.Price,
                 CurrencyCode = FirstNonEmpty(rate.Currency, "THB"),
                 EstimatedDeliveryDate = rate.EstimatedDelivery,
-                ServiceLevel = rate.ServiceLevel
+                ServiceLevel = rate.ServiceLevel,
+                Provider = rate.Provider
             }).ToList()
         };
     }
@@ -337,5 +338,7 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         public string? ServiceLevel { get; init; }
 
         public string? EstimatedDelivery { get; init; }
+
+        public string Provider { get; init; } = string.Empty;
     }
 }
