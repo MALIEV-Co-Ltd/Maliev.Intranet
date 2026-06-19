@@ -1,6 +1,7 @@
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -40,6 +41,11 @@ public interface IDeliveryServiceClient
     /// Retrieves files attached to a delivery note.
     /// </summary>
     Task<List<DeliveryNoteFileDto>> GetFilesAsync(string id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Uploads a proof or document file to a delivery note.
+    /// </summary>
+    Task<DeliveryNoteFileDto?> UploadFileAsync(string id, Stream content, string fileName, string contentType, string fileType, string? description, CancellationToken ct = default);
 
     /// <summary>
     /// Deletes a delivery note.
@@ -165,6 +171,35 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         }
 
         return await response.Content.ReadFromJsonAsync<List<DeliveryNoteFileDto>>(JsonOptions, ct) ?? [];
+    }
+
+    /// <inheritdoc />
+    public async Task<DeliveryNoteFileDto?> UploadFileAsync(
+        string id,
+        Stream content,
+        string fileName,
+        string contentType,
+        string fileType,
+        string? description,
+        CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        using var fileContent = new StreamContent(content);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        form.Add(fileContent, "file", fileName);
+        form.Add(new StringContent(fileType), "fileType");
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            form.Add(new StringContent(description), "description");
+        }
+
+        var response = await httpClient.PostAsync($"/delivery/v1/delivery-notes/{Uri.EscapeDataString(id)}/files", form, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<DeliveryNoteFileDto>(JsonOptions, ct);
     }
 
     /// <inheritdoc />

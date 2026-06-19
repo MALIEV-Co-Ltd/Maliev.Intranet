@@ -101,6 +101,26 @@
             </PanelCard>
 
             <PanelCard Title="Documents">
+                <FormGrid>
+                    <FormField Label="Proof type">
+                        <select class="mlv-form-input" @bind="_proofFileType" disabled="@_proofUploading">
+                            <option value="Signature">Signature</option>
+                            <option value="Photo">Photo</option>
+                            <option value="PackingList">Packing list</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </FormField>
+                    <FormField Label="Description"><input class="mlv-form-input" @bind="_proofDescription" @bind:event="oninput" disabled="@_proofUploading" /></FormField>
+                    <FormField Label="Proof file">
+                        <InputFile class="mlv-form-input" OnChange="UploadProofFileAsync" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" disabled="@_proofUploading" />
+                    </FormField>
+                </FormGrid>
+
+                @if (_proofUploading)
+                {
+                    <div class="mlv-form-help mt-3">Uploading proof of delivery...</div>
+                }
+
                 @if (_files.Count == 0)
                 {
                     <div class="mlv-empty">No delivery documents are attached yet.</div>
@@ -153,8 +173,12 @@
     private bool _loading = true;
     private bool _statusUpdating;
     private bool _pdfRequesting;
+    private bool _proofUploading;
     private string? _error;
     private string _receivedBy = string.Empty;
+    private string _proofFileType = "Signature";
+    private string? _proofDescription = "Proof of delivery";
+    private Guid? _signatureFileId;
     private DateTime _actualDeliveryTime = DateTime.Now;
 
     private bool CanMarkInTransit => _note is not null &&
@@ -195,6 +219,10 @@
             {
                 _actualDeliveryTime = _note.ActualDeliveryTime.Value.ToLocalTime();
             }
+
+            _signatureFileId = _note.SignatureFileId ?? _files
+                .FirstOrDefault(file => string.Equals(file.FileType, "Signature", StringComparison.OrdinalIgnoreCase))
+                ?.FileId;
         }
         catch (Exception ex)
         {
@@ -223,7 +251,8 @@
             {
                 NewStatus = status,
                 ReceivedByName = status == "Delivered" ? _receivedBy : null,
-                ActualDeliveryTime = status == "Delivered" ? _actualDeliveryTime : null
+                ActualDeliveryTime = status == "Delivered" ? _actualDeliveryTime : null,
+                SignatureFileId = status == "Delivered" ? _signatureFileId : null
             });
 
             if (!response.IsSuccessStatusCode)
@@ -262,6 +291,55 @@
         finally
         {
             _pdfRequesting = false;
+        }
+    }
+
+    private async Task UploadProofFileAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        _proofUploading = true;
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var content = new StreamContent(stream);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            form.Add(content, "file", file.Name);
+            form.Add(new StringContent(_proofFileType), "fileType");
+            if (!string.IsNullOrWhiteSpace(_proofDescription))
+            {
+                form.Add(new StringContent(_proofDescription), "description");
+            }
+
+            var response = await Http.PostAsync($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/files", form);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Proof of delivery could not be uploaded.", Severity.Warning);
+                return;
+            }
+
+            var uploaded = await response.Content.ReadFromJsonAsync<DeliveryNoteFileDto>();
+            if (uploaded is not null && string.Equals(uploaded.FileType, "Signature", StringComparison.OrdinalIgnoreCase))
+            {
+                _signatureFileId = uploaded.FileId;
+            }
+
+            _files = await Http.GetFromJsonAsync<List<DeliveryNoteFileDto>>($"api/v1/deliverynotes/{Uri.EscapeDataString(DeliveryNoteId)}/files") ?? [];
+            Snackbar.Add("Proof of delivery uploaded.", Severity.Success);
+        }
+        catch (IOException)
+        {
+            Snackbar.Add("Proof file must be 5 MB or smaller.", Severity.Warning);
+        }
+        finally
+        {
+            _proofUploading = false;
         }
     }
 

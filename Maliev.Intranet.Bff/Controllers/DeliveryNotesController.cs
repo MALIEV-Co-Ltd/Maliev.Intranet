@@ -84,6 +84,37 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     }
 
     /// <summary>
+    /// Uploads a proof or document file to a delivery note.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Delivery.UpdateStatus, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpPost("{id}/files")]
+    [RequestSizeLimit(5 * 1024 * 1024)]
+    public async Task<ActionResult<DeliveryNoteFileDto>> UploadFile(
+        string id,
+        IFormFile file,
+        [FromForm] string fileType,
+        [FromForm] string? description,
+        CancellationToken ct)
+    {
+        if (file.Length == 0)
+        {
+            return BadRequest();
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await client.UploadFileAsync(
+            id,
+            stream,
+            file.FileName,
+            string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            fileType,
+            description,
+            ct);
+
+        return result != null ? CreatedAtAction(nameof(GetFiles), new { id, version = "1.0" }, result) : BadRequest();
+    }
+
+    /// <summary>
     /// Deletes a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.Delete, AuthenticationSchemes = "Bearer,Cookies")]

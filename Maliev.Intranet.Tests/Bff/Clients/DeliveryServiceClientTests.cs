@@ -257,6 +257,56 @@ public sealed class DeliveryServiceClientTests
     }
 
     [Fact]
+    public async Task UploadFileAsync_PostsDeliveryServiceMultipartFileContract()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? multipartBody = null;
+        var fileId = Guid.Parse("c263a794-1c98-45b6-858e-d861482a7b1d");
+        var client = MakeClient(async (request, ct) =>
+        {
+            capturedRequest = request;
+            multipartBody = await request.Content!.ReadAsStringAsync(ct);
+            return JsonContent.Create(new
+            {
+                fileId,
+                deliveryNoteId = "DN-2026-000005",
+                fileType = "Signature",
+                originalFileName = "receiver-signature.png",
+                storageUrl = "memory://delivery/signature.png",
+                fileSizeBytes = 18,
+                description = "Signed at customer dock",
+                uploadedAt = new DateTime(2026, 6, 19, 9, 0, 0, DateTimeKind.Utc),
+                uploadedBy = "tester",
+                version = 1U
+            });
+        });
+
+        await using var stream = new MemoryStream("signature-proof"u8.ToArray());
+        var result = await client.UploadFileAsync(
+            "DN-2026-000005",
+            stream,
+            "receiver-signature.png",
+            "image/png",
+            "Signature",
+            "Signed at customer dock");
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal("/delivery/v1/delivery-notes/DN-2026-000005/files", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.StartsWith("multipart/form-data", capturedRequest.Content!.Headers.ContentType!.MediaType, StringComparison.Ordinal);
+        Assert.Contains("name=file", multipartBody, StringComparison.Ordinal);
+        Assert.Contains("filename=receiver-signature.png", multipartBody, StringComparison.Ordinal);
+        Assert.Contains("name=fileType", multipartBody, StringComparison.Ordinal);
+        Assert.Contains("Signature", multipartBody, StringComparison.Ordinal);
+        Assert.Contains("name=description", multipartBody, StringComparison.Ordinal);
+        Assert.NotNull(result);
+        Assert.Equal(fileId, result.FileId);
+        Assert.Equal("Signature", result.FileType);
+        Assert.Equal("receiver-signature.png", result.OriginalFileName);
+        Assert.Equal("memory://delivery/signature.png", result.StorageUrl);
+    }
+
+    [Fact]
     public async Task GetShippingCouriersAsync_TargetsDeliveryServiceShippingCouriersRoute()
     {
         HttpRequestMessage? capturedRequest = null;
