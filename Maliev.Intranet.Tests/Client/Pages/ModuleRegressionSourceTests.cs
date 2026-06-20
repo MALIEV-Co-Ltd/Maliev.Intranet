@@ -108,6 +108,23 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void SalesProjectReviewQueue_IsReachableFromNavigationAndStatusFilter()
+    {
+        var nav = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
+        var projects = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Projects.razor");
+        var controller = ReadRepoFile("Maliev.Intranet.Bff", "Controllers", "ProjectsController.cs");
+        var client = ReadRepoFile("Maliev.Intranet.Bff", "Clients", "ProjectServiceClient.cs");
+
+        Assert.Contains("new(\"Review queue\", \"sales/projects?status=CustomerReview\"", nav, StringComparison.Ordinal);
+        Assert.Contains("MalievPermissions.Project.Read", nav, StringComparison.Ordinal);
+        Assert.Contains("(\"Customer Review\", \"CustomerReview\")", projects, StringComparison.Ordinal);
+        Assert.Contains("query.Add($\"status={Uri.EscapeDataString(ActiveStatus)}\")", projects, StringComparison.Ordinal);
+        Assert.Contains("[FromQuery] string? status = null", controller, StringComparison.Ordinal);
+        Assert.Contains("client.GetProjectsAsync(status, search, customerId, page, pageSize, ct)", controller, StringComparison.Ordinal);
+        Assert.Contains("url += $\"&status={Uri.EscapeDataString(status)}\"", client, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SalesOrdersPages_SurfaceQuoteAndPaymentMetadata()
     {
         var orderList = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Sales", "OrderList.razor");
