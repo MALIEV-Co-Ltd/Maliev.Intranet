@@ -1,0 +1,146 @@
+@page "/sales/orders"
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Orders | MALIEV Intranet</PageTitle>
+
+<div class="mlv-module-shell">
+    <ModuleHeader Title="Orders" Subtitle="Customer orders, payment state, accepted quotes, and production handoff.">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="ReloadAsync">Refresh</SecondaryButton>
+        <PrimaryButton Icon="@Icons.Material.Outlined.Add" Href="/sales/projects/new">New Quote</PrimaryButton>
+    </ModuleHeader>
+
+    <PageBody>
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+
+        <PanelCard Title="Order queue">
+            <div class="mlv-toolbar">
+                <div class="mlv-toolbar-left">
+                    <SearchBox Placeholder="Search order, customer, or quote..." Value="@_search" ValueChanged="OnSearchChangedAsync" />
+                </div>
+            </div>
+
+            @if (_loading)
+            {
+                <ProgressiveSkeleton Layout="table" Rows="8" Columns="7" ShowFilters="false" Label="Loading orders" />
+            }
+            else if (_orders.Count > 0)
+            {
+                <table class="mlv-table">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Fulfillment</th>
+                            <th>Payment</th>
+                            <th>Quote</th>
+                            <th>Total</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in _orders)
+                        {
+                            <tr @onclick="@(() => OpenOrder(order))">
+                                <td class="mlv-mono">@order.OrderNumber</td>
+                                <td>@DisplayCustomer(order)</td>
+                                <td><StatusBadge Status="@order.Status" /></td>
+                                <td><StatusBadge Status="@order.PaymentStatus" Text="@DisplayPayment(order)" /></td>
+                                <td>@DisplayQuote(order)</td>
+                                <td class="mlv-mono">@CurrencyFormatter.Format(order.TotalAmount, "THB", 2)</td>
+                                <td>@order.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="mlv-empty">No orders found.</div>
+            }
+        </PanelCard>
+    </PageBody>
+</div>
+
+@code {
+    private readonly List<OrderSummaryDto> _orders = [];
+    private bool _loading = true;
+    private string? _error;
+    private string _search = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _)
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnSearchChangedAsync(string value)
+    {
+        _search = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var url = "api/v1/orders?page=1&pageSize=100";
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                url += $"&search={Uri.EscapeDataString(_search.Trim())}";
+            }
+
+            var response = await Http.GetFromJsonAsync<PagedResponse<OrderSummaryDto>>(url);
+            _orders.Clear();
+            _orders.AddRange(response?.Data.OrderByDescending(order => order.CreatedAt).ToList() ?? []);
+        }
+        catch (Exception ex)
+        {
+            _error = "Orders could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenOrder(OrderSummaryDto order)
+    {
+        if (!string.IsNullOrWhiteSpace(order.OrderNumber))
+        {
+            Navigation.NavigateTo($"/sales/orders/{Uri.EscapeDataString(order.OrderNumber)}");
+        }
+    }
+
+    private static string DisplayCustomer(OrderSummaryDto order) =>
+        string.IsNullOrWhiteSpace(order.CustomerName) ? "Customer not assigned" : order.CustomerName;
+
+    private static string DisplayPayment(OrderSummaryDto order) =>
+        string.IsNullOrWhiteSpace(order.PaymentStatus) ? "Unpaid" : order.PaymentStatus;
+
+    private static string DisplayQuote(OrderSummaryDto order)
+    {
+        if (string.IsNullOrWhiteSpace(order.QuoteNumber))
+        {
+            return "-";
+        }
+
+        return order.QuoteVersionNumber is int version
+            ? $"{order.QuoteNumber} v{version}"
+            : order.QuoteNumber;
+    }
+}

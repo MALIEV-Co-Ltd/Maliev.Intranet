@@ -231,7 +231,7 @@
                                     @foreach (var order in _orders.Take(6))
                                     {
                                         <tr>
-                                            <td><a href="@($"/orders/{order.Id}")">@order.OrderNumber</a></td>
+                                            <td><a href="@OrderHref(order)">@order.OrderNumber</a></td>
                                             <td>@FormatDate(order.CreatedAt)</td>
                                             <td>-</td>
                                             <td class="mlv-mono">@FormatMoney(ResolveOrderTotal(order))</td>
@@ -436,7 +436,7 @@
                             @foreach (var order in _orders)
                             {
                                 <tr>
-                                    <td><a href="@($"/orders/{order.Id}")">@order.OrderNumber</a></td>
+                                    <td><a href="@OrderHref(order)">@order.OrderNumber</a></td>
                                     <td>@FormatDate(order.CreatedAt)</td>
                                     <td>-</td>
                                     <td class="mlv-mono">@FormatMoney(ResolveOrderTotal(order))</td>
@@ -2753,6 +2753,11 @@
 
     private static decimal ResolveOrderTotal(OrderSummaryDto order) =>
         order.TotalAmount > 0 ? order.TotalAmount : order.Total;
+
+    private static string OrderHref(OrderSummaryDto order) =>
+        string.IsNullOrWhiteSpace(order.OrderNumber)
+            ? "/sales/orders"
+            : $"/sales/orders/{Uri.EscapeDataString(order.OrderNumber)}";
 
     private static string FormatMoney(decimal value) => value.ToString("$#,0.##");
 

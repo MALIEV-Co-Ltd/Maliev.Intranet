@@ -88,6 +88,42 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void SalesOrdersRoutes_AreReachableFromNavigationAndOrderNumberLinks()
+    {
+        var nav = ReadRepoFile("Maliev.Intranet.Client", "Layout", "AppNavigation.cs");
+        var home = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Home.razor");
+        var customerDetail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerDetail.razor");
+        var orderList = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Sales", "OrderList.razor");
+        var orderDetail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Sales", "OrderDetail.razor");
+
+        Assert.Contains("new(\"Orders\", \"sales/orders\"", nav, StringComparison.Ordinal);
+        Assert.Contains("@page \"/sales/orders\"", orderList, StringComparison.Ordinal);
+        Assert.Contains("@page \"/sales/orders/{OrderId}\"", orderDetail, StringComparison.Ordinal);
+        Assert.Contains("api/v1/orders?page=1&pageSize=100", orderList, StringComparison.Ordinal);
+        Assert.Contains("api/v1/orders/{Uri.EscapeDataString(OrderId)}", orderDetail, StringComparison.Ordinal);
+        Assert.Contains("Uri.EscapeDataString(order.OrderNumber)", home, StringComparison.Ordinal);
+        Assert.Contains("OrderHref(order)", customerDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("/orders/{order.Id}", customerDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("/sales/orders/{order.Id}", home, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SalesOrdersPages_SurfaceQuoteAndPaymentMetadata()
+    {
+        var orderList = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Sales", "OrderList.razor");
+        var orderDetail = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Sales", "OrderDetail.razor");
+
+        Assert.Contains("Payment", orderList, StringComparison.Ordinal);
+        Assert.Contains("Quote", orderList, StringComparison.Ordinal);
+        Assert.Contains("order.PaymentStatus", orderList, StringComparison.Ordinal);
+        Assert.Contains("order.QuoteNumber", orderList, StringComparison.Ordinal);
+        Assert.Contains("Quote and payment", orderDetail, StringComparison.Ordinal);
+        Assert.Contains("_order.PaymentStatus", orderDetail, StringComparison.Ordinal);
+        Assert.Contains("_order.QuoteNumber", orderDetail, StringComparison.Ordinal);
+        Assert.Contains("_order.QuoteVersionId", orderDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CustomerList_SubscribesToCustomerChangedRealtimeSignal()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Pages", "Customers", "CustomerList.razor");

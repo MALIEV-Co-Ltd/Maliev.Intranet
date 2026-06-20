@@ -1,0 +1,155 @@
+@page "/sales/orders/{OrderId}"
+@using Maliev.Intranet.Client.Helpers
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>@(OrderTitle + " | MALIEV Intranet")</PageTitle>
+
+<div class="mlv-module-shell">
+    <PageHeader Title="@OrderTitle" Subtitle="@OrderSubtitle" BackLabel="Orders" BackHref="/sales/orders">
+        <SecondaryButton Icon="@Icons.Material.Outlined.Refresh" OnClick="ReloadAsync">Refresh</SecondaryButton>
+        <SecondaryButton Icon="@Icons.Material.Outlined.Inventory2" Href="@PurchaseOrderHref" Disabled="@(_order is null)">Create PO</SecondaryButton>
+    </PageHeader>
+
+    <PageBody>
+        @if (_loading)
+        {
+            <ProgressiveSkeleton Layout="detail" Rows="6" ShowFilters="false" Label="Loading order" />
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="mlv-error">@_error</div>
+        }
+        else if (_order is null)
+        {
+            <div class="mlv-empty">Order was not found.</div>
+        }
+        else
+        {
+            <StatBar Class="mb-4">
+                <StatTile Label="Fulfillment" Value="@DisplayStatus" />
+                <StatTile Label="Payment" Value="@DisplayPayment" />
+                <StatTile Label="Total" Value="@CurrencyFormatter.Format(_order.TotalAmount, _order.Currency, 2)" />
+                <StatTile Label="Created" Value="@_order.CreatedAt.ToString("dd MMM yyyy")" />
+            </StatBar>
+
+            <div class="mlv-grid">
+                <PanelCard Title="Order details" Class="mlv-span-6">
+                    <dl class="mlv-definition-list">
+                        <div><dt>Order number</dt><dd class="mlv-mono">@_order.OrderNumber</dd></div>
+                        <div><dt>Customer</dt><dd>@DisplayCustomer</dd></div>
+                        <div><dt>Customer type</dt><dd>@DisplayValue(_order.CustomerType)</dd></div>
+                        <div><dt>Customer PO</dt><dd>@DisplayValue(_order.CustomerPoNumber)</dd></div>
+                        <div><dt>Quantity</dt><dd>@(_order.OrderedQuantity?.ToString("N0") ?? "-")</dd></div>
+                        <div><dt>Updated</dt><dd>@_order.UpdatedAt.ToString("dd MMM yyyy HH:mm")</dd></div>
+                    </dl>
+                </PanelCard>
+
+                <PanelCard Title="Quote and payment" Class="mlv-span-6">
+                    <dl class="mlv-definition-list">
+                        <div><dt>Quote</dt><dd>@DisplayQuote</dd></div>
+                        <div><dt>Quote ID</dt><dd class="mlv-mono">@DisplayGuid(_order.QuoteId)</dd></div>
+                        <div><dt>Quote version ID</dt><dd class="mlv-mono">@DisplayGuid(_order.QuoteVersionId)</dd></div>
+                        <div><dt>Quoted amount</dt><dd class="mlv-mono">@CurrencyFormatter.Format(_order.QuotedAmount ?? _order.TotalAmount, _order.Currency, 2)</dd></div>
+                        <div><dt>Payment status</dt><dd><StatusBadge Status="@DisplayPayment" Text="@DisplayPayment" /></dd></div>
+                    </dl>
+                </PanelCard>
+
+                <PanelCard Title="Items" Class="mlv-span-12">
+                    @if (_order.Items.Count > 0)
+                    {
+                        <table class="mlv-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Process</th>
+                                    <th>Quantity</th>
+                                    <th>Unit price</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in _order.Items)
+                                {
+                                    <tr>
+                                        <td>@DisplayValue(item.Description)</td>
+                                        <td>@DisplayValue(item.ServiceType ?? item.ProductCode)</td>
+                                        <td class="mlv-mono">@item.Quantity.ToString("N0")</td>
+                                        <td class="mlv-mono">@CurrencyFormatter.Format(item.UnitPrice, _order.Currency, 2)</td>
+                                        <td class="mlv-mono">@CurrencyFormatter.Format(item.TotalPrice, _order.Currency, 2)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="mlv-empty">No order items are available.</div>
+                    }
+                </PanelCard>
+            </div>
+        }
+    </PageBody>
+</div>
+
+@code {
+    [Parameter] public string OrderId { get; set; } = string.Empty;
+
+    private OrderDetailDto? _order;
+    private bool _loading = true;
+    private string? _error;
+
+    private string OrderTitle => _order?.OrderNumber ?? "Order";
+    private string OrderSubtitle => _order is null ? "Customer order details" : $"{DisplayCustomer} - {DisplayStatus}";
+    private string DisplayCustomer => string.IsNullOrWhiteSpace(_order?.CustomerName) ? "Customer not assigned" : _order.CustomerName;
+    private string DisplayStatus => string.IsNullOrWhiteSpace(_order?.CurrentStatus) ? _order?.Status ?? "No status" : _order.CurrentStatus;
+    private string DisplayPayment => string.IsNullOrWhiteSpace(_order?.PaymentStatus) ? "Unpaid" : _order.PaymentStatus;
+    private string DisplayQuote => _order is null || string.IsNullOrWhiteSpace(_order.QuoteNumber)
+        ? "-"
+        : _order.QuoteVersionNumber is int version ? $"{_order.QuoteNumber} v{version}" : _order.QuoteNumber;
+    private string PurchaseOrderHref => _order is null
+        ? "/purchasing/new"
+        : $"/purchasing/new?sourceOrderId={Uri.EscapeDataString(_order.OrderNumber)}&returnUrl={Uri.EscapeDataString($"/sales/orders/{Uri.EscapeDataString(_order.OrderNumber)}")}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task ReloadAsync(MouseEventArgs _)
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _order = await Http.GetFromJsonAsync<OrderDetailDto>($"api/v1/orders/{Uri.EscapeDataString(OrderId)}");
+            if (_order is null)
+            {
+                _error = "Order was not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _order = null;
+            _error = "Order could not be loaded.";
+            Snackbar.Add(_error, Severity.Warning);
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string DisplayGuid(Guid? value) =>
+        value is null || value.Value == Guid.Empty ? "-" : value.Value.ToString("D");
+}

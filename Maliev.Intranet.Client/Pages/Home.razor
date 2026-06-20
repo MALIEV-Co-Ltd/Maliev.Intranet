@@ -126,7 +126,7 @@
                         <tbody>
                             @foreach (var order in _orders.Take(8))
                             {
-                                <tr @onclick="@(() => Navigation.NavigateTo($"/sales/orders/{order.Id}"))">
+                                <tr @onclick="@(() => Navigation.NavigateTo($"/sales/orders/{Uri.EscapeDataString(order.OrderNumber)}"))">
                                     <td class="mlv-mono">@order.OrderNumber</td>
                                     <td>@order.CustomerName</td>
                                     <td><StatusBadge Status="@order.Status" /></td>

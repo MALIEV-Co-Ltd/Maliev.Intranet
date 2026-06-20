@@ -20,6 +20,7 @@ internal static class AppNavigation
         new("Sales", Icons.Material.Outlined.Business, "Sales & CRM",
         [
             new("Projects", "sales/projects", Icons.Material.Outlined.FolderSpecial, MalievPermissions.Project.Read, Description: "Quotes and project history"),
+            new("Orders", "sales/orders", Icons.Material.Outlined.ReceiptLong, MalievPermissions.Order.Read, Description: "Order queue and payment state"),
             new("Customers", "customers", Icons.Material.Outlined.People, MalievPermissions.Customer.Read, Description: "Profiles, addresses, documents"),
             new("New customer", "customers/new", Icons.Material.Outlined.PersonAdd, MalievPermissions.Customer.Write, Description: "Onboard a customer"),
             new("Contact requests", "sales/contact-requests", Icons.Material.Outlined.ContactMail, MalievPermissions.ContactRequest.Read, Description: "Website contact queue"),
