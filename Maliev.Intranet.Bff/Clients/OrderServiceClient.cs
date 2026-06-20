@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -141,6 +143,11 @@ public class OrderServiceClient(HttpClient httpClient)
         string? Requirements,
         string? CustomerPoNumber,
         Guid? CustomerPoFileId,
+        Guid? QuoteId,
+        string? QuoteNumber,
+        Guid? QuoteVersionId,
+        int? QuoteVersionNumber,
+        string? PaymentStatus,
         bool IsOutsourced,
         decimal? SupplierCostTHB,
         string? SupplierName,
@@ -152,12 +159,15 @@ public class OrderServiceClient(HttpClient httpClient)
         {
             return new OrderSummaryDto
             {
-                Id = Guid.TryParse(OrderId, out var guid) ? guid : Guid.Empty,
+                Id = ResolveOrderGuid(OrderId),
                 OrderNumber = OrderId,
                 CustomerName = CustomerId ?? string.Empty,
                 Total = QuotedAmount.GetValueOrDefault(),
                 TotalAmount = QuotedAmount.GetValueOrDefault(),
                 Status = CurrentStatus ?? string.Empty,
+                PaymentStatus = PaymentStatus ?? "Unpaid",
+                QuoteNumber = QuoteNumber,
+                QuoteVersionNumber = QuoteVersionNumber,
                 CreatedAt = CreatedAt,
                 IsOutsourced = IsOutsourced
             };
@@ -167,7 +177,7 @@ public class OrderServiceClient(HttpClient httpClient)
         {
             return new OrderDetailDto
             {
-                Id = Guid.TryParse(OrderId, out var guid) ? guid : Guid.Empty,
+                Id = ResolveOrderGuid(OrderId),
                 OrderId = OrderId,
                 OrderNumber = OrderId,
                 CustomerId = Guid.TryParse(CustomerId, out var customerGuid) ? customerGuid : Guid.Empty,
@@ -175,11 +185,16 @@ public class OrderServiceClient(HttpClient httpClient)
                 CustomerType = CustomerType ?? string.Empty,
                 Status = CurrentStatus ?? string.Empty,
                 CurrentStatus = CurrentStatus,
+                PaymentStatus = PaymentStatus ?? "Unpaid",
                 OrderedQuantity = OrderedQuantity,
                 TotalAmount = QuotedAmount.GetValueOrDefault(),
                 QuotedAmount = QuotedAmount,
                 Currency = QuoteCurrency ?? "THB",
                 CustomerPoNumber = CustomerPoNumber,
+                QuoteId = QuoteId,
+                QuoteNumber = QuoteNumber,
+                QuoteVersionId = QuoteVersionId,
+                QuoteVersionNumber = QuoteVersionNumber,
                 CustomerPoFileId = CustomerPoFileId,
                 CreatedAt = CreatedAt,
                 UpdatedAt = UpdatedAt,
@@ -215,6 +230,19 @@ public class OrderServiceClient(HttpClient httpClient)
                 }
             ];
         }
+    }
+
+    private static Guid ResolveOrderGuid(string orderId)
+    {
+        return Guid.TryParse(orderId, out var guid)
+            ? guid
+            : StableGuid($"order:{orderId}");
+    }
+
+    private static Guid StableGuid(string value)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return new Guid(hash.AsSpan(0, 16));
     }
 }
 

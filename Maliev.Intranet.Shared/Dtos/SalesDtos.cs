@@ -27,6 +27,15 @@ public class OrderSummaryDto
     /// <summary>The current fulfillment status of the order.</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>The current payment status of the order.</summary>
+    public string PaymentStatus { get; set; } = "Unpaid";
+
+    /// <summary>The accepted quotation number associated with the order, if any.</summary>
+    public string? QuoteNumber { get; set; }
+
+    /// <summary>The accepted quotation version number associated with the order, if any.</summary>
+    public int? QuoteVersionNumber { get; set; }
+
     /// <summary>The date and time when the order was created.</summary>
     public DateTime CreatedAt { get; set; }
 
@@ -308,6 +317,21 @@ public class OrderDetailDto
 
     /// <summary>The customer's internal purchase order number, if provided.</summary>
     public string? CustomerPoNumber { get; set; }
+
+    /// <summary>The accepted quotation identifier associated with the order, if any.</summary>
+    public Guid? QuoteId { get; set; }
+
+    /// <summary>The accepted quotation number associated with the order, if any.</summary>
+    public string? QuoteNumber { get; set; }
+
+    /// <summary>The immutable accepted quotation version identifier, if any.</summary>
+    public Guid? QuoteVersionId { get; set; }
+
+    /// <summary>The immutable accepted quotation version number, if any.</summary>
+    public int? QuoteVersionNumber { get; set; }
+
+    /// <summary>The current payment status of the order.</summary>
+    public string PaymentStatus { get; set; } = "Unpaid";
 
     /// <summary>The identifier of the customer's uploaded purchase order file.</summary>
     public Guid? CustomerPoFileId { get; set; }

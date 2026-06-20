@@ -204,6 +204,113 @@ public sealed class IntranetOrderFlowTests
         Assert.Equal(409, statusResult.StatusCode);
     }
 
+    /// <summary>
+    /// Intranet order lists must preserve Make Studio quote/payment metadata from OrderService
+    /// and expose a stable non-empty local key even when OrderService uses human-readable order IDs.
+    /// </summary>
+    [Fact]
+    public async Task GetOrders_PreservesMakeStudioQuoteAndPaymentMetadata()
+    {
+        var orderJson = new
+        {
+            items = new[]
+            {
+                new
+                {
+                    orderId = "ORD-2026-QE-001",
+                    customerId = Guid.NewGuid().ToString(),
+                    customerType = "Customer",
+                    currentStatus = "Paid",
+                    paymentStatus = "Paid",
+                    orderedQuantity = 2,
+                    quotedAmount = 2500m,
+                    quoteCurrency = "THB",
+                    quoteNumber = "QT-2026-00042",
+                    quoteVersionNumber = 3,
+                    serviceCategoryName = "3D Printing",
+                    processTypeName = "FDM",
+                    isOutsourced = false,
+                    createdAt = DateTime.UtcNow.AddHours(-2),
+                    updatedAt = DateTime.UtcNow
+                }
+            },
+            page = 1,
+            pageSize = 20,
+            totalCount = 1,
+            totalPages = 1
+        };
+
+        var orderClient = MakeOrderClient(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(orderJson)
+            });
+        var controller = new OrdersController(orderClient);
+
+        var result = await controller.Get(ct: CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var page = Assert.IsType<PagedResponse<OrderSummaryDto>>(okResult.Value);
+        var order = Assert.Single(page.Data);
+        Assert.NotEqual(Guid.Empty, order.Id);
+        Assert.Equal("ORD-2026-QE-001", order.OrderNumber);
+        Assert.Equal("Paid", order.Status);
+        Assert.Equal("Paid", order.PaymentStatus);
+        Assert.Equal("QT-2026-00042", order.QuoteNumber);
+        Assert.Equal(3, order.QuoteVersionNumber);
+    }
+
+    /// <summary>
+    /// Intranet order detail must preserve the accepted quote identity and payment state
+    /// used by staff to trace a paid Make Studio order back to its formal quotation.
+    /// </summary>
+    [Fact]
+    public async Task GetOrderById_PreservesAcceptedQuoteIdentityAndPaymentStatus()
+    {
+        var quoteId = Guid.NewGuid();
+        var quoteVersionId = Guid.NewGuid();
+        var orderJson = new
+        {
+            orderId = "ORD-2026-QE-DETAIL",
+            customerId = Guid.NewGuid().ToString(),
+            customerType = "Customer",
+            currentStatus = "Paid",
+            paymentStatus = "Paid",
+            orderedQuantity = 1,
+            quotedAmount = 1999m,
+            quoteCurrency = "THB",
+            quoteId,
+            quoteNumber = "QT-2026-00099",
+            quoteVersionId,
+            quoteVersionNumber = 2,
+            serviceCategoryName = "3D Printing",
+            processTypeName = "SLS",
+            isOutsourced = false,
+            createdAt = DateTime.UtcNow.AddHours(-4),
+            updatedAt = DateTime.UtcNow
+        };
+
+        var orderClient = MakeOrderClient(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(orderJson)
+            });
+        var controller = new OrdersController(orderClient);
+
+        var result = await controller.GetById("ORD-2026-QE-DETAIL", CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var order = Assert.IsType<OrderDetailDto>(okResult.Value);
+        Assert.NotEqual(Guid.Empty, order.Id);
+        Assert.Equal("ORD-2026-QE-DETAIL", order.OrderNumber);
+        Assert.Equal("Paid", order.CurrentStatus);
+        Assert.Equal("Paid", order.PaymentStatus);
+        Assert.Equal(quoteId, order.QuoteId);
+        Assert.Equal("QT-2026-00099", order.QuoteNumber);
+        Assert.Equal(quoteVersionId, order.QuoteVersionId);
+        Assert.Equal(2, order.QuoteVersionNumber);
+    }
+
     // ── JobsController ────────────────────────────────────────────────────────
 
     /// <summary>
