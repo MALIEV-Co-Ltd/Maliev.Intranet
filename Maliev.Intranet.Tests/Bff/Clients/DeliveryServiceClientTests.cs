@@ -257,6 +257,33 @@ public sealed class DeliveryServiceClientTests
     }
 
     [Fact]
+    public async Task DownloadFileAsync_CallsDeliveryServiceDownloadRoute()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var fileId = Guid.Parse("c3cfb238-4d49-4b46-88d2-c804841c3ebe");
+        var expectedBytes = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 77, 83 };
+        var client = MakeClient(request =>
+        {
+            capturedRequest = request;
+            var content = new ByteArrayContent(expectedBytes);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment")
+            {
+                FileName = "proof.png"
+            };
+            return content;
+        });
+
+        using var response = await client.DownloadFileAsync("DN-2026-000004", fileId);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Get, capturedRequest.Method);
+        Assert.Equal($"/delivery/v1/delivery-notes/DN-2026-000004/files/{fileId:D}/download", capturedRequest.RequestUri!.PathAndQuery);
+        Assert.True(response.IsSuccessStatusCode);
+        Assert.Equal(expectedBytes, await response.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
     public async Task UploadFileAsync_PostsDeliveryServiceMultipartFileContract()
     {
         HttpRequestMessage? capturedRequest = null;

@@ -43,6 +43,11 @@ public interface IDeliveryServiceClient
     Task<List<DeliveryNoteFileDto>> GetFilesAsync(string id, CancellationToken ct = default);
 
     /// <summary>
+    /// Downloads a file attached to a delivery note.
+    /// </summary>
+    Task<HttpResponseMessage> DownloadFileAsync(string id, Guid fileId, CancellationToken ct = default);
+
+    /// <summary>
     /// Uploads a proof or document file to a delivery note.
     /// </summary>
     Task<DeliveryNoteFileDto?> UploadFileAsync(string id, Stream content, string fileName, string contentType, string fileType, string? description, CancellationToken ct = default);
@@ -172,6 +177,10 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
 
         return await response.Content.ReadFromJsonAsync<List<DeliveryNoteFileDto>>(JsonOptions, ct) ?? [];
     }
+
+    /// <inheritdoc />
+    public async Task<HttpResponseMessage> DownloadFileAsync(string id, Guid fileId, CancellationToken ct = default)
+        => await httpClient.GetAsync($"/delivery/v1/delivery-notes/{Uri.EscapeDataString(id)}/files/{fileId:D}/download", ct);
 
     /// <inheritdoc />
     public async Task<DeliveryNoteFileDto?> UploadFileAsync(

@@ -84,6 +84,28 @@ public class DeliveryNotesController(IDeliveryServiceClient client) : Controller
     }
 
     /// <summary>
+    /// Downloads a file attached to a delivery note.
+    /// </summary>
+    [RequirePermission(MalievPermissions.Delivery.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [HttpGet("{id}/files/{fileId:guid}/download")]
+    public async Task<IActionResult> DownloadFile(string id, Guid fileId, CancellationToken ct)
+    {
+        using var response = await client.DownloadFileAsync(id, fileId, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return StatusCode((int)response.StatusCode);
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? "delivery-note-file";
+
+        return File(bytes, contentType, fileName);
+    }
+
+    /// <summary>
     /// Uploads a proof or document file to a delivery note.
     /// </summary>
     [RequirePermission(MalievPermissions.Delivery.UpdateStatus, AuthenticationSchemes = "Bearer,Cookies")]
