@@ -6,6 +6,7 @@ using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -505,13 +506,17 @@ public class ProjectsController(
     /// Marks the project quotation as accepted by the customer, triggering order/job creation.
     /// </summary>
     /// <param name="id">The project GUID.</param>
+    /// <param name="request">Optional expected quotation version for stale-acceptance protection.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
     [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpPost("{id:guid}/accept-quotation")]
-    public async Task<IActionResult> AcceptQuotation(Guid id, CancellationToken ct)
+    public async Task<IActionResult> AcceptQuotation(
+        Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AcceptQuotationRequest? request,
+        CancellationToken ct)
     {
-        var response = await client.AcceptQuotationAsync(id, ct);
+        var response = await client.AcceptQuotationAsync(id, request, ct);
         return response.IsSuccessStatusCode ? NoContent() : StatusCode((int)response.StatusCode);
     }
 

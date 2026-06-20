@@ -921,7 +921,7 @@ public class ProjectsControllerTests
     {
         var controller = new ProjectsController(CreateRawClient(HttpStatusCode.OK), StubJobClient(), StubFacilityClient(), Logger);
 
-        var result = await controller.AcceptQuotation(Guid.NewGuid(), CancellationToken.None);
+        var result = await controller.AcceptQuotation(Guid.NewGuid(), null, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
     }

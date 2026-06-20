@@ -837,6 +837,18 @@ public class GenerateQuotationRequest
 }
 
 /// <summary>
+/// Request to accept the currently displayed quotation version for a project.
+/// </summary>
+public class AcceptQuotationRequest
+{
+    /// <summary>Gets or sets the expected current quotation version identifier.</summary>
+    public Guid? ExpectedQuotationVersionId { get; set; }
+
+    /// <summary>Gets or sets the expected current quotation version number.</summary>
+    public int? ExpectedQuotationVersionNumber { get; set; }
+}
+
+/// <summary>
 /// Request to confirm or override the AI-estimated price for a project part.
 /// </summary>
 public class ConfirmPartPriceRequest

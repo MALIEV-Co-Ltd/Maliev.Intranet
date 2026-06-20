@@ -321,8 +321,13 @@ public class ProjectServiceClient(HttpClient httpClient)
     /// <summary>
     /// Marks a project's quotation as accepted by the customer.
     /// </summary>
-    public async Task<HttpResponseMessage> AcceptQuotationAsync(Guid projectId, CancellationToken ct = default)
-        => await httpClient.PostAsync($"/project/v1/projects/{projectId}/accept-quotation", null, ct);
+    public async Task<HttpResponseMessage> AcceptQuotationAsync(
+        Guid projectId,
+        AcceptQuotationRequest? request = null,
+        CancellationToken ct = default)
+        => request is null
+            ? await httpClient.PostAsync($"/project/v1/projects/{projectId}/accept-quotation", null, ct)
+            : await httpClient.PostAsJsonAsync($"/project/v1/projects/{projectId}/accept-quotation", request, ct);
 
     // ── Dashboard helpers ────────────────────────────────────────────────────
 

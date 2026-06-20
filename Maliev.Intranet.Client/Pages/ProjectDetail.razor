@@ -1883,7 +1883,13 @@
         _accepting = true;
         try
         {
-            var response = await Http.PostAsync($"api/v1/projects/{Id}/accept-quotation", null);
+            var response = await Http.PostAsJsonAsync(
+                $"api/v1/projects/{Id}/accept-quotation",
+                new AcceptQuotationRequest
+                {
+                    ExpectedQuotationVersionId = _project?.CurrentQuotationVersionId,
+                    ExpectedQuotationVersionNumber = _project?.CurrentQuotationVersionNumber
+                });
             if (!response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Failed to accept quotation.", Severity.Error);
