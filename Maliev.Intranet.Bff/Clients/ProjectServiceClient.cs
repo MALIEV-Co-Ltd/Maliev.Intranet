@@ -341,6 +341,16 @@ public class ProjectServiceClient(HttpClient httpClient)
         return stats?.ConfiguringCount ?? 0;
     }
 
+    /// <summary>
+    /// Returns the count of projects waiting for employee review.
+    /// Used by the dashboard action items panel for Make Studio review requests.
+    /// </summary>
+    public async Task<int> GetCustomerReviewCountAsync(CancellationToken ct = default)
+    {
+        var stats = await GetProjectStatsAsync(ct);
+        return stats?.CustomerReviewCount ?? 0;
+    }
+
     private sealed class ProjectServicePagedProjectResponse
     {
         public List<ProjectServiceProjectSummaryResponse> Data { get; set; } = [];

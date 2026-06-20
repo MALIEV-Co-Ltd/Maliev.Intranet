@@ -871,6 +871,9 @@ public class ProjectStatsDto
     /// <summary>Gets or sets the count of projects in Configuring status (waiting for pricing).</summary>
     public int ConfiguringCount { get; set; }
 
+    /// <summary>Gets or sets the count of projects waiting for employee review.</summary>
+    public int CustomerReviewCount { get; set; }
+
     /// <summary>Gets or sets the count of projects in Quoted status (quotation sent to customer).</summary>
     public int QuotedCount { get; set; }
 

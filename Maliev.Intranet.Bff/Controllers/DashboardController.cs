@@ -183,6 +183,7 @@ public class DashboardController(
         var agingQuotesTask = SafeCount(t => quotationClient.GetAgingQuotationCountAsync(7, t), ct);
         var overdueInvoicesTask = SafeCount(t => invoiceClient.GetOverdueInvoiceCountAsync(t), ct);
         var configuringProjectsTask = SafeCount(t => projectClient.GetConfiguringCountAsync(t), ct);
+        var customerReviewProjectsTask = SafeCount(t => projectClient.GetCustomerReviewCountAsync(t), ct);
         var overdueJobsTask = SafeCount(t => jobClient.GetOverdueJobCountAsync(t), ct);
 
         var employeeId = await GetEmployeeIdAsync(ct);
@@ -190,7 +191,7 @@ public class DashboardController(
             ? Task.FromResult(0)
             : SafeCount(t => leaveClient.GetPendingApprovalCountAsync(employeeId, t), ct);
 
-        await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask, overdueJobsTask);
+        await Task.WhenAll(onHoldOrdersTask, agingQuotesTask, overdueInvoicesTask, pendingLeaveTask, configuringProjectsTask, customerReviewProjectsTask, overdueJobsTask);
 
         var result = new DashboardActionItemsDto();
 
@@ -199,6 +200,7 @@ public class DashboardController(
         var overdueInvoices = await overdueInvoicesTask;
         var pendingLeave = await pendingLeaveTask;
         var configuringProjects = await configuringProjectsTask;
+        var customerReviewProjects = await customerReviewProjectsTask;
         var overdueJobs = await overdueJobsTask;
 
         if (onHoldOrders > 0)
@@ -247,6 +249,18 @@ public class DashboardController(
                 NavigateTo = "/hr/leave?tab=approvals",
                 Severity = "Info",
                 ManagerOnly = true
+            });
+        }
+
+        if (customerReviewProjects > 0)
+        {
+            result.Categories.Add(new ActionItemCategoryDto
+            {
+                Label = $"{customerReviewProjects} project{(customerReviewProjects == 1 ? "" : "s")} waiting for employee review",
+                Icon = "Icons.Material.Outlined.RateReview",
+                Count = customerReviewProjects,
+                NavigateTo = "/sales/projects?status=CustomerReview",
+                Severity = "Warning"
             });
         }
 

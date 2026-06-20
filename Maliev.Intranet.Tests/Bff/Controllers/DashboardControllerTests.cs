@@ -216,6 +216,56 @@ public class DashboardControllerTests
     }
 
     [Fact]
+    public async Task GetActionItems_WithCustomerReviewProjects_ShouldReturnProjectReviewQueueActionItem()
+    {
+        var requestedPaths = new List<string>();
+        var handler = new MockHttpMessageHandler((req, ct) =>
+        {
+            requestedPaths.Add(req.RequestUri?.PathAndQuery ?? string.Empty);
+            var path = req.RequestUri?.AbsolutePath ?? string.Empty;
+
+            if (path.Equals("/project/v1/projects/stats", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        activeCount = 5,
+                        configuringCount = 0,
+                        customerReviewCount = 2,
+                        quotedCount = 0,
+                        inProductionCount = 0
+                    })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { count = 0, TodayTotal = 0m })
+            });
+        });
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://test") };
+        var controller = new DashboardController(
+            new OrderServiceClient(httpClient),
+            new QuotationServiceClient(httpClient),
+            new PaymentServiceClient(httpClient),
+            new EmployeeServiceClient(httpClient),
+            new InvoiceServiceClient(httpClient),
+            new LeaveServiceClient(httpClient),
+            new ProjectServiceClient(httpClient),
+            new JobServiceClient(httpClient));
+
+        var result = await controller.GetActionItems(CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var model = Assert.IsType<DashboardActionItemsDto>(okResult.Value);
+        var reviewItem = Assert.Single(model.Categories, item => item.NavigateTo == "/sales/projects?status=CustomerReview");
+        Assert.Equal("2 projects waiting for employee review", reviewItem.Label);
+        Assert.Equal("Warning", reviewItem.Severity);
+        Assert.Contains("/project/v1/projects/stats", requestedPaths);
+    }
+
+    [Fact]
     public async Task GetActionItems_WhenRequestIsCanceled_ShouldPropagateCancellation()
     {
         var handler = new MockHttpMessageHandler((req, ct) =>
