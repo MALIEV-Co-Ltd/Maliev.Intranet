@@ -9,6 +9,20 @@ public sealed class ModelViewerRenderingSourceTests
     private static string ModelViewer => ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor");
 
     [Fact]
+    public void ProjectNewModelViewer_DoesNotDefaultToReducedMotion()
+    {
+        var viewerScript = ViewerScript.ReplaceLineEndings("\n");
+        var modelViewer = ModelViewer.ReplaceLineEndings("\n");
+
+        Assert.DoesNotContain("prefers-reduced-motion", viewerScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reducedMotion", viewerScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matchMedia('(prefers-reduced-motion", viewerScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matchMedia(\"(prefers-reduced-motion", viewerScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("prefers-reduced-motion", modelViewer, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reducedMotion", modelViewer, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RealisticNormals_SmoothDuplicateCadVerticesByPosition()
     {
         var source = ViewerScript.ReplaceLineEndings("\n");
