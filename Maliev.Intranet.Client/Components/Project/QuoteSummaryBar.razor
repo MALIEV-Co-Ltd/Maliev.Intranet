@@ -121,14 +121,24 @@
                             </span>
                             <span class="qsb-adjustment-copy">
                                 <span class="qsb-adjustment-name">Shipping</span>
-                                <span class="qsb-adjustment-hint">Freight, courier, or delivery charge</span>
+                                <span class="qsb-adjustment-hint">Live courier rates from DeliveryService</span>
                             </span>
                         </div>
-                        <div class="qsb-money-entry">
-                            <CurrencyInput Label="Shipping"
-                                           HelperText="Freight, courier, or delivery charge"
-                                           @bind-ThbValue="ShippingCost"
-                                           Min="0m" />
+                        <div class="qsb-selected-rate" aria-live="polite">
+                            <span class="qsb-selected-rate-label">Selected courier rate</span>
+                            <span class="qsb-selected-rate-amount">
+                                @(ShippingCost > 0m ? $"{ShippingCost:N2} THB" : "No rate selected")
+                            </span>
+                            @if (_selectedShippingRate is not null)
+                            {
+                                <span class="qsb-selected-rate-meta">
+                                    @_selectedShippingRate.ProductName
+                                    @if (!string.IsNullOrWhiteSpace(_selectedShippingRate.Provider))
+                                    {
+                                        <span> via @_selectedShippingRate.Provider</span>
+                                    }
+                                </span>
+                            }
                         </div>
                         <div class="qsb-shipping-entry-grid">
                             <MudTextField T="string" Label="Recipient" @bind-Value="_shippingToName" Variant="Variant.Outlined" Margin="Margin.Dense" />
@@ -640,6 +650,37 @@
         min-width: 0;
     }
 
+    .qsb-selected-rate {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 2px 10px;
+        align-items: center;
+        padding: 8px 10px;
+        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
+        border-radius: 6px;
+        background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+        min-width: 0;
+    }
+
+    .qsb-selected-rate-label,
+    .qsb-selected-rate-meta {
+        min-width: 0;
+        font-size: 11px;
+        color: var(--maliev-muted);
+    }
+
+    .qsb-selected-rate-amount {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--mud-palette-primary);
+        white-space: nowrap;
+    }
+
+    .qsb-selected-rate-meta {
+        grid-column: 1 / -1;
+    }
+
     .qsb-terms-panel {
         margin: 0 12px 12px;
         padding: 10px;
@@ -931,6 +972,7 @@
     private bool _detailsOpen;
     private bool _fetchingRates;
     private List<ShippingRateOptionDto> _rateOptions = [];
+    private ShippingRateOptionDto? _selectedShippingRate;
     private string _shippingToName = "Customer";
     private string _shippingToPhone = "";
     private string _shippingToAddress = "";
@@ -1080,6 +1122,7 @@
 
     private async Task SelectCourierRate(ShippingRateOptionDto rate)
     {
+        _selectedShippingRate = rate;
         await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
         _rateOptions = [];
         StateHasChanged();

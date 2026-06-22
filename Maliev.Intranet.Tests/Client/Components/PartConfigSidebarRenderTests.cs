@@ -1065,6 +1065,18 @@ public sealed class PartConfigSidebarRenderTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void QuoteFooterShippingEntry_UsesLiveCourierRateSummary()
+    {
+        var markup = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor");
+        var codeBehind = ReadRepoFile("Maliev.Intranet.Client", "Components", "Project", "PartConfigSidebar.razor.cs");
+
+        Assert.Contains("Live courier rates from DeliveryService", markup, StringComparison.Ordinal);
+        Assert.Contains("pcs-qf-selected-rate", markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Freight, courier, or delivery charge", markup, StringComparison.Ordinal);
+        Assert.Contains("_quoteSelectedShippingRate = rate;", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MaterialColorOptions_WhenStandardResinHasClearCatalogChoice_HidesClear()
     {
         var materialId = Guid.NewGuid();

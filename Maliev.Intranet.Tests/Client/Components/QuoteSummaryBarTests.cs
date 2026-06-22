@@ -73,5 +73,8 @@ public sealed class QuoteSummaryBarTests : BunitContext, IAsyncLifetime
         Assert.Equal(2, cut.FindAll(".qsb-adjustment-card").Count);
         Assert.NotEmpty(cut.FindAll(".qsb-terms-panel"));
         Assert.Contains("Commercial adjustments", cut.Markup);
+        Assert.Contains("Live courier rates from DeliveryService", cut.Markup);
+        Assert.Contains("Selected courier rate", cut.Markup);
+        Assert.DoesNotContain("Freight, courier, or delivery charge", cut.Markup);
     }
 }

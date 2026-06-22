@@ -126,6 +126,7 @@ public partial class PartConfigSidebar : ComponentBase
     private bool _quotePdfGenerating;
     private bool _quoteFetchingRates;
     private List<ShippingRateOptionDto> _quoteRateOptions = [];
+    private ShippingRateOptionDto? _quoteSelectedShippingRate;
     private string _quoteShippingToName = "Customer";
     private string _quoteShippingToPhone = "";
     private string _quoteShippingToAddress = "";
@@ -265,6 +266,7 @@ public partial class PartConfigSidebar : ComponentBase
 
     private async Task SelectQuoteCourierRate(ShippingRateOptionDto rate)
     {
+        _quoteSelectedShippingRate = rate;
         await ShippingCostChanged.InvokeAsync(rate.TotalPrice);
         _quoteRateOptions = [];
         StateHasChanged();

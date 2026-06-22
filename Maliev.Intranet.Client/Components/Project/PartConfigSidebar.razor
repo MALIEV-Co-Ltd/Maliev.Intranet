@@ -1106,13 +1106,25 @@ else
                                     <MudIcon Icon="@Icons.Material.Outlined.LocalShipping" Size="Size.Small" />
                                     <div>
                                         <div class="pcs-qf-adj-name">Shipping</div>
-                                        <div class="pcs-qf-adj-hint">Freight, courier, or delivery charge</div>
+                                        <div class="pcs-qf-adj-hint">Live courier rates from DeliveryService</div>
                                     </div>
                                 </div>
-                                <CurrencyInput Label="Shipping"
-                                               HelperText="Freight, courier, or delivery charge"
-                                               @bind-ThbValue="ShippingCost"
-                                               Min="0m" />
+                                <div class="pcs-qf-selected-rate" aria-live="polite">
+                                    <span class="pcs-qf-selected-rate-label">Selected courier rate</span>
+                                    <span class="pcs-qf-selected-rate-amount">
+                                        @(ShippingCost > 0m ? $"{ShippingCost:N2} THB" : "No rate selected")
+                                    </span>
+                                    @if (_quoteSelectedShippingRate is not null)
+                                    {
+                                        <span class="pcs-qf-selected-rate-meta">
+                                            @_quoteSelectedShippingRate.ProductName
+                                            @if (!string.IsNullOrWhiteSpace(_quoteSelectedShippingRate.Provider))
+                                            {
+                                                <span> via @_quoteSelectedShippingRate.Provider</span>
+                                            }
+                                        </span>
+                                    }
+                                </div>
                                 <div class="pcs-qf-shipping-entry-grid">
                                     <MudTextField T="string" Label="Recipient" @bind-Value="_quoteShippingToName" Variant="Variant.Outlined" Margin="Margin.Dense" />
                                     <MudTextField T="string" Label="Phone" @bind-Value="_quoteShippingToPhone" Variant="Variant.Outlined" Margin="Margin.Dense" />
@@ -1502,6 +1514,37 @@ else
                 font-size: 10px;
                 color: var(--maliev-muted);
                 line-height: 1.25;
+            }
+
+            .pcs-qf-selected-rate {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 2px 8px;
+                align-items: center;
+                padding: 7px 9px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
+                border-radius: 6px;
+                background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+                min-width: 0;
+            }
+
+            .pcs-qf-selected-rate-label,
+            .pcs-qf-selected-rate-meta {
+                min-width: 0;
+                font-size: 10px;
+                color: var(--maliev-muted);
+            }
+
+            .pcs-qf-selected-rate-amount {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 12px;
+                font-weight: 800;
+                color: var(--mud-palette-primary);
+                white-space: nowrap;
+            }
+
+            .pcs-qf-selected-rate-meta {
+                grid-column: 1 / -1;
             }
 
             .pcs-qf-terms-panel {
