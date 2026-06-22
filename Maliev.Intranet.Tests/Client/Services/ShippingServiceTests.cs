@@ -52,6 +52,7 @@ public sealed class ShippingServiceTests
                 State = "Bang Rak",
                 Province = "Bangkok",
                 Postcode = "10500",
+                CountryCode = "SG",
                 Tel = "0800000000"
             },
             Parcel = new ShippingParcelDto
@@ -72,6 +73,7 @@ public sealed class ShippingServiceTests
         var root = payload.RootElement;
         Assert.Equal("10400", root.GetProperty("from").GetProperty("postcode").GetString());
         Assert.Equal("10500", root.GetProperty("to").GetProperty("postcode").GetString());
+        Assert.Equal("SG", root.GetProperty("to").GetProperty("countryCode").GetString());
         Assert.Equal(1250m, root.GetProperty("parcel").GetProperty("weight").GetDecimal());
         Assert.Equal("EMST", root.GetProperty("courierCodes")[0].GetString());
     }

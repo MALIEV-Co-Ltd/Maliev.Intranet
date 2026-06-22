@@ -31,6 +31,9 @@ public record ShippingAddressDto
     [Required]
     public string Postcode { get; init; } = string.Empty;
 
+    /// <summary>ISO 3166-1 alpha-2 country code.</summary>
+    public string CountryCode { get; init; } = "TH";
+
     /// <summary>Contact phone number.</summary>
     [Required]
     public string Tel { get; init; } = string.Empty;
