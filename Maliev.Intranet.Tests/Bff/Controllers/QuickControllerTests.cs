@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
@@ -361,6 +363,91 @@ public class QuickControllerTests
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         var result = await controller.GetMe();
         Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public void ClientConfig_GetClientConfig_ReturnsDefaultProcessingTimeout()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var controller = new ClientConfigController(configuration);
+
+        var result = controller.GetClientConfig();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<ClientConfigDto>(ok.Value);
+        Assert.Equal(3, dto.ProcessingTimeoutMinutes);
+    }
+
+    [Fact]
+    public void ClientConfig_GetClientConfig_ReturnsConfiguredProcessingTimeout()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MalievClient:ProcessingTimeoutMinutes"] = "7"
+            })
+            .Build();
+        var controller = new ClientConfigController(configuration);
+
+        var result = controller.GetClientConfig();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<ClientConfigDto>(ok.Value);
+        Assert.Equal(7, dto.ProcessingTimeoutMinutes);
+    }
+
+    [Fact]
+    public async Task Diagnostics_GetMe_ReturnsEffectiveIdentityAndIamResolution()
+    {
+        var principalId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var iamContext = new UserContextDto
+        {
+            UserId = principalId.ToString(),
+            Permissions = [MalievPermissions.System.DiagnosticsRead],
+            Roles = ["roles.system.diagnostics"]
+        };
+        var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
+        iamClient.Setup(client => client.GetUserAssignmentsAsync(principalId.ToString(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(iamContext);
+        var controller = new DiagnosticsController(iamClient.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                    [
+                        new Claim("user_id", principalId.ToString()),
+                        new Claim("email", "operator@maliev.com"),
+                        new Claim("permissions", MalievPermissions.System.DiagnosticsRead)
+                    ], "TestAuth"))
+                }
+            }
+        };
+
+        var result = await controller.GetMe();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var json = JsonSerializer.Serialize(ok.Value);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        Assert.True(root.GetProperty("IsAuthenticated").GetBoolean());
+        Assert.Equal("TestAuth", root.GetProperty("AuthenticationType").GetString());
+        Assert.Equal(principalId.ToString(), root.GetProperty("PrincipalId").GetString());
+        Assert.Contains(root.GetProperty("Claims").EnumerateArray(), claim =>
+            claim.GetProperty("Type").GetString() == "email"
+            && claim.GetProperty("Value").GetString() == "operator@maliev.com");
+        Assert.Equal(principalId.ToString(), root.GetProperty("IamResolvedData").GetProperty("UserId").GetString());
+    }
+
+    [Fact]
+    public void DiagnosticsController_RequiresDiagnosticsReadPermission()
+    {
+        var attribute = Assert.Single(typeof(DiagnosticsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: true));
+        var permission = Assert.IsType<RequirePermissionAttribute>(attribute);
+
+        Assert.Equal(MalievPermissions.System.DiagnosticsRead, permission.Permission);
+        Assert.Equal("Bearer,Cookies", permission.AuthenticationSchemes);
     }
 
     [Fact]
