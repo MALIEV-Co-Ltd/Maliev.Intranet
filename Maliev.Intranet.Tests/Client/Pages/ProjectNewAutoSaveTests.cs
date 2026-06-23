@@ -250,6 +250,83 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void ProjectNew_WithSessionDraftInStorage_RestoresRecoverableWorkspaceState()
+    {
+        var sessionId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var customerId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var tempProjectId = Guid.Parse("99999999-8888-7777-6666-555555555555");
+        var fileId = Guid.Parse("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb");
+        var serverPartId = Guid.Parse("cccccccc-1111-2222-3333-dddddddddddd");
+        var draft = new DraftProjectState
+        {
+            TempProjectId = tempProjectId,
+            Title = "Recovered aerospace bracket",
+            CustomerId = customerId,
+            CustomerName = "Ari Morgan",
+            CustomerCompanyName = "Orbital Fixtures",
+            CustomerEmail = "ari@example.com",
+            CustomerProfileImageUrl = "https://cdn.example/avatar.png",
+            SelectedCurrencyCode = "THB",
+            ShippingCost = 125.50m,
+            ManualDiscountAmount = 25.25m,
+            QuotationTerms = "Recovered payment terms",
+            LastModified = new DateTime(2026, 6, 23, 10, 30, 0, DateTimeKind.Utc),
+            Parts =
+            [
+                new DraftPartState
+                {
+                    FileId = fileId,
+                    ServerPartId = serverPartId,
+                    Name = "bracket.step",
+                    StoragePath = "projects/temp/recovered/bracket.step",
+                    Quantity = 4,
+                    ProcessCode = "CNC_MILL",
+                    MaterialCode = "AL6061",
+                    SurfaceFinishCode = "ANODIZED",
+                    ToleranceCode = "ISO2768_M",
+                    EstimatedUnitPrice = 42.50m,
+                    EstimatedTotalAmount = 170m,
+                    ThumbnailSmallUrl = "https://signed.example/thumb.webp",
+                    ViewerStoragePath = "projects/temp/recovered/bracket_viewer.glb",
+                    ViewerUrl = "https://signed.example/viewer.glb"
+                }
+            ]
+        };
+        var json = JsonSerializer.Serialize(draft);
+        JSInterop
+            .Setup<string>("sessionStorage.getItem", _ => true)
+            .SetResult(json);
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo($"/sales/projects/new?session={sessionId}");
+
+        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
+
+        cut.WaitForAssertion(() => Assert.Equal(tempProjectId, GetPrivateField<Guid>(cut.Instance, "_tempProjectId")), TimeSpan.FromSeconds(5));
+        Assert.Equal("Recovered aerospace bracket", GetPrivateField<string>(cut.Instance, "_title"));
+        Assert.Equal(125.50m, GetPrivateField<decimal>(cut.Instance, "_shippingCost"));
+        Assert.Equal(25.25m, GetPrivateField<decimal>(cut.Instance, "_manualDiscountAmount"));
+        Assert.Equal("Recovered payment terms", GetPrivateField<string>(cut.Instance, "_quotationTerms"));
+        var customer = GetPrivateField<CustomerSummaryDto>(cut.Instance, "_selectedCustomer");
+        Assert.Equal(customerId, customer.Id);
+        Assert.Equal("Ari Morgan", customer.Name);
+        Assert.Equal("Orbital Fixtures", customer.CompanyName);
+        var part = Assert.Single(GetParts(cut.Instance));
+        Assert.Equal(fileId, part.FileId);
+        Assert.Equal(serverPartId, part.ServerPartId);
+        Assert.Equal("bracket.step", part.Name);
+        Assert.Equal("projects/temp/recovered/bracket.step", part.StoragePath);
+        Assert.Equal(4, part.Quantity);
+        Assert.Equal("CNC_MILL", part.ProcessCode);
+        Assert.Equal("AL6061", part.MaterialCode);
+        Assert.Equal("ANODIZED", part.FinishCode);
+        Assert.Equal("ISO2768_M", part.ToleranceCode);
+        Assert.Equal(42.50m, part.EstimatedUnitPrice);
+        Assert.Equal(170m, part.EstimatedTotalAmount);
+        Assert.Equal("https://signed.example/thumb.webp", part.ThumbnailSmallUrl);
+        Assert.Equal("https://signed.example/viewer.glb", part.ViewerUrl);
+    }
+
+    [Fact]
     public async Task OpenBabylonViewer_WhenViewerUrlAlreadyExists_DoesNotRefreshOrShowError()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
