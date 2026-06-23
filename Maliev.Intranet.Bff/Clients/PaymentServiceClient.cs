@@ -30,7 +30,9 @@ public class PaymentServiceClient(HttpClient httpClient)
     /// <returns>A paged response containing payment summaries.</returns>
     public async Task<PagedResponse<PaymentSummaryDto>?> GetPaymentsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await httpClient.GetFromJsonAsync<PagedResponse<PaymentSummaryDto>>($"/payment/v1/payments?page={page}&pageSize={pageSize}", ct);
+        var response = await httpClient.GetAsync($"/payment/v1/payments?page={page}&pageSize={pageSize}", ct);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<PagedResponse<PaymentSummaryDto>>(cancellationToken: ct);
     }
 
     /// <summary>
