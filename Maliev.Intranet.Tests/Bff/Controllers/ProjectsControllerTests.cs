@@ -76,6 +76,53 @@ public class ProjectsControllerTests
         }
     }
 
+    [Fact]
+    public void ProjectEndpoints_RequireExpectedPermissionMatrix()
+    {
+        var controllerPermission = Assert.IsType<RequirePermissionAttribute>(
+            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+        Assert.Equal(MalievPermissions.Project.Read, controllerPermission.Permission);
+        Assert.Equal("Bearer,Cookies", controllerPermission.AuthenticationSchemes);
+
+        foreach (var methodName in new[]
+        {
+            nameof(ProjectsController.Get),
+            nameof(ProjectsController.GetById),
+            nameof(ProjectsController.GetPartLargeThumbnailUrl),
+            nameof(ProjectsController.GetProductionPlan),
+            nameof(ProjectsController.GetPartRouting)
+        })
+        {
+            var method = typeof(ProjectsController).GetMethod(methodName);
+            Assert.NotNull(method);
+            Assert.Empty(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+        }
+
+        foreach (var methodName in new[]
+        {
+            nameof(ProjectsController.Create),
+            nameof(ProjectsController.AddNote),
+            nameof(ProjectsController.Duplicate),
+            nameof(ProjectsController.Update),
+            nameof(ProjectsController.Delete),
+            nameof(ProjectsController.AddPart),
+            nameof(ProjectsController.UpdatePart),
+            nameof(ProjectsController.DeletePart),
+            nameof(ProjectsController.GetPartPrice),
+            nameof(ProjectsController.ConfirmPartPrice),
+            nameof(ProjectsController.GenerateQuotation),
+            nameof(ProjectsController.AcceptQuotation)
+        })
+        {
+            var method = typeof(ProjectsController).GetMethod(methodName);
+            Assert.NotNull(method);
+            var methodPermission = Assert.IsType<RequirePermissionAttribute>(
+                Assert.Single(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+            Assert.Equal(MalievPermissions.Project.Write, methodPermission.Permission);
+            Assert.Equal("Bearer,Cookies", methodPermission.AuthenticationSchemes);
+        }
+    }
+
     // ── GET (list) ────────────────────────────────────────────────────────────
 
     [Fact]
