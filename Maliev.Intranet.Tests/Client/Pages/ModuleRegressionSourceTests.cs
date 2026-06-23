@@ -223,6 +223,16 @@ public class ModuleRegressionSourceTests
     }
 
     [Fact]
+    public void RouterFallback_UsesNotFoundRecoveryPage()
+    {
+        var routes = ReadRepoFile("Maliev.Intranet.Client", "Routes.razor");
+
+        Assert.Contains("<NotFound>", routes, StringComparison.Ordinal);
+        Assert.Contains("<Maliev.Intranet.Client.Pages.NotFound />", routes, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sorry, there's nothing at this address.", routes, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TopBar_DoesNotContainDesignIterationDisplayTweaks()
     {
         var source = ReadRepoFile("Maliev.Intranet.Client", "Layout", "TopBar.razor");
