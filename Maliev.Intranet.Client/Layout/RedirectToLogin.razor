@@ -4,9 +4,11 @@
 @code {
     protected override void OnInitialized()
     {
-        var loginUrl = $"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
-        
-        if (!Navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase))
+        var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var returnUrl = string.IsNullOrWhiteSpace(relativeUri) ? "/" : $"/{relativeUri}";
+        var loginUrl = $"/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        if (!returnUrl.StartsWith("/login", StringComparison.OrdinalIgnoreCase))
         {
             Navigation.NavigateTo(loginUrl, forceLoad: true);
         }
