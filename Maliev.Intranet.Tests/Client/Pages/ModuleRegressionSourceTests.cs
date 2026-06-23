@@ -2231,12 +2231,22 @@ public class ModuleRegressionSourceTests
         var uploadHelper = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "uploadWithProgress.js")
             .ReplaceLineEndings("\n");
 
+        Assert.Contains("private const string ProjectUploadContainerId = \"project-new-file-upload\";", projectNewCode, StringComparison.Ordinal);
+        Assert.Contains("<div id=\"@ProjectUploadContainerId\" style=\"display:none;\">", projectNew, StringComparison.Ordinal);
+        Assert.Contains("<MudFileUpload T=\"IReadOnlyList<IBrowserFile>\"", projectNew, StringComparison.Ordinal);
+        Assert.Contains("FilesChanged=\"HandleFileSelected\"", projectNew, StringComparison.Ordinal);
+        Assert.Contains("Accept=\"@FileTypes.ThreeDAcceptString\"", projectNew, StringComparison.Ordinal);
+        Assert.Contains("MaximumFileCount=\"20\"", projectNew, StringComparison.Ordinal);
+        Assert.Contains("Hidden=\"true\"", projectNew, StringComparison.Ordinal);
         Assert.Contains("Class=\"pn-empty-dropzone project-new-upload-dropzone\"", projectNew, StringComparison.Ordinal);
         Assert.Contains("Class=\"plp-dropzone project-new-upload-dropzone\"", partsList, StringComparison.Ordinal);
         Assert.DoesNotContain("OnFilesDropped=\"OpenFilePicker\"", projectNew, StringComparison.Ordinal);
         Assert.DoesNotContain("OnFilesDropped=\"@OnAddPart\"", partsList, StringComparison.Ordinal);
         Assert.Contains("window.projectNewUploads.initDropZones", projectNewCode, StringComparison.Ordinal);
+        Assert.Contains("window.projectNewUploads.captureFiles", projectNewCode, StringComparison.Ordinal);
         Assert.Contains("function initDropZones", uploadHelper, StringComparison.Ordinal);
+        Assert.Contains("container.querySelectorAll('input[type=file]')", uploadHelper, StringComparison.Ordinal);
+        Assert.Contains("input.dispatchEvent(new Event('change', { bubbles: true }))", uploadHelper, StringComparison.Ordinal);
     }
 
     [Fact]
