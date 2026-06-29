@@ -4770,8 +4770,11 @@ function createRealisticPbrMaterial(scene, canvasId, materialType, preset) {
 
     const surfaceEffect = perCanvasSurfaceEffects[canvasId] || getSurfaceEffect(null);
     const SurfaceEffectPlugin = getSurfaceEffectPluginClass();
-    const surfacePlugin = new SurfaceEffectPlugin(pbr, surfaceEffect);
-    surfacePlugin.setEffect(surfaceEffect);
+    // Construction only — every caller of getRealisticMaterial() follows with
+    // syncRealisticMaterialProperties(), whose setEffect() call is the single
+    // authoritative enable (see the plugin constructor comment). Calling
+    // setEffect() here too would double-enable the plugin per material creation.
+    new SurfaceEffectPlugin(pbr, surfaceEffect);
 
     pbr._malievMaterialPipeline = 'pbr-plugin-fallback';
     pbr._malievNodeMaterialProfile = profile;
