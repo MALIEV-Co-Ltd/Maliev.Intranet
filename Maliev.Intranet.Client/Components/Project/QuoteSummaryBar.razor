@@ -168,18 +168,43 @@
                         </MudButton>
                         @if (_rateOptions.Count > 0 && !_fetchingRates)
                         {
-                            <div class="qsb-rate-options">
+                            <div class="qsb-rate-options" role="listbox" aria-label="Available courier rates">
+                                <div class="qsb-rate-options-head">
+                                    <span>Available couriers</span>
+                                    <strong>@_rateOptions.Count</strong>
+                                </div>
                                 @foreach (var rate in _rateOptions)
                                 {
+                                    var isSelected = ReferenceEquals(rate, _selectedShippingRate);
                                     <button type="button"
-                                            class="qsb-rate-option"
+                                            class="qsb-rate-option @(isSelected ? "is-selected" : "")"
+                                            aria-pressed="@isSelected"
                                             @onclick="@(() => SelectCourierRate(rate))">
-                                        <span class="qsb-rate-name">@rate.ProductName</span>
-                                        <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0") @rate.CurrencyCode</span>
-                                        @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
-                                        {
-                                            <span class="qsb-rate-edd">@rate.EstimatedDeliveryDate</span>
-                                        }
+                                        <span class="qsb-rate-selector" aria-hidden="true"></span>
+                                        <span class="qsb-rate-copy">
+                                            <span class="qsb-rate-name">@rate.ProductName</span>
+                                            <span class="qsb-rate-provider">
+                                                @if (!string.IsNullOrWhiteSpace(rate.Provider))
+                                                {
+                                                    <span>@rate.Provider</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(rate.CourierCode))
+                                                {
+                                                    <span>@rate.CourierCode</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(rate.ServiceLevel))
+                                                {
+                                                    <span>@rate.ServiceLevel</span>
+                                                }
+                                            </span>
+                                        </span>
+                                        <span class="qsb-rate-price-stack">
+                                            <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                            <span class="qsb-rate-currency">@rate.CurrencyCode</span>
+                                        </span>
+                                        <span class="qsb-rate-edd">
+                                            @(string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate) ? "ETA pending" : rate.EstimatedDeliveryDate)
+                                        </span>
                                     </button>
                                 }
                             </div>
@@ -890,12 +915,6 @@
         }
     }
 
-    .qsb-rate-options {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
     .qsb-shipping-entry-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -903,44 +922,146 @@
         margin: 2px 0 8px;
     }
 
-    .qsb-rate-option {
+    .qsb-rate-options {
+        display: grid;
+        gap: 7px;
+        padding: 8px;
+        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 20%, var(--maliev-border));
+        border-radius: 8px;
+        background: color-mix(in oklch, var(--maliev-panel) 86%, var(--mud-palette-info));
+    }
+
+    .qsb-rate-options-head {
         display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        gap: 6px;
-        padding: 6px 8px;
-        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
-        border-radius: 6px;
-        background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--maliev-muted);
+        font-size: var(--mud-typography-caption-size);
+        font-weight: 700;
+        letter-spacing: 0;
+    }
+
+    .qsb-rate-options-head strong {
+        min-width: 24px;
+        height: 22px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 999px;
+        color: var(--mud-palette-info);
+        background: color-mix(in oklch, var(--mud-palette-info) 13%, var(--maliev-panel));
+        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 22%, transparent);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: var(--mud-typography-caption-size);
+    }
+
+    .qsb-rate-option {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr) auto;
+        gap: 5px 9px;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        padding: 9px 10px;
+        border: 1px solid color-mix(in oklch, var(--mud-palette-info) 22%, var(--maliev-border));
+        border-radius: 8px;
+        background: var(--maliev-panel);
+        color: var(--maliev-ink);
         cursor: pointer;
         font-family: inherit;
         text-align: left;
-        transition: background 0.15s;
-        min-width: 0;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
 
-    .qsb-rate-option:hover {
-        background: color-mix(in oklch, var(--mud-palette-info) 10%, var(--maliev-panel));
+    .qsb-rate-option:hover,
+    .qsb-rate-option:focus-visible {
+        border-color: color-mix(in oklch, var(--mud-palette-info) 48%, var(--maliev-border));
+        background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+        outline: none;
+    }
+
+    .qsb-rate-option.is-selected {
+        border-color: var(--mud-palette-info);
+        box-shadow: 0 0 0 2px color-mix(in oklch, var(--mud-palette-info) 18%, transparent);
+        background: color-mix(in oklch, var(--mud-palette-info) 8%, var(--maliev-panel));
+    }
+
+    .qsb-rate-selector {
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 2px solid color-mix(in oklch, var(--mud-palette-info) 38%, var(--maliev-border));
+        background: var(--maliev-panel);
+        box-shadow: inset 0 0 0 3px var(--maliev-panel);
+    }
+
+    .qsb-rate-option.is-selected .qsb-rate-selector {
+        background: var(--mud-palette-info);
+        border-color: var(--mud-palette-info);
+    }
+
+    .qsb-rate-copy,
+    .qsb-rate-price-stack {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
 
     .qsb-rate-name {
-        flex: 0 0 auto;
-        font-size: 11px;
-        font-weight: 600;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-size: var(--mud-typography-body2-size);
+        font-weight: 750;
+        line-height: 1.2;
         color: var(--maliev-ink);
+    }
+
+    .qsb-rate-provider {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: 0;
+        color: var(--maliev-muted);
+        font-size: var(--mud-typography-caption-size);
+        line-height: 1.2;
+    }
+
+    .qsb-rate-provider span {
+        min-width: 0;
+        max-width: 100%;
+        padding: 1px 6px;
+        border: 1px solid var(--maliev-border);
+        border-radius: 999px;
+        background: var(--maliev-panel-2);
+        overflow-wrap: anywhere;
+    }
+
+    .qsb-rate-price-stack {
+        align-items: flex-end;
+        justify-self: end;
     }
 
     .qsb-rate-price {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 12px;
-        font-weight: 700;
+        font-size: var(--mud-typography-body2-size);
+        font-weight: 850;
+        line-height: 1;
         color: var(--mud-palette-primary);
     }
 
-    .qsb-rate-edd {
-        font-size: 10px;
+    .qsb-rate-currency {
         color: var(--maliev-muted);
-        margin-left: auto;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: var(--mud-typography-caption-size);
+        line-height: 1.1;
+    }
+
+    .qsb-rate-edd {
+        grid-column: 2 / -1;
+        font-size: var(--mud-typography-caption-size);
+        color: var(--maliev-muted);
+        line-height: 1.2;
     }
 </style>
 

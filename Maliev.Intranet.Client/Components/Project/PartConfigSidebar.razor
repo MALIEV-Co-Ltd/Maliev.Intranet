@@ -1153,18 +1153,43 @@ else
                                 </MudButton>
                                 @if (_quoteRateOptions.Count > 0 && !_quoteFetchingRates)
                                 {
-                                    <div class="pcs-qf-rate-options">
+                                    <div class="pcs-qf-rate-options" role="listbox" aria-label="Available courier rates">
+                                        <div class="pcs-qf-rate-options-head">
+                                            <span>Available couriers</span>
+                                            <strong>@_quoteRateOptions.Count</strong>
+                                        </div>
                                         @foreach (var rate in _quoteRateOptions)
                                         {
+                                            var isSelected = ReferenceEquals(rate, _quoteSelectedShippingRate);
                                             <button type="button"
-                                                    class="pcs-qf-rate-option"
+                                                    class="pcs-qf-rate-option @(isSelected ? "is-selected" : "")"
+                                                    aria-pressed="@isSelected"
                                                     @onclick="@(() => SelectQuoteCourierRate(rate))">
-                                                <span class="pcs-qf-rate-name">@rate.ProductName</span>
-                                                <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0") @rate.CurrencyCode</span>
-                                                @if (!string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate))
-                                                {
-                                                    <span class="pcs-qf-rate-edd">@rate.EstimatedDeliveryDate</span>
-                                                }
+                                                <span class="pcs-qf-rate-selector" aria-hidden="true"></span>
+                                                <span class="pcs-qf-rate-copy">
+                                                    <span class="pcs-qf-rate-name">@rate.ProductName</span>
+                                                    <span class="pcs-qf-rate-provider">
+                                                        @if (!string.IsNullOrWhiteSpace(rate.Provider))
+                                                        {
+                                                            <span>@rate.Provider</span>
+                                                        }
+                                                        @if (!string.IsNullOrWhiteSpace(rate.CourierCode))
+                                                        {
+                                                            <span>@rate.CourierCode</span>
+                                                        }
+                                                        @if (!string.IsNullOrWhiteSpace(rate.ServiceLevel))
+                                                        {
+                                                            <span>@rate.ServiceLevel</span>
+                                                        }
+                                                    </span>
+                                                </span>
+                                                <span class="pcs-qf-rate-price-stack">
+                                                    <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                                    <span class="pcs-qf-rate-currency">@rate.CurrencyCode</span>
+                                                </span>
+                                                <span class="pcs-qf-rate-edd">
+                                                    @(string.IsNullOrWhiteSpace(rate.EstimatedDeliveryDate) ? "ETA pending" : rate.EstimatedDeliveryDate)
+                                                </span>
                                             </button>
                                         }
                                     </div>
@@ -1565,9 +1590,12 @@ else
             }
 
             .pcs-qf-rate-options {
-                display: flex;
-                flex-direction: column;
-                gap: 3px;
+                display: grid;
+                gap: 6px;
+                padding: 7px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 20%, var(--maliev-border));
+                border-radius: 8px;
+                background: color-mix(in oklch, var(--maliev-panel) 86%, var(--mud-palette-info));
             }
 
             .pcs-qf-shipping-entry-grid {
@@ -1577,44 +1605,136 @@ else
                 margin: 2px 0 8px;
             }
 
-            .pcs-qf-rate-option {
+            .pcs-qf-rate-options-head {
                 display: flex;
-                flex-wrap: wrap;
                 align-items: center;
-                gap: 4px;
-                padding: 5px 7px;
-                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 24%, var(--maliev-border));
-                border-radius: 5px;
-                background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+                justify-content: space-between;
+                gap: 8px;
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                font-weight: 700;
+            }
+
+            .pcs-qf-rate-options-head strong {
+                min-width: 23px;
+                height: 21px;
+                display: inline-grid;
+                place-items: center;
+                border-radius: 999px;
+                color: var(--mud-palette-info);
+                background: color-mix(in oklch, var(--mud-palette-info) 13%, var(--maliev-panel));
+                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 22%, transparent);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: var(--mud-typography-caption-size);
+            }
+
+            .pcs-qf-rate-option {
+                display: grid;
+                grid-template-columns: 18px minmax(0, 1fr) auto;
+                gap: 5px 8px;
+                align-items: center;
+                width: 100%;
+                min-width: 0;
+                padding: 8px 9px;
+                border: 1px solid color-mix(in oklch, var(--mud-palette-info) 22%, var(--maliev-border));
+                border-radius: 8px;
+                background: var(--maliev-panel);
+                color: var(--maliev-ink);
                 cursor: pointer;
                 font-family: inherit;
                 text-align: left;
-                transition: background 0.15s;
-                min-width: 0;
+                transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
             }
 
-            .pcs-qf-rate-option:hover {
-                background: color-mix(in oklch, var(--mud-palette-info) 10%, var(--maliev-panel));
+            .pcs-qf-rate-option:hover,
+            .pcs-qf-rate-option:focus-visible {
+                border-color: color-mix(in oklch, var(--mud-palette-info) 48%, var(--maliev-border));
+                background: color-mix(in oklch, var(--mud-palette-info) 5%, var(--maliev-panel));
+                outline: none;
+            }
+
+            .pcs-qf-rate-option.is-selected {
+                border-color: var(--mud-palette-info);
+                box-shadow: 0 0 0 2px color-mix(in oklch, var(--mud-palette-info) 18%, transparent);
+                background: color-mix(in oklch, var(--mud-palette-info) 8%, var(--maliev-panel));
+            }
+
+            .pcs-qf-rate-selector {
+                width: 16px;
+                height: 16px;
+                border-radius: 999px;
+                border: 2px solid color-mix(in oklch, var(--mud-palette-info) 38%, var(--maliev-border));
+                background: var(--maliev-panel);
+                box-shadow: inset 0 0 0 3px var(--maliev-panel);
+            }
+
+            .pcs-qf-rate-option.is-selected .pcs-qf-rate-selector {
+                background: var(--mud-palette-info);
+                border-color: var(--mud-palette-info);
+            }
+
+            .pcs-qf-rate-copy,
+            .pcs-qf-rate-price-stack {
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
             }
 
             .pcs-qf-rate-name {
-                flex: 0 0 auto;
-                font-size: 10px;
-                font-weight: 600;
+                min-width: 0;
+                overflow-wrap: anywhere;
+                font-size: var(--mud-typography-body2-size);
+                font-weight: 750;
+                line-height: 1.2;
                 color: var(--maliev-ink);
+            }
+
+            .pcs-qf-rate-provider {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                min-width: 0;
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                line-height: 1.2;
+            }
+
+            .pcs-qf-rate-provider span {
+                min-width: 0;
+                max-width: 100%;
+                padding: 1px 6px;
+                border: 1px solid var(--maliev-border);
+                border-radius: 999px;
+                background: var(--maliev-panel-2);
+                overflow-wrap: anywhere;
+            }
+
+            .pcs-qf-rate-price-stack {
+                align-items: flex-end;
+                justify-self: end;
             }
 
             .pcs-qf-rate-price {
                 font-family: 'JetBrains Mono', monospace;
-                font-size: 11px;
-                font-weight: 700;
+                font-size: var(--mud-typography-body2-size);
+                font-weight: 850;
+                line-height: 1;
                 color: var(--mud-palette-primary);
             }
 
-            .pcs-qf-rate-edd {
-                font-size: 10px;
+            .pcs-qf-rate-currency {
                 color: var(--maliev-muted);
-                margin-left: auto;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: var(--mud-typography-caption-size);
+                line-height: 1.1;
+            }
+
+            .pcs-qf-rate-edd {
+                grid-column: 2 / -1;
+                font-size: var(--mud-typography-caption-size);
+                color: var(--maliev-muted);
+                line-height: 1.2;
             }
 
             .pcs-qf-details-popover ::deep .mud-input-control {
