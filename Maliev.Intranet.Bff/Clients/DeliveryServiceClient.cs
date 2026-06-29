@@ -250,6 +250,10 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
                 CurrencyCode = FirstNonEmpty(rate.Currency, "THB"),
                 EstimatedDeliveryDate = rate.EstimatedDelivery,
                 ServiceLevel = rate.ServiceLevel,
+                CourierLogoUrl = rate.CourierLogoUrl,
+                PackageCount = rate.PackageCount,
+                TotalWeight = rate.TotalWeight,
+                Packages = rate.Packages,
                 Provider = rate.Provider
             }).ToList()
         };
@@ -382,6 +386,14 @@ public class DeliveryServiceClient(HttpClient httpClient) : IDeliveryServiceClie
         public string? ServiceLevel { get; init; }
 
         public string? EstimatedDelivery { get; init; }
+
+        public string? CourierLogoUrl { get; init; }
+
+        public int PackageCount { get; init; } = 1;
+
+        public decimal TotalWeight { get; init; }
+
+        public List<ShippingPackageQuoteDto> Packages { get; init; } = [];
 
         public string Provider { get; init; } = string.Empty;
     }

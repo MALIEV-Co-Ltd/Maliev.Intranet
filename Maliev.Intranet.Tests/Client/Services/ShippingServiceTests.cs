@@ -63,7 +63,19 @@ public sealed class ShippingServiceTests
                 Width = 20.25m,
                 Height = 30.75m
             },
-            CourierCodes = ["EMST"]
+            CourierCodes = ["EMST"],
+            Parts =
+            [
+                new ShippingPackagePartDto
+                {
+                    Name = "Prototype housing",
+                    Quantity = 3,
+                    Weight = 420m,
+                    Length = 10m,
+                    Width = 20m,
+                    Height = 30m
+                }
+            ]
         });
 
         Assert.NotNull(capturedRequest);
@@ -76,5 +88,7 @@ public sealed class ShippingServiceTests
         Assert.Equal("SG", root.GetProperty("to").GetProperty("countryCode").GetString());
         Assert.Equal(1250m, root.GetProperty("parcel").GetProperty("weight").GetDecimal());
         Assert.Equal("EMST", root.GetProperty("courierCodes")[0].GetString());
+        Assert.Equal("Prototype housing", root.GetProperty("parts")[0].GetProperty("name").GetString());
+        Assert.Equal(3, root.GetProperty("parts")[0].GetProperty("quantity").GetInt32());
     }
 }

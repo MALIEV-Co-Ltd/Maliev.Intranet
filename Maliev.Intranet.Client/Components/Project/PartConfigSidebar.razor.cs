@@ -237,9 +237,53 @@ public partial class PartConfigSidebar : ComponentBase
                 Length = Math.Max(0.1m, _quoteShippingLengthCm),
                 Width = Math.Max(0.1m, _quoteShippingWidthCm),
                 Height = Math.Max(0.1m, _quoteShippingHeightCm)
-            }
+            },
+            Parts = BuildQuoteShippingPackageParts()
         };
     }
+
+    private List<ShippingPackagePartDto> BuildQuoteShippingPackageParts()
+    {
+        var dimensionedParts = AllParts
+            .Where(part => part.Dimensions is not null && part.Quantity > 0)
+            .ToList();
+
+        if (dimensionedParts.Count == 0)
+        {
+            return [];
+        }
+
+        var weightedVolumes = dimensionedParts
+            .Select(part => new
+            {
+                Part = part,
+                UnitVolume = Math.Max(1m, ToDecimal(part.Dimensions!.X) * ToDecimal(part.Dimensions.Y) * ToDecimal(part.Dimensions.Z)),
+                Quantity = Math.Max(1, part.Quantity)
+            })
+            .ToList();
+        var totalWeightedVolume = weightedVolumes.Sum(item => item.UnitVolume * item.Quantity);
+        var totalWeight = Math.Max(1m, _quoteShippingWeightGrams);
+
+        return weightedVolumes.Select(item =>
+        {
+            var partWeight = totalWeightedVolume <= 0m
+                ? totalWeight / weightedVolumes.Count
+                : totalWeight * ((item.UnitVolume * item.Quantity) / totalWeightedVolume);
+
+            return new ShippingPackagePartDto
+            {
+                Name = string.IsNullOrWhiteSpace(item.Part.Name) ? "MALIEV part" : item.Part.Name,
+                Quantity = item.Quantity,
+                Weight = Math.Max(1m, Math.Ceiling(partWeight / item.Quantity)),
+                Width = Math.Max(0.1m, ToDecimal(item.Part.Dimensions!.X) / 10m),
+                Length = Math.Max(0.1m, ToDecimal(item.Part.Dimensions.Y) / 10m),
+                Height = Math.Max(0.1m, ToDecimal(item.Part.Dimensions.Z) / 10m)
+            };
+        }).ToList();
+    }
+
+    private static decimal ToDecimal(double value) =>
+        double.IsFinite(value) ? (decimal)value : 0m;
 
     private string? ValidateQuoteShippingRateInputs()
     {

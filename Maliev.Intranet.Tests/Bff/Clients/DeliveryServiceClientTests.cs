@@ -347,6 +347,7 @@ public sealed class DeliveryServiceClientTests
                     courierCode = "thaipost",
                     courierName = "Thailand Post",
                     note = "Domestic parcel",
+                    logoUrl = "https://cdn.example/thailand-post.svg",
                     scope = "domestic",
                     provider = "Shippop"
                 }
@@ -361,6 +362,7 @@ public sealed class DeliveryServiceClientTests
         var courier = Assert.Single(result);
         Assert.Equal("thaipost", courier.CourierCode);
         Assert.Equal("Thailand Post", courier.CourierName);
+        Assert.Equal("https://cdn.example/thailand-post.svg", courier.LogoUrl);
         Assert.Equal("domestic", courier.Scope);
         Assert.Equal("Shippop", courier.Provider);
     }
@@ -384,6 +386,44 @@ public sealed class DeliveryServiceClientTests
                     currency = "THB",
                     serviceLevel = "standard",
                     estimatedDelivery = "2026-06-22",
+                    courierLogoUrl = "https://cdn.example/flash.svg",
+                    packageCount = 2,
+                    totalWeight = 1640m,
+                    packages = new[]
+                    {
+                        new
+                        {
+                            packageNumber = 1,
+                            name = "MALIEV box 1",
+                            weight = 820m,
+                            width = 18m,
+                            length = 28m,
+                            height = 12m,
+                            price = 36.25m,
+                            currency = "THB",
+                            estimatedDelivery = "2026-06-22",
+                            items = new[]
+                            {
+                                new { name = "Machined bracket", quantity = 5, unitWidth = 12m, unitLength = 20m, unitHeight = 8m, unitWeight = 150m }
+                            }
+                        },
+                        new
+                        {
+                            packageNumber = 2,
+                            name = "MALIEV box 2",
+                            weight = 820m,
+                            width = 18m,
+                            length = 28m,
+                            height = 12m,
+                            price = 36.25m,
+                            currency = "THB",
+                            estimatedDelivery = "2026-06-22",
+                            items = new[]
+                            {
+                                new { name = "Machined bracket", quantity = 5, unitWidth = 12m, unitLength = 20m, unitHeight = 8m, unitWeight = 150m }
+                            }
+                        }
+                    },
                     provider = "GoShip"
                 }
             });
@@ -420,7 +460,19 @@ public sealed class DeliveryServiceClientTests
                 Width = 12,
                 Height = 8
             },
-            CourierCodes = ["flash"]
+            CourierCodes = ["flash"],
+            Parts =
+            [
+                new ShippingPackagePartDto
+                {
+                    Name = "Machined bracket",
+                    Quantity = 10,
+                    Weight = 150,
+                    Length = 20,
+                    Width = 12,
+                    Height = 8
+                }
+            ]
         });
 
         Assert.NotNull(capturedRequest);
@@ -432,11 +484,19 @@ public sealed class DeliveryServiceClientTests
         Assert.Equal("AU", payload.RootElement.GetProperty("to").GetProperty("countryCode").GetString());
         Assert.Equal(750m, payload.RootElement.GetProperty("parcel").GetProperty("weight").GetDecimal());
         Assert.Equal("flash", payload.RootElement.GetProperty("courierCodes")[0].GetString());
+        Assert.Equal("Machined bracket", payload.RootElement.GetProperty("parts")[0].GetProperty("name").GetString());
+        Assert.Equal(10, payload.RootElement.GetProperty("parts")[0].GetProperty("quantity").GetInt32());
+        Assert.Equal(20m, payload.RootElement.GetProperty("parts")[0].GetProperty("length").GetDecimal());
         var rate = Assert.Single(result.Rates);
         Assert.Equal("flash", rate.CourierCode);
         Assert.Equal("Flash Express", rate.ProductName);
         Assert.Equal(72.5m, rate.TotalPrice);
         Assert.Equal("THB", rate.CurrencyCode);
+        Assert.Equal("https://cdn.example/flash.svg", rate.CourierLogoUrl);
+        Assert.Equal(2, rate.PackageCount);
+        Assert.Equal(1640m, rate.TotalWeight);
+        Assert.Equal(2, rate.Packages.Count);
+        Assert.Equal("Machined bracket", rate.Packages[0].Items[0].Name);
         Assert.Equal("GoShip", rate.Provider);
     }
 

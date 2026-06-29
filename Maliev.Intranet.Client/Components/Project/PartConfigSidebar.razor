@@ -1166,6 +1166,10 @@ else
                                                     aria-pressed="@isSelected"
                                                     @onclick="@(() => SelectQuoteCourierRate(rate))">
                                                 <span class="pcs-qf-rate-selector" aria-hidden="true"></span>
+                                                @if (!string.IsNullOrWhiteSpace(rate.CourierLogoUrl))
+                                                {
+                                                    <img class="pcs-qf-rate-logo" src="@rate.CourierLogoUrl" alt="" loading="lazy" />
+                                                }
                                                 <span class="pcs-qf-rate-copy">
                                                     <span class="pcs-qf-rate-name">@rate.ProductName</span>
                                                     <span class="pcs-qf-rate-provider">
@@ -1185,6 +1189,10 @@ else
                                                 </span>
                                                 <span class="pcs-qf-rate-price-stack">
                                                     <span class="pcs-qf-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                                    @if (rate.PackageCount > 1)
+                                                    {
+                                                        <span class="pcs-qf-rate-package-count">@rate.PackageCount boxes · @($"{rate.TotalWeight:N0} g")</span>
+                                                    }
                                                     <span class="pcs-qf-rate-currency">@rate.CurrencyCode</span>
                                                 </span>
                                                 <span class="pcs-qf-rate-edd">
@@ -1630,7 +1638,7 @@ else
 
             .pcs-qf-rate-option {
                 display: grid;
-                grid-template-columns: 18px minmax(0, 1fr) auto;
+                grid-template-columns: 18px 32px minmax(0, 1fr) auto;
                 gap: 5px 8px;
                 align-items: center;
                 width: 100%;
@@ -1673,12 +1681,28 @@ else
                 border-color: var(--mud-palette-info);
             }
 
+            .pcs-qf-rate-logo {
+                grid-column: 2;
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+                border: 1px solid var(--maliev-border);
+                background: #fff;
+                object-fit: contain;
+                padding: 4px;
+                flex: 0 0 auto;
+            }
+
             .pcs-qf-rate-copy,
             .pcs-qf-rate-price-stack {
                 min-width: 0;
                 display: flex;
                 flex-direction: column;
                 gap: 2px;
+            }
+
+            .pcs-qf-rate-copy {
+                grid-column: 3;
             }
 
             .pcs-qf-rate-name {
@@ -1711,6 +1735,7 @@ else
             }
 
             .pcs-qf-rate-price-stack {
+                grid-column: 4;
                 align-items: flex-end;
                 justify-self: end;
             }
@@ -1730,8 +1755,15 @@ else
                 line-height: 1.1;
             }
 
+            .pcs-qf-rate-package-count {
+                color: var(--maliev-muted);
+                font-size: var(--mud-typography-caption-size);
+                line-height: 1.1;
+                text-align: right;
+            }
+
             .pcs-qf-rate-edd {
-                grid-column: 2 / -1;
+                grid-column: 3 / -1;
                 font-size: var(--mud-typography-caption-size);
                 color: var(--maliev-muted);
                 line-height: 1.2;

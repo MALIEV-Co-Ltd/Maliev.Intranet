@@ -181,6 +181,10 @@
                                             aria-pressed="@isSelected"
                                             @onclick="@(() => SelectCourierRate(rate))">
                                         <span class="qsb-rate-selector" aria-hidden="true"></span>
+                                        @if (!string.IsNullOrWhiteSpace(rate.CourierLogoUrl))
+                                        {
+                                            <img class="qsb-rate-logo" src="@rate.CourierLogoUrl" alt="" loading="lazy" />
+                                        }
                                         <span class="qsb-rate-copy">
                                             <span class="qsb-rate-name">@rate.ProductName</span>
                                             <span class="qsb-rate-provider">
@@ -200,6 +204,10 @@
                                         </span>
                                         <span class="qsb-rate-price-stack">
                                             <span class="qsb-rate-price">@rate.TotalPrice.ToString("N0")</span>
+                                            @if (rate.PackageCount > 1)
+                                            {
+                                                <span class="qsb-rate-package-count">@rate.PackageCount boxes · @($"{rate.TotalWeight:N0} g")</span>
+                                            }
                                             <span class="qsb-rate-currency">@rate.CurrencyCode</span>
                                         </span>
                                         <span class="qsb-rate-edd">
@@ -957,7 +965,7 @@
 
     .qsb-rate-option {
         display: grid;
-        grid-template-columns: 18px minmax(0, 1fr) auto;
+        grid-template-columns: 18px 32px minmax(0, 1fr) auto;
         gap: 5px 9px;
         align-items: center;
         width: 100%;
@@ -1000,12 +1008,28 @@
         border-color: var(--mud-palette-info);
     }
 
+    .qsb-rate-logo {
+        grid-column: 2;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--maliev-border);
+        background: #fff;
+        object-fit: contain;
+        padding: 4px;
+        flex: 0 0 auto;
+    }
+
     .qsb-rate-copy,
     .qsb-rate-price-stack {
         min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 2px;
+    }
+
+    .qsb-rate-copy {
+        grid-column: 3;
     }
 
     .qsb-rate-name {
@@ -1038,6 +1062,7 @@
     }
 
     .qsb-rate-price-stack {
+        grid-column: 4;
         align-items: flex-end;
         justify-self: end;
     }
@@ -1057,8 +1082,15 @@
         line-height: 1.1;
     }
 
+    .qsb-rate-package-count {
+        color: var(--maliev-muted);
+        font-size: var(--mud-typography-caption-size);
+        line-height: 1.1;
+        text-align: right;
+    }
+
     .qsb-rate-edd {
-        grid-column: 2 / -1;
+        grid-column: 3 / -1;
         font-size: var(--mud-typography-caption-size);
         color: var(--maliev-muted);
         line-height: 1.2;
@@ -1214,9 +1246,53 @@
                 Length = Math.Max(0.1m, _shippingLengthCm),
                 Width = Math.Max(0.1m, _shippingWidthCm),
                 Height = Math.Max(0.1m, _shippingHeightCm)
-            }
+            },
+            Parts = BuildShippingPackageParts()
         };
     }
+
+    private List<ShippingPackagePartDto> BuildShippingPackageParts()
+    {
+        var dimensionedParts = Parts
+            .Where(part => part.Dimensions is not null && part.Quantity > 0)
+            .ToList();
+
+        if (dimensionedParts.Count == 0)
+        {
+            return [];
+        }
+
+        var weightedVolumes = dimensionedParts
+            .Select(part => new
+            {
+                Part = part,
+                UnitVolume = Math.Max(1m, ToDecimal(part.Dimensions!.X) * ToDecimal(part.Dimensions.Y) * ToDecimal(part.Dimensions.Z)),
+                Quantity = Math.Max(1, part.Quantity)
+            })
+            .ToList();
+        var totalWeightedVolume = weightedVolumes.Sum(item => item.UnitVolume * item.Quantity);
+        var totalWeight = Math.Max(1m, _shippingWeightGrams);
+
+        return weightedVolumes.Select(item =>
+        {
+            var partWeight = totalWeightedVolume <= 0m
+                ? totalWeight / weightedVolumes.Count
+                : totalWeight * ((item.UnitVolume * item.Quantity) / totalWeightedVolume);
+
+            return new ShippingPackagePartDto
+            {
+                Name = string.IsNullOrWhiteSpace(item.Part.Name) ? "MALIEV part" : item.Part.Name,
+                Quantity = item.Quantity,
+                Weight = Math.Max(1m, Math.Ceiling(partWeight / item.Quantity)),
+                Width = Math.Max(0.1m, ToDecimal(item.Part.Dimensions!.X) / 10m),
+                Length = Math.Max(0.1m, ToDecimal(item.Part.Dimensions.Y) / 10m),
+                Height = Math.Max(0.1m, ToDecimal(item.Part.Dimensions.Z) / 10m)
+            };
+        }).ToList();
+    }
+
+    private static decimal ToDecimal(double value) =>
+        double.IsFinite(value) ? (decimal)value : 0m;
 
     private string? ValidateShippingRateInputs()
     {
