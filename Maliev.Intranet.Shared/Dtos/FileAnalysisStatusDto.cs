@@ -36,7 +36,7 @@ public sealed record FileAnalysisStatusDto
     public string? ViewerStoragePath { get; init; }
 
     /// <summary>
-    /// Dot-prefixed extension passed to the BabylonJS loader, such as .glb, .stl, or .obj.
+    /// Dot-prefixed extension for the three.js viewer to load, such as .glb, .stl, or .obj.
     /// </summary>
     public string? ViewerFileExtension { get; init; }
 

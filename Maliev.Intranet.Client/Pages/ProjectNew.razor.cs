@@ -1362,8 +1362,8 @@ public partial class ProjectNew : IAsyncDisposable
 
     /// <summary>
     /// File extensions the in-browser thumbnail generator can render
-    /// (BabylonJS loaders plus the GeometryService runtime worker for 3MF).
-    /// Must stay in sync with GeometryInterop.js SUPPORTED_EXTENSIONS.
+    /// (three.js loaders plus the GeometryService runtime worker for 3MF).
+    /// Must stay in sync with GeometryInterop-three.js SUPPORTED_EXTENSIONS.
     /// </summary>
     private static readonly string[] LocallyRenderableThumbnailExtensions =
         [".stl", ".obj", ".glb", ".gltf", ".3mf"];
@@ -2236,7 +2236,7 @@ public partial class ProjectNew : IAsyncDisposable
                 _selectedPartIndex = index;
 
             _layoutMode = LayoutMode.Configurator;
-            await OpenBabylonViewer(request.Part);
+            await OpenPartViewer(request.Part);
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -2666,7 +2666,7 @@ public partial class ProjectNew : IAsyncDisposable
 
     /// <summary>
     /// Refreshes the 3D viewer signed URL when the current one has expired.
-    /// Called by PartDetailCard when BabylonJS viewer fails to load.
+    /// Called by PartDetailCard when the three.js viewer fails to load.
     /// </summary>
     private async Task RequestFreshViewerUrlAsync(string storagePath)
     {
@@ -4975,7 +4975,7 @@ public partial class ProjectNew : IAsyncDisposable
         return false;
     }
 
-    private async Task OpenBabylonViewer(PartViewModel part)
+    private async Task OpenPartViewer(PartViewModel part)
     {
         if (!string.IsNullOrWhiteSpace(part.ViewerUrl))
             return;

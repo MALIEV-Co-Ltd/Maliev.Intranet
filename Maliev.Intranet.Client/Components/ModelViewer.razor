@@ -8,7 +8,7 @@
 @inject ILogger<ModelViewer> Logger
 
 <div class="model-viewer-container" style="position: relative; width: 100%; height: 100%; min-height: 200px; overflow: visible; contain: layout style;" @onclick="CloseAnalysisPanels">
-    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block; filter: @(_isRealisticUpgrading ? "blur(8px)" : "none"); transition: filter 0.4s ease;"></canvas>
+    <canvas id="@_canvasId" style="width: 100%; height: 100%; touch-action: none; outline: none; display: block;"></canvas>
 
     @if (Model != null)
     {
@@ -92,22 +92,6 @@
         </div>
     }
 
-    @* ── Sphere render mode toggle — bottom-left, outside toolbar ── *@
-    <div class="vp-sphere-toggle" @onclick:stopPropagation>
-        @{
-            var isRealistic = _renderMode == "realistic";
-            var sphereImg = isRealistic ? "/images/sphere-realistic.png" : "/images/sphere-cad.png";
-            var sphereTooltip = isRealistic ? "Switch to CAD render" : "Switch to realistic render";
-        }
-        <MudTooltip Text="@sphereTooltip" Placement="Placement.Right" Arrow="false">
-            <button type="button"
-                    class="@($"vp-sphere-btn {(_renderMode == "realistic" || _renderMode == "solid" ? "vp-sphere-active" : "")}")"
-                    @onclick='@(() => SetRenderModeAsync(isRealistic ? "solid" : "realistic"))'>
-                <img src="@sphereImg" alt="@sphereTooltip" />
-            </button>
-        </MudTooltip>
-    </div>
-
     @* ── CAD Toolbar — bottom-center, floating ── *@
     <div class="vp-toolbar-shell">
         <MudPaper Elevation="8" Class="d-flex align-center pa-1 vp-toolbar-paper">
@@ -142,12 +126,6 @@
                 <button class="@($"vp-cube-btn {(_renderMode == "transparent" ? "vp-active" : "")}")"
                         @onclick='@(() => SetRenderModeAsync("transparent"))' type="button">
                     @GetModeIconSvg("transparent", _renderMode == "transparent")
-                </button>
-            </MudTooltip>
-            <MudTooltip Text="Realistic" Placement="Placement.Top" Arrow="false">
-                <button class="@($"vp-cube-btn {(_renderMode == "realistic" ? "vp-active" : "")}")"
-                        @onclick='@(() => SetRenderModeAsync("realistic"))' type="button">
-                    @GetModeIconSvg("realistic", _renderMode == "realistic")
                 </button>
             </MudTooltip>
 
@@ -258,11 +236,11 @@
     /// <summary>Whether the grid should currently be visible in the scene.</summary>
     public bool IsGridVisible => ShouldShowGrid;
 
-    private string _canvasId    = $"babylon-canvas-{Guid.NewGuid()}";
+    private string _canvasId    = $"viewer-canvas-{Guid.NewGuid()}";
     private string _sectionPanelId = $"section-panel-{Guid.NewGuid()}";
     private IJSObjectReference? _module;
     private DotNetObjectReference<ModelViewer>? _dotNetRef;
-    private string _renderMode        = "realistic";
+    private string _renderMode        = "solid";
     private string _materialType      = "aluminum";
     private string _cameraPreset      = "iso";
     private string _cameraProjection  = "orthographic";
@@ -277,7 +255,6 @@
     private string? _activeAnalysisTool;  // "flippedTriangles" | "measure" | "thickness" | null
     private string? _lastMeasurement;     // Display last measurement result in overlay
     private string? _lastViewerSettingsKey;
-    private bool _isRealisticUpgrading;
 
     // ── Section view ─────────────────────────────────────────────────────────
     private bool   _sectionEnabled;
@@ -350,7 +327,9 @@
         _renderMode = NormalizeRenderMode(settings.RenderMode);
         _materialType = NormalizeMaterialType(settings.MaterialType);
         _cameraProjection = NormalizeProjection(settings.CameraProjection);
-        _edgesEnabled = settings.EdgesEnabled && _renderMode != "wireframe";
+        // Edges default to ON for native CAD exchange formats (STEP/IGES) and OFF for mesh
+        // formats (STL/OBJ/3MF/GLB) until the user explicitly toggles them — see IsCadNativeExtension.
+        _edgesEnabled = (settings.EdgesEnabled ?? IsCadNativeExtension(FileExtension)) && _renderMode != "wireframe";
         _gridEnabled = settings.GridEnabled;
         _bboxEnabled = settings.BoundingBoxEnabled;
         _sectionEnabled = settings.SectionEnabled;
@@ -428,16 +407,25 @@
             settings.SectionOffsetMm.ToString("G17", CultureInfo.InvariantCulture),
             settings.SectionInverted);
 
+    // "realistic" was a previously-supported value (removed — PBR rendering proved too heavy
+    // for no real benefit). Any settings persisted with it fall back to "solid".
     private static string NormalizeRenderMode(string? mode) =>
-        string.Equals(mode, "solid", StringComparison.OrdinalIgnoreCase)
-            ? "solid"
-            : string.Equals(mode, "wireframe", StringComparison.OrdinalIgnoreCase)
-                ? "wireframe"
-                : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
-                    ? "transparent"
-                    : string.Equals(mode, "realistic", StringComparison.OrdinalIgnoreCase)
-                        ? "realistic"
-                        : "realistic";
+        string.Equals(mode, "wireframe", StringComparison.OrdinalIgnoreCase)
+            ? "wireframe"
+            : string.Equals(mode, "transparent", StringComparison.OrdinalIgnoreCase)
+                ? "transparent"
+                : "solid";
+
+    /// <summary>
+    /// True for native CAD exchange formats (STEP/IGES) — these get edge rendering enabled
+    /// by default. Mesh formats (STL/OBJ/3MF/GLB/glTF) default to edges off. Must match the
+    /// CAD_NATIVE_EXTENSIONS set in wwwroot/js/part-viewer-three.js.
+    /// </summary>
+    private static bool IsCadNativeExtension(string? fileExtension)
+    {
+        var ext = (fileExtension ?? string.Empty).Trim().ToLowerInvariant();
+        return ext is ".step" or ".stp" or ".iges" or ".igs";
+    }
 
     private static string NormalizeProjection(string? mode) =>
         string.Equals(mode, "perspective", StringComparison.OrdinalIgnoreCase)
@@ -586,17 +574,6 @@
                 <polygon points="50,44 14,28 50,12 86,28" fill="rgba(var(--mud-palette-primary-rgb), 0.22)" stroke="none"/>
                 """,
 
-            "realistic" => $"""
-                <path d="M50,54 L14,70 M50,54 L86,70 M50,54 L50,12" fill="none" stroke="{backC}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <polygon points="50,44 14,28 50,12 86,28" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
-                <polygon points="50,86 14,70 14,28 50,44" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
-                <polygon points="50,86 86,70 86,28 50,44" fill="{activeHighlight}" stroke="{edgeC}" stroke-width="2.5" stroke-linejoin="round"/>
-                <polygon points="50,86 86,70 86,28 50,12 14,28 14,70" fill="none" stroke="{edgeC}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M50,44 L50,86 M50,44 L14,28 M50,44 L86,28" fill="none" stroke="{edgeC}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="70" cy="68" r="12" fill="rgba(var(--mud-palette-primary-rgb), 0.35)" stroke="rgba(var(--mud-palette-primary-rgb), 0.65)" stroke-width="2.5"/>
-                <path d="M64 68 L67.5 71.5 L75.5 63" fill="none" stroke="var(--mud-palette-white)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                """,
-
             "edges" => $"""
                 <polygon points="50,44 14,28 50,12 86,28" fill="{solidTop}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
                 <polygon points="50,86 14,70 14,28 50,44" fill="{solidLeft}" stroke="{solidStroke}" stroke-width="1" stroke-linejoin="round"/>
@@ -664,7 +641,7 @@
             _lastViewerUrl = ViewerUrl;
             try
             {
-                _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>(identifier: "import", args: "./js/part-viewer.js");
+                _module ??= await JSRuntime.InvokeAsync<IJSObjectReference>(identifier: "import", args: "./js/part-viewer-three.js");
                 if (previousUrl != null)
                 {
                     await _module.InvokeVoidAsync("dispose", _canvasId);
@@ -697,7 +674,7 @@
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error initializing BabylonJS viewer");
+                Logger.LogError(ex, "Error initializing three.js viewer");
             }
         }
         else if (_module != null && _lastTurningAxisKey != turningAxisKey)
@@ -776,36 +753,12 @@
 
         if (_module != null)
         {
-            if (target == "realistic")
-            {
-                _isRealisticUpgrading = true;
-                await InvokeAsync(StateHasChanged);
-            }
             await _module.InvokeVoidAsync("setRenderMode", _canvasId, target);
             if (target == "wireframe")
                 await _module.InvokeVoidAsync("toggleEdges", _canvasId, false);
-            // Note: setMaterialType is intentionally NOT called here. setRenderMode already applies
-            // materialTypes[canvasId] (kept in sync by configureMaterialFromConfigurator). Calling
-            // setMaterialType would clear customAlbedoColors, wiping any configurator colour.
         }
 
         await NotifyViewerSettingsChangedAsync();
-    }
-
-    /// <summary>JSInvokable callback when realistic quality upgrade starts.</summary>
-    [JSInvokable]
-    public async Task NotifyRealisticUpgradeStart()
-    {
-        _isRealisticUpgrading = true;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    /// <summary>JSInvokable callback when realistic quality upgrade completes.</summary>
-    [JSInvokable]
-    public async Task NotifyRealisticUpgradeComplete()
-    {
-        _isRealisticUpgrading = false;
-        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -823,21 +776,6 @@
         if (_module == null) return;
         try
         {
-            // When a process or material is selected for the first time and the viewer is still
-            // in CAD (solid) mode, switch to realistic so the material renders correctly.
-            var hasSelection = !string.IsNullOrWhiteSpace(processCode) || !string.IsNullOrWhiteSpace(materialCode);
-            if (hasSelection && _renderMode == "solid")
-            {
-                _renderMode = "realistic";
-                _isRealisticUpgrading = true;
-                await InvokeAsync(StateHasChanged);
-                await _module.InvokeVoidAsync("setRenderMode", _canvasId, "realistic");
-            }
-
-            // The realistic upgrade overlay is driven by JSInvokable callbacks
-            // (NotifyRealisticUpgradeStart/Complete) fired from the JS deferred
-            // smooth-normal pipeline. We do NOT toggle the overlay here — that
-            // would hide it before the requestIdleCallback work has even started.
             await _module.InvokeVoidAsync("configureMaterialFromConfigurator",
                 _canvasId, _materialType, colorHex, finishCode ?? string.Empty, roughnessCode, processCode);
             await NotifyViewerSettingsChangedAsync();

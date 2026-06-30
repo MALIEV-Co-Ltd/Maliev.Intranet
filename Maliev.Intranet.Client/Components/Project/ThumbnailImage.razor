@@ -62,7 +62,7 @@
 
     private ThumbnailSetDto? _thumbnails;
     private ThumbnailProgress? _progress;
-    private EventCallback<ThumbnailProgress> _progressHandler;
+    private Func<ThumbnailProgress, Task>? _progressHandler;
     private bool _subscribed;
 
     protected override async Task OnInitializedAsync()
@@ -76,8 +76,16 @@
             return;
         }
 
-        // Subscribe to progress events
-        _progressHandler = EventCallback.Factory.Create<ThumbnailProgress>(this, OnProgress);
+        // Subscribe to progress events. A plain delegate is used here (not
+        // EventCallback<T>) because EventCallback routes through
+        // IHandleEvent.HandleEventAsync, which calls the component's bare,
+        // un-dispatched StateHasChanged() assuming it is already running on
+        // the renderer's dispatcher. NotifyAsync below invokes subscribers
+        // from arbitrary threads (background generation, test code), so that
+        // assumption doesn't hold — the resulting dispatcher exception gets
+        // swallowed by NotifyAsync's catch, abandoning OnProgress's own
+        // properly-dispatched render before it's awaited.
+        _progressHandler = OnProgress;
         ThumbnailService.Subscribe(_progressHandler);
         _subscribed = true;
 
@@ -131,7 +139,7 @@
     {
         if (_subscribed)
         {
-            ThumbnailService.Unsubscribe(_progressHandler);
+            ThumbnailService.Unsubscribe(_progressHandler!);
             _subscribed = false;
         }
         await ValueTask.CompletedTask;

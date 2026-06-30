@@ -69,7 +69,7 @@ public sealed class ProjectNewLocalThumbnailSourceTests
     {
         var projectNew = ReadRepoFile(ProjectNewPath);
         var interop = ReadRepoFile(
-            "Maliev.Intranet.Client", "wwwroot", "js", "geometry", "JsInterop", "GeometryInterop.js");
+            "Maliev.Intranet.Client", "wwwroot", "js", "geometry", "JsInterop", "GeometryInterop-three.js");
 
         foreach (var extension in DirectBrowserThumbnailExtensions)
         {

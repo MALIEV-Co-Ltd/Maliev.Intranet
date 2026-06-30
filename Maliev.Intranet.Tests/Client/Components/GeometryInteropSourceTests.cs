@@ -2,28 +2,26 @@ namespace Maliev.Intranet.Tests.Client.Components;
 
 /// <summary>
 /// Source-level regressions for the browser-local thumbnail generation interop script.
-/// The script is loaded as a CLASSIC script tag (no ES modules), so module syntax or a
-/// missing global registration silently disables local generation and forces every
-/// thumbnail onto the server fallback path.
+/// The script is loaded as an ES module (type="module") so it can import three.js via
+/// the importmap. A missing global registration silently disables local generation and
+/// forces every thumbnail onto the server fallback path.
 /// </summary>
 public sealed class GeometryInteropSourceTests
 {
     private static readonly string[] InteropPath =
-        ["Maliev.Intranet.Client", "wwwroot", "js", "geometry", "JsInterop", "GeometryInterop.js"];
+        ["Maliev.Intranet.Client", "wwwroot", "js", "geometry", "JsInterop", "GeometryInterop-three.js"];
 
     private static readonly string[] IndexHtmlPath =
         ["Maliev.Intranet.Client", "wwwroot", "index.html"];
 
     [Fact]
-    public void GeometryInteropIsAClassicScriptWithoutModuleSyntax()
+    public void GeometryInteropIsAnEsModuleWithThreeImport()
     {
+        // The script migrated from BabylonJS (classic script) to three.js (ES module)
+        // so it can consume the importmap-based three.js build without a global BABYLON runtime.
         var source = ReadRepoFile(InteropPath).ReplaceLineEndings("\n");
 
-        Assert.DoesNotContain("\nimport ", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("\nexport ", source, StringComparison.Ordinal);
-        Assert.False(
-            source.TrimStart().StartsWith("import ", StringComparison.Ordinal),
-            "GeometryInterop.js must not use ES module imports — it is loaded as a classic script.");
+        Assert.Contains("import * as THREE from 'three'", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -58,10 +56,10 @@ public sealed class GeometryInteropSourceTests
     {
         var source = ReadRepoFile(InteropPath);
 
+        // three.js WebGLRenderer: alpha:true → transparent canvas; preserveDrawingBuffer
+        // keeps the pixel data available for toDataURL after each frame.
         Assert.Contains("preserveDrawingBuffer: true", source, StringComparison.Ordinal);
-        Assert.Contains("premultipliedAlpha: false", source, StringComparison.Ordinal);
         Assert.Contains("alpha: true", source, StringComparison.Ordinal);
-        Assert.Contains("scene.clearColor = new BABYLON.Color4(0, 0, 0, 0)", source, StringComparison.Ordinal);
         Assert.Contains("toDataURL('image/png')", source, StringComparison.Ordinal);
     }
 
@@ -77,25 +75,26 @@ public sealed class GeometryInteropSourceTests
     [Theory]
     [InlineData("index.html host page")]
     [InlineData("BFF App.razor host page")]
-    public void HostPagesLoadBabylonBeforeGeometryInterop(string hostPage)
+    public void HostPagesLoadThreeJsImportmapAndGeometryInteropModule(string hostPage)
     {
         // InteractiveAuto serves the BFF's App.razor, NOT the WASM index.html.
-        // GeometryInterop.js missing from the served page leaves window.MalievGeometry
-        // undefined and silently disables ALL local thumbnail generation.
+        // GeometryInterop-three.js is loaded as type="module" and depends on the
+        // importmap mapping "three" to the vendored three.module.min.js.
         var html = hostPage.StartsWith("index", StringComparison.Ordinal)
             ? ReadRepoFile(IndexHtmlPath)
             : ReadRepoFile("Maliev.Intranet.Bff", "Components", "App.razor");
 
-        var babylonIndex = html.IndexOf("lib/babylonjs/babylon.js", StringComparison.Ordinal);
-        var loadersIndex = html.IndexOf("lib/babylonjs/babylonjs.loaders.min.js", StringComparison.Ordinal);
-        var interopIndex = html.IndexOf("js/geometry/JsInterop/GeometryInterop.js", StringComparison.Ordinal);
+        var importMapIndex = html.IndexOf("\"three\"", StringComparison.Ordinal);
+        var interopIndex = html.IndexOf("js/geometry/JsInterop/GeometryInterop-three.js", StringComparison.Ordinal);
 
-        Assert.True(babylonIndex >= 0, $"{hostPage} must load the BabylonJS runtime.");
-        Assert.True(loadersIndex >= 0, $"{hostPage} must load the BabylonJS mesh loaders.");
-        Assert.True(interopIndex >= 0, $"{hostPage} must load GeometryInterop.js.");
-        Assert.True(
-            babylonIndex < interopIndex && loadersIndex < interopIndex,
-            $"GeometryInterop.js depends on the global BABYLON runtime and must load after babylon.js and the loaders in {hostPage}.");
+        Assert.True(importMapIndex >= 0, $"{hostPage} must include the three.js importmap so GeometryInterop-three.js can resolve its import.");
+        Assert.True(interopIndex >= 0, $"{hostPage} must load GeometryInterop-three.js as a module script.");
+        Assert.Contains("type=\"importmap\"", html, StringComparison.Ordinal);
+        Assert.Contains("\"three\": \"/lib/three/build/three.module.min.js\"", html, StringComparison.Ordinal);
+        Assert.Contains("\"three/addons/\": \"/lib/three/jsm/\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"three\": \"lib/three", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"three/addons/\": \"lib/three", html, StringComparison.Ordinal);
+        Assert.Contains("type=\"module\"", html, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] relativeParts)

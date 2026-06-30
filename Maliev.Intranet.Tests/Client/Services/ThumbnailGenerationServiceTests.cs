@@ -1,6 +1,5 @@
 using Maliev.Intranet.Client.Services;
 using Maliev.Intranet.Shared.Dtos;
-using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.JSInterop;
 using Xunit;
@@ -66,8 +65,8 @@ public class ThumbnailGenerationServiceTests
 
         var received1 = new List<ThumbnailProgress>();
         var received2 = new List<ThumbnailProgress>();
-        var callback1 = EventCallback.Factory.Create<ThumbnailProgress>(this, p => received1.Add(p));
-        var callback2 = EventCallback.Factory.Create<ThumbnailProgress>(this, p => received2.Add(p));
+        Func<ThumbnailProgress, Task> callback1 = p => { received1.Add(p); return Task.CompletedTask; };
+        Func<ThumbnailProgress, Task> callback2 = p => { received2.Add(p); return Task.CompletedTask; };
 
         service.Subscribe(callback1);
         service.Subscribe(callback2);
@@ -89,7 +88,7 @@ public class ThumbnailGenerationServiceTests
             logger: NullLogger<ThumbnailGenerationService>.Instance);
 
         var received = new List<ThumbnailProgress>();
-        var callback = EventCallback.Factory.Create<ThumbnailProgress>(this, p => received.Add(p));
+        Func<ThumbnailProgress, Task> callback = p => { received.Add(p); return Task.CompletedTask; };
 
         service.Subscribe(callback);
         service.Unsubscribe(callback);

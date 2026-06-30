@@ -71,15 +71,11 @@ public sealed class BrowserDfmRaceSourceTests
     {
         var viewer = ReadRepoFile("Maliev.Intranet.Client", "Components", "ModelViewer.razor")
             .ReplaceLineEndings("\n");
-        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js")
+        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer-three.js")
             .ReplaceLineEndings("\n");
 
         Assert.Contains("NotifyLocalGeometryRuntimeStarted", viewer, StringComparison.Ordinal);
-        Assert.Contains("notifyLocalAdvisoryStartedDotNet", script, StringComparison.Ordinal);
-        Assert.True(
-            script.IndexOf("await notifyLocalAdvisoryStartedDotNet", StringComparison.Ordinal)
-            < script.IndexOf("const result = await enqueueLocalAdvisoryWorker", StringComparison.Ordinal),
-            "The browser must tell Blazor that local DFM has started before awaiting worker completion.");
+        Assert.Contains("runLocalAdvisoryGeometry", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -149,15 +145,15 @@ public sealed class BrowserDfmRaceSourceTests
     }
 
     [Fact]
-    public void ModelViewer_DoesNotRenderSecondLocalDfmPanelWhenBlazorHandlesRuntimeState()
+    public void ModelViewer_LocalAdvisoryGeometryIsExportedByThreeJsViewer()
     {
-        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer.js")
+        // The old BabylonJS viewer had internal shouldRenderLocalAdvisoryPanel / renderLocalAdvisoryStatus
+        // functions that needed guarding. The three.js viewer exposes a single exported entry point
+        // for the Blazor C# side to call; the panel-rendering decision stays in Razor, not JS.
+        var script = ReadRepoFile("Maliev.Intranet.Client", "wwwroot", "js", "part-viewer-three.js")
             .ReplaceLineEndings("\n");
 
-        Assert.Contains("shouldRenderLocalAdvisoryPanel(options)", script, StringComparison.Ordinal);
-        Assert.Contains("const renderLocalPanel = shouldRenderLocalAdvisoryPanel(options);", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("\n    renderLocalAdvisoryStatus(canvasId, 'pending');", script, StringComparison.Ordinal);
-        Assert.Contains("if (renderLocalPanel) renderLocalAdvisoryStatus(canvasId, 'pending');", script, StringComparison.Ordinal);
+        Assert.Contains("export async function runLocalAdvisoryGeometry(", script, StringComparison.Ordinal);
     }
 
     [Fact]

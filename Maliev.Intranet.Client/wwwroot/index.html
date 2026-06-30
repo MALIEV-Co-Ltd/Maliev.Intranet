@@ -41,53 +41,18 @@
         }
     </style>
     <link href="Maliev.Intranet.Client.styles.css" rel="stylesheet" />
-    <script type="importmap"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/lib/three/build/three.module.min.js",
+                "three/addons/": "/lib/three/jsm/"
+            }
+        }
+    </script>
     <script>
         window.malievMarkWasmReady = function () {
             document.documentElement.classList.add('maliev-wasm-ready');
         };
-    </script>
-    <script>
-        (function () {
-            var patchWebGL = function (proto) {
-                try {
-                    var descriptor = Object.getOwnPropertyDescriptor(proto, 'backbufferColorTextureHandle');
-                    if (descriptor && descriptor.set) return; // Already has a setter
-                    var internal = null;
-                    Object.defineProperty(proto, 'backbufferColorTextureHandle', {
-                        get: function () { return internal; },
-                        set: function (v) { internal = v; },
-                        enumerable: false,
-                        configurable: true,
-                    });
-                } catch (_) { /* proto may be frozen in some browsers */ }
-            };
-
-            // Patch all possible WebGL prototypes that Babylon.js might use
-            var prototypes = [];
-            if (typeof WebGLRenderingContext !== 'undefined') prototypes.push(WebGLRenderingContext.prototype);
-            if (typeof WebGL2RenderingContext !== 'undefined') prototypes.push(WebGL2RenderingContext.prototype);
-            if (typeof WebGLTexture !== 'undefined') prototypes.push(WebGLTexture.prototype);
-            if (typeof WebGLFramebuffer !== 'undefined') prototypes.push(WebGLFramebuffer.prototype);
-            if (typeof WebGLRenderbuffer !== 'undefined') prototypes.push(WebGLRenderbuffer.prototype);
-
-            // Also patch any object that might be used as a render target
-            prototypes.forEach(patchWebGL);
-
-            // Patch Object.prototype as last resort for any dynamic objects
-            try {
-                var descriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'backbufferColorTextureHandle');
-                if (!descriptor || !descriptor.set) {
-                    var internal = null;
-                    Object.defineProperty(Object.prototype, 'backbufferColorTextureHandle', {
-                        get: function () { return internal; },
-                        set: function (v) { internal = v; },
-                        enumerable: false,
-                        configurable: true,
-                    });
-                }
-            } catch (_) { }
-        })();
     </script>
 </head>
 
@@ -105,10 +70,7 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
-    <script src="lib/babylonjs/babylon.js"></script>
-    <script src="lib/babylonjs/babylonjs.materials.min.js"></script>
-    <script src="lib/babylonjs/babylonjs.loaders.min.js"></script>
-    <script src="js/geometry/JsInterop/GeometryInterop.js"></script>
+    <script type="module" src="js/geometry/JsInterop/GeometryInterop-three.js"></script>
     <script src="js/file-download.js"></script>
     <script src="js/material-labels.js"></script>
     <script src="js/production-schedule-board.js"></script>

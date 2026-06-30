@@ -201,7 +201,7 @@ public sealed class DraftPartState
     /// <summary>Storage path loaded by the browser viewer. May be the original STL/OBJ/GLB upload.</summary>
     public string? ViewerStoragePath { get; set; }
 
-    /// <summary>Dot-prefixed BabylonJS loader extension for the viewer source.</summary>
+    /// <summary>Dot-prefixed file extension for the three.js viewer source.</summary>
     public string? ViewerFileExtension { get; set; }
 
     /// <summary>Signed URL for GLB viewer. Restores instantly on page reload.</summary>
@@ -288,26 +288,30 @@ public sealed class DraftPartState
 /// </summary>
 public sealed class PartViewerSettings
 {
-    /// <summary>The active render mode: solid, wireframe, transparent, or realistic.</summary>
-    public string RenderMode { get; set; } = "realistic";
+    /// <summary>The active render mode: solid, wireframe, or transparent.</summary>
+    public string RenderMode { get; set; } = "solid";
 
     /// <summary>The initial render mode applied immediately when geometry loads.</summary>
-    public string InitialRenderMode { get; set; } = "realistic";
+    public string InitialRenderMode { get; set; } = "solid";
 
     /// <summary>The target render mode for upgrade after local advisory/runtime processing.</summary>
-    public string TargetRenderMode { get; set; } = "realistic";
+    public string TargetRenderMode { get; set; } = "solid";
 
     /// <summary>Options controlling deferred transition into realistic mode.</summary>
     public RenderModeTransitionSettings RenderModeTransition { get; set; } = new();
 
-    /// <summary>The material type key for realistic rendering (e.g. aluminum, steel, black-pom).</summary>
+    /// <summary>The material type key (kept for the part configurator; has no rendering effect since Realistic mode was removed).</summary>
     public string MaterialType { get; set; } = "aluminum";
 
     /// <summary>The active camera projection: perspective or orthographic.</summary>
     public string CameraProjection { get; set; } = "orthographic";
 
-    /// <summary>True when edge rendering is enabled.</summary>
-    public bool EdgesEnabled { get; set; }
+    /// <summary>
+    /// True/false once the user has explicitly toggled edge rendering; null when never
+    /// customized, in which case the viewer applies its format-aware default (native CAD
+    /// exchange formats like STEP/IGES default to edges-on, mesh formats default to edges-off).
+    /// </summary>
+    public bool? EdgesEnabled { get; set; }
 
     /// <summary>True when the grid floor is enabled.</summary>
     public bool GridEnabled { get; set; } = true;

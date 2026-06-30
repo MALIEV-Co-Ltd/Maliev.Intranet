@@ -1,13 +1,12 @@
 // Maliev.Intranet.Client/Services/ThumbnailGenerationService.cs
 using System.Collections.Concurrent;
 using Maliev.Intranet.Shared.Dtos;
-using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace Maliev.Intranet.Client.Services;
 
 /// <summary>
-/// Orchestrates client-side thumbnail generation using BabylonJS in WebAssembly.
+/// Orchestrates client-side thumbnail generation using three.js in the browser.
 /// Handles caching, progress reporting, and server fallback decisions.
 /// </summary>
 public sealed class ThumbnailGenerationService
@@ -18,7 +17,7 @@ public sealed class ThumbnailGenerationService
     private readonly ConcurrentDictionary<string, ThumbnailSetDto> _cache = new();
     private readonly ConcurrentDictionary<string, Task<ThumbnailSetDto>> _inflight = new();
     private readonly object _subscribersLock = new();
-    private readonly List<EventCallback<ThumbnailProgress>> _subscribers = new();
+    private readonly List<Func<ThumbnailProgress, Task>> _subscribers = new();
 
     /// <summary>
     /// Initializes a new instance of <see cref="ThumbnailGenerationService"/>.
@@ -54,7 +53,7 @@ public sealed class ThumbnailGenerationService
     /// <summary>
     /// Subscribes a callback to receive thumbnail progress events.
     /// </summary>
-    public void Subscribe(EventCallback<ThumbnailProgress> callback)
+    public void Subscribe(Func<ThumbnailProgress, Task> callback)
     {
         lock (_subscribersLock)
         {
@@ -65,7 +64,7 @@ public sealed class ThumbnailGenerationService
     /// <summary>
     /// Unsubscribes a callback from receiving thumbnail progress events.
     /// </summary>
-    public void Unsubscribe(EventCallback<ThumbnailProgress> callback)
+    public void Unsubscribe(Func<ThumbnailProgress, Task> callback)
     {
         lock (_subscribersLock)
         {
@@ -78,7 +77,7 @@ public sealed class ThumbnailGenerationService
     /// </summary>
     public async Task NotifyAsync(ThumbnailProgress progress)
     {
-        EventCallback<ThumbnailProgress>[] snapshot;
+        Func<ThumbnailProgress, Task>[] snapshot;
         lock (_subscribersLock)
         {
             snapshot = _subscribers.ToArray();
@@ -88,7 +87,7 @@ public sealed class ThumbnailGenerationService
         {
             try
             {
-                await callback.InvokeAsync(progress);
+                await callback(progress);
             }
             catch (Exception ex)
             {

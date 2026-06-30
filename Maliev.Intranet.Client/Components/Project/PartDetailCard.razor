@@ -160,7 +160,7 @@
     }
 
     @* ── Tab: 3D Viewer + Body Selection ───────────────────────────────────────────────── *@
-    @* Retain-and-hide: keep the Babylon engine alive across tab switches so GLB isn't reloaded. *@
+    @* Retain-and-hide: keep the three.js viewer alive across tab switches so GLB isn't reloaded. *@
     <div class="pdc-viewer-wrap" style="@(_activeTab == 0 ? "" : "display:none")"
          aria-hidden="@(_activeTab != 0 ? "true" : null)">
 
@@ -1210,7 +1210,7 @@
         _viewerLoadFailed = true;
         _viewerErrorMessage = errorMessage;
 
-        // BabylonJS internal errors (TypeError, WebGL issues) are NOT retryable -
+        // three.js internal errors (TypeError, WebGL issues) are NOT retryable -
         // retrying just creates an infinite flash loop. Only retry for recoverable errors.
         var isRetryable = errorMessage != null &&
             !errorMessage.Contains("TypeError") &&

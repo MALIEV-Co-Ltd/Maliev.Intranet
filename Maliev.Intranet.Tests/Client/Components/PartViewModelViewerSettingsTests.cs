@@ -37,7 +37,7 @@ public class PartViewModelViewerSettingsTests
 
         Assert.Equal("transparent", restoredFirst.ViewerSettings.RenderMode);
         Assert.Equal("orthographic", restoredFirst.ViewerSettings.CameraProjection);
-        Assert.True(restoredFirst.ViewerSettings.EdgesEnabled);
+        Assert.True(restoredFirst.ViewerSettings.EdgesEnabled.GetValueOrDefault());
         Assert.True(restoredFirst.ViewerSettings.GridEnabled);
         Assert.True(restoredFirst.ViewerSettings.BoundingBoxEnabled);
         Assert.True(restoredFirst.ViewerSettings.SectionEnabled);
@@ -45,8 +45,11 @@ public class PartViewModelViewerSettingsTests
         Assert.Equal(4.5, restoredFirst.ViewerSettings.SectionOffsetMm);
         Assert.True(restoredFirst.ViewerSettings.SectionInverted);
 
-        Assert.Equal("realistic", restoredSecond.ViewerSettings.RenderMode);
-        Assert.False(restoredSecond.ViewerSettings.EdgesEnabled);
+        Assert.Equal("solid", restoredSecond.ViewerSettings.RenderMode);
+        // EdgesEnabled stays null (never customized) until the viewer resolves its
+        // format-aware default (CAD exchange formats -> on, mesh formats -> off) — see
+        // ModelViewer.razor's IsCadNativeExtension / ApplyViewerSettings.
+        Assert.Null(restoredSecond.ViewerSettings.EdgesEnabled);
         Assert.True(restoredSecond.ViewerSettings.GridEnabled);
     }
 

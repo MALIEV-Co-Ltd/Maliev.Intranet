@@ -283,7 +283,7 @@ public class UploadsController(
     }
 
     /// <summary>
-    /// Gets the BabylonJS GLB viewer URL for an uploaded file by its GCS storage path.
+    /// Gets the GLB viewer URL for an uploaded file by its GCS storage path.
     /// The path is used as the cache key by the <see cref="IFileAnalysisStatusService"/>.
     /// Returns 404 when analysis is not yet complete or the GLB artifact is not available.
     /// </summary>
@@ -554,7 +554,7 @@ public class UploadsController(
 
     /// <summary>
     /// Returns a short-lived signed GCS download URL for an uploaded file by its ID.
-    /// Used by the BabylonJS viewer to stream the original 3D file directly from GCS.
+    /// Used by the three.js viewer to stream the original 3D file directly from GCS.
     /// </summary>
     /// <param name="fileId">The uploaded file GUID.</param>
     /// <param name="ct">Cancellation token.</param>

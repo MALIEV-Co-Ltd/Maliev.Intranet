@@ -129,16 +129,16 @@ public class PartViewModel
     /// <summary>Raw GCS storage path for the large isometric thumbnail. Preserved to re-resolve signed URLs after expiry.</summary>
     public string? ThumbnailLargeGcsPath { get; set; }
 
-    /// <summary>GLB artifact for BabylonJS viewer. Source: status.GlbStoragePath</summary>
+    /// <summary>GLB artifact for the three.js viewer. Source: status.GlbStoragePath</summary>
     public string? GlbStoragePath { get; set; }
 
     /// <summary>Storage path that the browser viewer should load. May be the original STL/OBJ/GLB upload.</summary>
     public string? ViewerStoragePath { get; set; }
 
-    /// <summary>Dot-prefixed BabylonJS loader extension for <see cref="ViewerStoragePath"/>.</summary>
+    /// <summary>Dot-prefixed file extension for the three.js viewer to load <see cref="ViewerStoragePath"/>.</summary>
     public string? ViewerFileExtension { get; set; }
 
-    /// <summary>Resolved signed viewer URL for BabylonJS inline rendering. Fetched on-demand when user opens 3D view.</summary>
+    /// <summary>Resolved signed viewer URL for three.js inline rendering. Fetched on-demand when user opens 3D view.</summary>
     public string? ViewerUrl { get; set; }
 
     /// <summary>Pre-resolved signed URL for the GLB file, delivered by the GlbReady SignalR event. Bypasses API round-trip on cube click.</summary>
@@ -189,7 +189,7 @@ public class PartViewModel
     /// <summary>
     /// Signed overlay GLB URLs keyed by "{PROCESS}__{category}" (e.g. "FDM__thin_wall").
     /// Populated from the DfmAnalysisReady SignalR event. Used by PartDetailCard to wire
-    /// clickable overlay toggling in the BabylonJS viewer.
+    /// clickable overlay toggling in the three.js viewer.
     /// </summary>
     public Dictionary<string, string>? OverlayUrls { get; set; }
 
