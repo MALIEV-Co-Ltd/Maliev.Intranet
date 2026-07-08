@@ -327,7 +327,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task OpenBabylonViewer_WhenViewerUrlAlreadyExists_DoesNotRefreshOrShowError()
+    public async Task OpenPartViewer_WhenViewerUrlAlreadyExists_DoesNotRefreshOrShowError()
     {
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
         var part = new PartViewModel
@@ -340,7 +340,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var snackbar = Services.GetRequiredService<ISnackbar>();
         ClearRequests();
 
-        await InvokePrivateTaskWithArgsAsync(cut, "OpenBabylonViewer", part);
+        await InvokePrivateTaskWithArgsAsync(cut, "OpenPartViewer", part);
 
         Assert.Equal("https://signed.example/review.glb", part.ViewerUrl);
         Assert.DoesNotContain(_sentRequests, request =>
@@ -350,7 +350,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public async Task OpenBabylonViewer_WhenViewerUrlEmpty_CallsViewerUrlEndpointWithStoragePath()
+    public async Task OpenPartViewer_WhenViewerUrlEmpty_CallsViewerUrlEndpointWithStoragePath()
     {
         const string storagePath = "projects/temp/review.stp";
         const string glbStoragePath = "projects/temp/review.stp_viewer.glb";
@@ -385,7 +385,7 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         };
         ClearRequests();
 
-        await InvokePrivateTaskWithArgsAsync(cut, "OpenBabylonViewer", part);
+        await InvokePrivateTaskWithArgsAsync(cut, "OpenPartViewer", part);
 
         Assert.Equal(signedUrl, part.ViewerUrl);
         Assert.Contains(_sentRequests, request =>

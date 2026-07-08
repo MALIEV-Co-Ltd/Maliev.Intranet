@@ -472,7 +472,7 @@ public sealed class ProjectDetailPageTests : BunitContext, IAsyncLifetime
         {
             Assert.Contains("project-thumbnail-viewer-frame", cut.Markup);
             Assert.Contains("model-viewer-container", cut.Markup);
-            Assert.Contains("babylon-canvas-", cut.Markup);
+            Assert.Contains("viewer-canvas-", cut.Markup);
             Assert.DoesNotContain("bracket-large.webp", cut.Markup);
         });
     }

@@ -14,16 +14,16 @@ This repository follows MALIEV's editorial social direction: white space, black 
 
 ## Typography
 
-- English: `Inter`, `Arial`, or the existing MALIEV system sans stack.
+- English: `Inter`, `Arial`, or the existing MALIEV system sans stack. The `MALIEV adaptation` keeps the editorial system compatible with operational app screens.
 - Thai: `Noto Sans Thai` wherever Thai text is rendered.
 - Use weight 600 for page and dialog headings, 400-500 for body/UI copy, and 650 only where the existing component system requires it.
-- Letter spacing is `0`. Do not tighten headings or utility text.
+- Letter spacing is `0`; letter spacing remains 0 across headings, buttons, labels, and utility text.
 - Body line height should read editorially: 1.45-1.6 for prose and 1.2-1.35 for compact controls.
 
 ## Components
 
 - Dialogs and account surfaces use white panels, `#333333` text, `#333333` borders, and 8px radius.
-- Primary buttons use `#333333` fill with white text.
+- Primary buttons use `#333333` fill with white text. `Primary Action Blue` is not part of the shared button contract.
 - Secondary buttons use white fill, `#333333` text, and a `#333333` or hairline border.
 - Inputs use white fill, `#333333` text, clear labels, and high-contrast placeholders.
 - Cards are for repeated items and framed tools only. Do not nest cards inside cards.
@@ -31,7 +31,7 @@ This repository follows MALIEV's editorial social direction: white space, black 
 
 ## Layout
 
-- Operational pages should be dense enough for repeated use and scanning.
+- Operational pages should preserve operational density for repeated use and scanning.
 - Use white space as quiet editorial margin, not empty dead area.
 - Surface the real project, order, customer, service, file, or workflow state on the first screen.
 - Keep controls stable across desktop and mobile; text must not overflow buttons, rails, dialogs, or cards.
