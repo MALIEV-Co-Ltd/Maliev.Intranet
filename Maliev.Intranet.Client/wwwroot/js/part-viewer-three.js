@@ -6,12 +6,14 @@
  * Powered by three.js (self-hosted ES modules, no bundler) — see wwwroot/lib/three/.
  * Provides JS interop functions for Blazor components.
  *
- * MIGRATION STATUS (BabylonJS -> three.js): core viewer is ported. Section view,
- * turning-axis overlay, DFM overlays, measure/thickness tools, flipped-triangle
- * view, the cutting mat and the orientation-cube gizmo are not yet ported and are
- * stubbed below (clearly logged) pending follow-up work. "Realistic" PBR render
- * mode has been removed entirely per product decision — only solid/wireframe/
- * transparent remain, and all renders use a flat professional-CAD-style look.
+ * MIGRATION STATUS (BabylonJS -> three.js): COMPLETE. Section view, turning-axis
+ * overlay, DFM overlays, measure/thickness tools, flipped-triangle view, the
+ * cutting mat, and the browser-first local DFM runtime are all ported. The
+ * orientation-cube gizmo was removed as unreadable clutter (product decision).
+ * "Realistic" PBR render mode has been removed entirely per product decision —
+ * only solid/wireframe/transparent remain, and all renders use a flat
+ * professional-CAD-style look. Keep in sync with Maliev.QuoteEngine's
+ * quote-part-viewer-three.js (same architecture, same per-canvas state maps).
  *
  * Supported formats: .glb, .gltf (GLTFLoader), .stl (STLLoader), .obj (OBJLoader),
  * .3mf (3MFLoader). Native CAD exchange formats (.step, .iges) are always
@@ -78,12 +80,16 @@ const CONFIG = {
         ambient: { color: 0xe0e6f5, intensity: 0.55 },
         background: 0xf5f6f8,
     },
+    // Dark mode is a neutral CAD studio (Fusion/Onshape-style): white key + cool
+    // fill and a hemisphere bounce so the part reads as bright neutral grey
+    // against the dark backdrop — never a moody colored render.
     STUDIO_DARK: {
-        key: { dir: [-0.5, -1.1, -0.8], color: 0xffd6a6, intensity: 3.2 },
-        rim: { dir: [-0.8, -0.3, 0.55], color: 0x6189ff, intensity: 1.6 },
-        back: { dir: [0.1, 0.9, 0.8], color: 0x5270e0, intensity: 0.5 },
-        ambient: { color: 0x1a2030, intensity: 0.3 },
-        background: 0x0a0a0a,
+        key: { dir: [-0.5, -1.1, -0.8], color: 0xffffff, intensity: 2.7 },
+        fill: { dir: [0.85, -0.4, -0.2], color: 0xdce6f5, intensity: 1.5 },
+        rim: { dir: [0.1, 0.7, -0.4], color: 0xf2f6ff, intensity: 0.7 },
+        hemisphere: { sky: 0x9fb2cc, ground: 0x2c313a, intensity: 0.9 },
+        ambient: { color: 0x545e6d, intensity: 0.5 },
+        background: 0x16181d,
     },
 
     EDGES: { color: 0x1f2226, colorDark: 0xcdd3de, widthPx: 1.6 },
@@ -99,14 +105,6 @@ const CONFIG = {
 
     SCALE_TOLERANCE: 0.05,
 
-    AXIS_GIZMO: {
-        length: 0.65,
-        coneHeight: 0.18,
-        coneRadius: 0.045,
-        colorX: 0xee4444, colorY: 0x22c750, colorZ: 0x3882f5,
-        viewport: { x: 0.84, y: 0.76, width: 0.16, height: 0.24 }, // fraction of canvas, bottom-left origin
-        hoverRegion: { xMin: 0.83, yMax: 0.25 }, // CSS-pixel fraction, top-left origin
-    },
 
     SECTION: { fillColor: 0xffc8e0, fillOpacity: 0.55, planeLiftMm: 0.1 },
 
@@ -171,12 +169,6 @@ const autoSpeedTarget = {};
 const resizeObservers = {};
 const panState = {};           // right-click pick-point pan
 const animationFrameHandles = {};
-
-// Axis gizmo (orientation cube)
-const gizmoScenes = {};
-const gizmoCameras = {};
-const gizmoLabelDivs = {};
-const gizmoMouseHandlers = {};
 
 // Section view
 const sectionStates = {};      // canvasId -> { plane, fillMesh }
@@ -621,6 +613,13 @@ function buildLights(scene, isDark) {
     key.position.set(...cfg.key.dir).negate();
     const result = { ambient, key };
     scene.add(ambient, key);
+
+    if (cfg.hemisphere) {
+        const hemisphere = new THREE.HemisphereLight(cfg.hemisphere.sky, cfg.hemisphere.ground, cfg.hemisphere.intensity);
+        hemisphere.position.set(0, 0, 1);
+        scene.add(hemisphere);
+        result.hemisphere = hemisphere;
+    }
 
     if (cfg.fill) {
         const fill = new THREE.DirectionalLight(cfg.fill.color, cfg.fill.intensity);
@@ -1069,7 +1068,7 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         const size = finalBox.getSize(new THREE.Vector3());
         const halfDiag = size.length() / 2;
         const fovRad = (camera.fov * Math.PI) / 180;
-        const fitRadius = Math.max((halfDiag / Math.tan(fovRad / 2)) * 1.2, 1);
+        const fitRadius = Math.max((halfDiag / Math.tan(fovRad / 2)) * 1.05, 1);
         fitRadiusMap[canvasId] = fitRadius;
         camera.near = CONFIG.CAMERA_NEAR;
         camera.far = fitRadius * CONFIG.CAMERA_FAR_RADIUS_FACTOR;
@@ -1081,8 +1080,6 @@ export async function initialize(canvasId, fileUrl, fileExt, isDark, knownDimsMm
         applyPresetImmediate(canvasId, PRESETS.iso.dir, PRESETS.iso.up, 1);
 
         if (settings.cameraProjection === 'orthographic') setCameraProjection(canvasId, 'orthographic');
-
-        createAxisGizmo(canvasId, canvas, cameras[canvasId]);
 
         setRenderMode(canvasId, settings.renderMode);
         toggleEdges(canvasId, edgesEnabled[canvasId]);
@@ -1152,7 +1149,6 @@ function startRenderLoop(canvasId, generation) {
             lod.frames--;
             measureFpsAndAdaptPixelRatio(canvasId, timestamp);
             renderer.render(scene, cameras[canvasId]);
-            renderAxisGizmo(canvasId);
             updateTurningAxisLabel(canvasId);
         }
 
@@ -1208,7 +1204,6 @@ export async function dispose(canvasId) {
     const canvas = canvasEls[canvasId];
     if (canvas && bodyPickHandlers[canvasId]) canvas.removeEventListener('click', bodyPickHandlers[canvasId]);
 
-    disposeAxisGizmo(canvasId);
     clearTurningAxis(canvasId);
     clearDfmOverlays(canvasId, null);
     disableMeasureTool(canvasId);
@@ -1229,132 +1224,6 @@ export async function dispose(canvasId) {
         dfmOverlays, flippedTriangleOriginalMaterials, renderLod, lodPixelLevel]) {
         delete map[canvasId];
     }
-}
-
-// ============================================================================
-// AXIS GIZMO (orientation cube, top-right corner)
-// ============================================================================
-
-function buildGizmoAxis(gizmoScene, dir, color) {
-    const length = CONFIG.AXIS_GIZMO.length;
-    const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(dir[0] * length, dir[1] * length, dir[2] * length)];
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color }));
-    gizmoScene.add(line);
-
-    const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(CONFIG.AXIS_GIZMO.coneRadius, CONFIG.AXIS_GIZMO.coneHeight, 12),
-        new THREE.MeshBasicMaterial({ color }),
-    );
-    const dirVec = new THREE.Vector3(dir[0], dir[1], dir[2]);
-    cone.position.copy(dirVec).multiplyScalar(length + CONFIG.AXIS_GIZMO.coneHeight / 2);
-    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVec);
-    gizmoScene.add(cone);
-}
-
-function createAxisGizmo(canvasId, canvas, mainCamera) {
-    disposeAxisGizmo(canvasId);
-
-    const gizmoScene = new THREE.Scene();
-    gizmoScene.add(new THREE.AmbientLight(0xffffff, 1.2));
-    buildGizmoAxis(gizmoScene, [1, 0, 0], CONFIG.AXIS_GIZMO.colorX);
-    buildGizmoAxis(gizmoScene, [0, 1, 0], CONFIG.AXIS_GIZMO.colorY);
-    buildGizmoAxis(gizmoScene, [0, 0, 1], CONFIG.AXIS_GIZMO.colorZ);
-
-    const hw = 1.1;
-    const gizmoCamera = new THREE.OrthographicCamera(-hw, hw, hw, -hw, 0.01, 100);
-    gizmoCamera.up.set(0, 0, 1);
-    gizmoScenes[canvasId] = gizmoScene;
-    gizmoCameras[canvasId] = gizmoCamera;
-
-    const labelDefs = [
-        { name: 'X', color: '#ee4444', pos: new THREE.Vector3(CONFIG.AXIS_GIZMO.length + 0.28, 0, 0) },
-        { name: 'Y', color: '#22c750', pos: new THREE.Vector3(0, CONFIG.AXIS_GIZMO.length + 0.28, 0) },
-        { name: 'Z', color: '#3882f5', pos: new THREE.Vector3(0, 0, CONFIG.AXIS_GIZMO.length + 0.28) },
-    ];
-    const labelDivs = labelDefs.map(({ name, color, pos }) => {
-        const div = document.createElement('div');
-        div.textContent = name;
-        div.style.cssText = `position:fixed;transform:translate(-50%,-50%);color:${color};font-size:11px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,monospace;pointer-events:none;opacity:0;transition:opacity .18s ease;z-index:25;text-shadow:0 0 4px rgba(0,0,0,.8);`;
-        document.body.appendChild(div);
-        return { div, localPos: pos };
-    });
-    gizmoLabelDivs[canvasId] = labelDivs;
-
-    const hover = CONFIG.AXIS_GIZMO.hoverRegion;
-    const onMove = (evt) => {
-        const rect = canvas.getBoundingClientRect();
-        const relX = (evt.clientX - rect.left) / rect.width;
-        const relY = (evt.clientY - rect.top) / rect.height;
-        const inGizmo = relX >= hover.xMin && relY <= hover.yMax;
-        labelDivs.forEach(({ div }) => { div.style.opacity = inGizmo ? '1' : '0'; });
-    };
-    const onLeave = () => labelDivs.forEach(({ div }) => { div.style.opacity = '0'; });
-    canvas.addEventListener('mousemove', onMove);
-    canvas.addEventListener('mouseleave', onLeave);
-    gizmoMouseHandlers[canvasId] = { onMove, onLeave, canvas };
-}
-
-function renderAxisGizmo(canvasId) {
-    const renderer = renderers[canvasId];
-    const gizmoScene = gizmoScenes[canvasId];
-    const gizmoCamera = gizmoCameras[canvasId];
-    const mainCamera = cameras[canvasId];
-    const controls = controlsMap[canvasId];
-    const canvas = canvasEls[canvasId];
-    if (!renderer || !gizmoScene || !gizmoCamera || !mainCamera || !controls) return;
-
-    const dir = mainCamera.position.clone().sub(controls.target).normalize();
-    gizmoCamera.position.copy(dir).multiplyScalar(3.5);
-    gizmoCamera.up.copy(mainCamera.up);
-    gizmoCamera.lookAt(0, 0, 0);
-
-    const vp = CONFIG.AXIS_GIZMO.viewport;
-    const w = renderer.domElement.clientWidth;
-    const h = renderer.domElement.clientHeight;
-    const dpr = renderer.getPixelRatio();
-    const x = Math.floor(vp.x * w * dpr);
-    const y = Math.floor(vp.y * h * dpr);
-    const vw = Math.ceil(vp.width * w * dpr);
-    const vh = Math.ceil(vp.height * h * dpr);
-
-    renderer.setViewport(x, y, vw, vh);
-    renderer.setScissor(x, y, vw, vh);
-    renderer.setScissorTest(true);
-    renderer.clearDepth();
-    renderer.render(gizmoScene, gizmoCamera);
-    renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, w * dpr, h * dpr);
-
-    const labelDivs = gizmoLabelDivs[canvasId];
-    if (labelDivs && canvas) {
-        const rect = canvas.getBoundingClientRect();
-        const gizmoRectW = rect.width * vp.width;
-        const gizmoRectH = rect.height * vp.height;
-        const gizmoRectLeft = rect.left + rect.width * vp.x;
-        const gizmoRectTop = rect.top + rect.height * (1 - vp.y - vp.height);
-        labelDivs.forEach(({ div, localPos }) => {
-            const ndc = localPos.clone().project(gizmoCamera);
-            if (ndc.z >= -1 && ndc.z <= 1) {
-                div.style.left = (gizmoRectLeft + (ndc.x * 0.5 + 0.5) * gizmoRectW) + 'px';
-                div.style.top = (gizmoRectTop + (1 - (ndc.y * 0.5 + 0.5)) * gizmoRectH) + 'px';
-            }
-        });
-    }
-}
-
-function disposeAxisGizmo(canvasId) {
-    if (gizmoMouseHandlers[canvasId]) {
-        const { onMove, onLeave, canvas } = gizmoMouseHandlers[canvasId];
-        canvas.removeEventListener('mousemove', onMove);
-        canvas.removeEventListener('mouseleave', onLeave);
-        delete gizmoMouseHandlers[canvasId];
-    }
-    if (gizmoLabelDivs[canvasId]) {
-        gizmoLabelDivs[canvasId].forEach(({ div }) => div.remove());
-        delete gizmoLabelDivs[canvasId];
-    }
-    if (gizmoScenes[canvasId]) { disposeObject3D(gizmoScenes[canvasId]); delete gizmoScenes[canvasId]; }
-    delete gizmoCameras[canvasId];
 }
 
 // ============================================================================
@@ -1691,44 +1560,136 @@ function thicknessMarkerColor(thicknessMm) {
     return 0xffa726;
 }
 
-export function enableThicknessAnalysis(canvasId) {
+export async function enableThicknessAnalysis(canvasId) {
     disableThicknessAnalysis(canvasId);
-    const canvas = canvasEls[canvasId];
-    const camera = cameras[canvasId];
     const scene = scenes[canvasId];
-    if (!canvas || !camera || !scene) return;
+    const meshes = cadMeshes[canvasId] || [];
+    if (!scene || meshes.length === 0) return null;
 
-    const state = { markers: [] };
-    const clickHandler = (evt) => {
-        const rect = canvas.getBoundingClientRect();
-        const pointer = new THREE.Vector2(
-            ((evt.clientX - rect.left) / rect.width) * 2 - 1,
-            -((evt.clientY - rect.top) / rect.height) * 2 + 1,
-        );
-        const raycaster = new THREE.Raycaster();
-        raycaster.far = CONFIG.THICKNESS.maxRayDistanceMm * 10;
-        raycaster.setFromCamera(pointer, camera);
-        const meshes = cadMeshes[canvasId] || [];
-        const hits = raycaster.intersectObjects(meshes, false);
-        if (hits.length < 2) return;
-        const entry = hits[0];
-        const exit = hits[hits.length - 1];
-        const thicknessMm = entry.point.distanceTo(exit.point);
-        if (thicknessMm > CONFIG.THICKNESS.maxRayDistanceMm) return;
-
-        const marker = new THREE.Mesh(
-            new THREE.SphereGeometry(0.4, 10, 10),
-            new THREE.MeshBasicMaterial({ color: thicknessMarkerColor(thicknessMm) }),
-        );
-        marker.position.copy(entry.point);
-        scene.add(marker);
-        state.markers.push(marker);
-        markDirty(canvasId);
-        debugLog(`thickness probe: ${thicknessMm.toFixed(2)}mm`);
-    };
-    canvas.addEventListener('click', clickHandler);
-    state.clickHandler = clickHandler;
+    // Full-mesh wall-thickness heatmap (mold-analysis style): per-vertex
+    // thickness measured by casting a ray from just inside each vertex along
+    // the inward normal to the opposite surface. Large meshes are sampled at a
+    // stride and processed in time-sliced chunks so the UI never freezes.
+    const MAX_SAMPLES = 15000;
+    const CHUNK = 800;
+    const EPSILON_MM = 0.05;
+    const state = { meshes: [], transparent: false };
     thicknessStates[canvasId] = state;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.far = CONFIG.THICKNESS.maxRayDistanceMm;
+    const origin = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const vertex = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+
+    const sampledValues = [];
+    const perMesh = [];
+
+    for (const mesh of meshes) {
+        const geometry = mesh?.geometry;
+        const positionAttr = geometry?.attributes?.position;
+        if (!positionAttr) continue;
+        if (!geometry.attributes.normal) geometry.computeVertexNormals();
+        const normalAttr = geometry.attributes.normal;
+        const vertexCount = positionAttr.count;
+        const stride = Math.max(1, Math.ceil(vertexCount / MAX_SAMPLES));
+        const thickness = new Float32Array(vertexCount).fill(NaN);
+        mesh.updateWorldMatrix(true, false);
+
+        for (let start = 0; start < vertexCount; start += stride * CHUNK) {
+            // Abort cleanly if the tool was toggled off mid-computation.
+            if (thicknessStates[canvasId] !== state) return null;
+            const end = Math.min(vertexCount, start + stride * CHUNK);
+            for (let i = start; i < end; i += stride) {
+                vertex.fromBufferAttribute(positionAttr, i).applyMatrix4(mesh.matrixWorld);
+                normal.fromBufferAttribute(normalAttr, i)
+                    .transformDirection(mesh.matrixWorld)
+                    .normalize();
+                direction.copy(normal).negate();
+                origin.copy(vertex).addScaledVector(direction, EPSILON_MM);
+                raycaster.set(origin, direction);
+                const hits = raycaster.intersectObject(mesh, false);
+                if (hits.length > 0) {
+                    const t = hits[0].distance + EPSILON_MM;
+                    if (t <= CONFIG.THICKNESS.maxRayDistanceMm) {
+                        thickness[i] = t;
+                        sampledValues.push(t);
+                    }
+                }
+            }
+            // Yield to the event loop between chunks (keeps mobile smooth).
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+
+        // Propagate sampled values to skipped vertices (stride locality).
+        if (stride > 1) {
+            let last = NaN;
+            for (let i = 0; i < vertexCount; i += 1) {
+                if (Number.isNaN(thickness[i])) thickness[i] = last;
+                else last = thickness[i];
+            }
+        }
+        perMesh.push({ mesh, thickness });
+    }
+
+    if (sampledValues.length === 0) {
+        delete thicknessStates[canvasId];
+        return null;
+    }
+
+    // Scale: 95th percentile so a single deep probe does not wash out the map.
+    sampledValues.sort((a, b) => a - b);
+    const maxMm = Math.max(
+        0.5,
+        sampledValues[Math.min(sampledValues.length - 1, Math.floor(sampledValues.length * 0.95))],
+    );
+
+    for (const entry of perMesh) {
+        const { mesh, thickness } = entry;
+        const geometry = mesh.geometry;
+        const colors = new Float32Array(thickness.length * 3);
+        for (let i = 0; i < thickness.length; i += 1) {
+            const t = thickness[i];
+            let r = 0.55; let g = 0.55; let b = 0.58; // unknown = neutral grey
+            if (!Number.isNaN(t)) {
+                const x = Math.min(1, Math.max(0, t / maxMm));
+                // Jet-style gradient: blue -> cyan -> green -> yellow -> red.
+                r = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * x - 3)));
+                g = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * x - 2)));
+                b = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * x - 1)));
+            }
+            colors[i * 3] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        entry.previousMaterial = mesh.material;
+        mesh.material = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            metalness: 0.05,
+            roughness: 0.85,
+        });
+        state.meshes.push(entry);
+    }
+
+    markDirty(canvasId);
+    return { minMm: 0, maxMm };
+}
+
+export function setThicknessTransparent(canvasId, enabled) {
+    const state = thicknessStates[canvasId];
+    if (!state) return;
+    state.transparent = !!enabled;
+    for (const entry of state.meshes) {
+        const material = entry.mesh.material;
+        if (!material || !material.vertexColors) continue;
+        material.transparent = state.transparent;
+        material.opacity = state.transparent ? 0.55 : 1.0;
+        material.depthWrite = !state.transparent;
+        material.needsUpdate = true;
+    }
+    markDirty(canvasId);
 }
 
 export function disableThicknessAnalysis(canvasId) {
@@ -1737,7 +1698,17 @@ export function disableThicknessAnalysis(canvasId) {
     const canvas = canvasEls[canvasId];
     const scene = scenes[canvasId];
     if (canvas && state.clickHandler) canvas.removeEventListener('click', state.clickHandler);
-    if (scene) state.markers.forEach((m) => { scene.remove(m); disposeObject3D(m); });
+    if (scene && Array.isArray(state.markers)) {
+        state.markers.forEach((m) => { scene.remove(m); disposeObject3D(m); });
+    }
+    for (const entry of state.meshes || []) {
+        if (entry.previousMaterial) {
+            const heatmapMaterial = entry.mesh.material;
+            entry.mesh.material = entry.previousMaterial;
+            if (heatmapMaterial && heatmapMaterial !== entry.previousMaterial) heatmapMaterial.dispose();
+        }
+        if (entry.mesh.geometry?.attributes?.color) entry.mesh.geometry.deleteAttribute('color');
+    }
     delete thicknessStates[canvasId];
     markDirty(canvasId);
 }
@@ -1793,7 +1764,7 @@ export function hideCuttingMat(canvasId) {
 }
 
 // ============================================================================
-// CONFIGURATOR MATERIAL / LOCAL ADVISORY RUNTIME — out of scope for this port
+// CONFIGURATOR MATERIAL — no rendering effect (Realistic mode removed)
 // ============================================================================
 
 export function configureMaterialFromConfigurator(canvasId, materialType, colorHex, finishCode, roughnessCode, processCode) {
@@ -1802,6 +1773,234 @@ export function configureMaterialFromConfigurator(canvasId, materialType, colorH
 }
 export function setMaterialType(canvasId, materialType) { /* no visual effect — see configureMaterialFromConfigurator */ }
 export function setPartColor(canvasId, cssColor) { /* no visual effect — see configureMaterialFromConfigurator */ }
-export function collectAdvisoryMeshBuffers(canvasId) { warnNotImplemented('collectAdvisoryMeshBuffers'); return null; }
-export async function runLocalAdvisoryGeometry(canvasId, options) { /* no-op: local DFM runtime is a separate WASM-worker subsystem, not yet ported */ }
 export function enableSectionPanelDrag(panelId) { /* no-op: section panel itself is Blazor-rendered HTML, not part of the 3D viewer */ }
+
+// ============================================================================
+// LOCAL ADVISORY GEOMETRY RUNTIME (browser-first DFM)
+// ----------------------------------------------------------------------------
+// Bridges the loaded viewer geometry (or the original uploaded bytes) into the
+// GeometryService-owned browser runtime worker served by the BFF at
+// /geometry/client-runtime/*. The worker computes advisory mesh metrics and DFM
+// issues locally; the server remains authoritative. Results are delivered back
+// to Blazor via the ModelViewer dotNet callbacks. Kept in sync with the
+// QuoteEngine quote-part-viewer-three.js implementation.
+// ============================================================================
+
+const GEOMETRY_RUNTIME_MANIFEST_URL = 'api/v1/geometry/runtime/manifest';
+const GEOMETRY_RUNTIME_ASSET_BASE = 'api/v1/geometry/runtime/assets/';
+let advisoryRuntimePromise = null;
+let advisoryWorker = null;
+let advisoryWorkerKey = null;
+const advisoryPending = new Map();
+let advisoryRequestSeq = 0;
+
+// The manifest may advertise an asset path whose prefix does not match the BFF proxy route
+// (GeometryService returns /geometry/client-runtime/assets/...). Resolve by asset file name
+// against the BFF runtime asset route so the worker/wasm are always fetchable via this origin.
+function resolveRuntimeAssetUrl(assetPath, origin) {
+    const name = String(assetPath || '').split('/').pop();
+    if (!name) return null;
+    return new URL(GEOMETRY_RUNTIME_ASSET_BASE + name, origin).href;
+}
+
+async function loadAdvisoryRuntimeManifest() {
+    if (advisoryRuntimePromise) return advisoryRuntimePromise;
+    advisoryRuntimePromise = (async () => {
+        const response = await fetch(new URL(GEOMETRY_RUNTIME_MANIFEST_URL, origin).href, { headers: { Accept: 'application/json' } });
+        if (!response || !response.ok) {
+            throw new Error(`Geometry runtime manifest request failed (${response ? response.status : 'no response'}).`);
+        }
+        const manifest = await response.json();
+        const workerAsset = manifest?.assets?.worker;
+        const wasmAsset = manifest?.assets?.wasm;
+        if (!workerAsset) throw new Error('Geometry runtime manifest did not include a worker asset.');
+        const origin = (typeof document !== 'undefined' && document.baseURI)
+            ? document.baseURI
+            : ((typeof location !== 'undefined' && location.origin) ? location.origin : GEOMETRY_RUNTIME_MANIFEST_URL);
+        return {
+            workerUrl: resolveRuntimeAssetUrl(workerAsset, origin),
+            wasmUrl: wasmAsset ? resolveRuntimeAssetUrl(wasmAsset, origin) : null
+        };
+    })().catch((error) => { advisoryRuntimePromise = null; throw error; });
+    return advisoryRuntimePromise;
+}
+
+async function ensureAdvisoryWorker(workerUrl) {
+    if (advisoryWorker && advisoryWorkerKey === workerUrl) return advisoryWorker;
+    if (advisoryWorker) { try { advisoryWorker.terminate(); } catch { /* ignore */ } advisoryWorker = null; }
+
+    // Load through a same-origin blob so the worker constructs even when the
+    // manifest points at a cross-origin GeometryService asset URL.
+    const response = await fetch(workerUrl);
+    if (!response || !response.ok) {
+        throw new Error(`Geometry runtime worker request failed (${response ? response.status : 'no response'}).`);
+    }
+    const source = await response.text();
+    const blobUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    let worker;
+    try {
+        worker = new Worker(blobUrl);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
+
+    const failAll = (error) => {
+        for (const pending of advisoryPending.values()) pending.reject(error);
+        advisoryPending.clear();
+    };
+    worker.onmessage = (event) => {
+        const message = event.data || {};
+        const pending = advisoryPending.get(message.id);
+        if (!pending) return;
+        advisoryPending.delete(message.id);
+        if (message.ok) pending.resolve(message.result);
+        else pending.reject(new Error(message.error || 'Local geometry runtime reported a failure.'));
+    };
+    worker.onerror = (event) => { failAll(new Error(event?.message || 'Local geometry runtime worker crashed.')); };
+    worker.onmessageerror = () => { failAll(new Error('Local geometry runtime returned an unreadable message.')); };
+
+    advisoryWorker = worker;
+    advisoryWorkerKey = workerUrl;
+    return worker;
+}
+
+function runAdvisoryOperation(worker, payload) {
+    const id = `dfm-${advisoryRequestSeq += 1}`;
+    return new Promise((resolve, reject) => {
+        advisoryPending.set(id, { resolve, reject });
+        try { worker.postMessage({ id, ...payload }); }
+        catch (error) { advisoryPending.delete(id); reject(error); }
+    });
+}
+
+async function waitForViewerMesh(canvasId, timeoutMs = 6000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const meshes = cadMeshes[canvasId];
+        if (Array.isArray(meshes) && meshes.some((mesh) => mesh?.geometry?.attributes?.position)) return true;
+        if (Date.now() >= deadline) return false;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+}
+
+// Collects world-space (millimetre) triangle buffers from the loaded viewer mesh.
+export function collectAdvisoryMeshBuffers(canvasId) {
+    const meshes = cadMeshes[canvasId] || [];
+    const positions = [];
+    const indices = [];
+    for (const mesh of meshes) {
+        const geometry = mesh?.geometry;
+        const positionAttr = geometry?.attributes?.position;
+        if (!positionAttr) continue;
+        mesh.updateWorldMatrix(true, false);
+        const worldGeometry = geometry.clone().applyMatrix4(mesh.matrixWorld);
+        const worldPositions = worldGeometry.attributes.position.array;
+        const baseVertex = positions.length / 3;
+        for (let i = 0; i < worldPositions.length; i += 1) positions.push(worldPositions[i]);
+        const indexAttr = worldGeometry.getIndex();
+        if (indexAttr) {
+            const source = indexAttr.array;
+            for (let i = 0; i < source.length; i += 1) indices.push(baseVertex + source[i]);
+        } else {
+            const vertexCount = worldPositions.length / 3;
+            for (let i = 0; i < vertexCount; i += 1) indices.push(baseVertex + i);
+        }
+        worldGeometry.dispose();
+    }
+    return { positions, indices };
+}
+
+async function buildAdvisoryInput(canvasId, options) {
+    // Prefer the original uploaded bytes (most faithful to the customer file).
+    const uploads = (typeof window !== 'undefined') ? window.projectNewUploads : null;
+    if (options.fileBytesProvider === 'projectNewUploads' && options.clientUploadId && uploads?.getFileBytes) {
+        try {
+            const bytes = await uploads.getFileBytes(options.clientUploadId);
+            if (bytes && bytes.length > 0) {
+                return { input: { fileBytes: bytes, fileName: options.fileName || '' }, source: 'upload_bytes' };
+            }
+        } catch (error) {
+            console.warn('[ThreeViewer] Upload bytes unavailable; falling back to viewer mesh.', error);
+        }
+    }
+
+    // Fall back to the loaded viewer mesh (always available once rendered).
+    await waitForViewerMesh(canvasId);
+    const meshBuffers = collectAdvisoryMeshBuffers(canvasId);
+    if (meshBuffers.positions.length >= 9 && meshBuffers.indices.length >= 3) {
+        return { input: { meshBuffers }, source: 'viewer_mesh' };
+    }
+    return null;
+}
+
+function mapAdvisoryResult(result, processCode) {
+    const metrics = result?.metrics || {};
+    const box = metrics.boundingBox || null;
+    const issues = Array.isArray(result?.issues) ? result.issues : [];
+    return {
+        processCode: result?.processCode ?? processCode ?? null,
+        runtimeVersion: result?.runtimeVersion ?? null,
+        algorithmVersion: result?.algorithmVersion ?? null,
+        authority: result?.authority ?? null,
+        executionMode: result?.executionMode ?? null,
+        isAuthoritative: result?.isAuthoritative ?? false,
+        inputHash: result?.inputHash ?? null,
+        metrics: {
+            vertexCount: metrics.vertexCount ?? null,
+            faceCount: metrics.faceCount ?? null,
+            volumeMm3: metrics.volumeMm3 ?? null,
+            surfaceAreaMm2: metrics.surfaceAreaMm2 ?? null,
+            boundingBoxMm: box ? { x: box.x, y: box.y, z: box.z } : null,
+            isManifold: metrics.isManifold ?? null,
+            nonManifoldEdgeCount: metrics.nonManifoldEdgeCount ?? null,
+            complexity: metrics.complexity ?? null
+        },
+        issues: issues.map((issue) => ({
+            category: issue?.category ?? null,
+            severity: issue?.severity ?? null,
+            title: issue?.title ?? null,
+            description: issue?.description ?? null,
+            value: issue?.value ?? null,
+            threshold: issue?.threshold ?? null,
+            faceIndices: Array.isArray(issue?.faceIndices) ? issue.faceIndices : [],
+            centroid: Array.isArray(issue?.centroid) ? issue.centroid : []
+        }))
+    };
+}
+
+export async function runLocalAdvisoryGeometry(canvasId, options) {
+    const opts = options || {};
+    const processCode = opts.processCode || null;
+    const dotNetRef = opts.dotNetRef || dotNetRefs[canvasId] || null;
+
+    const notifyUnavailable = async (reason) => {
+        if (!dotNetRef) return;
+        try { await dotNetRef.invokeMethodAsync('NotifyLocalGeometryRuntimeUnavailable', { processCode, reason }); }
+        catch (error) { console.warn('[ThreeViewer] Local DFM unavailable callback failed.', error); }
+    };
+
+    try {
+        if (dotNetRef) {
+            try { await dotNetRef.invokeMethodAsync('NotifyLocalGeometryRuntimeStarted', { processCode }); }
+            catch { /* non-fatal: proceed with analysis */ }
+        }
+
+        const prepared = await buildAdvisoryInput(canvasId, opts);
+        if (!prepared) { await notifyUnavailable('no_local_geometry_input'); return; }
+
+        const runtime = await loadAdvisoryRuntimeManifest();
+        const worker = await ensureAdvisoryWorker(runtime.workerUrl);
+        const result = await runAdvisoryOperation(worker, {
+            operation: 'analyze',
+            input: prepared.input,
+            processCode: processCode || 'FDM',
+            wasmUrl: runtime.wasmUrl
+        });
+
+        if (!dotNetRef) return;
+        await dotNetRef.invokeMethodAsync('NotifyLocalGeometryRuntimeComplete', mapAdvisoryResult(result, processCode));
+    } catch (error) {
+        console.warn('[ThreeViewer] Local advisory geometry runtime failed.', error);
+        await notifyUnavailable('local_runtime_error');
+    }
+}
