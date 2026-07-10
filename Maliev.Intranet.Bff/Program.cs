@@ -212,215 +212,6 @@ try
         options.Cookie.MaxAge = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
-    })
-    .AddGoogle(options =>
-    {
-        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? throw new InvalidOperationException("Google ClientId not configured");
-        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? throw new InvalidOperationException("Google ClientSecret not configured");
-
-        options.Scope.Add("profile");
-        options.Scope.Add("email");
-        options.SaveTokens = true; // Required so UserContextHandler can retrieve access_token for downstream service calls
-        options.ClaimActions.MapJsonKey("picture", "picture");
-
-        options.Events.OnRedirectToAuthorizationEndpoint = context =>
-        {
-            context.Response.Redirect(context.RedirectUri + "&prompt=select_account");
-            return Task.CompletedTask;
-        };
-
-        options.Events.OnTicketReceived = async context =>
-        {
-            var email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-            var fullName = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
-            var googleUserId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var picture = context.Principal.GetProfileImageUrl();
-            var identity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
-
-            if (!string.IsNullOrEmpty(email) && identity != null && !identity.HasClaim(c => c.Type == "email"))
-                identity.AddClaim(new System.Security.Claims.Claim("email", email));
-
-            if (!WorkspaceEmailDomainPolicy.IsAllowedEmployeeEmail(email))
-            {
-                context.Fail(WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage);
-                return;
-            }
-
-            var httpClientFactory = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
-            var authClient = httpClientFactory.CreateClient("AuthService");
-
-            try
-            {
-                var response = await authClient.PostAsJsonAsync("/auth/v1/exchange/google", new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture });
-                if (response.IsSuccessStatusCode)
-                {
-                    var authResult = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-                    var accessToken = authResult.GetProperty("access_token").GetString();
-
-                    // Read profile_image_url from AuthService response (authoritative source)
-                    var responseProfileImageUrl = authResult.TryGetProperty("user", out var userObj)
-                        && userObj.TryGetProperty("profile_image_url", out var picProp)
-                        && picProp.ValueKind == System.Text.Json.JsonValueKind.String
-                        ? picProp.GetString()
-                        : null;
-                    var effectivePicture = responseProfileImageUrl ?? picture;
-                    if (!string.IsNullOrEmpty(accessToken) && context.Properties != null)
-                    {
-                        // Store access_token in AuthenticationProperties instead of claims to reduce cookie size
-                        context.Properties.StoreTokens(new[] {
-                            new AuthenticationToken { Name = "access_token", Value = accessToken }
-                        });
-
-                        // Parse JWT to extract essential claims for cookie
-                        var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-                        var jwtToken = handler.ReadJwtToken(accessToken);
-
-                        // Only store minimal claims needed for UI personalization (not roles/permissions)
-                        var essentialClaims = jwtToken.Claims.Where(c =>
-                            c.Type is "sub" or "user_id" or "user_type" or
-                            System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email or
-                            System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name);
-
-                        // Store google_user_id as a separate claim BEFORE removing the old NameIdentifier
-                        // This is required for token re-exchange in UserContextHandler
-                        if (!string.IsNullOrEmpty(googleUserId) && identity != null)
-                        {
-                            identity.AddClaim(new System.Security.Claims.Claim("google_user_id", googleUserId));
-                        }
-
-                        // Store profile picture URL from AuthService response (authoritative source)
-                        if (!string.IsNullOrEmpty(effectivePicture) && identity != null)
-                        {
-                            identity.AddClaim(new System.Security.Claims.Claim("picture", effectivePicture));
-                        }
-
-                        // Remove the old Google NameIdentifier (numeric sub) before adding platform claims
-                        // to prevent SignInAsync from merging it with the new platform sub.
-                        var oldNameIdClaim = identity?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-                        if (oldNameIdClaim != null)
-                        {
-                            identity?.RemoveClaim(oldNameIdClaim);
-                        }
-
-                        foreach (var claim in essentialClaims)
-                        {
-                            identity?.AddClaim(new System.Security.Claims.Claim(claim.Type, claim.Value));
-                        }
-
-                        // Add access_token as a claim fallback — if cookie truncation prevents GetTokenAsync
-                        // from finding the stored token, UserContextHandler can fall back to user.FindFirst("access_token")
-                        identity?.AddClaim(new System.Security.Claims.Claim("access_token", accessToken));
-
-                        // Do NOT add roles/permissions to cookie - they will be read from JWT during authorization
-                        identity?.AddClaim(new System.Security.Claims.Claim("permissions", MalievPermissions.Auth.SessionsRead));
-
-                        // Auto-bootstrap: promote first employee to platform owner in Development.
-                        // After a successful promote, re-exchange the token so the cookie JWT
-                        // includes the newly granted Platform Owner role.
-                        if (context.HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
-                        {
-                            try
-                            {
-                                var iamFactory = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
-                                using var iamHttp = iamFactory.CreateClient("IAMServiceBootstrap");
-                                iamHttp.DefaultRequestHeaders.Authorization =
-                                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-                                // ⚠ BOOTSTRAP RACE — do NOT change this to IsSuccessStatusCode-only.
-                                //
-                                // Two paths reach here on first login:
-                                //   A) IntranetBff wins the race: promote returns 200 OK → we granted the role.
-                                //   B) EmployeeCreatedConsumer wins the race (RabbitMQ fast): promote returns
-                                //      400 BadRequest ("System is already bootstrapped") → consumer already granted
-                                //      the role, but the JWT in `accessToken` was issued BEFORE the grant and
-                                //      therefore contains zero permissions.
-                                //
-                                // In path B, skipping the re-exchange leaves the user with a stale zero-permission
-                                // JWT baked into the auth cookie.  Every downstream call then returns 403 until the
-                                // short-lived JWT expires.  We must re-exchange in BOTH cases so the cookie always
-                                // carries a token that reflects the current DB state.
-                                var promoteResp = await iamHttp.PostAsync("/iam/v1/principals/bootstrap/promote", null);
-                                if (promoteResp.IsSuccessStatusCode ||
-                                    promoteResp.StatusCode == System.Net.HttpStatusCode.BadRequest)
-                                {
-                                    // Re-exchange to get a JWT that reflects the new role
-                                    var refreshResp = await authClient.PostAsJsonAsync("/auth/v1/exchange/google",
-                                        new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = effectivePicture });
-                                    if (refreshResp.IsSuccessStatusCode)
-                                    {
-                                        var refreshResult = await refreshResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-                                        var newToken = refreshResult.GetProperty("access_token").GetString();
-                                        if (!string.IsNullOrEmpty(newToken))
-                                        {
-                                            accessToken = newToken;
-                                            context.Properties!.StoreTokens(new[] {
-                                                new AuthenticationToken { Name = "access_token", Value = newToken }
-                                            });
-                                            // Update the access_token claim so UserContextHandler picks up the new token
-                                            var oldTokenClaim = identity?.FindFirst("access_token");
-                                            if (oldTokenClaim != null) identity?.RemoveClaim(oldTokenClaim);
-                                            identity?.AddClaim(new System.Security.Claims.Claim("access_token", newToken));
-                                        }
-                                    }
-                                }
-                            }
-                            catch { /* Bootstrap is best-effort */ }
-                        }
-
-                        // Persist profile image to Employee service if available
-                        if (!string.IsNullOrEmpty(effectivePicture))
-                        {
-                            try
-                            {
-                                var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-                                var principalIdClaim = identity?.FindFirst("sub") ?? identity?.FindFirst("user_id");
-                                if (principalIdClaim != null && Guid.TryParse(principalIdClaim.Value, out var principalId))
-                                {
-                                    // Use the accessToken we just received from AuthService exchange
-                                    // UserContextHandler doesn't work here because auth hasn't completed yet
-                                    using var employeeClient = httpClientFactory.CreateClient();
-                                    var baseUrl = config["Services:EmployeeService:BaseUrl"];
-                                    employeeClient.BaseAddress = !string.IsNullOrEmpty(baseUrl)
-                                        ? new Uri(baseUrl)
-                                        : new Uri("https+http://EmployeeService");
-                                    employeeClient.DefaultRequestHeaders.Authorization =
-                                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-                                    // Get employee by principal ID
-                                    var getResponse = await employeeClient.GetAsync($"/employee/v1/employees/by-principal/{principalId}", CancellationToken.None);
-                                    if (getResponse.IsSuccessStatusCode)
-                                    {
-                                        var profile = await getResponse.Content.ReadFromJsonAsync<EmployeeSelfProfileDto>(cancellationToken: CancellationToken.None);
-                                        if (profile != null)
-                                        {
-                                            // Update profile image
-                                            var updateRequest = new UpdateEmployeeSelfProfileRequest
-                                            {
-                                                ProfileImageUrl = effectivePicture
-                                            };
-                                            await employeeClient.PutAsJsonAsync($"/employee/v1/profile/{profile.Id}/profile", updateRequest, CancellationToken.None);
-                                        }
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                // Log but don't fail authentication if profile image persistence fails
-                                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                                logger.LogWarning(ex, "Failed to persist profile image for user {Email}", email);
-                            }
-                        }
-                    }
-                }
-            }
-            catch { context.Fail("Auth exchange failed"); }
-        };
-        options.Events.OnRemoteFailure = context =>
-        {
-            context.Response.Redirect("/login?error=" + System.Net.WebUtility.UrlEncode(context.Failure?.Message ?? "Authentication failed"));
-            context.HandleResponse();
-            return Task.CompletedTask;
-        };
     });
 
     builder.Services.AddAuthorization(options =>
@@ -454,7 +245,7 @@ try
     });
     builder.Services.AddSingleton<NominatimGeocodingService>();
 
-    // Named client for Google OAuth callback (no UserContextHandler - pre-auth)
+    // Pre-auth identity exchanges use the BFF's service identity, never caller-supplied claims.
     builder.Services.AddHttpClient("AuthService", (sp, client) =>
     {
         var config = sp.GetRequiredService<IConfiguration>();
@@ -462,6 +253,15 @@ try
         client.BaseAddress = new Uri(!string.IsNullOrEmpty(url) ? url : "http://AuthService");
     })
     .AddServiceDiscovery()
+    .AddHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff");
+        return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(
+            tokenProvider,
+            loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
+    })
     .AddStandardResilienceHandler();
 
     // BFF service clients with user context forwarding

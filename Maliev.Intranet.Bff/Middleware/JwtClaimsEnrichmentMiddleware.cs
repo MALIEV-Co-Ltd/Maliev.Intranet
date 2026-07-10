@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Maliev.Intranet.Bff.Clients;
-using Maliev.Intranet.Shared;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -64,7 +63,7 @@ public class JwtClaimsEnrichmentMiddleware
 
                             if (jwtToken.ValidTo <= DateTime.UtcNow.AddSeconds(TokenRefreshBufferSeconds))
                             {
-                                var refreshedToken = await TryReExchangePlatformJwtAsync(context);
+                                var refreshedToken = await TryRefreshPlatformJwtAsync(context);
                                 if (!string.IsNullOrEmpty(refreshedToken))
                                 {
                                     accessToken = refreshedToken;
@@ -139,7 +138,7 @@ public class JwtClaimsEnrichmentMiddleware
         await _next(context);
     }
 
-    private async Task<string?> TryReExchangePlatformJwtAsync(HttpContext context)
+    private async Task<string?> TryRefreshPlatformJwtAsync(HttpContext context)
     {
         var userId = context.User.FindFirst("user_id")?.Value
             ?? context.User.FindFirst("sub")?.Value
@@ -147,91 +146,44 @@ public class JwtClaimsEnrichmentMiddleware
 
         try
         {
-            var email = context.User.FindFirst("email")?.Value ?? context.User.FindFirst(ClaimTypes.Email)?.Value;
-            var fullName = context.User.FindFirst("name")?.Value ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
-            var googleUserId = context.User.GetGoogleUserId();
-            var picture = context.User.GetProfileImageUrl();
-
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(googleUserId))
+            var refreshToken = await context.GetTokenAsync("refresh_token")
+                ?? context.User.FindFirst("refresh_token")?.Value;
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                _logger.LogWarning("Cannot refresh platform JWT for user {UserId}: email or google_user_id is missing.", userId);
+                _logger.LogWarning("Cannot refresh platform JWT for user {UserId}: refresh token is missing.", userId);
                 return null;
             }
 
             var factory = context.RequestServices.GetRequiredService<IHttpClientFactory>();
             using var authClient = factory.CreateClient("AuthService");
-            var exchangeResponse = await authClient.PostAsJsonAsync(
-                "/auth/v1/exchange/google",
-                new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture },
+            using var refreshResponse = await authClient.PostAsJsonAsync(
+                "/auth/v1/refresh",
+                new { refresh_token = refreshToken },
                 context.RequestAborted);
 
-            if (!exchangeResponse.IsSuccessStatusCode)
+            if (!refreshResponse.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "AuthService exchange returned {StatusCode} during platform JWT refresh for user {UserId}.",
-                    exchangeResponse.StatusCode,
+                    "AuthService refresh returned {StatusCode} during platform JWT refresh for user {UserId}.",
+                    refreshResponse.StatusCode,
                     userId);
                 return null;
             }
 
-            var result = await exchangeResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: context.RequestAborted);
-            var newToken = result.GetProperty("access_token").GetString();
-            if (string.IsNullOrWhiteSpace(newToken))
+            var result = await refreshResponse.Content.ReadFromJsonAsync<TokenRefreshResponse>(cancellationToken: context.RequestAborted);
+            if (result is null || string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
             {
                 return null;
             }
 
-            // Read profile_image_url from exchange response
-            var responseProfileImageUrl = result.TryGetProperty("user", out var userObj)
-                && userObj.TryGetProperty("profile_image_url", out var picProp)
-                && picProp.ValueKind == System.Text.Json.JsonValueKind.String
-                ? picProp.GetString()
-                : null;
-
             var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             if (authResult?.Properties is not null)
             {
-                authResult.Properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = newToken }]);
-
-                // Update picture claim if profile image changed
-                var identity = context.User.Identity as ClaimsIdentity;
-                if (!string.IsNullOrEmpty(responseProfileImageUrl) && identity is not null)
-                {
-                    var existingPictureClaim = identity.FindFirst("picture");
-                    if (existingPictureClaim is null || existingPictureClaim.Value != responseProfileImageUrl)
-                    {
-                        if (existingPictureClaim is not null)
-                            identity.RemoveClaim(existingPictureClaim);
-                        identity.AddClaim(new Claim("picture", responseProfileImageUrl));
-                    }
-                }
-
+                authResult.Properties.StoreTokens([
+                    new AuthenticationToken { Name = "access_token", Value = result.AccessToken },
+                    new AuthenticationToken { Name = "refresh_token", Value = result.RefreshToken }
+                ]);
                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, context.User, authResult.Properties);
-            }
-
-            // Sync profile image to Employee service
-            if (!string.IsNullOrEmpty(responseProfileImageUrl))
-            {
-                try
-                {
-                    var employeeClient = context.RequestServices.GetRequiredService<EmployeeServiceClient>();
-                    var principalIdClaim = context.User.FindFirst("sub") ?? context.User.FindFirst("user_id");
-                    if (principalIdClaim is not null && Guid.TryParse(principalIdClaim.Value, out var principalId))
-                    {
-                        var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
-                        if (employee is not null && employee.ProfileImageUrl != responseProfileImageUrl)
-                        {
-                            await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
-                            {
-                                ProfileImageUrl = responseProfileImageUrl
-                            }, ct: default);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to sync profile image to Employee service for user {UserId}", userId);
-                }
             }
 
             var identity2 = context.User.Identity as ClaimsIdentity;
@@ -241,9 +193,9 @@ public class JwtClaimsEnrichmentMiddleware
                 identity2?.RemoveClaim(oldTokenClaim);
             }
 
-            identity2?.AddClaim(new Claim("access_token", newToken));
+            identity2?.AddClaim(new Claim("access_token", result.AccessToken));
             _logger.LogInformation("Platform JWT refreshed before authorization for user {UserId}.", userId);
-            return newToken;
+            return result.AccessToken;
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -254,5 +206,14 @@ public class JwtClaimsEnrichmentMiddleware
             _logger.LogWarning(ex, "Platform JWT refresh failed before authorization for user {UserId}.", userId);
             return null;
         }
+    }
+
+    private sealed class TokenRefreshResponse
+    {
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("refresh_token")]
+        public string RefreshToken { get; set; } = string.Empty;
     }
 }

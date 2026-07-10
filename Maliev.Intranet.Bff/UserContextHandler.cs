@@ -2,8 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
-using Maliev.Intranet.Bff.Clients;
-using Maliev.Intranet.Shared;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -55,7 +54,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
         if (!string.IsNullOrEmpty(accessToken) && IsPlatformJwtExpiredOrExpiringSoon(accessToken))
         {
             logger.LogInformation("Platform JWT expired or expiring soon for user {UserId}; refreshing before request to {Url}", userId, request.RequestUri);
-            var refreshed = await TryReExchangePlatformJwtAsync(httpContext, userId, cancellationToken);
+            var refreshed = await TryRefreshPlatformJwtAsync(httpContext, userId, cancellationToken);
             if (!string.IsNullOrEmpty(refreshed))
                 accessToken = refreshed;
         }
@@ -79,7 +78,7 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 logger.LogWarning("Downstream 401 for {Method} {Url} despite proactive check; attempting one-shot re-exchange for user {UserId}", request.Method, request.RequestUri, userId);
-                var retryToken = await TryReExchangePlatformJwtAsync(httpContext, userId, cancellationToken);
+                var retryToken = await TryRefreshPlatformJwtAsync(httpContext, userId, cancellationToken);
                 if (!string.IsNullOrEmpty(retryToken))
                 {
                     var retry = new HttpRequestMessage(request.Method, request.RequestUri);
@@ -140,140 +139,80 @@ public class UserContextHandler(IHttpContextAccessor httpContextAccessor, ILogge
     }
 
     /// <summary>
-    /// Re-exchanges the user's Google identity (claims already in cookie) with AuthService
-    /// to obtain a fresh platform JWT, then updates the auth cookie in place.
+    /// Rotates the server-held refresh token with AuthService and updates the cookie ticket.
     /// </summary>
-    private async Task<string?> TryReExchangePlatformJwtAsync(HttpContext context, string? userId, CancellationToken ct)
+    private async Task<string?> TryRefreshPlatformJwtAsync(HttpContext context, string? userId, CancellationToken ct)
     {
         try
         {
-            var user = context.User;
-            var email = user.FindFirst("email")?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value;
-            var fullName = user.FindFirst("name")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value;
-            var picture = user.GetProfileImageUrl();
-
-            // Extract google_user_id (Google's numeric sub) from the stored platform JWT.
-            // OnTicketReceived stores the platform JWT as "access_token" in auth properties.
-            // We must send Google's numeric sub for the exchange request, not the platform sub.
-            var googleUserId = user.GetGoogleUserId();
-            var accessToken = user.FindFirst("access_token")?.Value;
-            if (string.IsNullOrEmpty(accessToken))
-                accessToken = await context.GetTokenAsync("access_token");
-
-            if (!string.IsNullOrEmpty(accessToken))
+            var refreshToken = await context.GetTokenAsync("refresh_token")
+                ?? context.User.FindFirst("refresh_token")?.Value;
+            if (string.IsNullOrWhiteSpace(refreshToken))
             {
-                var handler = new JwtSecurityTokenHandler();
-                if (handler.CanReadToken(accessToken))
-                {
-                    var jwt = handler.ReadJwtToken(accessToken);
-                    // The platform JWT's "sub" is the platform GUID.
-                    // Google's numeric sub was originally stored as ClaimTypes.NameIdentifier in the cookie
-                    // (set by Google OAuth before we replaced it with the platform sub).
-                    googleUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                }
-            }
-
-            // Fallback: if no stored JWT, use cookie claim (shouldn't happen in practice)
-            googleUserId ??= user.GetGoogleUserId();
-
-            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(googleUserId))
-            {
-                logger.LogWarning("Cannot re-exchange: email or google_user_id missing for user {UserId}", userId);
+                logger.LogWarning("Cannot refresh platform JWT because the session has no refresh token for user {UserId}.", userId);
                 return null;
             }
 
             var factory = context.RequestServices.GetRequiredService<IHttpClientFactory>();
             using var authClient = factory.CreateClient("AuthService");
 
-            var exchangeResponse = await authClient.PostAsJsonAsync(
-                "/auth/v1/exchange/google",
-                new { email, full_name = fullName, google_user_id = googleUserId, profile_image_url = picture },
+            using var refreshResponse = await authClient.PostAsJsonAsync(
+                "/auth/v1/refresh",
+                new { refresh_token = refreshToken },
                 ct);
 
-            if (!exchangeResponse.IsSuccessStatusCode)
+            if (!refreshResponse.IsSuccessStatusCode)
             {
-                logger.LogError("AuthService exchange returned {Status} during token refresh for user {UserId}", exchangeResponse.StatusCode, userId);
+                logger.LogWarning("AuthService refresh returned {Status} for user {UserId}.", refreshResponse.StatusCode, userId);
                 return null;
             }
 
-            var result = await exchangeResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(cancellationToken: ct);
-            var newToken = result.GetProperty("access_token").GetString();
-            if (string.IsNullOrEmpty(newToken)) return null;
+            var result = await refreshResponse.Content.ReadFromJsonAsync<TokenRefreshResponse>(cancellationToken: ct);
+            if (result is null || string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
+            {
+                logger.LogWarning("AuthService returned an incomplete refresh response for user {UserId}.", userId);
+                return null;
+            }
 
-            // Read profile_image_url from exchange response to keep cookie and Employee service in sync
-            var responseProfileImageUrl = result.TryGetProperty("user", out var userObj)
-                && userObj.TryGetProperty("profile_image_url", out var picProp)
-                && picProp.ValueKind == System.Text.Json.JsonValueKind.String
-                ? picProp.GetString()
-                : null;
-
-            // Persist the new token back into the auth cookie so subsequent requests use it
             var authResult = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             if (authResult?.Properties != null)
             {
-                authResult.Properties.StoreTokens([new AuthenticationToken { Name = "access_token", Value = newToken }]);
+                authResult.Properties.StoreTokens([
+                    new AuthenticationToken { Name = "access_token", Value = result.AccessToken },
+                    new AuthenticationToken { Name = "refresh_token", Value = result.RefreshToken }
+                ]);
 
-                // Update user claims with fresh profile image if available and different
                 var identity = context.User.Identity as ClaimsIdentity;
-                if (!string.IsNullOrEmpty(responseProfileImageUrl) && identity != null)
+                var oldAccessTokenClaim = identity?.FindFirst("access_token");
+                if (oldAccessTokenClaim is not null)
                 {
-                    var existingPictureClaim = identity.FindFirst("picture");
-                    if (existingPictureClaim == null || existingPictureClaim.Value != responseProfileImageUrl)
-                    {
-                        if (existingPictureClaim != null)
-                            identity.RemoveClaim(existingPictureClaim);
-                        identity.AddClaim(new Claim("picture", responseProfileImageUrl));
-                        logger.LogInformation("Updated profile picture from exchange response for user {UserId}", userId);
-                    }
+                    identity!.RemoveClaim(oldAccessTokenClaim);
                 }
-
+                identity?.AddClaim(new Claim("access_token", result.AccessToken));
                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, context.User, authResult.Properties);
             }
 
-            // Persist profile image to Employee service if it changed
-            await SyncProfileImageToEmployeeServiceAsync(context, userId, responseProfileImageUrl);
-
-            logger.LogInformation("Platform JWT refreshed via re-exchange for user {UserId}", userId);
-            return newToken;
+            logger.LogInformation("Platform JWT refreshed with a rotated refresh token for user {UserId}.", userId);
+            return result.AccessToken;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Platform JWT re-exchange failed for user {UserId}", userId);
+            logger.LogError(ex, "Platform JWT refresh failed for user {UserId}", userId);
             return null;
         }
     }
 
-    /// <summary>
-    /// Persists the profile image URL to the Employee service if it differs from the cookie value.
-    /// </summary>
-    private static async Task SyncProfileImageToEmployeeServiceAsync(HttpContext context, string? userId, string? profileImageUrl)
+    private sealed class TokenRefreshResponse
     {
-        if (string.IsNullOrEmpty(profileImageUrl))
-            return;
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
 
-        try
-        {
-            var employeeClient = context.RequestServices.GetRequiredService<EmployeeServiceClient>();
-            var user = context.User;
-            var principalIdClaim = user.FindFirst("sub") ?? user.FindFirst("user_id");
-            if (principalIdClaim != null && Guid.TryParse(principalIdClaim.Value, out var principalId))
-            {
-                var employee = await employeeClient.GetByPrincipalIdAsync(principalId, ct: default);
-                if (employee != null && employee.ProfileImageUrl != profileImageUrl)
-                {
-                    await employeeClient.UpdateSelfServiceProfileAsync(employee.Id, new UpdateEmployeeSelfProfileRequest
-                    {
-                        ProfileImageUrl = profileImageUrl
-                    }, ct: default);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
-            var logger = loggerFactory.CreateLogger(nameof(UserContextHandler));
-            logger.LogWarning(ex, "Failed to sync profile image to Employee service for user {UserId}", userId);
-        }
+        [JsonPropertyName("refresh_token")]
+        public string RefreshToken { get; set; } = string.Empty;
     }
 
     /// <summary>

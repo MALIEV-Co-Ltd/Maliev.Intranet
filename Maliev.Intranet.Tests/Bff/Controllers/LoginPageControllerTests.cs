@@ -29,7 +29,7 @@ public class LoginPageControllerTests
     }
 
     [Fact]
-    public void Login_UsesMalievLogoGoogleButtonActiveThemeIconsAndCompanyFooter()
+    public void Login_UsesMalievLogoOfficialGoogleButtonActiveThemeIconsAndCompanyFooter()
     {
         var controller = new LoginPageController
         {
@@ -45,9 +45,11 @@ public class LoginPageControllerTests
         Assert.Contains("src=\"/images/logo.svg\"", content.Content);
         Assert.Contains("src=\"/images/logo-white.svg\"", content.Content);
         Assert.Contains("alt=\"MALIEV Logo\"", content.Content);
-        Assert.Contains("class=\"btn-google\"", content.Content);
-        Assert.Contains("class=\"google-logo\"", content.Content);
-        Assert.Contains("Continue with Google", content.Content);
+        Assert.Contains("https://accounts.google.com/gsi/client", content.Content);
+        Assert.Contains("data-google-signin-host", content.Content);
+        Assert.Contains("google-identity-signin.js", content.Content);
+        Assert.DoesNotContain("class=\"btn-google\"", content.Content);
+        Assert.DoesNotContain("class=\"google-logo\"", content.Content);
         Assert.Contains("class=\"email-entry-form\"", content.Content);
         Assert.Contains("data-email-continue", content.Content);
         Assert.DoesNotContain(">Email address<", content.Content, StringComparison.Ordinal);

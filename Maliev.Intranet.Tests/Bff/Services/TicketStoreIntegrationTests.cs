@@ -57,6 +57,7 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
                 ["Services:CustomerService:BaseUrl"] = "http://customer-service",
                 ["Services:IAMService:BaseUrl"] = "http://iam-service",
                 ["Jwt:SecurityKey"] = "test-security-key-for-integration-tests-min32chars",
+                ["ASPNETCORE_ENVIRONMENT"] = "Testing",
                 ["MassTransit:UseInMemory"] = "true",
                 ["MassTransit:SkipBusWait"] = "true",
             });
@@ -198,13 +199,13 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
     /// </summary>
     private sealed class MockAuthServiceHandler(RSA testRsa) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri?.PathAndQuery ?? "";
 
             if (path.Contains("/.well-known/openid-configuration"))
             {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
                         $$"""
@@ -217,7 +218,7 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
                         """,
                         System.Text.Encoding.UTF8,
                         "application/json")
-                });
+                };
             }
 
             if (path.Contains("/.well-known/jwks"))
@@ -233,28 +234,66 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
                 };
 
                 var jwks = new { keys = new[] { jwk } };
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
                         JsonSerializer.Serialize(jwks),
                         System.Text.Encoding.UTF8,
                         "application/json")
-                });
+                };
             }
 
-            if (path.Contains("/auth/v1/login") || path.Contains("/auth/v1/exchange/google"))
+            if (path.Equals("/auth/v1/exchange/google/nonce", StringComparison.Ordinal))
             {
-                var userId = "test-user";
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                var nonceRequest = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement;
+                if (nonceRequest.GetProperty("application").GetString() != "intranet")
+                {
+                    return new HttpResponseMessage(HttpStatusCode.BadRequest);
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        nonce = "test-google-nonce-at-least-thirty-two-characters",
+                        expires_at_utc = DateTime.UtcNow.AddMinutes(10)
+                    })
+                };
+            }
+
+            if (path.Equals("/auth/v1/exchange/google", StringComparison.Ordinal))
+            {
+                var exchangeRequest = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement;
+                var propertyNames = exchangeRequest.EnumerateObject().Select(property => property.Name).Order().ToArray();
+                if (!propertyNames.SequenceEqual(["application", "credential", "nonce"]) ||
+                    exchangeRequest.GetProperty("application").GetString() != "intranet" ||
+                    exchangeRequest.GetProperty("credential").GetString() != "test-google-credential" ||
+                    exchangeRequest.GetProperty("nonce").GetString() != "test-google-nonce-at-least-thirty-two-characters")
+                {
+                    return new HttpResponseMessage(HttpStatusCode.BadRequest);
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
-                        CreateLoginResponse(userId),
+                        CreateLoginResponse("test-user"),
                         System.Text.Encoding.UTF8,
                         "application/json")
-                });
+                };
             }
 
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            if (path.Contains("/auth/v1/login"))
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        CreateLoginResponse("test-user"),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
         }
 
         private string CreateLoginResponse(string userId)
@@ -287,6 +326,7 @@ public class TicketStoreTestFactory : WebApplicationFactory<Program>
             return JsonSerializer.Serialize(new
             {
                 access_token = tokenStr,
+                refresh_token = "test-refresh-token",
                 user = new { user_id = userId, user_type = "employee", email = $"{userId}@maliev.com", name = $"Test {userId}" }
             });
         }
@@ -334,6 +374,38 @@ public class TicketStoreIntegrationTests : IClassFixture<TicketStoreTestFactory>
     public TicketStoreIntegrationTests(TicketStoreTestFactory factory)
     {
         _factory = factory;
+    }
+
+    [Fact]
+    public async Task GoogleIdentitySignIn_NonceBoundCredentialEstablishesSessionAndPreservesLocalReturnUrl()
+    {
+        var client = _factory.CreateClientWithCookies();
+
+        var nonceResponse = await client.PostAsJsonAsync("/api/v1/auth/google/nonce", new
+        {
+            returnUrl = "/customers"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, nonceResponse.StatusCode);
+        var noncePayload = await nonceResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("test-google-id", noncePayload.GetProperty("clientId").GetString());
+        Assert.Equal("test-google-nonce-at-least-thirty-two-characters", noncePayload.GetProperty("nonce").GetString());
+        var flowCookie = Assert.Single(nonceResponse.Headers.GetValues("Set-Cookie"), value => value.StartsWith("Maliev.Intranet.GoogleIdentity=", StringComparison.Ordinal));
+        Assert.Contains("httponly", flowCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=strict", flowCookie, StringComparison.OrdinalIgnoreCase);
+
+        var exchangeResponse = await client.PostAsJsonAsync("/api/v1/auth/google", new
+        {
+            credential = "test-google-credential",
+            nonce = noncePayload.GetProperty("nonce").GetString()
+        });
+
+        Assert.Equal(HttpStatusCode.OK, exchangeResponse.StatusCode);
+        var exchangePayload = await exchangeResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("/customers", exchangePayload.GetProperty("returnUrl").GetString());
+
+        var userResponse = await client.GetAsync("/api/v1/auth/user");
+        Assert.Equal(HttpStatusCode.OK, userResponse.StatusCode);
     }
 
     /// <summary>

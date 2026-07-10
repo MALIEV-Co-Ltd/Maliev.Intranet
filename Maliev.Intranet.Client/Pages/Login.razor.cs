@@ -53,6 +53,7 @@ public partial class Login : ComponentBase
     private bool _isCheckingAuth = true;
     private bool _isDarkMode;
     private LoginStep _loginStep = LoginStep.Email;
+    private ElementReference _googleIdentityHost;
 
     private static readonly EmailAddressAttribute EmailValidator = new();
 
@@ -90,6 +91,15 @@ public partial class Login : ComponentBase
             {
                 _errorMessage = Error;
                 StateHasChanged();
+            }
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("malievGoogleIdentity.initializeHost", _googleIdentityHost);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or JSException or JSDisconnectedException)
+            {
+                Logger.LogWarning(exception, "Google Identity Services could not initialize on the client login fallback.");
             }
         }
     }

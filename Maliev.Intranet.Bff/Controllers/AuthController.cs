@@ -4,11 +4,16 @@ using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Maliev.Intranet.Bff.Controllers;
 
@@ -20,18 +25,127 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnvironment env, ILogger<AuthController> logger) : ControllerBase
 {
-    /// <summary>
-    /// Initiates the login process using Google Workspace.
-    /// </summary>
-    [AllowAnonymous]
-    [HttpGet("login")]
-    public IActionResult Login([FromQuery] string returnUrl = "/")
+    private const string GoogleIdentityApplication = "intranet";
+    private const string GoogleIdentityFlowCookie = "Maliev.Intranet.GoogleIdentity";
+    private const string GoogleIdentityFlowProtectionPurpose = "Maliev.Intranet.GoogleIdentity.Flow.v1";
+    private static readonly JsonSerializerOptions SnakeCaseJsonOptions = new()
     {
-        if (!Url.IsLocalUrl(returnUrl))
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        PropertyNameCaseInsensitive = true
+    };
+
+    /// <summary>Issues a one-time nonce for the browser's official Google Identity Services flow.</summary>
+    [AllowAnonymous]
+    [HttpPost("google/nonce")]
+    public async Task<IActionResult> IssueGoogleIdentityNonce(
+        [FromBody] GoogleIdentityBrowserNonceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+        var clientId = configuration["Authentication:Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
         {
-            returnUrl = "/";
+            logger.LogError("Google Identity Services client ID is not configured for Intranet.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Google sign-in is temporarily unavailable.");
         }
-        return Challenge(new AuthenticationProperties { RedirectUri = returnUrl }, GoogleDefaults.AuthenticationScheme);
+
+        using var authClient = httpClientFactory.CreateClient("AuthService");
+        using var nonceResponse = await authClient.PostAsJsonAsync(
+            "/auth/v1/exchange/google/nonce",
+            new { application = GoogleIdentityApplication },
+            cancellationToken);
+        if (!nonceResponse.IsSuccessStatusCode)
+        {
+            logger.LogWarning("AuthService rejected the Intranet Google nonce request with {StatusCode}.", nonceResponse.StatusCode);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Google sign-in is temporarily unavailable.");
+        }
+
+        var issued = await nonceResponse.Content.ReadFromJsonAsync<GoogleIdentityNonceResponse>(
+            SnakeCaseJsonOptions,
+            cancellationToken);
+        if (issued is null || string.IsNullOrWhiteSpace(issued.Nonce) || issued.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            logger.LogWarning("AuthService returned an invalid Intranet Google nonce response.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Google sign-in is temporarily unavailable.");
+        }
+
+        var state = new GoogleIdentityFlowState(
+            issued.Nonce,
+            ToSafeLocalUrl(request.ReturnUrl),
+            issued.ExpiresAtUtc);
+        var protectedState = ProtectGoogleIdentityFlow(state);
+        Response.Cookies.Append(GoogleIdentityFlowCookie, protectedState, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            IsEssential = true,
+            Path = "/api/v1/auth/google",
+            Expires = new DateTimeOffset(issued.ExpiresAtUtc, TimeSpan.Zero)
+        });
+
+        return Ok(new
+        {
+            clientId,
+            nonce = issued.Nonce,
+            expiresAtUtc = issued.ExpiresAtUtc
+        });
+    }
+
+    /// <summary>Exchanges a nonce-bound GIS credential and establishes the MALIEV employee session.</summary>
+    [AllowAnonymous]
+    [HttpPost("google")]
+    public async Task<IActionResult> CompleteGoogleIdentitySignIn(
+        [FromBody] GoogleIdentityBrowserExchangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Request.Cookies.TryGetValue(GoogleIdentityFlowCookie, out var protectedState) ||
+            !TryUnprotectGoogleIdentityFlow(protectedState, out var state) ||
+            state.ExpiresAtUtc <= DateTime.UtcNow ||
+            !FixedTimeEquals(state.Nonce, request.Nonce))
+        {
+            DeleteGoogleIdentityFlowCookie();
+            return Unauthorized("Google sign-in session is invalid or expired.");
+        }
+
+        DeleteGoogleIdentityFlowCookie();
+        using var authClient = httpClientFactory.CreateClient("AuthService");
+        using var exchangeResponse = await authClient.PostAsJsonAsync(
+            "/auth/v1/exchange/google",
+            new
+            {
+                credential = request.Credential,
+                application = GoogleIdentityApplication,
+                nonce = request.Nonce
+            },
+            cancellationToken);
+        if (!exchangeResponse.IsSuccessStatusCode)
+        {
+            logger.LogWarning("AuthService rejected the Intranet GIS credential with {StatusCode}.", exchangeResponse.StatusCode);
+            return Unauthorized("Google sign-in could not be completed.");
+        }
+
+        var authResult = await exchangeResponse.Content.ReadFromJsonAsync<LoginResponse>(
+            SnakeCaseJsonOptions,
+            cancellationToken);
+        if (authResult is null)
+        {
+            return Unauthorized("Google sign-in could not be completed.");
+        }
+
+        var signInResult = await SignInWithPlatformIdentityAsync(
+            authResult,
+            authResult.User?.Email ?? "Google employee",
+            rememberMe: false,
+            cancellationToken);
+        if (signInResult != LoginAttemptResult.SignedIn)
+        {
+            return Unauthorized(signInResult == LoginAttemptResult.InvalidWorkspaceEmail
+                ? WorkspaceEmailDomainPolicy.UnauthorizedDomainMessage
+                : "Google sign-in could not be completed.");
+        }
+
+        return Ok(new { returnUrl = state.ReturnUrl });
     }
 
     /// <summary>
@@ -81,15 +195,15 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             return LoginAttemptResult.InvalidWorkspaceEmail;
         }
 
-        var authClient = httpClientFactory.CreateClient("AuthService");
+        using var authClient = httpClientFactory.CreateClient("AuthService");
 
         // Proxy request to the real AuthService (snake_case property names)
-        var response = await authClient.PostAsJsonAsync("/auth/v1/login", new
+        using var response = await authClient.PostAsJsonAsync("/auth/v1/login", new
         {
             username,
             password,
             user_type = "employee"
-        });
+        }, HttpContext.RequestAborted);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -97,13 +211,9 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             return LoginAttemptResult.InvalidCredentials;
         }
 
-        // Read and deserialize response (AuthService returns snake_case)
-        var rawResponse = await response.Content.ReadAsStringAsync();
-        var authResult = System.Text.Json.JsonSerializer.Deserialize<LoginResponse>(rawResponse, new System.Text.Json.JsonSerializerOptions
-        {
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower,
-            PropertyNameCaseInsensitive = true
-        });
+        var authResult = await response.Content.ReadFromJsonAsync<LoginResponse>(
+            SnakeCaseJsonOptions,
+            HttpContext.RequestAborted);
 
         if (authResult?.User == null || string.IsNullOrEmpty(authResult.AccessToken))
         {
@@ -111,14 +221,79 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             return LoginAttemptResult.InvalidCredentials;
         }
 
-        // Parse JWT to extract claims
+        return await SignInWithPlatformIdentityAsync(
+            authResult,
+            username,
+            rememberMe,
+            HttpContext.RequestAborted);
+    }
+
+    private async Task<LoginAttemptResult> SignInWithPlatformIdentityAsync(
+        LoginResponse authResult,
+        string loginIdentifier,
+        bool rememberMe,
+        CancellationToken cancellationToken)
+    {
+        var accessToken = authResult.AccessToken;
+        var refreshToken = authResult.RefreshToken;
+
+        if (env.IsDevelopment())
+        {
+            try
+            {
+                using var bootstrapClient = httpClientFactory.CreateClient("IAMServiceBootstrap");
+                bootstrapClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                using var promoteResponse = await bootstrapClient.PostAsync(
+                    "/iam/v1/principals/bootstrap/promote",
+                    null,
+                    cancellationToken);
+                if ((promoteResponse.IsSuccessStatusCode || promoteResponse.StatusCode == System.Net.HttpStatusCode.BadRequest) &&
+                    !string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    using var authClient = httpClientFactory.CreateClient("AuthService");
+                    using var refreshResponse = await authClient.PostAsJsonAsync(
+                        "/auth/v1/refresh",
+                        new { refresh_token = refreshToken },
+                        cancellationToken);
+                    if (refreshResponse.IsSuccessStatusCode)
+                    {
+                        var refreshed = await refreshResponse.Content.ReadFromJsonAsync<TokenResponse>(
+                            SnakeCaseJsonOptions,
+                            cancellationToken);
+                        if (refreshed is not null && !string.IsNullOrWhiteSpace(refreshed.AccessToken))
+                        {
+                            accessToken = refreshed.AccessToken;
+                            refreshToken = refreshed.RefreshToken;
+                        }
+                    }
+
+                    logger.LogInformation("Auto-bootstrap check completed for {Username}.", loginIdentifier);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Bootstrap auto-promotion check failed for {Username} (non-fatal)", loginIdentifier);
+            }
+        }
+
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(authResult.AccessToken);
+        if (!handler.CanReadToken(accessToken))
+        {
+            logger.LogWarning("Login failed for {Username}: AuthService returned an unreadable access token", loginIdentifier);
+            return LoginAttemptResult.InvalidCredentials;
+        }
+
+        var jwtToken = handler.ReadJwtToken(accessToken);
         var identityEmail = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? authResult.User.Email;
 
         if (!WorkspaceEmailDomainPolicy.IsAllowedEmployeeEmail(identityEmail))
         {
-            logger.LogWarning("Rejected Intranet login for {Username}: AuthService returned non-workspace email", username);
+            logger.LogWarning("Rejected Intranet login for {Username}: AuthService returned non-workspace email", loginIdentifier);
             return LoginAttemptResult.InvalidWorkspaceEmail;
         }
 
@@ -127,12 +302,17 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? authResult.User.UserId),
-            new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? username),
+            new Claim(ClaimTypes.Name, jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? authResult.User.Name ?? loginIdentifier),
             new Claim("email", workspaceEmail),
             new Claim("user_type", jwtToken.Claims.FirstOrDefault(c => c.Type == "user_type")?.Value ?? authResult.User.UserType),
             new Claim("permissions", MalievPermissions.Auth.SessionsRead),
-            new Claim("access_token", authResult.AccessToken)
+            new Claim("access_token", accessToken)
         };
+
+        if (!string.IsNullOrWhiteSpace(authResult.User.ProfileImageUrl))
+        {
+            claims.Add(new Claim("picture", authResult.User.ProfileImageUrl));
+        }
 
         // Add roles and permissions from JWT
         foreach (var role in jwtToken.Claims.Where(c => c.Type == "roles"))
@@ -153,40 +333,23 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
             ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) // Cookie expires in 8 hours
         };
 
-        // Store access token in authentication properties for middleware access
-        authProperties.StoreTokens(new[]
+        var sessionTokens = new List<AuthenticationToken>
         {
-            new AuthenticationToken { Name = "access_token", Value = authResult.AccessToken }
-        });
+            new() { Name = "access_token", Value = accessToken }
+        };
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            sessionTokens.Add(new AuthenticationToken { Name = "refresh_token", Value = refreshToken });
+        }
+
+        authProperties.StoreTokens(sessionTokens);
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(claimsIdentity),
             authProperties);
 
-        logger.LogInformation("User {Username} logged in successfully", username);
-
-        // Auto-bootstrap: promote first employee to platform owner in Development
-        // Calls promote directly — the IAM endpoint has its own guard (humanUsers.Count <= 1)
-        if (env.IsDevelopment())
-        {
-            try
-            {
-                using var bootstrapClient = httpClientFactory.CreateClient("IAMServiceBootstrap");
-                bootstrapClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResult.AccessToken);
-
-                var promoteResp = await bootstrapClient.PostAsync("/iam/v1/principals/bootstrap/promote", null);
-                if (promoteResp.IsSuccessStatusCode)
-                {
-                    logger.LogInformation("Auto-bootstrapped first user {Username} as platform owner", username);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Bootstrap auto-promotion check failed for {Username} (non-fatal)", username);
-            }
-        }
+        logger.LogInformation("User {Username} logged in successfully", loginIdentifier);
 
         return LoginAttemptResult.SignedIn;
     }
@@ -251,6 +414,75 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         });
     }
 
+    private string ProtectGoogleIdentityFlow(GoogleIdentityFlowState state)
+    {
+        var protector = HttpContext.RequestServices
+            .GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector(GoogleIdentityFlowProtectionPurpose);
+        return protector.Protect(JsonSerializer.Serialize(state));
+    }
+
+    private bool TryUnprotectGoogleIdentityFlow(string protectedState, out GoogleIdentityFlowState state)
+    {
+        try
+        {
+            var protector = HttpContext.RequestServices
+                .GetRequiredService<IDataProtectionProvider>()
+                .CreateProtector(GoogleIdentityFlowProtectionPurpose);
+            var json = protector.Unprotect(protectedState);
+            var parsed = JsonSerializer.Deserialize<GoogleIdentityFlowState>(json);
+            if (parsed is not null && !string.IsNullOrWhiteSpace(parsed.Nonce))
+            {
+                state = parsed;
+                return true;
+            }
+        }
+        catch (CryptographicException)
+        {
+            // Tampered or unreadable flow cookies are rejected without exposing details.
+        }
+        catch (JsonException)
+        {
+            // Invalid protected payloads are treated as an expired flow.
+        }
+
+        state = new GoogleIdentityFlowState(string.Empty, "/", DateTime.MinValue);
+        return false;
+    }
+
+    private void DeleteGoogleIdentityFlowCookie()
+    {
+        Response.Cookies.Delete(GoogleIdentityFlowCookie, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            IsEssential = true,
+            Path = "/api/v1/auth/google"
+        });
+    }
+
+    private static bool FixedTimeEquals(string expected, string actual)
+    {
+        var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+        var actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(actual));
+        return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
+    }
+
+    private static string ToSafeLocalUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return "/";
+        }
+
+        return returnUrl.StartsWith("/", StringComparison.Ordinal) &&
+            !returnUrl.StartsWith("//", StringComparison.Ordinal) &&
+            !returnUrl.StartsWith("/\\", StringComparison.Ordinal)
+            ? returnUrl
+            : "/";
+    }
+
     /// <summary>
     /// Internal request model for standard login.
     /// </summary>
@@ -283,6 +515,30 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         public string ReturnUrl { get; set; } = "/";
     }
 
+    /// <summary>Browser request for a server-bound Google Identity Services nonce.</summary>
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class GoogleIdentityBrowserNonceRequest
+    {
+        /// <summary>Gets or sets the local route to continue to after sign-in.</summary>
+        [StringLength(2048)]
+        public string? ReturnUrl { get; set; }
+    }
+
+    /// <summary>Browser credential callback from the official Google Identity Services library.</summary>
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class GoogleIdentityBrowserExchangeRequest
+    {
+        /// <summary>Gets or sets the raw GIS ID-token credential.</summary>
+        [Required]
+        [StringLength(8192, MinimumLength = 1)]
+        public string Credential { get; set; } = string.Empty;
+
+        /// <summary>Gets or sets the nonce supplied to GIS for this browser flow.</summary>
+        [Required]
+        [StringLength(256, MinimumLength = 32)]
+        public string Nonce { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// Response from AuthService login endpoint.
     /// </summary>
@@ -304,7 +560,25 @@ public class AuthController(IHttpClientFactory httpClientFactory, IWebHostEnviro
         public string UserType { get; set; } = string.Empty;
         public string? Email { get; set; }
         public string? Name { get; set; }
+
+        public string? ProfileImageUrl { get; set; }
     }
+
+    private sealed class TokenResponse
+    {
+        public string AccessToken { get; set; } = string.Empty;
+
+        public string RefreshToken { get; set; } = string.Empty;
+    }
+
+    private sealed class GoogleIdentityNonceResponse
+    {
+        public string Nonce { get; set; } = string.Empty;
+
+        public DateTime ExpiresAtUtc { get; set; }
+    }
+
+    private sealed record GoogleIdentityFlowState(string Nonce, string ReturnUrl, DateTime ExpiresAtUtc);
 
     private enum LoginAttemptResult
     {
