@@ -75,6 +75,8 @@
                 client_id: configuration.clientId,
                 nonce: configuration.nonce,
                 ux_mode: "popup",
+                auto_select: false,
+                use_fedcm_for_button: true,
                 callback: async response => {
                     try {
                         await completeSignIn(host, response.credential, configuration.nonce);

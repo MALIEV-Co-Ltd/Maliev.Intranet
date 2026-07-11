@@ -32,6 +32,8 @@ public class GoogleIdentityFlowSourceTests
 
         Assert.Contains("google.accounts.id.initialize", googleScript, StringComparison.Ordinal);
         Assert.Contains("google.accounts.id.renderButton", googleScript, StringComparison.Ordinal);
+        Assert.Contains("use_fedcm_for_button: true", googleScript, StringComparison.Ordinal);
+        Assert.Contains("auto_select: false", googleScript, StringComparison.Ordinal);
         Assert.Contains("window.malievGoogleIdentity = { initializeHost }", googleScript, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/google/nonce", googleScript, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/google", googleScript, StringComparison.Ordinal);
