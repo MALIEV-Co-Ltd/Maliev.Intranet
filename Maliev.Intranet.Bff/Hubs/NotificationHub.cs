@@ -1,3 +1,6 @@
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Maliev.Intranet.Bff.Hubs;
@@ -5,29 +8,64 @@ namespace Maliev.Intranet.Bff.Hubs;
 /// <summary>
 /// SignalR hub for broadcasting real-time system notifications.
 /// </summary>
-public class NotificationHub : Hub
+/// <remarks>
+/// A file identifier supplied by a browser is only a locator. UploadService re-authorizes the
+/// current employee for the resource before the connection is admitted to its opaque group.
+/// </remarks>
+[RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+public class NotificationHub(UploadServiceClient uploadClient) : Hub
 {
     /// <summary>
-    /// Adds the current connection to the file-specific SignalR group.
-    /// Call this after uploading a 3D file to receive analysis events for that file only.
+    /// Adds the current connection to an authorized file-specific SignalR group.
     /// </summary>
-    /// <param name="storagePath">GCS storage path of the uploaded file (used as group key).</param>
-    public async Task JoinFileGroup(string storagePath)
-        => await Groups.AddToGroupAsync(Context.ConnectionId, $"file:{storagePath}");
+    /// <param name="fileId">The upload identifier for the file whose updates are requested.</param>
+    public async Task JoinFileGroup(Guid fileId)
+    {
+        var group = await AuthorizeFileGroupAsync(fileId);
+        await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+    }
 
     /// <summary>
-    /// Removes the current connection from the file-specific SignalR group.
-    /// Call this when the file is removed or the page is left.
+    /// Removes the current connection from an authorized file-specific SignalR group.
     /// </summary>
-    /// <param name="storagePath">GCS storage path of the file to leave.</param>
-    public async Task LeaveFileGroup(string storagePath)
-        => await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"file:{storagePath}");
+    /// <param name="fileId">The upload identifier for the file whose updates are no longer requested.</param>
+    public async Task LeaveFileGroup(Guid fileId)
+    {
+        var group = await AuthorizeFileGroupAsync(fileId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+    }
+
+    /// <summary>Builds the opaque SignalR group used for an authorized uploaded file.</summary>
+    public static string FileGroup(Guid fileId) => $"file:{fileId:N}";
+
+    /// <summary>Builds an opaque file group only for a valid upload identifier.</summary>
+    public static bool TryFileGroup(string? fileId, out string group)
+    {
+        if (Guid.TryParse(fileId, out var parsedFileId) && parsedFileId != Guid.Empty)
+        {
+            group = FileGroup(parsedFileId);
+            return true;
+        }
+
+        group = string.Empty;
+        return false;
+    }
+
+    private async Task<string> AuthorizeFileGroupAsync(Guid fileId)
+    {
+        if (fileId == Guid.Empty || !await uploadClient.CanReadFileAsync(fileId, Context.ConnectionAborted))
+        {
+            throw new HubException("File updates are unavailable.");
+        }
+
+        return FileGroup(fileId);
+    }
 }
 
 /// <summary>
 /// Payload pushed to the client when geometry analysis for an uploaded file completes.
 /// </summary>
-/// <param name="StoragePath">The GCS storage path of the original 3D file (used as join key on the client).</param>
+/// <param name="StoragePath">The GCS storage path of the original 3D file for client-side state reconciliation.</param>
 /// <param name="UploadId">The upload ID of the file, if available.</param>
 /// <param name="ThumbnailUrl">Signed URL to the generated thumbnail image, or null if unavailable.</param>
 /// <param name="HiResThumbnailUrl">Signed URL to the 1000px ISO WebP thumbnail for hi-res display, or null if unavailable.</param>

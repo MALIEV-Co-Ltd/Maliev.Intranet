@@ -175,8 +175,7 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
             NonManifoldFaceCount: nonManifoldFaceCount);
 
         await SendToFileGroupsAsync(
-            payload.StoragePath,
-            storagePath,
+            payload.FileId,
             signalRPayload,
             context.CancellationToken);
     }
@@ -203,24 +202,17 @@ public class DfmAnalysisReadyConsumer : IConsumer<DfmAnalysisReadyEvent>
     }
 
     private async Task SendToFileGroupsAsync(
-        string eventStoragePath,
-        string currentStoragePath,
+        string fileId,
         DfmAnalysisReadyPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (!NotificationHub.TryFileGroup(fileId, out var group))
         {
-            eventStoragePath,
-            currentStoragePath
-        };
-
-        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-                "DfmAnalysisReady",
-                payload,
-                cancellationToken);
+            _logger.LogWarning("DfmAnalysisReadyConsumer: invalid FileId {FileId}; skipping SignalR notification", fileId);
+            return;
         }
+
+        await _hub.Clients.Group(group).SendAsync("DfmAnalysisReady", payload, cancellationToken);
     }
 
     private void RecordServerDfmReports(

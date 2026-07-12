@@ -23,7 +23,7 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
         var client = _factory.CreateClient();
         var token = url.StartsWith("/hubs/chat", StringComparison.Ordinal)
             ? _factory.CreateTestToken("chat-reader", MalievPermissions.Chat.SessionsRead)
-            : _factory.CreateTestToken();
+            : _factory.CreateTestToken("project-reader", MalievPermissions.Project.Read);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
@@ -58,6 +58,19 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
             _factory.CreateTestToken("chat-no-read"));
 
         var response = await client.PostAsync("/hubs/chat/negotiate", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NotificationHubNegotiate_ReturnsForbidden_WhenAuthenticatedCallerLacksProjectReadPermission()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            _factory.CreateTestToken("project-no-read"));
+
+        var response = await client.PostAsync("/hubs/notifications/negotiate", null);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

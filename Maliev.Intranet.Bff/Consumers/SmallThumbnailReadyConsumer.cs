@@ -83,7 +83,7 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
             Failed: failed,
             ErrorCode: failed ? "thumbnail-url-resolution-failed" : null);
 
-        await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
+        await SendToFileGroupsAsync(payload.FileId, signalRPayload, context.CancellationToken);
 
         _logger.LogInformation(
             "SmallThumbnailReadyConsumer: pushed thumbnail URL via SignalR for {StoragePath}",
@@ -112,23 +112,16 @@ public class SmallThumbnailReadyConsumer : IConsumer<SmallThumbnailReadyEvent>
     }
 
     private async Task SendToFileGroupsAsync(
-        string eventStoragePath,
-        string currentStoragePath,
+        string fileId,
         FileAnalysisCompletedPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (!NotificationHub.TryFileGroup(fileId, out var group))
         {
-            eventStoragePath,
-            currentStoragePath
-        };
-
-        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-                "FileAnalysisCompleted",
-                payload,
-                cancellationToken);
+            _logger.LogWarning("SmallThumbnailReadyConsumer: invalid FileId {FileId}; skipping SignalR notification", fileId);
+            return;
         }
+
+        await _hub.Clients.Group(group).SendAsync("FileAnalysisCompleted", payload, cancellationToken);
     }
 }
