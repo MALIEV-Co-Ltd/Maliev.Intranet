@@ -44,7 +44,7 @@ public class ChatCallbackControllerTests
         var step = new ThinkingStepDto { StepNumber = 1, Title = "Thinking" };
         var result = await _controller.ReceiveThinkingStep(sessionId, "valid-token", step);
 
-        _clientsMock.Verify(x => x.Group(sessionId.ToString("D")), Times.Once);
+        _clientsMock.Verify(x => x.Group(Maliev.Intranet.Bff.Hubs.ChatHub.SessionGroup(sessionId)), Times.Once);
         Assert.IsType<OkResult>(result);
     }
 
@@ -55,7 +55,7 @@ public class ChatCallbackControllerTests
         var response = new BffChatMessageResponse { Content = "Hello" };
         var result = await _controller.ReceiveComplete(sessionId, "valid-token", response);
 
-        _clientsMock.Verify(x => x.Group(sessionId.ToString("D")), Times.Once);
+        _clientsMock.Verify(x => x.Group(Maliev.Intranet.Bff.Hubs.ChatHub.SessionGroup(sessionId)), Times.Once);
         Assert.IsType<OkResult>(result);
     }
 

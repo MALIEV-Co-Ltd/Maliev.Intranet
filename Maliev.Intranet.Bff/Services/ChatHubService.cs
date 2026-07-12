@@ -23,7 +23,7 @@ public class ChatHubService
     /// </summary>
     public async Task SendThinkingStepAsync(string sessionId, ThinkingStepDto step)
     {
-        await _hubContext.Clients.Group(sessionId).SendAsync("ReceiveThinkingStep", step);
+        await _hubContext.Clients.Group(ChatHub.SessionGroup(Guid.Parse(sessionId))).SendAsync("ReceiveThinkingStep", step);
     }
 
     /// <summary>
@@ -31,7 +31,7 @@ public class ChatHubService
     /// </summary>
     public async Task SendMessageAsync(string sessionId, BffChatMessageResponse response)
     {
-        await _hubContext.Clients.Group(sessionId).SendAsync("ReceiveMessage", response);
+        await _hubContext.Clients.Group(ChatHub.SessionGroup(Guid.Parse(sessionId))).SendAsync("ReceiveMessage", response);
     }
 
     /// <summary>
@@ -39,6 +39,6 @@ public class ChatHubService
     /// </summary>
     public async Task SendErrorAsync(string sessionId, string error)
     {
-        await _hubContext.Clients.Group(sessionId).SendAsync("ReceiveError", error);
+        await _hubContext.Clients.Group(ChatHub.SessionGroup(Guid.Parse(sessionId))).SendAsync("ReceiveError", error);
     }
 }

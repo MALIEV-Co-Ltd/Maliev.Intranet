@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Maliev.Intranet.Shared;
 using Xunit;
 
 namespace Maliev.Intranet.Tests.Bff.Hubs;
@@ -20,7 +21,9 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
     {
         // Arrange
         var client = _factory.CreateClient();
-        var token = _factory.CreateTestToken();
+        var token = url.StartsWith("/hubs/chat", StringComparison.Ordinal)
+            ? _factory.CreateTestToken("chat-reader", MalievPermissions.Chat.SessionsRead)
+            : _factory.CreateTestToken();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
@@ -44,5 +47,18 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
         // Assert
         // SignalR hubs in this project might have [Authorize]
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChatHubNegotiate_ReturnsForbidden_WhenAuthenticatedCallerLacksConversationReadPermission()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            _factory.CreateTestToken("chat-no-read"));
+
+        var response = await client.PostAsync("/hubs/chat/negotiate", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }
