@@ -289,6 +289,24 @@ public class UploadServiceClient
     }
 
     /// <summary>
+    /// Confirms that the caller represented by the current HTTP context can read a file.
+    /// UploadService applies the resource-scoped path authorization before returning success.
+    /// </summary>
+    /// <param name="id">The trusted upload identifier requested by the caller.</param>
+    /// <param name="ct">Cancellation token for the downstream authorization request.</param>
+    /// <returns><see langword="true"/> only when UploadService authorizes the current caller.</returns>
+    public virtual async Task<bool> CanReadFileAsync(Guid id, CancellationToken ct = default)
+    {
+        if (id == Guid.Empty)
+        {
+            return false;
+        }
+
+        using var response = await _httpClient.GetAsync($"/upload/v1/files/{id}", ct);
+        return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>
     /// Deletes a file.
     /// </summary>
     public async Task DeleteFileAsync(Guid id, CancellationToken ct = default)

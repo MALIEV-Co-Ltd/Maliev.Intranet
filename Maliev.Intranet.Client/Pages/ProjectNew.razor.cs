@@ -935,16 +935,18 @@ public partial class ProjectNew : IAsyncDisposable
         if (hubConnection?.State != HubConnectionState.Connected)
             return;
 
-        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        if (part.FileId == Guid.Empty)
         {
-            try
-            {
-                await hubConnection.InvokeAsync("JoinFileGroup", storagePath);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to join file SignalR group for {StoragePath}", storagePath);
-            }
+            return;
+        }
+
+        try
+        {
+            await hubConnection.InvokeAsync("JoinFileGroup", part.FileId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to join SignalR group for file {FileId}", part.FileId);
         }
     }
 
@@ -954,16 +956,18 @@ public partial class ProjectNew : IAsyncDisposable
         if (hubConnection?.State != HubConnectionState.Connected)
             return;
 
-        foreach (var storagePath in part.GetSignalRStoragePaths().Distinct(StringComparer.OrdinalIgnoreCase))
+        if (part.FileId == Guid.Empty)
         {
-            try
-            {
-                await hubConnection.InvokeAsync("LeaveFileGroup", storagePath);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogDebug(ex, "Failed to leave file SignalR group for {StoragePath}", storagePath);
-            }
+            return;
+        }
+
+        try
+        {
+            await hubConnection.InvokeAsync("LeaveFileGroup", part.FileId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to leave SignalR group for file {FileId}", part.FileId);
         }
     }
 

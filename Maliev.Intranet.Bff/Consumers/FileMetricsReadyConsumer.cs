@@ -114,10 +114,17 @@ public class FileMetricsReadyConsumer : IConsumer<FileMetricsReadyEvent>
             NonManifoldReason: nonManifoldReason,
             NonManifoldFaceCount: nonManifoldFaceCount);
 
-        await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-            "FileAnalysisCompleted",
-            signalRPayload,
-            context.CancellationToken);
+        if (NotificationHub.TryFileGroup(payload.FileId, out var group))
+        {
+            await _hub.Clients.Group(group).SendAsync(
+                "FileAnalysisCompleted",
+                signalRPayload,
+                context.CancellationToken);
+        }
+        else
+        {
+            _logger.LogWarning("FileMetricsReadyConsumer: invalid FileId {FileId}; skipping SignalR notification", payload.FileId);
+        }
 
         _logger.LogInformation(
             "FileMetricsReadyConsumer: pushed dimensions via SignalR for {StoragePath}",

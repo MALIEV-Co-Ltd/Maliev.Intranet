@@ -71,7 +71,7 @@ public class PriceCalculatedConsumer : IConsumer<PriceCalculatedEvent>
             EstimatedLeadTimeDays: payload.EstimatedLeadTimeDays,
             ValidUntil: payload.ValidUntil);
 
-        await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
+        await SendToFileGroupsAsync(payload.FileId, signalRPayload, context.CancellationToken);
     }
 
     private async Task<string?> ResolveCurrentStoragePathAsync(
@@ -101,27 +101,19 @@ public class PriceCalculatedConsumer : IConsumer<PriceCalculatedEvent>
     }
 
     private async Task SendToFileGroupsAsync(
-        string? eventStoragePath,
-        string currentStoragePath,
+        Guid fileId,
         PriceCalculatedPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (fileId == Guid.Empty)
         {
-            currentStoragePath
-        };
-
-        if (!string.IsNullOrWhiteSpace(eventStoragePath))
-        {
-            groupPaths.Add(eventStoragePath);
+            _logger.LogWarning("PriceCalculatedConsumer: missing FileId; skipping SignalR notification");
+            return;
         }
 
-        foreach (var path in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{path}").SendAsync(
-                "PriceCalculated",
-                payload,
-                cancellationToken);
-        }
+        await _hub.Clients.Group(NotificationHub.FileGroup(fileId)).SendAsync(
+            "PriceCalculated",
+            payload,
+            cancellationToken);
     }
 }

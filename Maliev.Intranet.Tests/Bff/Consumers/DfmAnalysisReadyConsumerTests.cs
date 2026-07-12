@@ -19,6 +19,30 @@ namespace Maliev.Intranet.Tests.Bff.Consumers;
 
 public sealed class DfmAnalysisReadyConsumerTests
 {
+    private static readonly Guid FileId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
+    [Fact]
+    public async Task Consume_WhenFileIdIsValid_PublishesToItsOpaqueFileGroup()
+    {
+        const string storagePath = "projects/project-1/part.stl";
+        var meterFactoryMock = new Mock<IMeterFactory>();
+        using var meter = new Meter("test");
+        meterFactoryMock.Setup(factory => factory.Create(It.IsAny<MeterOptions>())).Returns(meter);
+        var hub = CreateHub(out var clients);
+        var consumer = new DfmAnalysisReadyConsumer(
+            hub.Object,
+            CreateUploadHttpClientFactory(storagePath).Object,
+            CreateAnalysisStatusService(storagePath).Object,
+            new BffMetrics(meterFactoryMock.Object),
+            NullLogger<DfmAnalysisReadyConsumer>.Instance);
+
+        await consumer.Consume(CreateConsumeContext(storagePath).Object);
+
+        clients.Verify(
+            item => item.Group(NotificationHub.FileGroup(FileId)),
+            Times.Once);
+    }
+
     [Fact]
     public async Task Consume_WhenServerDfmReportsArrive_RecordsConsumedServerCpuDecisions()
     {
@@ -52,7 +76,7 @@ public sealed class DfmAnalysisReadyConsumerTests
 
         var httpClientFactory = CreateUploadHttpClientFactory(storagePath);
         var analysisStatusService = CreateAnalysisStatusService(storagePath);
-        var hub = CreateHub();
+        var hub = CreateHub(out _);
         var metrics = new BffMetrics(meterFactoryMock.Object);
         var consumer = new DfmAnalysisReadyConsumer(
             hub.Object,
@@ -112,7 +136,7 @@ public sealed class DfmAnalysisReadyConsumerTests
         return service;
     }
 
-    private static Mock<IHubContext<NotificationHub>> CreateHub()
+    private static Mock<IHubContext<NotificationHub>> CreateHub(out Mock<IHubClients> clients)
     {
         var proxy = new Mock<IClientProxy>();
         proxy
@@ -122,7 +146,7 @@ public sealed class DfmAnalysisReadyConsumerTests
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var clients = new Mock<IHubClients>();
+        clients = new Mock<IHubClients>();
         clients.Setup(item => item.Group(It.IsAny<string>())).Returns(proxy.Object);
 
         var hub = new Mock<IHubContext<NotificationHub>>();
@@ -138,7 +162,7 @@ public sealed class DfmAnalysisReadyConsumerTests
         {
             Payload = new DfmAnalysisReadyEventPayload
             {
-                FileId = "file-1",
+                FileId = FileId.ToString(),
                 StoragePath = storagePath,
                 FdmReport = new FdmDfmReportPayload
                 {

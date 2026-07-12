@@ -158,8 +158,7 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
                 );
 
                 await SendToFileGroupsAsync(
-                    payload.StoragePath,
-                    gcsStoragePath,
+                    payload.FileId,
                     signalRPayload,
                     context.CancellationToken);
             }
@@ -272,23 +271,16 @@ public class FileAnalyzedConsumer : IConsumer<FileAnalyzedEvent>
     }
 
     private async Task SendToFileGroupsAsync(
-        string eventStoragePath,
-        string currentStoragePath,
+        string fileId,
         GlbReadyPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (!NotificationHub.TryFileGroup(fileId, out var group))
         {
-            eventStoragePath,
-            currentStoragePath
-        };
-
-        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-                "GlbReady",
-                payload,
-                cancellationToken);
+            _logger.LogWarning("FileAnalyzedConsumer: invalid FileId {FileId}; skipping SignalR notification", fileId);
+            return;
         }
+
+        await _hub.Clients.Group(group).SendAsync("GlbReady", payload, cancellationToken);
     }
 }

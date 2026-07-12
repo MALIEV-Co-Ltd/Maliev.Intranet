@@ -78,7 +78,7 @@ public class FileAnalysisFailedConsumer : IConsumer<FileAnalysisFailedEvent>
             Failed: true,
             ErrorCode: payload.ErrorCode);
 
-        await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
+        await SendToFileGroupsAsync(payload.FileId, signalRPayload, context.CancellationToken);
 
         _logger.LogInformation(
             "FileAnalysisFailedConsumer: pushed failure notification via SignalR for {StoragePath}",
@@ -107,23 +107,16 @@ public class FileAnalysisFailedConsumer : IConsumer<FileAnalysisFailedEvent>
     }
 
     private async Task SendToFileGroupsAsync(
-        string eventStoragePath,
-        string currentStoragePath,
+        string fileId,
         FileAnalysisCompletedPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (!NotificationHub.TryFileGroup(fileId, out var group))
         {
-            eventStoragePath,
-            currentStoragePath
-        };
-
-        foreach (var storagePath in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{storagePath}").SendAsync(
-                "FileAnalysisCompleted",
-                payload,
-                cancellationToken);
+            _logger.LogWarning("FileAnalysisFailedConsumer: invalid FileId {FileId}; skipping SignalR notification", fileId);
+            return;
         }
+
+        await _hub.Clients.Group(group).SendAsync("FileAnalysisCompleted", payload, cancellationToken);
     }
 }

@@ -170,7 +170,7 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
                 Failed: overallFailed,
                 ErrorCode: overallFailed ? (payload.Failed ? "preview-generation-failed" : "preview-url-resolution-failed") : null);
 
-            await SendToFileGroupsAsync(payload.StoragePath, storagePath, signalRPayload, context.CancellationToken);
+            await SendToFileGroupsAsync(payload.FileId, signalRPayload, context.CancellationToken);
 
             _logger.LogInformation(
                 "Pushed preview URLs for {StoragePath} via SignalR (failed={Failed})",
@@ -214,24 +214,17 @@ public class PreviewImagesGeneratedConsumer : IConsumer<PreviewImagesGeneratedEv
     }
 
     private async Task SendToFileGroupsAsync(
-        string eventStoragePath,
-        string currentStoragePath,
+        string? fileId,
         FileAnalysisCompletedPayload payload,
         CancellationToken cancellationToken)
     {
-        var groupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (!NotificationHub.TryFileGroup(fileId, out var group))
         {
-            eventStoragePath,
-            currentStoragePath
-        };
-
-        foreach (var path in groupPaths.Where(path => !string.IsNullOrWhiteSpace(path)))
-        {
-            await _hub.Clients.Group($"file:{path}").SendAsync(
-                "FileAnalysisCompleted",
-                payload,
-                cancellationToken);
+            _logger.LogWarning("PreviewImagesGeneratedConsumer: invalid FileId {FileId}; skipping SignalR notification", fileId);
+            return;
         }
+
+        await _hub.Clients.Group(group).SendAsync("FileAnalysisCompleted", payload, cancellationToken);
     }
 
     private sealed record ResolvedPreviewUrl(string AssetName, string? StoragePath, string? Url, bool Failed);
