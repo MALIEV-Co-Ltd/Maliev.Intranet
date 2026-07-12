@@ -17,4 +17,18 @@ public class ProductionHubTests
         Assert.Equal("Bearer,Cookies", attribute.AuthenticationSchemes);
         Assert.Equal($"Permission:{MalievPermissions.Job.Read}", attribute.Policy);
     }
+
+    [Fact]
+    public void ProductionHub_DoesNotExposeClientCallableBroadcastMethods()
+    {
+        var browserMethods = typeof(ProductionHub)
+            .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.DeclaredOnly)
+            .Select(method => method.Name);
+
+        Assert.DoesNotContain("NotifyJobStatusChanged", browserMethods);
+        Assert.DoesNotContain("NotifyJobAssigned", browserMethods);
+        Assert.DoesNotContain("NotifyStatsUpdated", browserMethods);
+        Assert.DoesNotContain("NotifyScheduleChanged", browserMethods);
+    }
 }
