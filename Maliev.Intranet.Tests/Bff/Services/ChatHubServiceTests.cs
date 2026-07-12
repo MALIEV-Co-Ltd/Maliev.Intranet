@@ -28,20 +28,22 @@ public class ChatHubServiceTests
     [Fact]
     public async Task SendThinkingStepAsync_ShouldCallGroupSend()
     {
+        var sessionId = Guid.NewGuid();
         var step = new ThinkingStepDto { Title = "Thinking" };
-        await _service.SendThinkingStepAsync("session-1", step);
+        await _service.SendThinkingStepAsync(sessionId.ToString("D"), step);
 
-        _clientsMock.Verify(x => x.Group("session-1"), Times.Once);
+        _clientsMock.Verify(x => x.Group(ChatHub.SessionGroup(sessionId)), Times.Once);
         _clientProxyMock.Verify(x => x.SendCoreAsync("ReceiveThinkingStep", It.Is<object[]>(o => o[0] == step), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task SendMessageAsync_ShouldCallGroupSend()
     {
+        var sessionId = Guid.NewGuid();
         var response = new BffChatMessageResponse { Content = "Hello" };
-        await _service.SendMessageAsync("session-1", response);
+        await _service.SendMessageAsync(sessionId.ToString("D"), response);
 
-        _clientsMock.Verify(x => x.Group("session-1"), Times.Once);
+        _clientsMock.Verify(x => x.Group(ChatHub.SessionGroup(sessionId)), Times.Once);
         _clientProxyMock.Verify(x => x.SendCoreAsync("ReceiveMessage", It.Is<object[]>(o => o[0] == response), It.IsAny<CancellationToken>()), Times.Once);
     }
 }
