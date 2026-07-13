@@ -73,6 +73,8 @@ public class ProjectsControllerTests
                 Assert.Single(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
             Assert.Equal(MalievPermissions.Job.Write, methodPermission.Permission);
             Assert.Equal("Bearer,Cookies", methodPermission.AuthenticationSchemes);
+            Assert.Equal("projects/{id}", methodPermission.ResourcePathTemplate);
+            Assert.True(methodPermission.RequireLiveCheck);
         }
     }
 
@@ -84,9 +86,12 @@ public class ProjectsControllerTests
         Assert.Equal(MalievPermissions.Project.Read, controllerPermission.Permission);
         Assert.Equal("Bearer,Cookies", controllerPermission.AuthenticationSchemes);
 
+        var collectionMethod = typeof(ProjectsController).GetMethod(nameof(ProjectsController.Get));
+        Assert.NotNull(collectionMethod);
+        Assert.Empty(collectionMethod.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+
         foreach (var methodName in new[]
         {
-            nameof(ProjectsController.Get),
             nameof(ProjectsController.GetById),
             nameof(ProjectsController.GetPartLargeThumbnailUrl),
             nameof(ProjectsController.GetProductionPlan),
@@ -95,12 +100,23 @@ public class ProjectsControllerTests
         {
             var method = typeof(ProjectsController).GetMethod(methodName);
             Assert.NotNull(method);
-            Assert.Empty(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+            var methodPermission = Assert.IsType<RequirePermissionAttribute>(
+                Assert.Single(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+            Assert.Equal(MalievPermissions.Project.Read, methodPermission.Permission);
+            Assert.Equal("projects/{id}", methodPermission.ResourcePathTemplate);
+            Assert.True(methodPermission.RequireLiveCheck);
         }
+
+        var createMethod = typeof(ProjectsController).GetMethod(nameof(ProjectsController.Create));
+        Assert.NotNull(createMethod);
+        var createPermission = Assert.IsType<RequirePermissionAttribute>(
+            Assert.Single(createMethod.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+        Assert.Equal(MalievPermissions.Project.Write, createPermission.Permission);
+        Assert.Null(createPermission.ResourcePathTemplate);
+        Assert.False(createPermission.RequireLiveCheck);
 
         foreach (var methodName in new[]
         {
-            nameof(ProjectsController.Create),
             nameof(ProjectsController.AddNote),
             nameof(ProjectsController.Duplicate),
             nameof(ProjectsController.Update),
@@ -120,6 +136,8 @@ public class ProjectsControllerTests
                 Assert.Single(method.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
             Assert.Equal(MalievPermissions.Project.Write, methodPermission.Permission);
             Assert.Equal("Bearer,Cookies", methodPermission.AuthenticationSchemes);
+            Assert.Equal("projects/{id}", methodPermission.ResourcePathTemplate);
+            Assert.True(methodPermission.RequireLiveCheck);
         }
     }
 

@@ -46,6 +46,8 @@ try
         }
     }
 
+    AuthorizationSafetyConfiguration.EnsureSafe(builder.Configuration);
+
     // Add Service Defaults (OpenTelemetry, health checks, etc.)
     builder.AddServiceDefaults();
     builder.Services.AddDefaultApiVersioning();

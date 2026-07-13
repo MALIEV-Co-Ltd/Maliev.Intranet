@@ -2,6 +2,7 @@ using System.Globalization;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
@@ -37,6 +38,7 @@ public class ProjectsController(
     QuotationServiceClient? quotationClient = null,
     PdfServiceClient? pdfClient = null) : ControllerBase
 {
+    private const string ProjectResourcePath = "projects/{id}";
     private readonly ILogger<ProjectsController> _logger = logger;
     // ── Query endpoints ──────────────────────────────────────────────────────
 
@@ -72,6 +74,9 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Project detail or 404 if not found.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProjectDetailDto>> GetById(Guid id, CancellationToken ct)
     {
@@ -95,6 +100,9 @@ public class ProjectsController(
     /// <param name="partId">The project part GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A signed large thumbnail URL, or 404 when the part or artifact is not available.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}/parts/{partId:guid}/thumbnail-large-url")]
     public async Task<ActionResult> GetPartLargeThumbnailUrl(Guid id, Guid partId, CancellationToken ct)
     {
@@ -162,7 +170,9 @@ public class ProjectsController(
     /// <summary>
     /// Adds an internal note to a project.
     /// </summary>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/notes")]
     public async Task<ActionResult<ProjectNoteDto>> AddNote(
         Guid id,
@@ -185,7 +195,9 @@ public class ProjectsController(
     /// <summary>
     /// Duplicates a project into a new independent reorder draft.
     /// </summary>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/duplicate")]
     public async Task<ActionResult<ProjectDetailDto>> Duplicate(
         Guid id,
@@ -263,7 +275,9 @@ public class ProjectsController(
     /// <param name="request">Fields to update.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] object request, CancellationToken ct)
     {
@@ -277,7 +291,9 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -294,7 +310,9 @@ public class ProjectsController(
     /// <param name="request">Part creation payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created project part details.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/parts")]
     public async Task<ActionResult<ProjectPartDto>> AddPart(Guid id, [FromBody] AddProjectPartRequest request, CancellationToken ct)
     {
@@ -313,7 +331,9 @@ public class ProjectsController(
     /// <param name="request">Configuration update payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPut("{id:guid}/parts/{partId:guid}")]
     public async Task<IActionResult> UpdatePart(Guid id, Guid partId, [FromBody] UpdateProjectPartRequest request, CancellationToken ct)
     {
@@ -328,7 +348,9 @@ public class ProjectsController(
     /// <param name="partId">The part GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpDelete("{id:guid}/parts/{partId:guid}")]
     public async Task<IActionResult> DeletePart(Guid id, Guid partId, CancellationToken ct)
     {
@@ -345,7 +367,9 @@ public class ProjectsController(
     /// <param name="partId">The part GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Price breakdown DTO.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/parts/{partId:guid}/price")]
     public async Task<ActionResult<ProjectPriceBreakdownDto>> GetPartPrice(Guid id, Guid partId, CancellationToken ct)
     {
@@ -361,7 +385,9 @@ public class ProjectsController(
     /// <param name="request">Confirmed price and optional override reason.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/parts/{partId:guid}/confirm-price")]
     public async Task<IActionResult> ConfirmPartPrice(Guid id, Guid partId, [FromBody] ConfirmPartPriceRequest request, CancellationToken ct)
     {
@@ -379,7 +405,9 @@ public class ProjectsController(
     /// <param name="request">Quotation validity and delivery expectations.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/generate-quotation")]
     public async Task<IActionResult> GenerateQuotation(
         Guid id,
@@ -509,7 +537,9 @@ public class ProjectsController(
     /// <param name="request">Optional expected quotation version for stale-acceptance protection.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Project.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/accept-quotation")]
     public async Task<IActionResult> AcceptQuotation(
         Guid id,
@@ -528,6 +558,9 @@ public class ProjectsController(
     /// <param name="id">The project GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The project production plan.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}/production-plan")]
     public async Task<ActionResult<ProjectProductionPlanDto>> GetProductionPlan(Guid id, CancellationToken ct)
     {
@@ -590,7 +623,9 @@ public class ProjectsController(
     /// <summary>
     /// Creates a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/parts/{partId:guid}/planning-hold")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CreatePlanningHold(
         Guid id,
@@ -615,7 +650,9 @@ public class ProjectsController(
     /// <summary>
     /// Updates a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPatch("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> UpdatePlanningHold(
         Guid id,
@@ -635,7 +672,9 @@ public class ProjectsController(
     /// <summary>
     /// Cancels a tentative queue hold for a project part.
     /// </summary>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpDelete("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CancelPlanningHold(
         Guid id,
@@ -661,6 +700,9 @@ public class ProjectsController(
     /// <param name="processType">The manufacturing process code (e.g. "FDM", "CNC_MILL").</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Production routing DTO.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}/parts/{partId:guid}/routing")]
     public async Task<ActionResult<ProductionRoutingDto>> GetPartRouting(
         Guid id, Guid partId,
