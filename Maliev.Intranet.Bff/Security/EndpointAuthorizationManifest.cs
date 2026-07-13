@@ -42,6 +42,12 @@ public sealed record ResourceOwnershipManifest(
     string? Authority,
     string? ResourceParameter);
 
+/// <summary>Machine-readable permission policy metadata for one endpoint requirement.</summary>
+public sealed record PermissionAuthorizationManifest(
+    string Permission,
+    string? ResourcePathTemplate,
+    bool RequireLiveCheck);
+
 /// <summary>Identifies a SignalR hub and its externally mapped route.</summary>
 public sealed record HubManifestSurface(string Route, Type HubType);
 
@@ -55,6 +61,7 @@ public sealed record EndpointAuthorizationManifestEntry(
     string Authentication,
     string Authorization,
     IReadOnlyList<string> Permissions,
+    IReadOnlyList<PermissionAuthorizationManifest> PermissionRequirements,
     ResourceOwnershipManifest Ownership,
     string RateLimit,
     string Coverage);
@@ -147,11 +154,25 @@ public static class EndpointAuthorizationManifestBuilder
         var allowAnonymous = endpointMetadata.GetMetadata<IAllowAnonymous>()
             ?? method?.GetCustomAttribute<AllowAnonymousAttribute>(true)
             ?? declaringType.GetCustomAttribute<AllowAnonymousAttribute>(true);
-        var permissions = endpointMetadata.GetOrderedMetadata<RequirePermissionAttribute>()
+        var permissionAttributes = endpointMetadata.GetOrderedMetadata<RequirePermissionAttribute>()
             .Concat(method?.GetCustomAttributes<RequirePermissionAttribute>(true) ?? [])
             .Concat(declaringType.GetCustomAttributes<RequirePermissionAttribute>(true))
+            .DistinctBy(attribute => new
+            {
+                attribute.Permission,
+                attribute.ResourcePathTemplate,
+                attribute.RequireLiveCheck
+            })
+            .ToArray();
+        var permissions = permissionAttributes
             .Select(attribute => attribute.Permission)
             .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var permissionRequirements = permissionAttributes
+            .Select(attribute => new PermissionAuthorizationManifest(
+                attribute.Permission,
+                attribute.ResourcePathTemplate,
+                attribute.RequireLiveCheck))
             .ToArray();
         var authorizeData = endpointMetadata.GetOrderedMetadata<IAuthorizeData>()
             .Concat(method?.GetCustomAttributes<AuthorizeAttribute>(true) ?? [])
@@ -191,6 +212,7 @@ public static class EndpointAuthorizationManifestBuilder
             authentication,
             authorization,
             permissions,
+            permissionRequirements,
             ownershipManifest,
             ResolveRateLimit(endpointMetadata),
             "uncovered");
