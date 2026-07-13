@@ -1,14 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Maliev.Intranet.Tests.Testing;
@@ -139,6 +142,204 @@ public class ProjectsControllerTests
             Assert.Equal("projects/{id}", methodPermission.ResourcePathTemplate);
             Assert.True(methodPermission.RequireLiveCheck);
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Planning_hold_mutation_rejects_a_hold_owned_by_another_project(bool cancel)
+    {
+        var routeProjectId = Guid.NewGuid();
+        var ownedProjectId = Guid.NewGuid();
+        var holdId = Guid.NewGuid();
+        var mutationCalled = false;
+        var jobHandler = new MockHttpMessageHandler((request, _) =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new ProductionPlanningHoldDto
+                    {
+                        Id = holdId,
+                        ProjectId = ownedProjectId,
+                        ProjectPartId = Guid.NewGuid(),
+                        Status = "Active"
+                    })
+                });
+            }
+
+            mutationCalled = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+        });
+        var controller = new ProjectsController(
+            CreateClient(new ProjectDetailDto { Id = routeProjectId }),
+            new JobServiceClient(new HttpClient(jobHandler) { BaseAddress = new Uri("http://test") }),
+            StubFacilityClient(),
+            Logger);
+
+        var result = cancel
+            ? await controller.CancelPlanningHold(routeProjectId, holdId, CancellationToken.None)
+            : await controller.UpdatePlanningHold(
+                routeProjectId,
+                holdId,
+                new UpdateProductionPlanningHoldRequest(),
+                CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.False(mutationCalled);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Planning_hold_mutation_accepts_a_hold_owned_by_the_route_project(bool cancel)
+    {
+        var projectId = Guid.NewGuid();
+        var holdId = Guid.NewGuid();
+        var requests = new List<string>();
+        var userClientCalled = false;
+        var hold = new ProductionPlanningHoldDto
+        {
+            Id = holdId,
+            ProjectId = projectId,
+            ProjectPartId = Guid.NewGuid(),
+            Status = "Active"
+        };
+        var jobHandler = new MockHttpMessageHandler((request, _) =>
+        {
+            requests.Add($"{request.Method} {request.RequestUri!.PathAndQuery}");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(hold)
+            });
+        });
+        var controller = new ProjectsController(
+            CreateClient(new ProjectDetailDto { Id = projectId }),
+            new JobServiceClient(new HttpClient(new MockHttpMessageHandler((_, _) =>
+            {
+                userClientCalled = true;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+            }))
+            { BaseAddress = new Uri("http://user-job-service") }),
+            StubFacilityClient(),
+            Logger,
+            planningHoldServiceClient: new PlanningHoldServiceClient(
+                new HttpClient(jobHandler) { BaseAddress = new Uri("http://service-job-service") }));
+
+        var result = cancel
+            ? await controller.CancelPlanningHold(projectId, holdId, CancellationToken.None)
+            : await controller.UpdatePlanningHold(
+                projectId,
+                holdId,
+                new UpdateProductionPlanningHoldRequest(),
+                CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedHold = Assert.IsType<ProductionPlanningHoldDto>(ok.Value);
+        Assert.Equal(holdId, returnedHold.Id);
+        Assert.Equal(projectId, returnedHold.ProjectId);
+        Assert.False(userClientCalled);
+        Assert.Equal($"GET /job/v1/jobs/planning-holds/{holdId:D}", requests[0]);
+        Assert.Equal(
+            cancel
+                ? $"DELETE /job/v1/jobs/planning-holds/{holdId:D}"
+                : $"PATCH /job/v1/jobs/planning-holds/{holdId:D}",
+            requests[1]);
+    }
+
+    [Fact]
+    public async Task Planning_hold_creation_uses_service_identity_client_after_project_authorization()
+    {
+        var projectId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var holdId = Guid.NewGuid();
+        var userClientCalled = false;
+        string? serviceRequest = null;
+        string? delegatedActor = null;
+        var serviceClient = new PlanningHoldServiceClient(new HttpClient(new MockHttpMessageHandler((request, _) =>
+        {
+            serviceRequest = $"{request.Method} {request.RequestUri!.PathAndQuery}";
+            delegatedActor = request.Headers.GetValues("X-Maliev-Delegated-Actor-Id").Single();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ProductionPlanningHoldDto
+                {
+                    Id = holdId,
+                    ProjectId = projectId,
+                    ProjectPartId = partId,
+                    Status = "Active"
+                })
+            });
+        }))
+        { BaseAddress = new Uri("http://service-job-service") });
+        var controller = new ProjectsController(
+            CreateClient(new ProjectDetailDto
+            {
+                Id = projectId,
+                Parts =
+                [
+                    new ProjectPartDto
+                    {
+                        Id = partId,
+                        ProcessType = "FDM",
+                        MaterialName = "PLA",
+                        Quantity = 2
+                    }
+                ]
+            }),
+            new JobServiceClient(new HttpClient(new MockHttpMessageHandler((_, _) =>
+            {
+                userClientCalled = true;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+            }))
+            { BaseAddress = new Uri("http://user-job-service") }),
+            StubFacilityClient(),
+            Logger,
+            planningHoldServiceClient: serviceClient)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim("user_id", "employee-123")],
+                        authenticationType: "Test"))
+                }
+            }
+        };
+
+        var result = await controller.CreatePlanningHold(
+            projectId,
+            partId,
+            new CreateProductionPlanningHoldRequest
+            {
+                MachineId = "MAL-FDM-001",
+                ProductionTimeMinutes = 60
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var hold = Assert.IsType<ProductionPlanningHoldDto>(ok.Value);
+        Assert.Equal(holdId, hold.Id);
+        Assert.False(userClientCalled);
+        Assert.Equal("POST /job/v1/jobs/planning-holds", serviceRequest);
+        Assert.Equal("employee-123", delegatedActor);
+    }
+
+    [Theory]
+    [InlineData(nameof(ProjectsController.UpdatePlanningHold))]
+    [InlineData(nameof(ProjectsController.CancelPlanningHold))]
+    public void Existing_hold_mutations_declare_project_and_hold_ownership(string actionName)
+    {
+        var action = typeof(ProjectsController).GetMethod(actionName);
+        Assert.NotNull(action);
+        var ownership = Assert.IsType<ResourceOwnershipAttribute>(
+            Assert.Single(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false)));
+
+        Assert.Equal(ResourceOwnershipKind.BffValidated, ownership.Kind);
+        Assert.Equal("JobService+IAMService", ownership.Authority);
+        Assert.Equal("id,holdId", ownership.ResourceParameter);
     }
 
     // ── GET (list) ────────────────────────────────────────────────────────────

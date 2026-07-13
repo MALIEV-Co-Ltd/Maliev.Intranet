@@ -198,6 +198,15 @@ public class JobServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Retrieves one planning hold so callers can resolve its authoritative project ownership.
+    /// </summary>
+    /// <param name="holdId">The planning hold identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The unmodified HTTP response from JobService.</returns>
+    public async Task<HttpResponseMessage> GetPlanningHoldAsync(Guid holdId, CancellationToken ct = default) =>
+        await httpClient.GetAsync($"/job/v1/jobs/planning-holds/{holdId}", ct);
+
+    /// <summary>
     /// Creates a tentative production planning hold.
     /// </summary>
     /// <param name="request">The hold request.</param>

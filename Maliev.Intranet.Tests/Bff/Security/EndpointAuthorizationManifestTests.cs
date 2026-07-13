@@ -143,8 +143,21 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
         Assert.Equal("projects/{id}", requirement.ResourcePathTemplate);
         Assert.True(requirement.RequireLiveCheck);
         Assert.Equal(ResourceOwnershipKind.BffValidated, ownership.Kind);
-        Assert.Equal("IAMService", ownership.Authority);
-        Assert.Equal("id", ownership.ResourceParameter);
+        if (actionName == nameof(ProjectsController.CreatePlanningHold))
+        {
+            Assert.Equal("ProjectService+IAMService", ownership.Authority);
+            Assert.Equal("id,partId", ownership.ResourceParameter);
+        }
+        else if (actionName is nameof(ProjectsController.UpdatePlanningHold) or nameof(ProjectsController.CancelPlanningHold))
+        {
+            Assert.Equal("JobService+IAMService", ownership.Authority);
+            Assert.Equal("id,holdId", ownership.ResourceParameter);
+        }
+        else
+        {
+            Assert.Equal("IAMService", ownership.Authority);
+            Assert.Equal("id", ownership.ResourceParameter);
+        }
     }
 
     [Theory]

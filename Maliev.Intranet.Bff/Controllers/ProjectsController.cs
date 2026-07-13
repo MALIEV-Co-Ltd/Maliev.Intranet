@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
@@ -23,6 +24,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="customerClient">The typed CustomerService HTTP client used to hydrate quote customer details.</param>
 /// <param name="quotationClient">The typed QuotationService HTTP client used to hydrate generated quotation details.</param>
 /// <param name="pdfClient">The typed PdfService HTTP client used to generate quotation PDFs.</param>
+/// <param name="planningHoldServiceClient">Performs hold operations with the BFF service identity after employee authorization.</param>
 [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
@@ -36,7 +38,8 @@ public class ProjectsController(
     IFileAnalysisStatusService? analysisStatusService = null,
     CustomerServiceClient? customerClient = null,
     QuotationServiceClient? quotationClient = null,
-    PdfServiceClient? pdfClient = null) : ControllerBase
+    PdfServiceClient? pdfClient = null,
+    PlanningHoldServiceClient? planningHoldServiceClient = null) : ControllerBase
 {
     private const string ProjectResourcePath = "projects/{id}";
     private readonly ILogger<ProjectsController> _logger = logger;
@@ -625,7 +628,7 @@ public class ProjectsController(
     /// </summary>
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
         ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
-    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "ProjectService+IAMService", "id,partId")]
     [HttpPost("{id:guid}/parts/{partId:guid}/planning-hold")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CreatePlanningHold(
         Guid id,
@@ -642,8 +645,14 @@ public class ProjectsController(
         if (blockReason is not null)
             return Conflict(new { error = blockReason });
 
+        var actorId = ResolveCurrentActorId();
+        if (actorId is null)
+            return Forbid();
+
         var forwarded = NormalizeCreateHoldRequest(project, part, request);
-        var response = await jobClient.CreatePlanningHoldAsync(forwarded, ct);
+        var response = planningHoldServiceClient is null
+            ? await jobClient.CreatePlanningHoldAsync(forwarded, ct)
+            : await planningHoldServiceClient.CreateAsync(forwarded, actorId, ct);
         return await ForwardPlanningHoldResponseAsync(response, ct);
     }
 
@@ -652,7 +661,7 @@ public class ProjectsController(
     /// </summary>
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
         ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
-    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "JobService+IAMService", "id,holdId")]
     [HttpPatch("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> UpdatePlanningHold(
         Guid id,
@@ -664,8 +673,22 @@ public class ProjectsController(
         if (project is null)
             return NotFound();
 
+        using var lookupResponse = planningHoldServiceClient is null
+            ? await jobClient.GetPlanningHoldAsync(holdId, ct)
+            : await planningHoldServiceClient.GetAsync(holdId, ct);
+        if (!lookupResponse.IsSuccessStatusCode)
+            return await ForwardPlanningHoldResponseAsync(lookupResponse, ct);
+
+        var hold = await lookupResponse.Content.ReadFromJsonAsync<ProductionPlanningHoldDto>(cancellationToken: ct);
+        if (hold is null)
+            return StatusCode(StatusCodes.Status502BadGateway);
+        if (hold.ProjectId != id)
+            return NotFound();
+
         var forwarded = NormalizeUpdateHoldRequest(project, request);
-        var response = await jobClient.UpdatePlanningHoldAsync(holdId, forwarded, ct);
+        var response = planningHoldServiceClient is null
+            ? await jobClient.UpdatePlanningHoldAsync(holdId, forwarded, ct)
+            : await planningHoldServiceClient.UpdateAsync(holdId, forwarded, ct);
         return await ForwardPlanningHoldResponseAsync(response, ct);
     }
 
@@ -674,7 +697,7 @@ public class ProjectsController(
     /// </summary>
     [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
         ResourcePathTemplate = ProjectResourcePath, RequireLiveCheck = true)]
-    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "JobService+IAMService", "id,holdId")]
     [HttpDelete("{id:guid}/planning-holds/{holdId:guid}")]
     public async Task<ActionResult<ProductionPlanningHoldDto>> CancelPlanningHold(
         Guid id,
@@ -685,7 +708,21 @@ public class ProjectsController(
         if (project is null)
             return NotFound();
 
-        var response = await jobClient.CancelPlanningHoldAsync(holdId, ct);
+        using var lookupResponse = planningHoldServiceClient is null
+            ? await jobClient.GetPlanningHoldAsync(holdId, ct)
+            : await planningHoldServiceClient.GetAsync(holdId, ct);
+        if (!lookupResponse.IsSuccessStatusCode)
+            return await ForwardPlanningHoldResponseAsync(lookupResponse, ct);
+
+        var hold = await lookupResponse.Content.ReadFromJsonAsync<ProductionPlanningHoldDto>(cancellationToken: ct);
+        if (hold is null)
+            return StatusCode(StatusCodes.Status502BadGateway);
+        if (hold.ProjectId != id)
+            return NotFound();
+
+        var response = planningHoldServiceClient is null
+            ? await jobClient.CancelPlanningHoldAsync(holdId, ct)
+            : await planningHoldServiceClient.CancelAsync(holdId, ct);
         return await ForwardPlanningHoldResponseAsync(response, ct);
     }
 
@@ -1199,6 +1236,11 @@ public class ProjectsController(
 
         return null;
     }
+
+    private string? ResolveCurrentActorId() =>
+        User.FindFirst("user_id")?.Value
+        ?? User.FindFirst("sub")?.Value
+        ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
     private static string? FormatPartConfiguration(ProjectPartDto part)
     {
