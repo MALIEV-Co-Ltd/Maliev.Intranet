@@ -1799,18 +1799,15 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
     [Fact]
     public void CanSubmit_WhenConfiguredPartHasUnacknowledgedDfmIssue_IsFalse()
     {
-        var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
-        cut.WaitForAssertion(() =>
-            Assert.Contains(_sentRequests, request => request.RequestUri?.AbsolutePath == "/api/v1/pricing/lead-times"));
-
-        SetPrivateField(cut.Instance, "_title", "DFM gate quote");
-        SetPrivateField(cut.Instance, "_selectedCustomer", new CustomerSummaryDto
+        var page = new global::Maliev.Intranet.Client.Pages.ProjectNew();
+        SetPrivateField(page, "_title", "DFM gate quote");
+        SetPrivateField(page, "_selectedCustomer", new CustomerSummaryDto
         {
             Id = Guid.NewGuid(),
             Name = "Wanasrivwilai Engineering",
             Email = "quote@example.test",
         });
-        SetPrivateField(cut.Instance, "_selectedLeadTime", new LeadTimeOptionDto("STANDARD", "Standard", 7, 10, 1m, true));
+        SetPrivateField(page, "_selectedLeadTime", new LeadTimeOptionDto("STANDARD", "Standard", 7, 10, 1m, true));
         var report = new FdmDfmReportPayload(
             ReportType: "FDM",
             ThinWallCount: 1,
@@ -1840,14 +1837,14 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
             FdmDfmReport = report,
         };
         part.ResolveDfmReport();
-        GetParts(cut.Instance).Add(part);
+        GetParts(page).Add(part);
 
         Assert.True(part.HasProcessRelevantDfmIssues);
-        Assert.False(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));
+        Assert.False(GetPrivateProperty<bool>(page, "CanSubmit"));
 
         part.DfmAcknowledged = true;
 
-        Assert.True(GetPrivateProperty<bool>(cut.Instance, "CanSubmit"));
+        Assert.True(GetPrivateProperty<bool>(page, "CanSubmit"));
     }
 
     [Fact]
