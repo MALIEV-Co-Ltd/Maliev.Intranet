@@ -4,6 +4,7 @@ using System.Text;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
@@ -19,12 +20,19 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="client">The typed JobService client.</param>
 /// <param name="orderClient">The typed OrderService client, used to enrich job details with 6-sided previews.</param>
 /// <param name="uploadClient">The typed UploadService client, used to resolve GCS storage paths to signed URLs.</param>
-[RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+/// <param name="authorizationService">Authorizes dynamically resolved job-ticket resources.</param>
+[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class JobsController(JobServiceClient client, OrderServiceClient orderClient, UploadServiceClient uploadClient) : ControllerBase
+public class JobsController(
+    JobServiceClient client,
+    OrderServiceClient orderClient,
+    UploadServiceClient uploadClient,
+    IAuthorizationService authorizationService) : ControllerBase
 {
+    private const string JobResourcePath = "jobs/{id}";
+
     // ── Queue ─────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -32,6 +40,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The production queue DTO.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("queue")]
     public async Task<ActionResult<ProductionQueueDto>> GetQueue(CancellationToken ct)
     {
@@ -46,6 +55,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The stats DTO.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("stats")]
     public async Task<ActionResult<JobStatsDto>> GetStats(CancellationToken ct)
     {
@@ -65,6 +75,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="page">Page number.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Paged list of job summaries.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<JobSummaryDto>>> Get(
         [FromQuery] string? status = null,
@@ -86,6 +97,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="id">The job GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The job detail DTO, or 404.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<JobDetailDto>> GetById(Guid id, CancellationToken ct)
     {
@@ -123,6 +137,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="id">The job GUID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The QR data DTO, or 404.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}/qr")]
     public async Task<ActionResult<JobQrDto>> GetQr(Guid id, CancellationToken ct)
     {
@@ -136,6 +153,8 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="request">The scanned QR payload, URL, or raw job identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The matching job detail, or an error if the scan cannot be resolved.</returns>
+    [BffEnforcedPermission(MalievPermissions.Job.Read, "jobs/{parsedJobId}", requireLiveCheck: true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "request.code")]
     [HttpPost("ticket-scan")]
     public async Task<ActionResult<JobDetailDto>> ResolveTicketScan(
         [FromBody] JobTicketScanRequest request,
@@ -144,6 +163,18 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
         if (!TryExtractScannedJobId(request.Code, out Guid jobId))
         {
             return BadRequest(new { error = "Scan a MALIEV job ticket QR code or paste a valid job id." });
+        }
+
+        var authorization = await authorizationService.AuthorizeAsync(
+            User,
+            resource: null,
+            new PermissionRequirement(
+                MalievPermissions.Job.Read,
+                $"jobs/{jobId:D}",
+                requireLiveCheck: true));
+        if (!authorization.Succeeded)
+        {
+            return Forbid();
         }
 
         var result = await client.GetJobByIdAsync(jobId, ct);
@@ -160,7 +191,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
         Guid id,
@@ -185,7 +218,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPatch("{id:guid}/details")]
     public async Task<IActionResult> UpdateDetails(
         Guid id,
@@ -208,7 +243,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPost("{id:guid}/assign-machine")]
     public async Task<IActionResult> AssignMachine(
         Guid id,
@@ -235,6 +272,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="to">Range end (UTC). Defaults to 30 days from now.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of machine schedule items.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("machine/{machineId}/schedule")]
     public async Task<ActionResult<List<MachineScheduleItemDto>>> GetMachineSchedule(
         string machineId,
@@ -256,7 +294,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPatch("{id:guid}/reorder")]
     public async Task<IActionResult> Reorder(
         Guid id,
@@ -281,6 +321,7 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="to">Range end (UTC). Defaults to 7 days from now.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One summary per active machine, each with its list of scheduled jobs.</returns>
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
     [HttpGet("schedule")]
     public async Task<ActionResult<ProductionScheduleBoardDto>> GetAllMachineSchedules(
         [FromServices] IFacilityServiceClient facilityClient,
@@ -310,7 +351,9 @@ public class JobsController(JobServiceClient client, OrderServiceClient orderCli
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = JobResourcePath, RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpPatch("{id:guid}/schedule")]
     public async Task<IActionResult> Reschedule(
         Guid id,

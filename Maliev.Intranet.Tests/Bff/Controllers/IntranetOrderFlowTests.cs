@@ -326,7 +326,11 @@ public sealed class IntranetOrderFlowTests
         var orderClientStub = MakeOrderClient(
             _ => new HttpResponseMessage(HttpStatusCode.OK));
         var (hubMock, allProxyMock) = MakeHubMocks();
-        var controller = new JobsController(jobClient, orderClientStub, MakeUploadClientStub());
+        var controller = new JobsController(
+            jobClient,
+            orderClientStub,
+            MakeUploadClientStub(),
+            Mock.Of<Microsoft.AspNetCore.Authorization.IAuthorizationService>());
 
         var result = await controller.UpdateStatus(
             jobId,
@@ -356,7 +360,11 @@ public sealed class IntranetOrderFlowTests
         var orderClientStub = MakeOrderClient(
             _ => new HttpResponseMessage(HttpStatusCode.OK));
         var (hubMock, allProxyMock) = MakeHubMocks();
-        var controller = new JobsController(jobClient, orderClientStub, MakeUploadClientStub());
+        var controller = new JobsController(
+            jobClient,
+            orderClientStub,
+            MakeUploadClientStub(),
+            Mock.Of<Microsoft.AspNetCore.Authorization.IAuthorizationService>());
 
         var result = await controller.UpdateStatus(
             jobId,
