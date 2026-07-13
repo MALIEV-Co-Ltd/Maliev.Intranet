@@ -17,13 +17,16 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
     [Theory]
     [InlineData("/hubs/notifications/negotiate")]
     [InlineData("/hubs/chat/negotiate")]
+    [InlineData("/hubs/production/negotiate")]
     public async Task HubNegotiate_ReturnsOk_WhenAuthenticated(string url)
     {
         // Arrange
         var client = _factory.CreateClient();
         var token = url.StartsWith("/hubs/chat", StringComparison.Ordinal)
             ? _factory.CreateTestToken("chat-reader", MalievPermissions.Chat.SessionsRead)
-            : _factory.CreateTestToken("project-reader", MalievPermissions.Project.Read);
+            : url.StartsWith("/hubs/production", StringComparison.Ordinal)
+                ? _factory.CreateTestToken("job-reader", MalievPermissions.Job.Read)
+                : _factory.CreateTestToken("project-reader", MalievPermissions.Project.Read);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
@@ -36,6 +39,7 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
     [Theory]
     [InlineData("/hubs/notifications/negotiate")]
     [InlineData("/hubs/chat/negotiate")]
+    [InlineData("/hubs/production/negotiate")]
     public async Task HubNegotiate_ReturnsUnauthorized_WhenNoToken(string url)
     {
         // Arrange
@@ -71,6 +75,19 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
             _factory.CreateTestToken("project-no-read"));
 
         var response = await client.PostAsync("/hubs/notifications/negotiate", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProductionHubNegotiate_ReturnsForbidden_WhenAuthenticatedCallerLacksJobReadPermission()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            _factory.CreateTestToken("job-no-read"));
+
+        var response = await client.PostAsync("/hubs/production/negotiate", null);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

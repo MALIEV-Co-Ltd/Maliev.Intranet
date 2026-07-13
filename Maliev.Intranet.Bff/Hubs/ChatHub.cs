@@ -1,6 +1,7 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Bff.Security;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Maliev.Intranet.Bff.Hubs;
@@ -19,6 +20,7 @@ public class ChatHub(ChatbotServiceClient chatbotClient) : Hub
     /// <summary>
     /// Joins the user to a session-specific group for targeted messages.
     /// </summary>
+    [ResourceOwnership(ResourceOwnershipKind.DownstreamValidated, "ChatbotService", "sessionId")]
     public async Task JoinSession(Guid sessionId)
     {
         var group = await AuthorizeSessionGroupAsync(sessionId);
@@ -28,6 +30,7 @@ public class ChatHub(ChatbotServiceClient chatbotClient) : Hub
     /// <summary>
     /// Removes the user from a session group.
     /// </summary>
+    [ResourceOwnership(ResourceOwnershipKind.DownstreamValidated, "ChatbotService", "sessionId")]
     public async Task LeaveSession(Guid sessionId)
     {
         var group = await AuthorizeSessionGroupAsync(sessionId);

@@ -1,6 +1,7 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
+using Maliev.Intranet.Bff.Security;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Maliev.Intranet.Bff.Hubs;
@@ -19,6 +20,7 @@ public class NotificationHub(UploadServiceClient uploadClient) : Hub
     /// Adds the current connection to an authorized file-specific SignalR group.
     /// </summary>
     /// <param name="fileId">The upload identifier for the file whose updates are requested.</param>
+    [ResourceOwnership(ResourceOwnershipKind.DownstreamValidated, "UploadService", "fileId")]
     public async Task JoinFileGroup(Guid fileId)
     {
         var group = await AuthorizeFileGroupAsync(fileId);
@@ -29,6 +31,7 @@ public class NotificationHub(UploadServiceClient uploadClient) : Hub
     /// Removes the current connection from an authorized file-specific SignalR group.
     /// </summary>
     /// <param name="fileId">The upload identifier for the file whose updates are no longer requested.</param>
+    [ResourceOwnership(ResourceOwnershipKind.DownstreamValidated, "UploadService", "fileId")]
     public async Task LeaveFileGroup(Guid fileId)
     {
         var group = await AuthorizeFileGroupAsync(fileId);
