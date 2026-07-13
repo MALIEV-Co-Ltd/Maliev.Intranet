@@ -48,6 +48,24 @@ public sealed record PermissionAuthorizationManifest(
     string? ResourcePathTemplate,
     bool RequireLiveCheck);
 
+/// <summary>
+/// Declares a permission that the BFF enforces after resolving a resource from request content.
+/// This is manifest metadata; the action remains responsible for invoking authorization before I/O.
+/// </summary>
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
+public sealed class BffEnforcedPermissionAttribute(
+    string permission,
+    string resourcePathTemplate,
+    bool requireLiveCheck) : Attribute
+{
+    /// <summary>The permission evaluated by the action.</summary>
+    public string Permission { get; } = permission;
+    /// <summary>The resolved resource shape recorded in the authorization manifest.</summary>
+    public string ResourcePathTemplate { get; } = resourcePathTemplate;
+    /// <summary>Whether the action requires an authoritative live IAM decision.</summary>
+    public bool RequireLiveCheck { get; } = requireLiveCheck;
+}
+
 /// <summary>Identifies a SignalR hub and its externally mapped route.</summary>
 public sealed record HubManifestSurface(string Route, Type HubType);
 
@@ -164,15 +182,30 @@ public static class EndpointAuthorizationManifestBuilder
                 attribute.RequireLiveCheck
             })
             .ToArray();
-        var permissions = permissionAttributes
-            .Select(attribute => attribute.Permission)
-            .Distinct(StringComparer.Ordinal)
+        var bffEnforcedPermissionAttributes = endpointMetadata.GetOrderedMetadata<BffEnforcedPermissionAttribute>()
+            .Concat(method?.GetCustomAttributes<BffEnforcedPermissionAttribute>(true) ?? [])
+            .Concat(declaringType.GetCustomAttributes<BffEnforcedPermissionAttribute>(true))
+            .DistinctBy(attribute => new
+            {
+                attribute.Permission,
+                attribute.ResourcePathTemplate,
+                attribute.RequireLiveCheck
+            })
             .ToArray();
         var permissionRequirements = permissionAttributes
             .Select(attribute => new PermissionAuthorizationManifest(
                 attribute.Permission,
                 attribute.ResourcePathTemplate,
                 attribute.RequireLiveCheck))
+            .Concat(bffEnforcedPermissionAttributes.Select(attribute => new PermissionAuthorizationManifest(
+                attribute.Permission,
+                attribute.ResourcePathTemplate,
+                attribute.RequireLiveCheck)))
+            .Distinct()
+            .ToArray();
+        var permissions = permissionRequirements
+            .Select(requirement => requirement.Permission)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
         var authorizeData = endpointMetadata.GetOrderedMetadata<IAuthorizeData>()
             .Concat(method?.GetCustomAttributes<AuthorizeAttribute>(true) ?? [])

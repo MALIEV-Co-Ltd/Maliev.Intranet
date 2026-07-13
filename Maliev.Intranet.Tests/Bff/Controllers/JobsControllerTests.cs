@@ -1,11 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Security.Claims;
 using System.Text.Json;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Maliev.Intranet.Tests.Testing;
 using Moq;
@@ -103,8 +109,93 @@ public class JobsControllerTests
         return (hub.Object, allProxy);
     }
 
-    private static JobsController Make(JobServiceClient client) =>
-        new(client, MakeOrderClient(new object()), MakeUploadClient(new object()));
+    private static JobsController Make(JobServiceClient client)
+    {
+        var authorization = new Mock<IAuthorizationService>();
+        authorization
+            .Setup(service => service.AuthorizeAsync(
+                It.IsAny<ClaimsPrincipal>(),
+                It.IsAny<object?>(),
+                It.IsAny<IEnumerable<IAuthorizationRequirement>>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        return new JobsController(
+            client,
+            MakeOrderClient(new object()),
+            MakeUploadClient(new object()),
+            authorization.Object)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "Test"))
+                }
+            }
+        };
+    }
+
+    [Theory]
+    [InlineData(nameof(JobsController.GetById), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.GetQr), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.UpdateStatus), MalievPermissions.Job.Write)]
+    [InlineData(nameof(JobsController.UpdateDetails), MalievPermissions.Job.Write)]
+    [InlineData(nameof(JobsController.AssignMachine), MalievPermissions.Job.Write)]
+    [InlineData(nameof(JobsController.Reorder), MalievPermissions.Job.Write)]
+    [InlineData(nameof(JobsController.Reschedule), MalievPermissions.Job.Write)]
+    public void Job_resource_routes_require_authoritative_scoped_permission(
+        string actionName,
+        string permission)
+    {
+        var action = Assert.Single(
+            typeof(JobsController).GetMethods(),
+            method => method.Name == actionName);
+        var requirement = Assert.Single(action.GetCustomAttributes<RequirePermissionAttribute>(inherit: false));
+        var ownership = Assert.IsType<ResourceOwnershipAttribute>(
+            Assert.Single(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false)));
+
+        Assert.Equal(permission, requirement.Permission);
+        Assert.Equal("jobs/{id}", requirement.ResourcePathTemplate);
+        Assert.True(requirement.RequireLiveCheck);
+        Assert.Equal(ResourceOwnershipKind.BffValidated, ownership.Kind);
+        Assert.Equal("IAMService", ownership.Authority);
+        Assert.Equal("id", ownership.ResourceParameter);
+    }
+
+    [Fact]
+    public void Ticket_scan_declares_its_bff_enforced_dynamic_permission()
+    {
+        var action = typeof(JobsController).GetMethod(nameof(JobsController.ResolveTicketScan));
+        Assert.NotNull(action);
+        var marker = Assert.Single(
+            action.GetCustomAttributes(inherit: false),
+            attribute => attribute.GetType().Name == "BffEnforcedPermissionAttribute");
+
+        Assert.Equal(MalievPermissions.Job.Read, marker.GetType().GetProperty("Permission")?.GetValue(marker));
+        Assert.Equal("jobs/{parsedJobId}", marker.GetType().GetProperty("ResourcePathTemplate")?.GetValue(marker));
+        Assert.Equal(true, marker.GetType().GetProperty("RequireLiveCheck")?.GetValue(marker));
+    }
+
+    [Theory]
+    [InlineData(nameof(JobsController.GetQueue), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.GetStats), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.Get), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.GetMachineSchedule), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.GetAllMachineSchedules), MalievPermissions.Job.Read)]
+    [InlineData(nameof(JobsController.UpdatePlanningHold), MalievPermissions.Job.Write)]
+    public void Job_routes_without_a_job_id_are_explicitly_global(
+        string actionName,
+        string permission)
+    {
+        var action = Assert.Single(
+            typeof(JobsController).GetMethods(),
+            method => method.Name == actionName);
+        var requirement = Assert.Single(action.GetCustomAttributes<RequirePermissionAttribute>(inherit: false));
+
+        Assert.Equal(permission, requirement.Permission);
+        Assert.Null(requirement.ResourcePathTemplate);
+        Assert.False(requirement.RequireLiveCheck);
+        Assert.Empty(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false));
+    }
 
     // ── GET /queue ────────────────────────────────────────────────────────────
 
@@ -263,7 +354,8 @@ public class JobsControllerTests
         var controller = new JobsController(
             MakeClient(downstreamJob),
             MakeOrderClient(Array.Empty<OrderPreviewImageDto>()),
-            MakeUploadClient(new object()));
+            MakeUploadClient(new object()),
+            Mock.Of<IAuthorizationService>());
 
         var result = await controller.GetById(JobId, CancellationToken.None);
 
