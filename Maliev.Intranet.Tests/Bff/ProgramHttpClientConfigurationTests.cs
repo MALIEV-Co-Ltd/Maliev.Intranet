@@ -26,6 +26,19 @@ public class ProgramHttpClientConfigurationTests
     }
 
     [Fact]
+    public void PlanningHoldServiceClient_UsesIntranetServiceIdentity()
+    {
+        var programSource = File.ReadAllText(FindProgramSource());
+
+        Assert.Contains("AddHttpClient<PlanningHoldServiceClient>", programSource, StringComparison.Ordinal);
+        Assert.Contains(
+            "new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, \"IntranetBff\")",
+            programSource,
+            StringComparison.Ordinal);
+        Assert.Contains("Retry.DisableForUnsafeHttpMethods()", programSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Program_DoesNotSynchronouslyConnectRedisDuringStartup()
     {
         var programSource = File.ReadAllText(FindProgramSource());

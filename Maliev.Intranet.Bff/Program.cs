@@ -314,6 +314,29 @@ try
     builder.AddBffServiceClient<IFacilityServiceClient, FacilityServiceClient>("FacilityService");
     builder.AddBffServiceClient<ProjectServiceClient>("ProjectService");
     builder.AddBffServiceClient<JobServiceClient>("JobService");
+    builder.Services.AddHttpClient<PlanningHoldServiceClient>((sp, client) =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var explicitUrl = config["Services:JobService:BaseUrl"];
+        client.BaseAddress = new Uri(!string.IsNullOrEmpty(explicitUrl)
+            ? explicitUrl
+            : "https+http://JobService");
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    })
+    .AddServiceDiscovery()
+    .AddHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var tokenProvider = new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountTokenProvider(config, "IntranetBff");
+        return new Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler(
+            tokenProvider,
+            loggerFactory.CreateLogger<Maliev.Aspire.ServiceDefaults.IAM.ServiceAccountAuthenticationHandler>());
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.DisableForUnsafeHttpMethods();
+    });
     builder.AddBffServiceClient<CurrencyServiceClient>("CurrencyService");
     builder.AddBffServiceClient<SearchServiceClient>("SearchService");
 

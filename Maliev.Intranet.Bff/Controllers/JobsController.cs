@@ -21,6 +21,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="orderClient">The typed OrderService client, used to enrich job details with 6-sided previews.</param>
 /// <param name="uploadClient">The typed UploadService client, used to resolve GCS storage paths to signed URLs.</param>
 /// <param name="authorizationService">Authorizes dynamically resolved job-ticket resources.</param>
+/// <param name="planningHoldServiceClient">Performs hold operations with the BFF service identity after employee authorization.</param>
 [Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
@@ -29,7 +30,8 @@ public class JobsController(
     JobServiceClient client,
     OrderServiceClient orderClient,
     UploadServiceClient uploadClient,
-    IAuthorizationService authorizationService) : ControllerBase
+    IAuthorizationService authorizationService,
+    PlanningHoldServiceClient? planningHoldServiceClient = null) : ControllerBase
 {
     private const string JobResourcePath = "jobs/{id}";
 
@@ -376,7 +378,8 @@ public class JobsController(
     /// <param name="hub">The ProductionHub context for broadcasting.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>204 No Content on success.</returns>
-    [RequirePermission(MalievPermissions.Job.Write, AuthenticationSchemes = "Bearer,Cookies")]
+    [BffEnforcedPermission(MalievPermissions.Job.Write, "projects/{resolvedProjectId}", requireLiveCheck: true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "JobService+IAMService", "holdId")]
     [HttpPatch("planning-holds/{holdId:guid}")]
     public async Task<IActionResult> UpdatePlanningHold(
         Guid holdId,
@@ -384,7 +387,35 @@ public class JobsController(
         [FromServices] Microsoft.AspNetCore.SignalR.IHubContext<Maliev.Intranet.Bff.Hubs.ProductionHub> hub,
         CancellationToken ct)
     {
-        var response = await client.UpdatePlanningHoldAsync(holdId, request, ct);
+        using var lookupResponse = planningHoldServiceClient is null
+            ? await client.GetPlanningHoldAsync(holdId, ct)
+            : await planningHoldServiceClient.GetAsync(holdId, ct);
+        if (!lookupResponse.IsSuccessStatusCode)
+        {
+            return await ForwardDownstreamFailureAsync(lookupResponse, ct);
+        }
+
+        var hold = await lookupResponse.Content.ReadFromJsonAsync<ProductionPlanningHoldDto>(cancellationToken: ct);
+        if (hold is null)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        var authorization = await authorizationService.AuthorizeAsync(
+            User,
+            resource: null,
+            new PermissionRequirement(
+                MalievPermissions.Job.Write,
+                $"projects/{hold.ProjectId:D}",
+                requireLiveCheck: true));
+        if (!authorization.Succeeded)
+        {
+            return Forbid();
+        }
+
+        var response = planningHoldServiceClient is null
+            ? await client.UpdatePlanningHoldAsync(holdId, request, ct)
+            : await planningHoldServiceClient.UpdateAsync(holdId, request, ct);
         if (!response.IsSuccessStatusCode) return await ForwardDownstreamFailureAsync(response, ct);
 
         await hub.Clients.All.SendAsync("ScheduleChanged", new { MachineId = request.MachineId });

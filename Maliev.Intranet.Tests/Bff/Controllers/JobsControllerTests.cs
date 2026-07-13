@@ -181,7 +181,6 @@ public class JobsControllerTests
     [InlineData(nameof(JobsController.Get), MalievPermissions.Job.Read)]
     [InlineData(nameof(JobsController.GetMachineSchedule), MalievPermissions.Job.Read)]
     [InlineData(nameof(JobsController.GetAllMachineSchedules), MalievPermissions.Job.Read)]
-    [InlineData(nameof(JobsController.UpdatePlanningHold), MalievPermissions.Job.Write)]
     public void Job_routes_without_a_job_id_are_explicitly_global(
         string actionName,
         string permission)
@@ -195,6 +194,100 @@ public class JobsControllerTests
         Assert.Null(requirement.ResourcePathTemplate);
         Assert.False(requirement.RequireLiveCheck);
         Assert.Empty(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false));
+    }
+
+    [Fact]
+    public void Planning_hold_update_declares_dynamic_project_authorization()
+    {
+        var action = typeof(JobsController).GetMethod(nameof(JobsController.UpdatePlanningHold));
+        Assert.NotNull(action);
+        var marker = Assert.Single(action.GetCustomAttributes<BffEnforcedPermissionAttribute>(inherit: false));
+        var ownership = Assert.IsType<ResourceOwnershipAttribute>(
+            Assert.Single(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false)));
+
+        Assert.Equal(MalievPermissions.Job.Write, marker.Permission);
+        Assert.Equal("projects/{resolvedProjectId}", marker.ResourcePathTemplate);
+        Assert.True(marker.RequireLiveCheck);
+        Assert.Equal(ResourceOwnershipKind.BffValidated, ownership.Kind);
+        Assert.Equal("JobService+IAMService", ownership.Authority);
+        Assert.Equal("holdId", ownership.ResourceParameter);
+        Assert.Empty(action.GetCustomAttributes<RequirePermissionAttribute>(inherit: false));
+    }
+
+    [Fact]
+    public async Task UpdatePlanningHold_AfterAuthorization_UsesServiceIdentityClientForLookupAndMutation()
+    {
+        var holdId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var userClientCalled = false;
+        var userClient = new JobServiceClient(new HttpClient(new MockHttpMessageHandler((_, _) =>
+        {
+            userClientCalled = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }))
+        { BaseAddress = new Uri("http://user-job-service") });
+        var serviceRequests = new List<string>();
+        var serviceClient = new PlanningHoldServiceClient(new HttpClient(new MockHttpMessageHandler((request, _) =>
+        {
+            serviceRequests.Add($"{request.Method} {request.RequestUri!.PathAndQuery}");
+            return Task.FromResult(request.Method == HttpMethod.Get
+                ? new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new ProductionPlanningHoldDto
+                    {
+                        Id = holdId,
+                        ProjectId = projectId,
+                        ProjectPartId = Guid.NewGuid(),
+                        Status = "Active"
+                    })
+                }
+                : new HttpResponseMessage(HttpStatusCode.NoContent));
+        }))
+        { BaseAddress = new Uri("http://service-job-service") });
+        var authorization = new Mock<IAuthorizationService>();
+        authorization
+            .Setup(service => service.AuthorizeAsync(
+                It.IsAny<ClaimsPrincipal>(),
+                It.IsAny<object?>(),
+                It.IsAny<IEnumerable<IAuthorizationRequirement>>()))
+            .ReturnsAsync(AuthorizationResult.Success());
+        var controller = new JobsController(
+            userClient,
+            MakeOrderClient(new object()),
+            MakeUploadClient(new object()),
+            authorization.Object,
+            serviceClient)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "Test"))
+                }
+            }
+        };
+        var (hub, _) = MockHub();
+
+        var result = await controller.UpdatePlanningHold(
+            holdId,
+            new UpdateProductionPlanningHoldRequest
+            {
+                MachineId = "MAL-FDM-002",
+                ScheduledStartTime = DateTime.UtcNow.AddHours(1),
+                ScheduledEndTime = DateTime.UtcNow.AddHours(2),
+                ProductionTimeMinutes = 60
+            },
+            hub,
+            CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.False(userClientCalled);
+        Assert.Equal(
+            [
+                $"GET /job/v1/jobs/planning-holds/{holdId:D}",
+                $"PATCH /job/v1/jobs/planning-holds/{holdId:D}"
+            ],
+            serviceRequests);
     }
 
     // ── GET /queue ────────────────────────────────────────────────────────────
