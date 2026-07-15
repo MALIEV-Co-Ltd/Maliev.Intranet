@@ -8,7 +8,6 @@ using Maliev.Intranet.Bff.Controllers;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -455,7 +454,7 @@ public class QuickControllerTests
     {
         var authMock = new Mock<IAuthorizationService>();
         authMock.Setup(x => x.AuthorizeAsync(It.IsAny<ClaimsPrincipal>(), It.IsAny<object>(), It.IsAny<string>())).ReturnsAsync(AuthorizationResult.Success());
-        var controller = new IamController(new IAMServiceClient(CreateClient(new List<PermissionDto>())), authMock.Object, new Mock<IWebHostEnvironment>().Object);
+        var controller = new IamController(new IAMServiceClient(CreateClient(new List<PermissionDto>())), authMock.Object);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Test")) } };
         var result = await controller.GetPermissions();
         Assert.IsType<OkObjectResult>(result.Result);
@@ -473,7 +472,7 @@ public class QuickControllerTests
                 new RoleDto { RoleId = "roles.customer.viewer", ServiceName = "customer", Name = "Customer Viewer", Description = "Read-only access", PermissionIds = ["customer.customers.read"] },
                 new RoleDto { RoleId = "roles.iam.admin", ServiceName = "iam", Name = "IAM Admin", Description = "Manage IAM", PermissionIds = ["iam.roles.create"] }
             ]);
-        var controller = new IamController(iamClient.Object, authMock.Object, new Mock<IWebHostEnvironment>().Object)
+        var controller = new IamController(iamClient.Object, authMock.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Test")) } }
         };
@@ -499,7 +498,7 @@ public class QuickControllerTests
                 new PermissionDto { PermissionId = "customer.customers.read", Name = "Read customers", Category = "Customer", Description = "Read customer records" },
                 new PermissionDto { PermissionId = "iam.roles.create", Name = "Create roles", Category = "IAM", Description = "Create IAM roles" }
             ]);
-        var controller = new IamController(iamClient.Object, authMock.Object, new Mock<IWebHostEnvironment>().Object)
+        var controller = new IamController(iamClient.Object, authMock.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Test")) } }
         };
