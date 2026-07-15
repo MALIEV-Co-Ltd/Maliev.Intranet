@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Aspire.ServiceDefaults.IAM;
 using Maliev.Intranet.Bff.Clients;
@@ -244,6 +245,32 @@ public sealed class IamControllerAuthorizationTests(IamConsoleAuthorizationFacto
         Assert.Empty(factory.IamClient.StandardChecks);
     }
 
+    [Fact]
+    public async Task Invite_uses_the_canonical_global_binding_request_and_requires_binding_success()
+    {
+        factory.Reset([
+            MalievPermissions.IAM.Principals.Create,
+            MalievPermissions.IAM.Bindings.Create
+        ]);
+        using var client = CreateClient(
+            "iam-inviter",
+            MalievPermissions.IAM.Principals.Create,
+            MalievPermissions.IAM.Bindings.Create);
+
+        var response = await SendAsync(client, "POST", "/api/v1/iam/users/invite");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var bindingRequest = Assert.Single(
+            factory.DownstreamRequests,
+            request => request.Method == "POST" && request.Path.EndsWith("/roles", StringComparison.Ordinal));
+        using var json = JsonDocument.Parse(Assert.IsType<string>(bindingRequest.Body));
+        Assert.Equal(3, json.RootElement.EnumerateObject().Count());
+        Assert.Equal("roles.iam.viewer", json.RootElement.GetProperty("roleId").GetString());
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("resourcePath").ValueKind);
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("expiresAt").ValueKind);
+        Assert.False(json.RootElement.TryGetProperty("roleName", out _));
+    }
+
     private HttpClient CreateClient(string principalId, params string[] permissions)
     {
         var client = factory.CreateClient();
@@ -305,29 +332,48 @@ public sealed class IamConsoleAuthorizationFactory : SignalRTestFactory
         });
     }
 
-    private Task<HttpResponseMessage> HandleDownstreamAsync(
+    private async Task<HttpResponseMessage> HandleDownstreamAsync(
         HttpRequestMessage request,
-        CancellationToken _)
+        CancellationToken cancellationToken)
     {
         var path = request.RequestUri?.AbsolutePath ?? string.Empty;
-        _downstreamRequests.Enqueue(new IamConsoleDownstreamRequest(request.Method.Method, path));
+        var body = request.Content is null
+            ? null
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        _downstreamRequests.Enqueue(new IamConsoleDownstreamRequest(request.Method.Method, path, body));
 
         if (request.Method == HttpMethod.Get &&
             path.StartsWith("/iam/v1/principals/", StringComparison.Ordinal) &&
             !path.EndsWith("/roles", StringComparison.Ordinal))
         {
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
         }
 
         if (request.Method == HttpMethod.Post && path == "/iam/v1/principals")
         {
-            return Task.FromResult(JsonResponse(
+            return JsonResponse(
                 HttpStatusCode.Created,
-                $$"""{"principalId":"{{Guid.Parse("a1f0d442-d541-42e8-8fcc-8e513ecb8fc3"):D}}","createdAt":"2026-07-15T00:00:00Z"}"""));
+                $$"""{"principalId":"{{Guid.Parse("a1f0d442-d541-42e8-8fcc-8e513ecb8fc3"):D}}","createdAt":"2026-07-15T00:00:00Z"}""");
+        }
+
+        if (request.Method == HttpMethod.Post && path.EndsWith("/roles", StringComparison.Ordinal))
+        {
+            return JsonResponse(
+                HttpStatusCode.OK,
+                $$"""
+                {
+                  "bindingId": "4d6905e4-adf0-4c0b-966f-ea51df8cbd41",
+                  "principalId": "a1f0d442-d541-42e8-8fcc-8e513ecb8fc3",
+                  "roleId": "roles.iam.viewer",
+                  "resourcePath": null,
+                  "grantedAt": "2026-07-15T00:00:01Z",
+                  "expiresAt": null
+                }
+                """);
         }
 
         var content = request.Method == HttpMethod.Get ? "[]" : string.Empty;
-        return Task.FromResult(JsonResponse(HttpStatusCode.OK, content));
+        return JsonResponse(HttpStatusCode.OK, content);
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, string json) => new(statusCode)
@@ -336,7 +382,7 @@ public sealed class IamConsoleAuthorizationFactory : SignalRTestFactory
     };
 }
 
-public sealed record IamConsoleDownstreamRequest(string Method, string Path);
+public sealed record IamConsoleDownstreamRequest(string Method, string Path, string? Body = null);
 
 public sealed record IamConsolePermissionCheck(string Permission, string? ResourcePath);
 

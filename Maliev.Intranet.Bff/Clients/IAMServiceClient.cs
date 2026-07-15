@@ -248,31 +248,35 @@ public class IAMServiceClient(HttpClient httpClient)
     public virtual async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)
     {
         var response = await httpClient.GetFromJsonAsync<List<RoleBindingDto>>($"/iam/v1/principals/{principalId}/roles", ct);
-        return response?
-            .Select(binding =>
-            {
-                binding.RoleName = FirstNonBlank(binding.RoleName, HumanizeRoleId(binding.RoleId));
-                return binding;
-            })
-            .ToList() ?? new();
+        return response ?? [];
     }
 
     /// <summary>
     /// Grants a role to a principal.
     /// </summary>
-    public virtual async Task<bool> GrantRoleAsync(Guid principalId, GrantRoleRequestDto request, CancellationToken ct = default)
+    public virtual async Task<RoleBindingDto> GrantRoleAsync(
+        Guid principalId,
+        GrantRoleRequestDto request,
+        CancellationToken ct = default)
     {
-        var response = await httpClient.PostAsJsonAsync($"/iam/v1/principals/{principalId}/roles", request, ct);
-        return response.IsSuccessStatusCode;
+        using var response = await httpClient.PostAsJsonAsync(
+            $"/iam/v1/principals/{principalId}/roles",
+            request,
+            ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
+            ?? throw new JsonException("IAM returned a null role-binding payload.");
     }
 
     /// <summary>
     /// Revokes a role from a principal.
     /// </summary>
-    public virtual async Task<bool> RevokeRoleAsync(Guid principalId, Guid bindingId, CancellationToken ct = default)
+    public virtual async Task RevokeRoleAsync(Guid principalId, Guid bindingId, CancellationToken ct = default)
     {
-        var response = await httpClient.DeleteAsync($"/iam/v1/principals/{principalId}/roles/{bindingId}", ct);
-        return response.IsSuccessStatusCode;
+        using var response = await httpClient.DeleteAsync(
+            $"/iam/v1/principals/{principalId}/roles/{bindingId}",
+            ct);
+        response.EnsureSuccessStatusCode();
     }
 
     internal virtual async Task<IamResolvePermissionsResult?> ResolvePermissionsAsync(

@@ -39,7 +39,7 @@
                             {
                                 <div class="mlv-list-row">
                                     <div>
-                                        <div class="mlv-row-main">@RoleDisplayName(role.RoleName, role.RoleId)</div>
+                                        <div class="mlv-row-main">@RoleDisplayName(role.RoleId)</div>
                                         <div class="mlv-row-sub">@role.ResourcePath</div>
                                     </div>
                                     <StatusBadge Status="@role.RoleId" />
@@ -84,13 +84,8 @@
         }
     }
 
-    private static string RoleDisplayName(string? roleName, string roleId)
+    private static string RoleDisplayName(string roleId)
     {
-        if (!string.IsNullOrWhiteSpace(roleName))
-        {
-            return roleName;
-        }
-
         var normalized = roleId.StartsWith("roles.", StringComparison.OrdinalIgnoreCase)
             ? roleId["roles.".Length..]
             : roleId;
