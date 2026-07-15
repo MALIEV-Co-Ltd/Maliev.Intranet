@@ -152,7 +152,11 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
     /// <summary>
     /// Retrieves HR analytics data.
     /// </summary>
-    [RequirePermission(MalievPermissions.Employee.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(
+        MalievPermissions.Employee.ReportsView,
+        AuthenticationSchemes = "Bearer,Cookies",
+        RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet("analytics")]
     public async Task<ActionResult<HrAnalyticsDto>> GetAnalytics(CancellationToken ct)
     {

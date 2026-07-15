@@ -345,6 +345,8 @@ public static class MalievPermissions
         public const string ProfileRead = "employee.profiles.read";
         /// <summary>Permission to update employee self-service profile fields.</summary>
         public const string ProfileUpdate = "employee.profiles.update";
+        /// <summary>Permission to view aggregate employee reports and analytics.</summary>
+        public const string ReportsView = "employee.reports.view";
     }
 
     /// <summary>
