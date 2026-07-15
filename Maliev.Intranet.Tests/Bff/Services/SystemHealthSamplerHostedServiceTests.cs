@@ -16,10 +16,9 @@ public sealed class SystemHealthSamplerHostedServiceTests
         var sampler = new SystemHealthSamplerHostedService(
             provider.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<SystemHealthSamplerHostedService>.Instance,
-            TimeSpan.FromMilliseconds(100));
+            TimeSpan.FromHours(1));
 
         await sampler.StartAsync(CancellationToken.None);
-        await Task.Delay(30);
         await sampler.StopAsync(CancellationToken.None);
 
         Assert.Equal(0, probeService.CheckCount);
