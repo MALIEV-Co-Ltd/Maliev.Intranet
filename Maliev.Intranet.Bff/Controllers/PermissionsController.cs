@@ -41,18 +41,4 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
         return Ok(roles);
     }
 
-    /// <summary>
-    /// Retrieves the assignments for a specific user.
-    /// </summary>
-    /// <param name="userId">The user ID.</param>
-    /// <returns>The user's assignments.</returns>
-    [HttpGet("users/{userId}")]
-    [RequirePermission(MalievPermissions.IAM.Bindings.List,
-        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
-    public async Task<ActionResult<UserContextDto>> GetUserAssignments(string userId)
-    {
-        var assignments = await client.GetUserAssignmentsAsync(userId);
-        return assignments != null ? Ok(assignments) : NotFound();
-    }
-
 }
