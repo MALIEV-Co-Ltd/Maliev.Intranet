@@ -87,8 +87,10 @@ public class GrantRoleRequestDto
 {
     /// <summary>The unique identifier of the role to be granted.</summary>
     public string RoleId { get; set; } = string.Empty;
-    /// <summary>The name of the role for display and validation purposes.</summary>
-    public string RoleName { get; set; } = string.Empty;
+    /// <summary>The hierarchical resource path, or <see langword="null"/> for a global binding.</summary>
+    public string? ResourcePath { get; set; }
+    /// <summary>The optional expiration date and time for the role grant.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }
 
 /// <summary>
@@ -97,15 +99,15 @@ public class GrantRoleRequestDto
 public class RoleBindingDto
 {
     /// <summary>The unique identifier for the role binding record.</summary>
-    public string BindingId { get; set; } = string.Empty;
+    public Guid BindingId { get; set; }
     /// <summary>The identifier of the role being bound.</summary>
     public string RoleId { get; set; } = string.Empty;
     /// <summary>The resource path or scope the role applies to (e.g., "customers/123").</summary>
-    public string ResourcePath { get; set; } = string.Empty;
+    public string? ResourcePath { get; set; }
     /// <summary>The identifier of the principal receiving the role.</summary>
     public Guid PrincipalId { get; set; }
-    /// <summary>The name of the role being bound.</summary>
-    public string RoleName { get; set; } = string.Empty;
     /// <summary>The date and time when the role was granted.</summary>
     public DateTime GrantedAt { get; set; }
+    /// <summary>The optional expiration date and time of the role binding.</summary>
+    public DateTime? ExpiresAt { get; set; }
 }

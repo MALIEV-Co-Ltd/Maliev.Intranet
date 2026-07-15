@@ -85,24 +85,116 @@ public class IAMServiceClientTests
     }
 
     [Fact]
-    public async Task GrantRoleAsync_UsesCanonicalBindingRouteAndRequiredRoleId()
+    public async Task GrantRoleAsync_UsesExactCanonicalContractAndMapsBindingResponse()
     {
         var principalId = Guid.Parse("e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4");
-        var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK);
+        var bindingId = Guid.Parse("fa638c28-af72-41ef-87df-d886950b3c53");
+        var grantedAt = new DateTime(2026, 7, 15, 2, 0, 0, DateTimeKind.Utc);
+        var expiresAt = new DateTime(2026, 8, 15, 2, 0, 0, DateTimeKind.Utc);
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create(new
+            {
+                bindingId,
+                principalId,
+                roleId = "roles.platform.viewer",
+                resourcePath = "projects/project-42",
+                grantedAt,
+                expiresAt
+            }));
         var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
 
         var result = await client.GrantRoleAsync(
             principalId,
-            new GrantRoleRequestDto { RoleId = "roles.platform.viewer" });
+            new GrantRoleRequestDto
+            {
+                RoleId = "roles.platform.viewer",
+                ResourcePath = "projects/project-42",
+                ExpiresAt = expiresAt
+            });
 
-        Assert.True(result);
+        Assert.Equal(bindingId, result.BindingId);
+        Assert.Equal(principalId, result.PrincipalId);
+        Assert.Equal("roles.platform.viewer", result.RoleId);
+        Assert.Equal("projects/project-42", result.ResourcePath);
+        Assert.Equal(grantedAt, result.GrantedAt);
+        Assert.Equal(expiresAt, result.ExpiresAt);
         Assert.Equal(HttpMethod.Post, handler.Method);
         Assert.Equal($"/iam/v1/principals/{principalId}/roles", handler.RequestUri?.PathAndQuery);
         using var document = JsonDocument.Parse(Assert.IsType<string>(handler.Body));
+        Assert.Equal(3, document.RootElement.EnumerateObject().Count());
         Assert.Equal("roles.platform.viewer", document.RootElement.GetProperty("roleId").GetString());
-        Assert.False(document.RootElement.TryGetProperty("userId", out _));
-        Assert.False(document.RootElement.TryGetProperty("roles", out _));
-        Assert.False(document.RootElement.TryGetProperty("permissions", out _));
+        Assert.Equal("projects/project-42", document.RootElement.GetProperty("resourcePath").GetString());
+        Assert.Equal(expiresAt, document.RootElement.GetProperty("expiresAt").GetDateTime());
+        Assert.False(document.RootElement.TryGetProperty("roleName", out _));
+    }
+
+    [Fact]
+    public async Task GetPrincipalRolesAsync_PreservesNullableAuthoritativeBindingFields()
+    {
+        var principalId = Guid.Parse("a60dfc27-d3d7-4304-a3aa-9f752e7bd861");
+        var bindingId = Guid.Parse("769df55b-9279-4242-a253-6080b8c1e3b7");
+        var grantedAt = new DateTime(2026, 7, 15, 2, 30, 0, DateTimeKind.Utc);
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create(new[]
+            {
+                new
+                {
+                    bindingId,
+                    principalId,
+                    roleId = "roles.iam.viewer",
+                    resourcePath = (string?)null,
+                    grantedAt,
+                    expiresAt = (DateTime?)null
+                }
+            }));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var binding = Assert.Single(await client.GetPrincipalRolesAsync(principalId));
+
+        Assert.Equal(bindingId, binding.BindingId);
+        Assert.Equal(principalId, binding.PrincipalId);
+        Assert.Equal("roles.iam.viewer", binding.RoleId);
+        Assert.Null(binding.ResourcePath);
+        Assert.Equal(grantedAt, binding.GrantedAt);
+        Assert.Null(binding.ExpiresAt);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Conflict)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task GrantRoleAsync_PreservesDownstreamFailureStatus(HttpStatusCode statusCode)
+    {
+        var handler = new RecordingHttpMessageHandler(statusCode);
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GrantRoleAsync(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" }));
+
+        Assert.Equal(statusCode, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GrantRoleAsync_PropagatesCancellationToIam()
+    {
+        var handler = new CancellationObservingHttpMessageHandler();
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+        using var cancellation = new CancellationTokenSource();
+
+        var pending = client.GrantRoleAsync(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" },
+            cancellation.Token);
+        await handler.RequestStarted;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.True(handler.CancellationObserved);
     }
 
     [Fact]
@@ -113,14 +205,30 @@ public class IAMServiceClientTests
         var handler = new RecordingHttpMessageHandler(HttpStatusCode.NoContent);
         var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
 
-        var result = await client.RevokeRoleAsync(principalId, bindingId);
+        await client.RevokeRoleAsync(principalId, bindingId);
 
-        Assert.True(result);
         Assert.Equal(HttpMethod.Delete, handler.Method);
         Assert.Equal(
             $"/iam/v1/principals/{principalId}/roles/{bindingId}",
             handler.RequestUri?.PathAndQuery);
         Assert.Null(handler.Body);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.Conflict)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task RevokeRoleAsync_PreservesDownstreamFailureStatus(HttpStatusCode statusCode)
+    {
+        var handler = new RecordingHttpMessageHandler(statusCode);
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.RevokeRoleAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid()));
+
+        Assert.Equal(statusCode, exception.StatusCode);
     }
 
     [Fact]

@@ -39,7 +39,7 @@ public class SharedDtoTests
         _ = new PermissionDto { PermissionId = "p1" };
         _ = new RoleDto { RoleId = "r1" };
         _ = new PrincipalSummaryDto { PrincipalId = Guid.NewGuid() };
-        _ = new RoleBindingDto { BindingId = "b1" };
+        _ = new RoleBindingDto { BindingId = Guid.NewGuid() };
 
         // Accounting
         _ = new ChartOfAccountDto { Code = "1" };

@@ -190,13 +190,16 @@ public class IamController(
     /// Retrieves role bindings for a specific principal.
     /// </summary>
     /// <param name="principalId">The principal ID.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
     /// <returns>The list of role bindings.</returns>
     [RequirePermission(MalievPermissions.IAM.Bindings.List,
         AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     [HttpGet("users/{principalId}/roles")]
-    public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(Guid principalId)
+    public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(
+        Guid principalId,
+        CancellationToken cancellationToken)
     {
-        var roles = await client.GetPrincipalRolesAsync(principalId);
+        var roles = await client.GetPrincipalRolesAsync(principalId, cancellationToken);
         return Ok(roles);
     }
 
@@ -205,14 +208,25 @@ public class IamController(
     /// </summary>
     /// <param name="principalId">The principal ID.</param>
     /// <param name="request">The grant request.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
     /// <returns>Success status.</returns>
     [RequirePermission(MalievPermissions.IAM.Bindings.Create,
         AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     [HttpPost("users/{principalId}/roles")]
-    public async Task<IActionResult> GrantRole(Guid principalId, [FromBody] GrantRoleRequestDto request)
+    public async Task<IActionResult> GrantRole(
+        Guid principalId,
+        [FromBody] GrantRoleRequestDto request,
+        CancellationToken cancellationToken)
     {
-        var success = await client.GrantRoleAsync(principalId, request);
-        return success ? Ok() : BadRequest("Failed to grant role.");
+        try
+        {
+            var binding = await client.GrantRoleAsync(principalId, request, cancellationToken);
+            return Ok(binding);
+        }
+        catch (HttpRequestException ex)
+        {
+            return MapIamBindingFailure(ex.StatusCode);
+        }
     }
 
     /// <summary>
@@ -220,26 +234,40 @@ public class IamController(
     /// </summary>
     /// <param name="principalId">The principal ID.</param>
     /// <param name="bindingId">The unique binding ID.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
     /// <returns>Success status.</returns>
     [RequirePermission(MalievPermissions.IAM.Bindings.Delete,
         AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     [HttpDelete("users/{principalId}/roles/{bindingId}")]
-    public async Task<IActionResult> RevokeRole(Guid principalId, Guid bindingId)
+    public async Task<IActionResult> RevokeRole(
+        Guid principalId,
+        Guid bindingId,
+        CancellationToken cancellationToken)
     {
-        var success = await client.RevokeRoleAsync(principalId, bindingId);
-        return success ? Ok() : BadRequest("Failed to revoke role.");
+        try
+        {
+            await client.RevokeRoleAsync(principalId, bindingId, cancellationToken);
+            return Ok();
+        }
+        catch (HttpRequestException ex)
+        {
+            return MapIamBindingFailure(ex.StatusCode);
+        }
     }
 
     /// <summary>
     /// Queues an employee invitation request for future downstream IAM wiring.
     /// </summary>
     /// <param name="request">The invite request.</param>
+    /// <param name="cancellationToken">The request cancellation token.</param>
     /// <returns>An accepted response containing the queued invite data.</returns>
     [RequirePermission(MalievPermissions.IAM.Principals.Create,
         AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     [BffEnforcedPermission(MalievPermissions.IAM.Bindings.Create, "global", requireLiveCheck: true)]
     [HttpPost("users/invite")]
-    public async Task<IActionResult> InviteUser([FromBody] InviteUserRequest request)
+    public async Task<IActionResult> InviteUser(
+        [FromBody] InviteUserRequest request,
+        CancellationToken cancellationToken)
     {
         var bindingAuthorization = await authorizationService.AuthorizeAsync(
             User,
@@ -253,7 +281,10 @@ public class IamController(
             return Forbid();
         }
 
-        var principal = await client.CreatePrincipalAsync(request.Email, request.DisplayName);
+        var principal = await client.CreatePrincipalAsync(
+            request.Email,
+            request.DisplayName,
+            cancellationToken);
         if (principal is null)
         {
             return BadRequest("Failed to create IAM principal.");
@@ -261,15 +292,33 @@ public class IamController(
 
         if (!string.IsNullOrWhiteSpace(request.RoleId))
         {
-            var granted = await client.GrantRoleAsync(principal.PrincipalId, new GrantRoleRequestDto { RoleId = request.RoleId });
-            if (!granted)
+            try
             {
-                return BadRequest("Principal was created but the role could not be granted.");
+                await client.GrantRoleAsync(
+                    principal.PrincipalId,
+                    new GrantRoleRequestDto { RoleId = request.RoleId },
+                    cancellationToken);
+            }
+            catch (HttpRequestException ex)
+            {
+                return MapIamBindingFailure(ex.StatusCode);
             }
         }
 
         return CreatedAtAction(nameof(GetUserRoles), new { principalId = principal.PrincipalId }, principal);
     }
+
+    private IActionResult MapIamBindingFailure(System.Net.HttpStatusCode? downstreamStatus) => downstreamStatus switch
+    {
+        System.Net.HttpStatusCode.Unauthorized => Unauthorized(),
+        System.Net.HttpStatusCode.Forbidden => Forbid(),
+        System.Net.HttpStatusCode.NotFound => NotFound("IAM role binding was not found."),
+        System.Net.HttpStatusCode.BadRequest => BadRequest("IAM rejected the role-binding request."),
+        System.Net.HttpStatusCode.Conflict => Conflict("IAM rejected the role-binding request due to a conflict."),
+        _ => StatusCode(
+            StatusCodes.Status503ServiceUnavailable,
+            "IAM role-binding service is temporarily unavailable.")
+    };
 
     /// <summary>
     /// Updates basic user profile state for future downstream IAM wiring.

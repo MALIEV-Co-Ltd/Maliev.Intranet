@@ -1394,7 +1394,8 @@ public class ModuleRegressionSourceTests
         Assert.Contains("RoleDisplayName(role)", list, StringComparison.Ordinal);
         Assert.Contains("RoleSubtitle(role)", list, StringComparison.Ordinal);
         Assert.Contains("HumanizeRoleId(role.RoleId)", client, StringComparison.Ordinal);
-        Assert.Contains("RoleDisplayName(role.RoleName, role.RoleId)", detail, StringComparison.Ordinal);
+        Assert.Contains("RoleDisplayName(role.RoleId)", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("role.RoleName", detail, StringComparison.Ordinal);
     }
 
     [Fact]

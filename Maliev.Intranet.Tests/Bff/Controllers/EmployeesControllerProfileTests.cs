@@ -33,17 +33,15 @@ public sealed class EmployeesControllerProfileTests
             .ReturnsAsync([
                 new RoleBindingDto
                 {
-                    BindingId = Guid.NewGuid().ToString(),
+                    BindingId = Guid.NewGuid(),
                     PrincipalId = principalId,
-                    RoleId = "roles.platform.owner",
-                    RoleName = ""
+                    RoleId = "roles.platform.owner"
                 },
                 new RoleBindingDto
                 {
-                    BindingId = Guid.NewGuid().ToString(),
+                    BindingId = Guid.NewGuid(),
                     PrincipalId = principalId,
-                    RoleId = "roles.customer.admin",
-                    RoleName = "Customer Admin"
+                    RoleId = "roles.customer.admin"
                 }
             ]);
 
