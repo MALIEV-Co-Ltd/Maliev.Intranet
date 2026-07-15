@@ -227,27 +227,6 @@ public class IAMServiceClient(HttpClient httpClient)
     }
 
     /// <summary>
-    /// Assigns roles and permissions to a user.
-    /// </summary>
-    /// <param name="request">The assignment request.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>A task representing the operation.</returns>
-    public virtual async Task<bool> AssignToUserAsync(UserAssignmentRequest request, CancellationToken ct = default)
-    {
-        if (!Guid.TryParse(request.UserId, out var principalId))
-        {
-            return false;
-        }
-
-        // This is a legacy method, we should prefer GrantRoleAsync
-        foreach (var role in request.Roles)
-        {
-            await GrantRoleAsync(principalId, new GrantRoleRequestDto { RoleId = role }, ct);
-        }
-        return true;
-    }
-
-    /// <summary>
     /// Retrieves the current roles and permissions for a specific user.
     /// </summary>
     /// <param name="userId">The user ID.</param>
