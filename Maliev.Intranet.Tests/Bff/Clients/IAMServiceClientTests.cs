@@ -123,7 +123,125 @@ public class IAMServiceClientTests
         Assert.Null(handler.Body);
     }
 
-    private sealed class RecordingHttpMessageHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    [Fact]
+    public async Task ResolvePermissionsAsync_PreservesTheCompleteIamResponse()
+    {
+        var principalId = Guid.Parse("b4a8830f-bb19-48f1-9fd4-9ed52ff7175d");
+        var cacheUntil = new DateTime(2026, 7, 15, 9, 30, 0, DateTimeKind.Utc);
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create(new
+            {
+                principalId,
+                permissions = new[] { "system.diagnostics.read", "iam.permissions.list" },
+                roles = new[] { "roles.system.diagnostics" },
+                resourcePath = "projects/project-42",
+                cacheUntil,
+                fromCache = true
+            }));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var result = await client.ResolvePermissionsAsync(principalId.ToString());
+
+        Assert.NotNull(result);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("/iam/v1/auth/resolve-permissions", handler.RequestUri?.PathAndQuery);
+        using var request = JsonDocument.Parse(Assert.IsType<string>(handler.Body));
+        var property = Assert.Single(request.RootElement.EnumerateObject());
+        Assert.Equal("principalId", property.Name);
+        Assert.Equal(principalId.ToString(), property.Value.GetString());
+        Assert.Equal(principalId, result.PrincipalId);
+        Assert.Equal(["system.diagnostics.read", "iam.permissions.list"], result.Permissions);
+        Assert.Equal(["roles.system.diagnostics"], result.Roles);
+        Assert.Equal("projects/project-42", result.ResourcePath);
+        Assert.Equal(cacheUntil, result.CacheUntil);
+        Assert.True(result.FromCache);
+    }
+
+    [Fact]
+    public async Task ResolvePermissionsAsync_DoesNotTreatAnEmptyPrincipalIdAsANullResponse()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create(new
+            {
+                principalId = Guid.Empty,
+                permissions = Array.Empty<string>(),
+                roles = Array.Empty<string>(),
+                resourcePath = (string?)null,
+                cacheUntil = (DateTime?)null,
+                fromCache = false
+            }));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var result = await client.ResolvePermissionsAsync(Guid.Empty.ToString());
+
+        Assert.NotNull(result);
+        Assert.Equal(Guid.Empty, result.PrincipalId);
+        Assert.Empty(result.Permissions);
+        Assert.Empty(result.Roles);
+        Assert.Null(result.ResourcePath);
+        Assert.Null(result.CacheUntil);
+        Assert.False(result.FromCache);
+    }
+
+    [Fact]
+    public async Task ResolvePermissionsAsync_RejectsANullSuccessBody()
+    {
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create<object?>(null));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        await Assert.ThrowsAsync<JsonException>(() => client.ResolvePermissionsAsync("principal"));
+    }
+
+    [Theory]
+    [InlineData("permissions")]
+    [InlineData("roles")]
+    public async Task ResolvePermissionsAsync_RejectsNullRequiredCollections(string nullProperty)
+    {
+        var permissions = nullProperty == "permissions" ? "null" : "[]";
+        var roles = nullProperty == "roles" ? "null" : "[]";
+        var json = $$"""
+            {
+              "principalId": "b4a8830f-bb19-48f1-9fd4-9ed52ff7175d",
+              "permissions": {{permissions}},
+              "roles": {{roles}},
+              "resourcePath": null,
+              "cacheUntil": null,
+              "fromCache": false
+            }
+            """;
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            new StringContent(json, System.Text.Encoding.UTF8, "application/json"));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<JsonException>(
+            () => client.ResolvePermissionsAsync("principal"));
+
+        Assert.Contains(nullProperty, exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ResolvePermissionsAsync_PropagatesCancellationToIam()
+    {
+        var handler = new CancellationObservingHttpMessageHandler();
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+        using var cancellation = new CancellationTokenSource();
+
+        var pending = client.ResolvePermissionsAsync("principal", cancellation.Token);
+        await handler.RequestStarted;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.True(handler.CancellationObserved);
+    }
+
+    private sealed class RecordingHttpMessageHandler(
+        HttpStatusCode statusCode,
+        HttpContent? responseContent = null) : HttpMessageHandler
     {
         public HttpMethod? Method { get; private set; }
 
@@ -141,7 +259,33 @@ public class IAMServiceClientTests
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
-            return new HttpResponseMessage(statusCode);
+            return new HttpResponseMessage(statusCode) { Content = responseContent };
+        }
+    }
+
+    private sealed class CancellationObservingHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _requestStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task RequestStarted => _requestStarted.Task;
+
+        public bool CancellationObserved { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            _requestStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The request should have been cancelled.");
+            }
+            catch (OperationCanceledException)
+            {
+                CancellationObserved = true;
+                throw;
+            }
         }
     }
 }

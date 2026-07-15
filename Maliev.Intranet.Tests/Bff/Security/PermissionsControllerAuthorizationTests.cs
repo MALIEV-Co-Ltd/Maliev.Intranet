@@ -27,8 +27,7 @@ public sealed class PermissionsControllerAuthorizationTests(
     public static TheoryData<string, string, string> ActionRequirements => new()
     {
         { nameof(PermissionsController.GetAvailablePermissions), MalievPermissions.IAM.Permissions.List, "GET" },
-        { nameof(PermissionsController.GetAvailableRoles), MalievPermissions.IAM.Roles.List, "GET" },
-        { nameof(PermissionsController.GetUserAssignments), MalievPermissions.IAM.Bindings.List, "GET" }
+        { nameof(PermissionsController.GetAvailableRoles), MalievPermissions.IAM.Roles.List, "GET" }
     };
 
     public static TheoryData<string, string, string, string, HttpStatusCode> RuntimeRequirements => new()
@@ -46,13 +45,6 @@ public sealed class PermissionsControllerAuthorizationTests(
             MalievPermissions.IAM.Roles.List,
             MalievPermissions.IAM.Permissions.List,
             HttpStatusCode.OK
-        },
-        {
-            "GET",
-            $"/api/v1/permissions/users/{Guid.Parse("8b10a597-67ef-4c64-8516-c8284d5588bc"):D}",
-            MalievPermissions.IAM.Bindings.List,
-            MalievPermissions.IAM.Bindings.Create,
-            HttpStatusCode.NotFound
         }
     };
 
@@ -125,6 +117,24 @@ public sealed class PermissionsControllerAuthorizationTests(
             entry => entry.Member == "UpdateAssignments");
     }
 
+    [Fact]
+    public void Manifest_does_not_expose_the_retired_user_assignment_read()
+    {
+        var endpointDataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+        var manifest = EndpointAuthorizationManifestBuilder.Build(
+            endpointDataSource,
+            EndpointAuthorizationManifestBuilder.IntranetHubs);
+
+        Assert.DoesNotContain(
+            manifest.Entries,
+            entry => entry.Kind == "controller"
+                && entry.Methods.Contains("GET")
+                && entry.Surface.EndsWith("/permissions/users/{userId}", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            manifest.Entries,
+            entry => entry.Member == "GetUserAssignments");
+    }
+
     [Theory]
     [MemberData(nameof(RuntimeRequirements))]
     public async Task Route_requires_its_own_live_capability_and_rejects_stale_claims(
@@ -183,6 +193,25 @@ public sealed class PermissionsControllerAuthorizationTests(
                 roles = new[] { "roles.platform.viewer" },
                 permissions = new[] { "iam.permissions.list" }
             });
+
+        Assert.Contains(
+            response.StatusCode,
+            new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
+        Assert.Empty(factory.IamClient.LiveChecks);
+        Assert.Empty(factory.IamClient.StandardChecks);
+    }
+
+    [Fact]
+    public async Task Retired_user_assignment_route_is_not_routable_and_does_not_call_iam()
+    {
+        factory.IamClient.Reset(MalievPermissions.IAM.Bindings.List);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            factory.CreateTestToken("binding-reader"));
+
+        var response = await client.GetAsync(
+            "/api/v1/permissions/users/8b10a597-67ef-4c64-8516-c8284d5588bc");
 
         Assert.Contains(
             response.StatusCode,

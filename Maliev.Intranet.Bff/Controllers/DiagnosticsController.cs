@@ -22,7 +22,7 @@ public class DiagnosticsController(IAMServiceClient iamClient) : ControllerBase
     /// Returns information about the currently authenticated user and their IAM state.
     /// </summary>
     [HttpGet("me")]
-    public async Task<IActionResult> GetMe()
+    public async Task<IActionResult> GetMe(CancellationToken cancellationToken = default)
     {
         var user = HttpContext.User;
         var claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList();
@@ -32,7 +32,7 @@ public class DiagnosticsController(IAMServiceClient iamClient) : ControllerBase
             ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         var iamData = principalId != null
-            ? await GetIamData(principalId)
+            ? await GetIamData(principalId, cancellationToken)
             : null;
 
         return Ok(new
@@ -45,12 +45,15 @@ public class DiagnosticsController(IAMServiceClient iamClient) : ControllerBase
         });
     }
 
-    private async Task<object?> GetIamData(string principalId)
+    private async Task<object?> GetIamData(string principalId, CancellationToken cancellationToken)
     {
         try
         {
-            // Just try to resolve permissions via the client
-            return await iamClient.GetUserAssignmentsAsync(principalId);
+            return await iamClient.ResolvePermissionsAsync(principalId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

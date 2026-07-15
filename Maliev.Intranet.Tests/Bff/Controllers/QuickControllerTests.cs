@@ -399,16 +399,17 @@ public class QuickControllerTests
     public async Task Diagnostics_GetMe_ReturnsEffectiveIdentityAndIamResolution()
     {
         var principalId = Guid.Parse("11111111-2222-3333-4444-555555555555");
-        var iamContext = new UserContextDto
+        var cacheUntil = new DateTime(2026, 7, 15, 10, 0, 0, DateTimeKind.Utc);
+        var iamClient = new IAMServiceClient(CreateClient(new
         {
-            UserId = principalId.ToString(),
-            Permissions = [MalievPermissions.System.DiagnosticsRead],
-            Roles = ["roles.system.diagnostics"]
-        };
-        var iamClient = new Mock<IAMServiceClient>(new HttpClient { BaseAddress = new Uri("http://iam") });
-        iamClient.Setup(client => client.GetUserAssignmentsAsync(principalId.ToString(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(iamContext);
-        var controller = new DiagnosticsController(iamClient.Object)
+            principalId,
+            permissions = new[] { MalievPermissions.System.DiagnosticsRead },
+            roles = new[] { "roles.system.diagnostics" },
+            resourcePath = "system/diagnostics",
+            cacheUntil,
+            fromCache = true
+        }));
+        var controller = new DiagnosticsController(iamClient)
         {
             ControllerContext = new ControllerContext
             {
@@ -436,7 +437,17 @@ public class QuickControllerTests
         Assert.Contains(root.GetProperty("Claims").EnumerateArray(), claim =>
             claim.GetProperty("Type").GetString() == "email"
             && claim.GetProperty("Value").GetString() == "operator@maliev.com");
-        Assert.Equal(principalId.ToString(), root.GetProperty("IamResolvedData").GetProperty("UserId").GetString());
+        var iamData = root.GetProperty("IamResolvedData");
+        Assert.Equal(principalId, iamData.GetProperty("PrincipalId").GetGuid());
+        Assert.Equal(
+            MalievPermissions.System.DiagnosticsRead,
+            Assert.Single(iamData.GetProperty("Permissions").EnumerateArray()).GetString());
+        Assert.Equal(
+            "roles.system.diagnostics",
+            Assert.Single(iamData.GetProperty("Roles").EnumerateArray()).GetString());
+        Assert.Equal("system/diagnostics", iamData.GetProperty("ResourcePath").GetString());
+        Assert.Equal(cacheUntil, iamData.GetProperty("CacheUntil").GetDateTime());
+        Assert.True(iamData.GetProperty("FromCache").GetBoolean());
     }
 
     [Fact]

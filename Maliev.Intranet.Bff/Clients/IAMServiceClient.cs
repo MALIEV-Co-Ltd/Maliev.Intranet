@@ -1,8 +1,18 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Maliev.Intranet.Shared;
 
 namespace Maliev.Intranet.Bff.Clients;
+
+internal sealed record IamResolvePermissionsResult(
+    Guid PrincipalId,
+    IReadOnlyList<string> Permissions,
+    IReadOnlyList<string> Roles,
+    string? ResourcePath,
+    DateTime? CacheUntil,
+    bool FromCache);
 
 /// <summary>
 /// Client for interacting with the IAM microservice.
@@ -136,6 +146,45 @@ public class IAMServiceClient(HttpClient httpClient)
         List<string>? Permissions,
         List<string>? PermissionIds);
 
+    private sealed record IamResolvePermissionsRequest
+    {
+        [JsonPropertyName("principalId")]
+        public required string PrincipalId { get; init; }
+
+        [JsonPropertyName("resourcePath")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ResourcePath { get; init; }
+
+        [JsonPropertyName("requestTime")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DateTime? RequestTime { get; init; }
+
+        [JsonPropertyName("requestIp")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? RequestIp { get; init; }
+    }
+
+    private sealed record IamResolvePermissionsResponse
+    {
+        [JsonPropertyName("principalId")]
+        public required Guid PrincipalId { get; init; }
+
+        [JsonPropertyName("permissions")]
+        public required List<string> Permissions { get; init; }
+
+        [JsonPropertyName("roles")]
+        public required List<string> Roles { get; init; }
+
+        [JsonPropertyName("resourcePath")]
+        public string? ResourcePath { get; init; }
+
+        [JsonPropertyName("cacheUntil")]
+        public DateTime? CacheUntil { get; init; }
+
+        [JsonPropertyName("fromCache")]
+        public required bool FromCache { get; init; }
+    }
+
     private static PrincipalSummaryDto MapPrincipal(IamPrincipalResponse principal) => new()
     {
         Id = principal.PrincipalId,
@@ -226,26 +275,41 @@ public class IAMServiceClient(HttpClient httpClient)
         return response.IsSuccessStatusCode;
     }
 
-    /// <summary>
-    /// Retrieves the current roles and permissions for a specific user.
-    /// </summary>
-    /// <param name="userId">The user ID.</param>
-    /// <param name="ct">The cancellation token.</param>
-    /// <returns>The user's assignment details.</returns>
-    public virtual async Task<UserContextDto?> GetUserAssignmentsAsync(string userId, CancellationToken ct = default)
+    internal virtual async Task<IamResolvePermissionsResult?> ResolvePermissionsAsync(
+        string principalId,
+        CancellationToken ct = default)
     {
-        if (!Guid.TryParse(userId, out var principalId))
+        using var response = await httpClient.PostAsJsonAsync(
+            "/iam/v1/auth/resolve-permissions",
+            new IamResolvePermissionsRequest { PrincipalId = principalId },
+            ct);
+        if (!response.IsSuccessStatusCode)
         {
             return null;
         }
 
-        // This endpoint might be different in the new IAM service
-        var response = await httpClient.PostAsJsonAsync("/iam/v1/auth/resolve-permissions", new { principalId }, ct);
-        if (response.IsSuccessStatusCode)
+        var result = await response.Content.ReadFromJsonAsync<IamResolvePermissionsResponse>(cancellationToken: ct);
+        if (result is null)
         {
-            var result = await response.Content.ReadFromJsonAsync<UserContextDto>(cancellationToken: ct);
-            return result;
+            throw new JsonException("IAM returned a null permission-resolution payload.");
         }
-        return null;
+
+        if (result.Permissions is null)
+        {
+            throw new JsonException("IAM permission-resolution field 'permissions' cannot be null.");
+        }
+
+        if (result.Roles is null)
+        {
+            throw new JsonException("IAM permission-resolution field 'roles' cannot be null.");
+        }
+
+        return new IamResolvePermissionsResult(
+            result.PrincipalId,
+            result.Permissions,
+            result.Roles,
+            result.ResourcePath,
+            result.CacheUntil,
+            result.FromCache);
     }
 }
