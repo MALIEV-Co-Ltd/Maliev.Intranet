@@ -67,7 +67,7 @@ public sealed class ProductionCollectionAuthorizationTests(ProductionCollectionA
             [new ProductionPermissionCheck(MalievPermissions.Job.Read, "global")],
             factory.IamClient.LiveChecks);
         Assert.Empty(factory.IamClient.StandardChecks);
-        Assert.NotEmpty(factory.DownstreamRequests);
+        Assert.Equal(ExpectedDownstreamRequests(route), factory.DownstreamRequests);
     }
 
     [Theory]
@@ -112,6 +112,22 @@ public sealed class ProductionCollectionAuthorizationTests(ProductionCollectionA
             factory.CreateTestToken(principalId, permissions));
         return client;
     }
+
+    private static ProductionDownstreamRequest[] ExpectedDownstreamRequests(string route) => route switch
+    {
+        "/api/v1/jobs/queue" or "/api/v1/jobs/stats" =>
+            [new("GET", "/job/v1/jobs/kanban")],
+        "/api/v1/jobs?status=Queued&processType=FDM&priority=High&page=2" =>
+            [new("GET", "/job/v1/jobs?page=2&status=Queued&processType=FDM&priority=High")],
+        var value when value.StartsWith("/api/v1/jobs/machine/", StringComparison.Ordinal) =>
+            [new("GET", "/job/v1/jobs/machine/FDM-01/schedule?from=2026-07-01T00:00:00.0000000Z&to=2026-07-02T00:00:00.0000000Z")],
+        var value when value.StartsWith("/api/v1/jobs/schedule", StringComparison.Ordinal) =>
+            [
+                new("GET", "/facility/v1/equipments?page=1&pageSize=200"),
+                new("GET", "/job/v1/jobs/schedule?from=2026-07-01T00%3A00%3A00.0000000Z&to=2026-07-02T00%3A00%3A00.0000000Z")
+            ],
+        _ => throw new InvalidOperationException($"No downstream contract registered for {route}.")
+    };
 
     private sealed record AuthorizationScenario(
         string Name,
