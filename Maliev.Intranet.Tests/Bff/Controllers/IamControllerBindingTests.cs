@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Bff.Controllers;
@@ -142,10 +143,126 @@ public class IamControllerBindingTests
         Assert.Equal(StatusCodes.Status409Conflict, GetStatusCode(result));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("{not-json")]
+    public async Task GrantRole_InvalidIamSuccessBody_ReturnsServiceUnavailable(string body)
+    {
+        var iamClient = CreateRawIamClient((request, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        }));
+        var controller = CreateController(iamClient);
+
+        var result = await controller.GrantRole(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" },
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Fact]
+    public async Task GrantRole_NonCallerCancellation_ReturnsServiceUnavailable()
+    {
+        var iamClient = CreateRawIamClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("IAM request timed out.")));
+        var controller = CreateController(iamClient);
+
+        var result = await controller.GrantRole(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" },
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{not-json")]
+    public async Task InviteUser_InvalidIamSuccessBody_ReturnsServiceUnavailable(string body)
+    {
+        var principalId = Guid.NewGuid();
+        var iamClient = CreateRawIamClient((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/iam/v1/principals")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = JsonContent.Create(new { principalId, createdAt = DateTime.UtcNow })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+        var controller = CreateController(iamClient, authorizeBinding: true);
+
+        var result = await controller.InviteUser(CreateInviteRequest(), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Fact]
+    public async Task InviteUser_NonCallerCancellation_ReturnsServiceUnavailable()
+    {
+        var principalId = Guid.NewGuid();
+        var iamClient = CreateRawIamClient((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/iam/v1/principals")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = JsonContent.Create(new { principalId, createdAt = DateTime.UtcNow })
+                });
+            }
+
+            return Task.FromException<HttpResponseMessage>(new TaskCanceledException("IAM request timed out."));
+        });
+        var controller = CreateController(iamClient, authorizeBinding: true);
+
+        var result = await controller.InviteUser(CreateInviteRequest(), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Fact]
+    public async Task InviteUser_CallerCancellationStillPropagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var principal = new PrincipalSummaryDto
+        {
+            PrincipalId = Guid.NewGuid(),
+            Email = "new.employee@maliev.com",
+            DisplayName = "New Employee"
+        };
+        var iamClient = CreateIamClient();
+        iamClient
+            .Setup(client => client.CreatePrincipalAsync(principal.Email, principal.DisplayName, cancellation.Token))
+            .ReturnsAsync(principal);
+        iamClient
+            .Setup(client => client.GrantRoleAsync(principal.PrincipalId, It.IsAny<GrantRoleRequestDto>(), cancellation.Token))
+            .Callback(cancellation.Cancel)
+            .ThrowsAsync(new OperationCanceledException(cancellation.Token));
+        var controller = CreateController(iamClient, authorizeBinding: true);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            controller.InviteUser(CreateInviteRequest(), cancellation.Token));
+    }
+
     private static Mock<IAMServiceClient> CreateIamClient() =>
         new(new HttpClient { BaseAddress = new Uri("http://iam") });
 
+    private static IAMServiceClient CreateRawIamClient(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder) =>
+        new(new HttpClient(new StubHttpMessageHandler(responder)) { BaseAddress = new Uri("http://iam") });
+
     private static IamController CreateController(Mock<IAMServiceClient> iamClient, bool authorizeBinding = false)
+        => CreateController(iamClient.Object, authorizeBinding);
+
+    private static IamController CreateController(IAMServiceClient iamClient, bool authorizeBinding = false)
     {
         var authorization = new Mock<IAuthorizationService>();
         authorization
@@ -154,7 +271,7 @@ public class IamControllerBindingTests
                 It.IsAny<object?>(),
                 It.IsAny<IEnumerable<IAuthorizationRequirement>>()))
             .ReturnsAsync(authorizeBinding ? AuthorizationResult.Success() : AuthorizationResult.Failed());
-        return new IamController(iamClient.Object, authorization.Object)
+        return new IamController(iamClient, authorization.Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -166,6 +283,13 @@ public class IamControllerBindingTests
         };
     }
 
+    private static IamController.InviteUserRequest CreateInviteRequest() => new()
+    {
+        Email = "new.employee@maliev.com",
+        DisplayName = "New Employee",
+        RoleId = "roles.iam.viewer"
+    };
+
     private static int GetStatusCode(IActionResult result) => result switch
     {
         ForbidResult => StatusCodes.Status403Forbidden,
@@ -174,4 +298,12 @@ public class IamControllerBindingTests
         ObjectResult status => status.StatusCode ?? StatusCodes.Status200OK,
         _ => throw new Xunit.Sdk.XunitException($"Unexpected result type {result.GetType().Name}.")
     };
+
+    private sealed class StubHttpMessageHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) => responder(request, cancellationToken);
+    }
 }

@@ -197,6 +197,39 @@ public class IAMServiceClientTests
         Assert.True(handler.CancellationObserved);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("{not-json")]
+    public async Task GrantRoleAsync_InvalidSuccessBody_IsClassifiedAsUnavailable(string body)
+    {
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GrantRoleAsync(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" }));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsType<JsonException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task GrantRoleAsync_DownstreamTimeout_IsClassifiedAsUnavailable()
+    {
+        var handler = new NonCallerCancellationHttpMessageHandler();
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GrantRoleAsync(
+            Guid.NewGuid(),
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" },
+            CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsAssignableFrom<OperationCanceledException>(exception.InnerException);
+    }
+
     [Fact]
     public async Task RevokeRoleAsync_UsesCanonicalBindingRouteWithoutPayload()
     {
@@ -395,5 +428,13 @@ public class IAMServiceClientTests
                 throw;
             }
         }
+    }
+
+    private sealed class NonCallerCancellationHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("IAM request timed out."));
     }
 }

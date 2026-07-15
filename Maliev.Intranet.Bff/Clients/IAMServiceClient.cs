@@ -259,14 +259,28 @@ public class IAMServiceClient(HttpClient httpClient)
         GrantRoleRequestDto request,
         CancellationToken ct = default)
     {
-        using var response = await httpClient.PostAsJsonAsync(
-            $"/iam/v1/principals/{principalId}/roles",
-            request,
-            ct);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
-            ?? throw new JsonException("IAM returned a null role-binding payload.");
+        try
+        {
+            using var response = await httpClient.PostAsJsonAsync(
+                $"/iam/v1/principals/{principalId}/roles",
+                request,
+                ct);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
+                ?? throw new JsonException("IAM returned a null role-binding payload.");
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw CreateBindingUnavailableException("IAM role-binding request timed out.", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw CreateBindingUnavailableException("IAM returned an invalid role-binding payload.", ex);
+        }
     }
+
+    private static HttpRequestException CreateBindingUnavailableException(string message, Exception innerException) =>
+        new(message, innerException, System.Net.HttpStatusCode.ServiceUnavailable);
 
     /// <summary>
     /// Revokes a role from a principal.
