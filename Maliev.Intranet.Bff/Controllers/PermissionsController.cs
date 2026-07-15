@@ -11,7 +11,6 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// API controller for managing permissions and roles via IAM service.
 /// </summary>
 /// <param name="client">The IAM service client.</param>
-[RequirePermission(MalievPermissions.Iam.Manage, AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
@@ -22,6 +21,8 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
     /// </summary>
     /// <returns>A list of permissions.</returns>
     [HttpGet("available")]
+    [RequirePermission(MalievPermissions.IAM.Permissions.List,
+        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     public async Task<ActionResult<List<PermissionDto>>> GetAvailablePermissions()
     {
         var permissions = await client.GetPermissionsAsync();
@@ -33,6 +34,8 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
     /// </summary>
     /// <returns>A list of roles.</returns>
     [HttpGet("roles")]
+    [RequirePermission(MalievPermissions.IAM.Roles.List,
+        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     public async Task<ActionResult<List<RoleDto>>> GetAvailableRoles()
     {
         var roles = await client.GetRolesAsync();
@@ -45,6 +48,8 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
     /// <param name="userId">The user ID.</param>
     /// <returns>The user's assignments.</returns>
     [HttpGet("users/{userId}")]
+    [RequirePermission(MalievPermissions.IAM.Bindings.List,
+        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     public async Task<ActionResult<UserContextDto>> GetUserAssignments(string userId)
     {
         var assignments = await client.GetUserAssignmentsAsync(userId);
@@ -57,6 +62,8 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
     /// <param name="request">The assignment request.</param>
     /// <returns>An OK result if successful.</returns>
     [HttpPost("assignments")]
+    [RequirePermission(MalievPermissions.IAM.Bindings.Create,
+        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     public async Task<IActionResult> UpdateAssignments([FromBody] UserAssignmentRequest request)
     {
         var success = await client.AssignToUserAsync(request);
