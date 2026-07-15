@@ -271,6 +271,22 @@ public sealed class IamControllerAuthorizationTests(IamConsoleAuthorizationFacto
         Assert.False(json.RootElement.TryGetProperty("roleName", out _));
     }
 
+    [Fact]
+    public async Task GrantRole_InvalidModel_IsRejectedBeforeIamCall()
+    {
+        factory.Reset([MalievPermissions.IAM.Bindings.Create]);
+        using var client = CreateClient("iam-binding-validator", MalievPermissions.IAM.Bindings.Create);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/iam/users/{PrincipalId:D}/roles",
+            new { roleId = "" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.DoesNotContain(
+            factory.DownstreamRequests,
+            request => request.Method == "POST" && request.Path.EndsWith("/roles", StringComparison.Ordinal));
+    }
+
     private HttpClient CreateClient(string principalId, params string[] permissions)
     {
         var client = factory.CreateClient();

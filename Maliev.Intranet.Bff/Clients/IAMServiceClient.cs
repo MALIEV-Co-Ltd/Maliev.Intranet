@@ -20,6 +20,9 @@ internal sealed record IamResolvePermissionsResult(
 /// <param name="httpClient">The HTTP client instance.</param>
 public class IAMServiceClient(HttpClient httpClient)
 {
+    // PostgreSQL timestamps have microsecond precision, so returned expiry instants may differ by one microsecond.
+    private static readonly TimeSpan BindingExpiryPrecisionTolerance = TimeSpan.FromMicroseconds(1);
+
     /// <summary>
     /// Retrieves all available permissions from the IAM service.
     /// </summary>
@@ -247,8 +250,26 @@ public class IAMServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task<List<RoleBindingDto>> GetPrincipalRolesAsync(Guid principalId, CancellationToken ct = default)
     {
-        var response = await httpClient.GetFromJsonAsync<List<RoleBindingDto>>($"/iam/v1/principals/{principalId}/roles", ct);
-        return response ?? [];
+        try
+        {
+            var bindings = await httpClient.GetFromJsonAsync<List<RoleBindingDto>>(
+                $"/iam/v1/principals/{principalId}/roles",
+                ct) ?? throw new JsonException("IAM returned a null role-binding list payload.");
+            foreach (var binding in bindings)
+            {
+                ValidateAuthoritativeBinding(binding, principalId);
+            }
+
+            return bindings;
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw CreateBindingUnavailableException("IAM role-binding list request timed out.", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw CreateBindingUnavailableException("IAM returned an invalid role-binding list payload.", ex);
+        }
     }
 
     /// <summary>
@@ -268,7 +289,7 @@ public class IAMServiceClient(HttpClient httpClient)
             response.EnsureSuccessStatusCode();
             var binding = await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
                 ?? throw new JsonException("IAM returned a null role-binding payload.");
-            ValidateRoleBindingContract(binding, principalId, request.RoleId);
+            ValidateRoleBindingContract(binding, principalId, request);
             return binding;
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
@@ -287,16 +308,37 @@ public class IAMServiceClient(HttpClient httpClient)
     private static void ValidateRoleBindingContract(
         RoleBindingDto binding,
         Guid requestedPrincipalId,
-        string requestedRoleId)
+        GrantRoleRequestDto request)
+    {
+        ValidateAuthoritativeBinding(binding, requestedPrincipalId);
+        if (!string.Equals(binding.RoleId, request.RoleId, StringComparison.Ordinal) ||
+            !string.Equals(binding.ResourcePath, request.ResourcePath, StringComparison.Ordinal) ||
+            !ExpiryMatches(binding.ExpiresAt, request.ExpiresAt))
+        {
+            throw new JsonException("IAM returned a role-binding payload that does not match the requested contract.");
+        }
+    }
+
+    private static void ValidateAuthoritativeBinding(RoleBindingDto binding, Guid requestedPrincipalId)
     {
         if (binding.BindingId == Guid.Empty ||
             binding.PrincipalId != requestedPrincipalId ||
             string.IsNullOrWhiteSpace(binding.RoleId) ||
-            !string.Equals(binding.RoleId, requestedRoleId, StringComparison.Ordinal) ||
             binding.GrantedAt == default)
         {
-            throw new JsonException("IAM returned a role-binding payload that does not match the requested contract.");
+            throw new JsonException("IAM returned an incomplete or mismatched role-binding payload.");
         }
+    }
+
+    private static bool ExpiryMatches(DateTime? actual, DateTime? requested)
+    {
+        if (actual is null || requested is null)
+        {
+            return actual is null && requested is null;
+        }
+
+        var difference = actual.Value.ToUniversalTime() - requested.Value.ToUniversalTime();
+        return Math.Abs(difference.Ticks) <= BindingExpiryPrecisionTolerance.Ticks;
     }
 
     /// <summary>
@@ -304,10 +346,17 @@ public class IAMServiceClient(HttpClient httpClient)
     /// </summary>
     public virtual async Task RevokeRoleAsync(Guid principalId, Guid bindingId, CancellationToken ct = default)
     {
-        using var response = await httpClient.DeleteAsync(
-            $"/iam/v1/principals/{principalId}/roles/{bindingId}",
-            ct);
-        response.EnsureSuccessStatusCode();
+        try
+        {
+            using var response = await httpClient.DeleteAsync(
+                $"/iam/v1/principals/{principalId}/roles/{bindingId}",
+                ct);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw CreateBindingUnavailableException("IAM role-binding revoke request timed out.", ex);
+        }
     }
 
     internal virtual async Task<IamResolvePermissionsResult?> ResolvePermissionsAsync(

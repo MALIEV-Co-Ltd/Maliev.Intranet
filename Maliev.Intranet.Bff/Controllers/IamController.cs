@@ -195,12 +195,19 @@ public class IamController(
     [RequirePermission(MalievPermissions.IAM.Bindings.List,
         AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
     [HttpGet("users/{principalId}/roles")]
-    public async Task<ActionResult<List<RoleBindingDto>>> GetUserRoles(
+    public async Task<IActionResult> GetUserRoles(
         Guid principalId,
         CancellationToken cancellationToken)
     {
-        var roles = await client.GetPrincipalRolesAsync(principalId, cancellationToken);
-        return Ok(roles);
+        try
+        {
+            var roles = await client.GetPrincipalRolesAsync(principalId, cancellationToken);
+            return Ok(roles);
+        }
+        catch (HttpRequestException ex)
+        {
+            return MapIamBindingFailure(ex.StatusCode);
+        }
     }
 
     /// <summary>

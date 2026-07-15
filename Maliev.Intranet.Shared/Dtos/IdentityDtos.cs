@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.Intranet.Shared;
 
 /// <summary>
@@ -86,6 +88,7 @@ public class PrincipalSummaryDto
 public class GrantRoleRequestDto
 {
     /// <summary>The unique identifier of the role to be granted.</summary>
+    [Required]
     public string RoleId { get; set; } = string.Empty;
     /// <summary>The hierarchical resource path, or <see langword="null"/> for a global binding.</summary>
     public string? ResourcePath { get; set; }
