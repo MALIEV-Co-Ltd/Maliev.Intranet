@@ -20,6 +20,8 @@ namespace Maliev.Intranet.Bff.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class EmployeesController(EmployeeServiceClient client, IAMServiceClient iamClient) : ControllerBase
 {
+    private const string EmployeeResourcePath = "employee/{id}";
+
     /// <summary>
     /// Retrieves a paged list of employees.
     /// </summary>
@@ -45,7 +47,12 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
     /// <param name="id">The employee ID.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The employee details.</returns>
-    [RequirePermission(MalievPermissions.Employee.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(
+        MalievPermissions.Employee.ProfileRead,
+        AuthenticationSchemes = "Bearer,Cookies",
+        ResourcePathTemplate = EmployeeResourcePath,
+        RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.BffValidated, "IAMService", "id")]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EmployeeDetailDto>> GetById(Guid id, CancellationToken ct)
     {
