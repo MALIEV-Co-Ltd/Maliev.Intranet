@@ -7,6 +7,7 @@ using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -25,7 +26,7 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <param name="quotationClient">The typed QuotationService HTTP client used to hydrate generated quotation details.</param>
 /// <param name="pdfClient">The typed PdfService HTTP client used to generate quotation PDFs.</param>
 /// <param name="planningHoldServiceClient">Performs hold operations with the BFF service identity after employee authorization.</param>
-[RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies")]
+[Authorize(AuthenticationSchemes = "Bearer,Cookies")]
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
@@ -55,6 +56,8 @@ public class ProjectsController(
     /// <param name="pageSize">Items per page (default 20).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Paged project summaries.</returns>
+    [RequirePermission(MalievPermissions.Project.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ProjectSummaryDto>>> Get(
         [FromQuery] string? status = null,
