@@ -55,26 +55,72 @@ public sealed class ResourceOwnershipAttribute : Attribute
 }
 
 /// <summary>Machine-readable resource authorization metadata.</summary>
+/// <remarks>
+/// <c>with</c> expressions support updates that remain valid after each init assignment.
+/// Cross-shape transitions between global/default and object-bound metadata must use the constructor
+/// because separate init assignments cannot atomically cross an otherwise invalid intermediate state.
+/// </remarks>
 public sealed record ResourceOwnershipManifest
 {
+    private string? _authority;
+    private ResourceOwnershipKind _kind;
+    private string? _resourceParameter;
+
     /// <summary>Creates validated ownership metadata.</summary>
     public ResourceOwnershipManifest(
-        ResourceOwnershipKind kind,
-        string? authority,
-        string? resourceParameter)
+        ResourceOwnershipKind Kind,
+        string? Authority,
+        string? ResourceParameter)
     {
-        ResourceOwnershipRules.Validate(kind, authority, resourceParameter, allowNotDeclared: true);
-        Kind = kind;
-        Authority = authority;
-        ResourceParameter = resourceParameter;
+        ResourceOwnershipRules.Validate(Kind, Authority, ResourceParameter, allowNotDeclared: true);
+        _kind = Kind;
+        _authority = Authority;
+        _resourceParameter = ResourceParameter;
     }
 
     /// <summary>The ownership enforcement category.</summary>
-    public ResourceOwnershipKind Kind { get; }
+    public ResourceOwnershipKind Kind
+    {
+        get => _kind;
+        init
+        {
+            ResourceOwnershipRules.Validate(value, _authority, _resourceParameter, allowNotDeclared: true);
+            _kind = value;
+        }
+    }
+
     /// <summary>The component making an object-bound decision, when applicable.</summary>
-    public string? Authority { get; }
+    public string? Authority
+    {
+        get => _authority;
+        init
+        {
+            ResourceOwnershipRules.Validate(_kind, value, _resourceParameter, allowNotDeclared: true);
+            _authority = value;
+        }
+    }
+
     /// <summary>The request value locating an object-bound resource, when applicable.</summary>
-    public string? ResourceParameter { get; }
+    public string? ResourceParameter
+    {
+        get => _resourceParameter;
+        init
+        {
+            ResourceOwnershipRules.Validate(_kind, _authority, value, allowNotDeclared: true);
+            _resourceParameter = value;
+        }
+    }
+
+    /// <summary>Deconstructs the ownership metadata using the former positional-record shape.</summary>
+    public void Deconstruct(
+        out ResourceOwnershipKind kind,
+        out string? authority,
+        out string? resourceParameter)
+    {
+        kind = Kind;
+        authority = Authority;
+        resourceParameter = ResourceParameter;
+    }
 }
 
 internal static class ResourceOwnershipRules
