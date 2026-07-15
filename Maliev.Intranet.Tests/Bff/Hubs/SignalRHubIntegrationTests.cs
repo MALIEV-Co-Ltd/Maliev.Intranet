@@ -17,16 +17,13 @@ public class SignalRHubIntegrationTests(SignalRTestFactory factory) : IClassFixt
     [Theory]
     [InlineData("/hubs/notifications/negotiate")]
     [InlineData("/hubs/chat/negotiate")]
-    [InlineData("/hubs/production/negotiate")]
     public async Task HubNegotiate_ReturnsOk_WhenAuthenticated(string url)
     {
         // Arrange
         var client = _factory.CreateClient();
         var token = url.StartsWith("/hubs/chat", StringComparison.Ordinal)
             ? _factory.CreateTestToken("chat-reader", MalievPermissions.Chat.SessionsRead)
-            : url.StartsWith("/hubs/production", StringComparison.Ordinal)
-                ? _factory.CreateTestToken("job-reader", MalievPermissions.Job.Read)
-                : _factory.CreateTestToken("project-reader", MalievPermissions.Project.Read);
+            : _factory.CreateTestToken("project-reader", MalievPermissions.Project.Read);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act

@@ -13,6 +13,8 @@ public enum ResourceOwnershipKind
 {
     /// <summary>The endpoint has not yet declared a resource rule.</summary>
     NotDeclared,
+    /// <summary>A global permission is the complete access rule; no object lookup applies.</summary>
+    GlobalPermission,
     /// <summary>The BFF validates access before completing the operation.</summary>
     BffValidated,
     /// <summary>An authoritative downstream service validates access.</summary>
@@ -25,15 +27,15 @@ public enum ResourceOwnershipKind
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
 public sealed class ResourceOwnershipAttribute(
     ResourceOwnershipKind kind,
-    string authority,
-    string resourceParameter) : Attribute
+    string? authority = null,
+    string? resourceParameter = null) : Attribute
 {
     /// <summary>The ownership enforcement category.</summary>
     public ResourceOwnershipKind Kind { get; } = kind;
     /// <summary>The BFF component or downstream service that makes the decision.</summary>
-    public string Authority { get; } = authority;
+    public string? Authority { get; } = authority;
     /// <summary>The request parameter used only as a resource locator.</summary>
-    public string ResourceParameter { get; } = resourceParameter;
+    public string? ResourceParameter { get; } = resourceParameter;
 }
 
 /// <summary>Machine-readable resource authorization metadata.</summary>

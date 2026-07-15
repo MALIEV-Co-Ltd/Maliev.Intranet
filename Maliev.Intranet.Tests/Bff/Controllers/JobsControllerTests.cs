@@ -192,8 +192,11 @@ public class JobsControllerTests
 
         Assert.Equal(permission, requirement.Permission);
         Assert.Null(requirement.ResourcePathTemplate);
-        Assert.False(requirement.RequireLiveCheck);
-        Assert.Empty(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false));
+        Assert.True(requirement.RequireLiveCheck);
+        var ownership = Assert.Single(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false));
+        Assert.Equal("GlobalPermission", ownership.Kind.ToString());
+        Assert.Null(ownership.Authority);
+        Assert.Null(ownership.ResourceParameter);
     }
 
     [Fact]

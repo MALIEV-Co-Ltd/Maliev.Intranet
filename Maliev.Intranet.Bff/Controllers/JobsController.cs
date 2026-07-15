@@ -42,7 +42,8 @@ public class JobsController(
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The production queue DTO.</returns>
-    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet("queue")]
     public async Task<ActionResult<ProductionQueueDto>> GetQueue(CancellationToken ct)
     {
@@ -57,7 +58,8 @@ public class JobsController(
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The stats DTO.</returns>
-    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet("stats")]
     public async Task<ActionResult<JobStatsDto>> GetStats(CancellationToken ct)
     {
@@ -77,7 +79,8 @@ public class JobsController(
     /// <param name="page">Page number.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Paged list of job summaries.</returns>
-    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<JobSummaryDto>>> Get(
         [FromQuery] string? status = null,
@@ -274,7 +277,8 @@ public class JobsController(
     /// <param name="to">Range end (UTC). Defaults to 30 days from now.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of machine schedule items.</returns>
-    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet("machine/{machineId}/schedule")]
     public async Task<ActionResult<List<MachineScheduleItemDto>>> GetMachineSchedule(
         string machineId,
@@ -323,7 +327,8 @@ public class JobsController(
     /// <param name="to">Range end (UTC). Defaults to 7 days from now.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One summary per active machine, each with its list of scheduled jobs.</returns>
-    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet("schedule")]
     public async Task<ActionResult<ProductionScheduleBoardDto>> GetAllMachineSchedules(
         [FromServices] IFacilityServiceClient facilityClient,
