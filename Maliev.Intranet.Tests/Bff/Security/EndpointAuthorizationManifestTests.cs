@@ -225,8 +225,7 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
                 ResourceOwnershipKind.DownstreamValidated, "UploadService", "fileId"));
         Assert.Contains(manifest.Entries, entry =>
             entry.Member == nameof(ProjectsController.Create)
-            && entry.Permissions.Contains(MalievPermissions.Project.Read)
-            && entry.Permissions.Contains(MalievPermissions.Project.Write));
+            && entry.Permissions.SequenceEqual([MalievPermissions.Project.Write]));
         Assert.Contains(manifest.Entries, entry =>
             entry.Member == nameof(ProjectsController.GetById)
             && entry.PermissionRequirements.Contains(new PermissionAuthorizationManifest(
@@ -245,9 +244,14 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
                 true)));
         Assert.Contains(manifest.Entries, entry =>
             entry.Member == nameof(ProjectsController.Get)
-            && entry.PermissionRequirements.All(requirement =>
-                requirement.ResourcePathTemplate is null && !requirement.RequireLiveCheck)
-            && entry.Ownership.Kind == ResourceOwnershipKind.NotDeclared);
+            && entry.PermissionRequirements.Contains(new PermissionAuthorizationManifest(
+                MalievPermissions.Project.Read,
+                null,
+                true))
+            && entry.Ownership == new ResourceOwnershipManifest(
+                ResourceOwnershipKind.GlobalPermission,
+                null,
+                null));
     }
 
     [Fact]
@@ -360,14 +364,12 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
         }
     }
 
-    [Theory]
-    [InlineData(nameof(ProjectsController.Get))]
-    [InlineData(nameof(ProjectsController.Create))]
-    public void Project_collection_routes_remain_unscoped(string actionName)
+    [Fact]
+    public void Project_create_route_remains_unscoped()
     {
         var action = Assert.Single(
             typeof(ProjectsController).GetMethods(),
-            method => method.Name == actionName);
+            method => method.Name == nameof(ProjectsController.Create));
 
         Assert.Empty(action.GetCustomAttributes<ResourceOwnershipAttribute>(inherit: false));
         Assert.DoesNotContain(

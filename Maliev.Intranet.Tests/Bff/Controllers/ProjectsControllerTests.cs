@@ -10,6 +10,7 @@ using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Bff.Services;
 using Maliev.Intranet.Shared;
 using Maliev.Intranet.Shared.Dtos;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -59,9 +60,10 @@ public class ProjectsControllerTests
     [Fact]
     public void PlanningHoldEndpoints_RequireProjectReadAndJobWritePermissions()
     {
-        var controllerPermission = Assert.IsType<RequirePermissionAttribute>(
-            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
-        Assert.Equal(MalievPermissions.Project.Read, controllerPermission.Permission);
+        var controllerAuthorization = Assert.IsType<AuthorizeAttribute>(
+            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)));
+        Assert.Equal("Bearer,Cookies", controllerAuthorization.AuthenticationSchemes);
+        Assert.Empty(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
 
         foreach (var methodName in new[]
         {
@@ -84,14 +86,24 @@ public class ProjectsControllerTests
     [Fact]
     public void ProjectEndpoints_RequireExpectedPermissionMatrix()
     {
-        var controllerPermission = Assert.IsType<RequirePermissionAttribute>(
-            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
-        Assert.Equal(MalievPermissions.Project.Read, controllerPermission.Permission);
-        Assert.Equal("Bearer,Cookies", controllerPermission.AuthenticationSchemes);
+        var controllerAuthorization = Assert.IsType<AuthorizeAttribute>(
+            Assert.Single(typeof(ProjectsController).GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)));
+        Assert.Equal("Bearer,Cookies", controllerAuthorization.AuthenticationSchemes);
+        Assert.Empty(typeof(ProjectsController).GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
 
         var collectionMethod = typeof(ProjectsController).GetMethod(nameof(ProjectsController.Get));
         Assert.NotNull(collectionMethod);
-        Assert.Empty(collectionMethod.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false));
+        var collectionPermission = Assert.IsType<RequirePermissionAttribute>(
+            Assert.Single(collectionMethod.GetCustomAttributes(typeof(RequirePermissionAttribute), inherit: false)));
+        var collectionOwnership = Assert.IsType<ResourceOwnershipAttribute>(
+            Assert.Single(collectionMethod.GetCustomAttributes(typeof(ResourceOwnershipAttribute), inherit: false)));
+        Assert.Equal(MalievPermissions.Project.Read, collectionPermission.Permission);
+        Assert.Equal("Bearer,Cookies", collectionPermission.AuthenticationSchemes);
+        Assert.Null(collectionPermission.ResourcePathTemplate);
+        Assert.True(collectionPermission.RequireLiveCheck);
+        Assert.Equal(ResourceOwnershipKind.GlobalPermission, collectionOwnership.Kind);
+        Assert.Null(collectionOwnership.Authority);
+        Assert.Null(collectionOwnership.ResourceParameter);
 
         foreach (var methodName in new[]
         {
