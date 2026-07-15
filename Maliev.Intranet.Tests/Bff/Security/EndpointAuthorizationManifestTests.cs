@@ -292,6 +292,37 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
     }
 
     [Fact]
+    public void Build_RecordsDashboardReadsAsAuthoritativeGlobalPermissions()
+    {
+        var manifest = EndpointAuthorizationManifestBuilder.Build(
+            _endpointDataSource,
+            EndpointAuthorizationManifestBuilder.IntranetHubs);
+        var expectedMembers = new[]
+        {
+            nameof(DashboardController.Get),
+            nameof(DashboardController.GetActionItems)
+        };
+
+        foreach (var member in expectedMembers)
+        {
+            var entry = Assert.Single(
+                manifest.Entries,
+                candidate => candidate.Member == member
+                    && candidate.Surface.StartsWith(
+                        "/api/v{version:apiVersion}/Dashboard",
+                        StringComparison.OrdinalIgnoreCase));
+            var requirement = Assert.Single(entry.PermissionRequirements);
+
+            Assert.Equal(MalievPermissions.Dashboard.View, requirement.Permission);
+            Assert.Null(requirement.ResourcePathTemplate);
+            Assert.True(requirement.RequireLiveCheck);
+            Assert.Equal(ResourceOwnershipKind.GlobalPermission, entry.Ownership.Kind);
+            Assert.Null(entry.Ownership.Authority);
+            Assert.Null(entry.Ownership.ResourceParameter);
+        }
+    }
+
+    [Fact]
     public async Task Endpoint_RequiresPermissionAndReturnsRuntimeManifest()
     {
         var unauthorizedClient = factory.CreateClient();

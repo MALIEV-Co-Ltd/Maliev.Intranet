@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -11,7 +12,11 @@ namespace Maliev.Intranet.Bff.Controllers;
 /// <summary>
 /// Controller for retrieving aggregated dashboard data.
 /// </summary>
-[RequirePermission(MalievPermissions.Dashboard.View, AuthenticationSchemes = "Bearer,Cookies")]
+[RequirePermission(
+    MalievPermissions.Dashboard.View,
+    AuthenticationSchemes = "Bearer,Cookies",
+    RequireLiveCheck = true)]
+[ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
