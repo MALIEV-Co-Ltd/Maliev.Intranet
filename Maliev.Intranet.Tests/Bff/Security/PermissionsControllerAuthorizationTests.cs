@@ -28,8 +28,7 @@ public sealed class PermissionsControllerAuthorizationTests(
     {
         { nameof(PermissionsController.GetAvailablePermissions), MalievPermissions.IAM.Permissions.List, "GET" },
         { nameof(PermissionsController.GetAvailableRoles), MalievPermissions.IAM.Roles.List, "GET" },
-        { nameof(PermissionsController.GetUserAssignments), MalievPermissions.IAM.Bindings.List, "GET" },
-        { nameof(PermissionsController.UpdateAssignments), MalievPermissions.IAM.Bindings.Create, "POST" }
+        { nameof(PermissionsController.GetUserAssignments), MalievPermissions.IAM.Bindings.List, "GET" }
     };
 
     public static TheoryData<string, string, string, string, HttpStatusCode> RuntimeRequirements => new()
@@ -54,13 +53,6 @@ public sealed class PermissionsControllerAuthorizationTests(
             MalievPermissions.IAM.Bindings.List,
             MalievPermissions.IAM.Bindings.Create,
             HttpStatusCode.NotFound
-        },
-        {
-            "POST",
-            "/api/v1/permissions/assignments",
-            MalievPermissions.IAM.Bindings.Create,
-            MalievPermissions.IAM.Bindings.List,
-            HttpStatusCode.OK
         }
     };
 
@@ -115,6 +107,24 @@ public sealed class PermissionsControllerAuthorizationTests(
         }
     }
 
+    [Fact]
+    public void Manifest_does_not_expose_the_retired_bulk_assignment_mutation()
+    {
+        var endpointDataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+        var manifest = EndpointAuthorizationManifestBuilder.Build(
+            endpointDataSource,
+            EndpointAuthorizationManifestBuilder.IntranetHubs);
+
+        Assert.DoesNotContain(
+            manifest.Entries,
+            entry => entry.Kind == "controller"
+                && entry.Methods.Contains("POST")
+                && entry.Surface.EndsWith("/permissions/assignments", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            manifest.Entries,
+            entry => entry.Member == "UpdateAssignments");
+    }
+
     [Theory]
     [MemberData(nameof(RuntimeRequirements))]
     public async Task Route_requires_its_own_live_capability_and_rejects_stale_claims(
@@ -157,28 +167,27 @@ public sealed class PermissionsControllerAuthorizationTests(
     }
 
     [Fact]
-    public async Task Assignment_mutation_fails_closed_when_live_iam_is_unavailable()
+    public async Task Retired_bulk_assignment_route_is_not_routable()
     {
-        factory.IamClient.Reset(
-            MalievPermissions.IAM.Bindings.Create,
-            throwOnLiveCheck: true);
+        factory.IamClient.Reset(MalievPermissions.IAM.Bindings.Create);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer",
-            factory.CreateTestToken(
-                "stale-binding-creator",
-                MalievPermissions.IAM.Bindings.Create,
-                MalievPermissions.Iam.Manage));
+            factory.CreateTestToken("binding-creator"));
 
-        var response = await SendAsync(
-            client,
-            "POST",
-            "/api/v1/permissions/assignments");
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/permissions/assignments",
+            new
+            {
+                userId = "8b10a597-67ef-4c64-8516-c8284d5588bc",
+                roles = new[] { "roles.platform.viewer" },
+                permissions = new[] { "iam.permissions.list" }
+            });
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Contains(
-            new CapabilityPermissionCheck(MalievPermissions.IAM.Bindings.Create, "global"),
-            factory.IamClient.LiveChecks);
+            response.StatusCode,
+            new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
+        Assert.Empty(factory.IamClient.LiveChecks);
         Assert.Empty(factory.IamClient.StandardChecks);
     }
 
@@ -187,16 +196,6 @@ public sealed class PermissionsControllerAuthorizationTests(
         string method,
         string route)
     {
-        if (method == "POST")
-        {
-            return client.PostAsJsonAsync(route, new
-            {
-                userId = "8b10a597-67ef-4c64-8516-c8284d5588bc",
-                roles = Array.Empty<string>(),
-                permissions = Array.Empty<string>()
-            });
-        }
-
         return client.GetAsync(route);
     }
 }

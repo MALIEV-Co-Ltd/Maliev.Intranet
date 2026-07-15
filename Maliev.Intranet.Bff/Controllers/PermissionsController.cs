@@ -2,7 +2,6 @@ using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
 using Maliev.Intranet.Shared;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.Intranet.Bff.Controllers;
@@ -56,17 +55,4 @@ public class PermissionsController(IAMServiceClient client) : ControllerBase
         return assignments != null ? Ok(assignments) : NotFound();
     }
 
-    /// <summary>
-    /// Updates assignments for a user.
-    /// </summary>
-    /// <param name="request">The assignment request.</param>
-    /// <returns>An OK result if successful.</returns>
-    [HttpPost("assignments")]
-    [RequirePermission(MalievPermissions.IAM.Bindings.Create,
-        AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
-    public async Task<IActionResult> UpdateAssignments([FromBody] UserAssignmentRequest request)
-    {
-        var success = await client.AssignToUserAsync(request);
-        return success ? Ok() : BadRequest("Failed to update user assignments.");
-    }
 }

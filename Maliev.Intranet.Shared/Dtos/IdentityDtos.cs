@@ -56,19 +56,6 @@ public class RoleDto
 }
 
 /// <summary>
-/// Request model for assigning roles and permissions to a specific user.
-/// </summary>
-public class UserAssignmentRequest
-{
-    /// <summary>The identifier of the user to be updated.</summary>
-    public string UserId { get; set; } = string.Empty;
-    /// <summary>List of role identifiers to assign to the user.</summary>
-    public List<string> Roles { get; set; } = new();
-    /// <summary>List of specific permission identifiers to grant to the user.</summary>
-    public List<string> Permissions { get; set; } = new();
-}
-
-/// <summary>
 /// Summary information for an Identity and Access Management (IAM) principal.
 /// </summary>
 public class PrincipalSummaryDto
