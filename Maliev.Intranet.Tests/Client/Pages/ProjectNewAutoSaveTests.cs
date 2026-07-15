@@ -1731,6 +1731,8 @@ public class ProjectNewAutoSaveTests : BunitContext, IAsyncLifetime
         var cut = Render<global::Maliev.Intranet.Client.Pages.ProjectNew>();
         cut.WaitForAssertion(() =>
             Assert.Contains(_sentRequests, request => request.RequestUri?.AbsolutePath == "/api/v1/pricing/lead-times"));
+        cut.WaitForAssertion(() =>
+            Assert.NotNull(GetPrivateField<Microsoft.AspNetCore.SignalR.Client.HubConnection?>(cut.Instance, "_hubConnection")));
         ClearRequests();
 
         var materialId = Guid.NewGuid();
