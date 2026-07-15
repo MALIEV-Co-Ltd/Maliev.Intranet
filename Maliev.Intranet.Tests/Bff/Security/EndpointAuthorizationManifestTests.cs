@@ -323,6 +323,28 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
     }
 
     [Fact]
+    public void Build_RecordsEmployeeDirectoryReadAsAuthoritativeGlobalPermission()
+    {
+        var manifest = EndpointAuthorizationManifestBuilder.Build(
+            _endpointDataSource,
+            EndpointAuthorizationManifestBuilder.IntranetHubs);
+        var entry = Assert.Single(
+            manifest.Entries,
+            candidate => candidate.Member == nameof(EmployeesController.Get)
+                && candidate.Surface.StartsWith(
+                    "/api/v{version:apiVersion}/Employees",
+                    StringComparison.OrdinalIgnoreCase));
+        var requirement = Assert.Single(entry.PermissionRequirements);
+
+        Assert.Equal(MalievPermissions.Employee.Read, requirement.Permission);
+        Assert.Null(requirement.ResourcePathTemplate);
+        Assert.True(requirement.RequireLiveCheck);
+        Assert.Equal(ResourceOwnershipKind.GlobalPermission, entry.Ownership.Kind);
+        Assert.Null(entry.Ownership.Authority);
+        Assert.Null(entry.Ownership.ResourceParameter);
+    }
+
+    [Fact]
     public async Task Endpoint_RequiresPermissionAndReturnsRuntimeManifest()
     {
         var unauthorizedClient = factory.CreateClient();

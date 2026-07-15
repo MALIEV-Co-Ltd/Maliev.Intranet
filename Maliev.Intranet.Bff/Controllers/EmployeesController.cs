@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.Intranet.Bff.Clients;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +27,11 @@ public class EmployeesController(EmployeeServiceClient client, IAMServiceClient 
     /// <param name="pageSize">The number of items per page.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A paged list of employees.</returns>
-    [RequirePermission(MalievPermissions.Employee.Read, AuthenticationSchemes = "Bearer,Cookies")]
+    [RequirePermission(
+        MalievPermissions.Employee.Read,
+        AuthenticationSchemes = "Bearer,Cookies",
+        RequireLiveCheck = true)]
+    [ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
     [HttpGet]
     public async Task<ActionResult<PagedResponse<EmployeeSummaryDto>>> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
     {
