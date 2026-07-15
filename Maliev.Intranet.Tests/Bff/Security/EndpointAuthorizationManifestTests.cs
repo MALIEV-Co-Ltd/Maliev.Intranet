@@ -41,6 +41,104 @@ public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IC
     }
 
     [Fact]
+    public void ResourceOwnershipManifest_PreservesFormerClrConstructionSurface()
+    {
+        var constructor = Assert.Single(typeof(ResourceOwnershipManifest).GetConstructors());
+
+        Assert.Equal(
+            ["Kind", "Authority", "ResourceParameter"],
+            constructor.GetParameters().Select(parameter => parameter.Name));
+        Assert.All(
+            new[]
+            {
+                nameof(ResourceOwnershipManifest.Kind),
+                nameof(ResourceOwnershipManifest.Authority),
+                nameof(ResourceOwnershipManifest.ResourceParameter)
+            },
+            propertyName =>
+            {
+                var property = typeof(ResourceOwnershipManifest).GetProperty(propertyName);
+                Assert.NotNull(property?.SetMethod);
+                Assert.Contains(
+                    typeof(System.Runtime.CompilerServices.IsExternalInit),
+                    property!.SetMethod!.ReturnParameter.GetRequiredCustomModifiers());
+            });
+
+        var deconstruct = typeof(ResourceOwnershipManifest).GetMethod(
+            "Deconstruct",
+            [
+                typeof(ResourceOwnershipKind).MakeByRefType(),
+                typeof(string).MakeByRefType(),
+                typeof(string).MakeByRefType()
+            ]);
+        Assert.NotNull(deconstruct);
+    }
+
+    [Fact]
+    public void ResourceOwnershipManifest_JsonRoundTripsValidStateAndRejectsInvalidState()
+    {
+        var source = new ResourceOwnershipManifest(
+            ResourceOwnershipKind.DownstreamValidated,
+            "UploadService",
+            "fileId");
+        var json = JsonSerializer.Serialize(source);
+
+        Assert.Equal(source, JsonSerializer.Deserialize<ResourceOwnershipManifest>(json));
+        Assert.Throws<ArgumentException>(() => JsonSerializer.Deserialize<ResourceOwnershipManifest>(
+            """{"Kind":2,"Authority":"UploadService","ResourceParameter":""}"""));
+    }
+
+    [Fact]
+    public void ResourceOwnershipManifest_SupportsNamedConstructionDeconstructionAndSafeWithUpdates()
+    {
+        var source = new ResourceOwnershipManifest(
+            Kind: ResourceOwnershipKind.DownstreamValidated,
+            Authority: "UploadService",
+            ResourceParameter: "fileId");
+
+        var (kind, authority, resourceParameter) = source;
+        var updated = source with
+        {
+            Kind = ResourceOwnershipKind.SignedCapability,
+            Authority = "CapabilityService",
+            ResourceParameter = "capabilityId"
+        };
+
+        Assert.Equal(ResourceOwnershipKind.DownstreamValidated, kind);
+        Assert.Equal("UploadService", authority);
+        Assert.Equal("fileId", resourceParameter);
+        Assert.Equal(
+            new ResourceOwnershipManifest(
+                ResourceOwnershipKind.SignedCapability,
+                "CapabilityService",
+                "capabilityId"),
+            updated);
+    }
+
+    [Fact]
+    public void ResourceOwnershipManifest_WithCannotBypassInvariants()
+    {
+        var objectBound = new ResourceOwnershipManifest(
+            ResourceOwnershipKind.BffValidated,
+            "IAMService",
+            "id");
+        var global = new ResourceOwnershipManifest(
+            ResourceOwnershipKind.GlobalPermission,
+            null,
+            null);
+
+        Assert.Throws<ArgumentException>(() => objectBound with { Authority = " " });
+        Assert.Throws<ArgumentException>(() => objectBound with { ResourceParameter = null });
+        Assert.Throws<ArgumentException>(() => objectBound with { Kind = ResourceOwnershipKind.GlobalPermission });
+        Assert.Throws<ArgumentException>(() => global with
+        {
+            Kind = ResourceOwnershipKind.BffValidated,
+            Authority = "IAMService",
+            ResourceParameter = "id"
+        });
+    }
+
+    [Fact]
     public void ResourceOwnershipAttribute_OnlyAllowsGlobalPermissionWithoutObjectBinding()
     {
         var ownership = new ResourceOwnershipAttribute(ResourceOwnershipKind.GlobalPermission);
