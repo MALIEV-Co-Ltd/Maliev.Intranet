@@ -7,6 +7,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -16,6 +17,70 @@ namespace Maliev.Intranet.Tests.Bff.Security;
 public class EndpointAuthorizationManifestTests(SignalRTestFactory factory) : IClassFixture<SignalRTestFactory>
 {
     private readonly EndpointDataSource _endpointDataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+
+    [Theory]
+    [InlineData(ResourceOwnershipKind.NotDeclared, 0)]
+    [InlineData(ResourceOwnershipKind.BffValidated, 1)]
+    [InlineData(ResourceOwnershipKind.DownstreamValidated, 2)]
+    [InlineData(ResourceOwnershipKind.SignedCapability, 3)]
+    [InlineData(ResourceOwnershipKind.GlobalPermission, 4)]
+    public void ResourceOwnershipKind_PreservesStableNumericWireValues(
+        ResourceOwnershipKind kind,
+        int expectedValue)
+    {
+        var manifest = kind switch
+        {
+            ResourceOwnershipKind.NotDeclared or ResourceOwnershipKind.GlobalPermission =>
+                new ResourceOwnershipManifest(kind, null, null),
+            _ => new ResourceOwnershipManifest(kind, "authority", "resourceId")
+        };
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(manifest));
+
+        Assert.Equal(expectedValue, (int)kind);
+        Assert.Equal(expectedValue, json.RootElement.GetProperty("Kind").GetInt32());
+    }
+
+    [Fact]
+    public void ResourceOwnershipAttribute_OnlyAllowsGlobalPermissionWithoutObjectBinding()
+    {
+        var ownership = new ResourceOwnershipAttribute(ResourceOwnershipKind.GlobalPermission);
+
+        Assert.Equal(ResourceOwnershipKind.GlobalPermission, ownership.Kind);
+        Assert.Null(ownership.Authority);
+        Assert.Null(ownership.ResourceParameter);
+        Assert.Throws<ArgumentException>(() => new ResourceOwnershipAttribute(ResourceOwnershipKind.NotDeclared));
+        Assert.Throws<ArgumentException>(() => new ResourceOwnershipAttribute(ResourceOwnershipKind.BffValidated));
+    }
+
+    [Theory]
+    [InlineData(ResourceOwnershipKind.NotDeclared, "IAMService", "id")]
+    [InlineData(ResourceOwnershipKind.GlobalPermission, "IAMService", "id")]
+    [InlineData(ResourceOwnershipKind.BffValidated, "", "id")]
+    [InlineData(ResourceOwnershipKind.BffValidated, "IAMService", " ")]
+    [InlineData((ResourceOwnershipKind)99, "IAMService", "id")]
+    public void ResourceOwnershipAttribute_RejectsInvalidObjectBinding(
+        ResourceOwnershipKind kind,
+        string authority,
+        string resourceParameter)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ResourceOwnershipAttribute(kind, authority, resourceParameter));
+    }
+
+    [Theory]
+    [InlineData(ResourceOwnershipKind.NotDeclared, "unexpected", null)]
+    [InlineData(ResourceOwnershipKind.GlobalPermission, null, "unexpected")]
+    [InlineData(ResourceOwnershipKind.BffValidated, null, "id")]
+    [InlineData(ResourceOwnershipKind.DownstreamValidated, "UploadService", "")]
+    [InlineData((ResourceOwnershipKind)99, null, null)]
+    public void ResourceOwnershipManifest_RejectsInvalidDisposition(
+        ResourceOwnershipKind kind,
+        string? authority,
+        string? resourceParameter)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ResourceOwnershipManifest(kind, authority, resourceParameter));
+    }
 
     [Fact]
     public void Build_CoversEveryControllerAndHubSurfaceWithExplicitAuthorizationMetadata()

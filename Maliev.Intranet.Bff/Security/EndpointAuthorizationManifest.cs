@@ -12,37 +12,102 @@ namespace Maliev.Intranet.Bff.Security;
 public enum ResourceOwnershipKind
 {
     /// <summary>The endpoint has not yet declared a resource rule.</summary>
-    NotDeclared,
-    /// <summary>A global permission is the complete access rule; no object lookup applies.</summary>
-    GlobalPermission,
+    NotDeclared = 0,
     /// <summary>The BFF validates access before completing the operation.</summary>
-    BffValidated,
+    BffValidated = 1,
     /// <summary>An authoritative downstream service validates access.</summary>
-    DownstreamValidated,
+    DownstreamValidated = 2,
     /// <summary>A signed, resource-bound capability validates access.</summary>
-    SignedCapability
+    SignedCapability = 3,
+    /// <summary>A global permission is the complete access rule; no object lookup applies.</summary>
+    GlobalPermission = 4
 }
 
 /// <summary>Describes a resource-ownership assertion applied by an endpoint or hub method.</summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
-public sealed class ResourceOwnershipAttribute(
-    ResourceOwnershipKind kind,
-    string? authority = null,
-    string? resourceParameter = null) : Attribute
+public sealed class ResourceOwnershipAttribute : Attribute
 {
+    /// <summary>Declares a global-permission surface with no object binding.</summary>
+    public ResourceOwnershipAttribute(ResourceOwnershipKind kind)
+    {
+        ResourceOwnershipRules.Validate(kind, null, null, allowNotDeclared: false);
+        Kind = kind;
+    }
+
+    /// <summary>Declares an object-bound authorization surface.</summary>
+    public ResourceOwnershipAttribute(
+        ResourceOwnershipKind kind,
+        string authority,
+        string resourceParameter)
+    {
+        ResourceOwnershipRules.Validate(kind, authority, resourceParameter, allowNotDeclared: false);
+        Kind = kind;
+        Authority = authority;
+        ResourceParameter = resourceParameter;
+    }
+
     /// <summary>The ownership enforcement category.</summary>
-    public ResourceOwnershipKind Kind { get; } = kind;
+    public ResourceOwnershipKind Kind { get; }
     /// <summary>The BFF component or downstream service that makes the decision.</summary>
-    public string? Authority { get; } = authority;
+    public string? Authority { get; }
     /// <summary>The request parameter used only as a resource locator.</summary>
-    public string? ResourceParameter { get; } = resourceParameter;
+    public string? ResourceParameter { get; }
 }
 
 /// <summary>Machine-readable resource authorization metadata.</summary>
-public sealed record ResourceOwnershipManifest(
-    ResourceOwnershipKind Kind,
-    string? Authority,
-    string? ResourceParameter);
+public sealed record ResourceOwnershipManifest
+{
+    /// <summary>Creates validated ownership metadata.</summary>
+    public ResourceOwnershipManifest(
+        ResourceOwnershipKind kind,
+        string? authority,
+        string? resourceParameter)
+    {
+        ResourceOwnershipRules.Validate(kind, authority, resourceParameter, allowNotDeclared: true);
+        Kind = kind;
+        Authority = authority;
+        ResourceParameter = resourceParameter;
+    }
+
+    /// <summary>The ownership enforcement category.</summary>
+    public ResourceOwnershipKind Kind { get; }
+    /// <summary>The component making an object-bound decision, when applicable.</summary>
+    public string? Authority { get; }
+    /// <summary>The request value locating an object-bound resource, when applicable.</summary>
+    public string? ResourceParameter { get; }
+}
+
+internal static class ResourceOwnershipRules
+{
+    internal static void Validate(
+        ResourceOwnershipKind kind,
+        string? authority,
+        string? resourceParameter,
+        bool allowNotDeclared)
+    {
+        switch (kind)
+        {
+            case ResourceOwnershipKind.NotDeclared
+                when allowNotDeclared && authority is null && resourceParameter is null:
+            case ResourceOwnershipKind.GlobalPermission
+                when authority is null && resourceParameter is null:
+                return;
+            case ResourceOwnershipKind.BffValidated:
+            case ResourceOwnershipKind.DownstreamValidated:
+            case ResourceOwnershipKind.SignedCapability:
+                if (!string.IsNullOrWhiteSpace(authority) && !string.IsNullOrWhiteSpace(resourceParameter))
+                {
+                    return;
+                }
+
+                break;
+        }
+
+        throw new ArgumentException(
+            $"Invalid ownership metadata for {kind}: object-bound kinds require authority and resource locator; only global permissions omit both.",
+            nameof(kind));
+    }
+}
 
 /// <summary>Machine-readable permission policy metadata for one endpoint requirement.</summary>
 public sealed record PermissionAuthorizationManifest(
