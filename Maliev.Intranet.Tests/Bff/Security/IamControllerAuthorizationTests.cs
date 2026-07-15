@@ -358,12 +358,13 @@ public sealed class IamConsoleAuthorizationFactory : SignalRTestFactory
 
         if (request.Method == HttpMethod.Post && path.EndsWith("/roles", StringComparison.Ordinal))
         {
+            var principalId = Guid.Parse(path.Split('/')[4]);
             return JsonResponse(
                 HttpStatusCode.OK,
                 $$"""
                 {
                   "bindingId": "4d6905e4-adf0-4c0b-966f-ea51df8cbd41",
-                  "principalId": "a1f0d442-d541-42e8-8fcc-8e513ecb8fc3",
+                  "principalId": "{{principalId:D}}",
                   "roleId": "roles.iam.viewer",
                   "resourcePath": null,
                   "grantedAt": "2026-07-15T00:00:01Z",
