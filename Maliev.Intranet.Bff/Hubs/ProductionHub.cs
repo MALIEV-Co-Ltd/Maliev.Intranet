@@ -1,4 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.Intranet.Bff.Security;
 using Maliev.Intranet.Shared;
 using Microsoft.AspNetCore.SignalR;
 
@@ -9,7 +10,8 @@ namespace Maliev.Intranet.Bff.Hubs;
 /// Clients subscribe to this hub to receive live job status changes and stats refreshes
 /// without polling the BFF API.
 /// </summary>
-[RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies")]
+[RequirePermission(MalievPermissions.Job.Read, AuthenticationSchemes = "Bearer,Cookies", RequireLiveCheck = true)]
+[ResourceOwnership(ResourceOwnershipKind.GlobalPermission)]
 public class ProductionHub : Hub
 {
 }
