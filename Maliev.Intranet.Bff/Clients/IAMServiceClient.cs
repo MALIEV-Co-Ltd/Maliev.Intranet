@@ -266,8 +266,10 @@ public class IAMServiceClient(HttpClient httpClient)
                 request,
                 ct);
             response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
+            var binding = await response.Content.ReadFromJsonAsync<RoleBindingDto>(cancellationToken: ct)
                 ?? throw new JsonException("IAM returned a null role-binding payload.");
+            ValidateRoleBindingContract(binding, principalId, request.RoleId);
+            return binding;
         }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
@@ -281,6 +283,21 @@ public class IAMServiceClient(HttpClient httpClient)
 
     private static HttpRequestException CreateBindingUnavailableException(string message, Exception innerException) =>
         new(message, innerException, System.Net.HttpStatusCode.ServiceUnavailable);
+
+    private static void ValidateRoleBindingContract(
+        RoleBindingDto binding,
+        Guid requestedPrincipalId,
+        string requestedRoleId)
+    {
+        if (binding.BindingId == Guid.Empty ||
+            binding.PrincipalId != requestedPrincipalId ||
+            string.IsNullOrWhiteSpace(binding.RoleId) ||
+            !string.Equals(binding.RoleId, requestedRoleId, StringComparison.Ordinal) ||
+            binding.GrantedAt == default)
+        {
+            throw new JsonException("IAM returned a role-binding payload that does not match the requested contract.");
+        }
+    }
 
     /// <summary>
     /// Revokes a role from a principal.

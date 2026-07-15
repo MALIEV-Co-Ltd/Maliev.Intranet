@@ -252,6 +252,84 @@ public class IamControllerBindingTests
             controller.InviteUser(CreateInviteRequest(), cancellation.Token));
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""
+        {
+          "bindingId": "8cc18a23-8476-4dbb-82c1-11998075c8f5",
+          "principalId": "11111111-1111-1111-1111-111111111111",
+          "roleId": "roles.iam.viewer",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    [InlineData("""
+        {
+          "bindingId": "8cc18a23-8476-4dbb-82c1-11998075c8f5",
+          "principalId": "e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4",
+          "roleId": "roles.iam.admin",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    public async Task GrantRole_ContractInvalidIamSuccessBody_ReturnsServiceUnavailable(string body)
+    {
+        var principalId = Guid.Parse("e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4");
+        var iamClient = CreateRawIamClient((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        }));
+        var controller = CreateController(iamClient);
+
+        var result = await controller.GrantRole(
+            principalId,
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" },
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""
+        {
+          "bindingId": "63c90380-62ed-4d2a-aa4a-591bb86d2625",
+          "principalId": "11111111-1111-1111-1111-111111111111",
+          "roleId": "roles.iam.viewer",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    [InlineData("""
+        {
+          "bindingId": "63c90380-62ed-4d2a-aa4a-591bb86d2625",
+          "principalId": "a1f0d442-d541-42e8-8fcc-8e513ecb8fc3",
+          "roleId": "roles.iam.admin",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    public async Task InviteUser_ContractInvalidIamSuccessBody_ReturnsServiceUnavailable(string body)
+    {
+        var principalId = Guid.Parse("a1f0d442-d541-42e8-8fcc-8e513ecb8fc3");
+        var iamClient = CreateRawIamClient((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/iam/v1/principals")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = JsonContent.Create(new { principalId, createdAt = DateTime.UtcNow })
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+        var controller = CreateController(iamClient, authorizeBinding: true);
+
+        var result = await controller.InviteUser(CreateInviteRequest(), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
     private static Mock<IAMServiceClient> CreateIamClient() =>
         new(new HttpClient { BaseAddress = new Uri("http://iam") });
 

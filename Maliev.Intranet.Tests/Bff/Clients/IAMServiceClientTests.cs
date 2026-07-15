@@ -230,6 +230,40 @@ public class IAMServiceClientTests
         Assert.IsAssignableFrom<OperationCanceledException>(exception.InnerException);
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""
+        {
+          "bindingId": "a8fcb217-83b6-41d7-a838-0a0adb0d7c53",
+          "principalId": "11111111-1111-1111-1111-111111111111",
+          "roleId": "roles.iam.viewer",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    [InlineData("""
+        {
+          "bindingId": "a8fcb217-83b6-41d7-a838-0a0adb0d7c53",
+          "principalId": "e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4",
+          "roleId": "roles.iam.admin",
+          "grantedAt": "2026-07-15T03:00:00Z"
+        }
+        """)]
+    public async Task GrantRoleAsync_ContractInvalidSuccessBody_IsClassifiedAsUnavailable(string body)
+    {
+        var principalId = Guid.Parse("e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4");
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GrantRoleAsync(
+            principalId,
+            new GrantRoleRequestDto { RoleId = "roles.iam.viewer" }));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsType<JsonException>(exception.InnerException);
+    }
+
     [Fact]
     public async Task RevokeRoleAsync_UsesCanonicalBindingRouteWithoutPayload()
     {
