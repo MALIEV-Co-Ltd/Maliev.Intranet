@@ -162,6 +162,33 @@ public class IAMServiceClientTests
     }
 
     [Theory]
+    [InlineData("null")]
+    [InlineData("{not-json")]
+    [InlineData("[{}]")]
+    [InlineData("""
+        [{
+          "bindingId": "769df55b-9279-4242-a253-6080b8c1e3b7",
+          "principalId": "11111111-1111-1111-1111-111111111111",
+          "roleId": "roles.iam.viewer",
+          "grantedAt": "2026-07-15T02:30:00Z"
+        }]
+        """)]
+    public async Task GetPrincipalRolesAsync_InvalidSuccessContract_IsClassifiedAsUnavailable(string body)
+    {
+        var principalId = Guid.Parse("a60dfc27-d3d7-4304-a3aa-9f752e7bd861");
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.GetPrincipalRolesAsync(principalId));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsType<JsonException>(exception.InnerException);
+    }
+
+    [Theory]
     [InlineData(HttpStatusCode.Forbidden)]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.BadRequest)]
@@ -264,6 +291,75 @@ public class IAMServiceClientTests
         Assert.IsType<JsonException>(exception.InnerException);
     }
 
+    [Theory]
+    [InlineData("projects/project-99", "2026-08-15T02:00:00Z")]
+    [InlineData("projects/project-42", "2026-08-15T02:00:00.002Z")]
+    public async Task GrantRoleAsync_MismatchedScopeOrExpiry_IsClassifiedAsUnavailable(
+        string responseResourcePath,
+        string responseExpiresAt)
+    {
+        var principalId = Guid.Parse("e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4");
+        var requestedExpiry = new DateTime(2026, 8, 15, 2, 0, 0, DateTimeKind.Utc);
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            new StringContent(
+                $$"""
+                {
+                  "bindingId": "fa638c28-af72-41ef-87df-d886950b3c53",
+                  "principalId": "{{principalId:D}}",
+                  "roleId": "roles.platform.viewer",
+                  "resourcePath": "{{responseResourcePath}}",
+                  "grantedAt": "2026-07-15T02:00:00Z",
+                  "expiresAt": "{{responseExpiresAt}}"
+                }
+                """,
+                System.Text.Encoding.UTF8,
+                "application/json"));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GrantRoleAsync(
+            principalId,
+            new GrantRoleRequestDto
+            {
+                RoleId = "roles.platform.viewer",
+                ResourcePath = "projects/project-42",
+                ExpiresAt = requestedExpiry
+            }));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsType<JsonException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task GrantRoleAsync_PostgreSqlPrecisionExpiryDifference_IsAccepted()
+    {
+        var principalId = Guid.Parse("e7d25f00-c7e5-4e2a-9fa9-f9b02fb3d6c4");
+        var requestedExpiry = new DateTime(2026, 8, 15, 2, 0, 0, DateTimeKind.Utc).AddTicks(9);
+        var handler = new RecordingHttpMessageHandler(
+            HttpStatusCode.OK,
+            JsonContent.Create(new
+            {
+                bindingId = Guid.Parse("fa638c28-af72-41ef-87df-d886950b3c53"),
+                principalId,
+                roleId = "roles.platform.viewer",
+                resourcePath = "projects/project-42",
+                grantedAt = new DateTime(2026, 7, 15, 2, 0, 0, DateTimeKind.Utc),
+                expiresAt = requestedExpiry.AddTicks(-9)
+            }));
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var binding = await client.GrantRoleAsync(
+            principalId,
+            new GrantRoleRequestDto
+            {
+                RoleId = "roles.platform.viewer",
+                ResourcePath = "projects/project-42",
+                ExpiresAt = requestedExpiry
+            });
+
+        Assert.Equal(requestedExpiry.AddTicks(-9), binding.ExpiresAt);
+    }
+
     [Fact]
     public async Task RevokeRoleAsync_UsesCanonicalBindingRouteWithoutPayload()
     {
@@ -296,6 +392,36 @@ public class IAMServiceClientTests
             Guid.NewGuid()));
 
         Assert.Equal(statusCode, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task RevokeRoleAsync_DownstreamTimeout_IsClassifiedAsUnavailable()
+    {
+        var handler = new NonCallerCancellationHttpMessageHandler();
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.RevokeRoleAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.IsAssignableFrom<OperationCanceledException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task RevokeRoleAsync_CallerCancellation_Propagates()
+    {
+        var handler = new CancellationObservingHttpMessageHandler();
+        var client = new IAMServiceClient(new HttpClient(handler) { BaseAddress = new Uri("http://iam") });
+        using var cancellation = new CancellationTokenSource();
+
+        var pending = client.RevokeRoleAsync(Guid.NewGuid(), Guid.NewGuid(), cancellation.Token);
+        await handler.RequestStarted;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.True(handler.CancellationObserved);
     }
 
     [Fact]

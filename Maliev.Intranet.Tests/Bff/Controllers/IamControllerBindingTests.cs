@@ -94,6 +94,23 @@ public class IamControllerBindingTests
     }
 
     [Theory]
+    [InlineData("null")]
+    [InlineData("{not-json")]
+    [InlineData("[{}]")]
+    public async Task GetUserRoles_InvalidIamSuccessContract_ReturnsServiceUnavailable(string body)
+    {
+        var iamClient = CreateRawIamClient((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+        }));
+        var controller = CreateController(iamClient);
+
+        var result = await controller.GetUserRoles(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Theory]
     [InlineData(HttpStatusCode.Forbidden, StatusCodes.Status403Forbidden)]
     [InlineData(HttpStatusCode.NotFound, StatusCodes.Status404NotFound)]
     [InlineData(HttpStatusCode.Conflict, StatusCodes.Status409Conflict)]
@@ -111,6 +128,33 @@ public class IamControllerBindingTests
         var result = await controller.RevokeRole(principalId, bindingId, CancellationToken.None);
 
         Assert.Equal(expectedStatus, GetStatusCode(result));
+    }
+
+    [Fact]
+    public async Task RevokeRole_NonCallerCancellation_ReturnsServiceUnavailable()
+    {
+        var iamClient = CreateRawIamClient((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("IAM revoke timed out.")));
+        var controller = CreateController(iamClient);
+
+        var result = await controller.RevokeRole(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, GetStatusCode(result));
+    }
+
+    [Fact]
+    public async Task RevokeRole_CallerCancellationStillPropagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var iamClient = CreateRawIamClient((_, _) =>
+        {
+            cancellation.Cancel();
+            return Task.FromException<HttpResponseMessage>(new OperationCanceledException(cancellation.Token));
+        });
+        var controller = CreateController(iamClient);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            controller.RevokeRole(Guid.NewGuid(), Guid.NewGuid(), cancellation.Token));
     }
 
     [Fact]
